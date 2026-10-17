@@ -11,3 +11,5 @@ programs
 .wrangler
 evidence
 .data
+video/node_modules
+video/out
