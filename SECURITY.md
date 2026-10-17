@@ -19,4 +19,4 @@ Report privately through [GitHub security advisories](https://github.com/Mileriu
   - a memo with the order id
 - **Bond and verification fee:** a system transfer to the treasury vault, with a memo.
 
-Every transaction is simulated on devnet before your wallet is asked to sign it.
+Buy, bond and verification-fee transactions are simulated on devnet before your wallet is asked to sign them. So is the dispute transaction you can re-request from your purchases page. The first dispute transaction is returned when your dispute is recorded and is not simulated by us; your wallet still simulates it. If the RPC is unreachable we skip our simulation, and the wallet's own check still applies.

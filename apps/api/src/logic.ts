@@ -967,15 +967,14 @@ export async function disputeTx(deps: Deps, orderId: string, userId: string) {
   if (account?.status === 'disputed') return { onChain: true, txBase64: null };
   const buyer = await userById(deps.sql, userId);
   const latest = await deps.blockhash();
-  return {
-    onChain: false,
-    txBase64: openDisputeTx({
-      programId,
-      buyer: buyer.wallet as string,
-      escrow: order.escrow_address as string,
-      recentBlockhash: latest.blockhash,
-    }),
-  };
+  const txBase64 = openDisputeTx({
+    programId,
+    buyer: buyer.wallet as string,
+    escrow: order.escrow_address as string,
+    recentBlockhash: latest.blockhash,
+  });
+  await preflightTx(deps, txBase64);
+  return { onChain: false, txBase64 };
 }
 
 function needsSandbox(category: string, fileName: string): boolean {
