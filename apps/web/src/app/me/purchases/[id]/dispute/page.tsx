@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button, Panel } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useWallet } from '@/lib/wallet';
 
 const REASONS: [string, string, string][] = [
   ['not_as_described', 'Not as described', 'The listing page promised something this does not do.'],
@@ -19,6 +20,7 @@ const REASONS: [string, string, string][] = [
 
 export default function DisputePage() {
   const params = useParams<{ id: string }>();
+  const wallet = useWallet();
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,14 +31,31 @@ export default function DisputePage() {
     setBusy(true);
     const data = new FormData(event.currentTarget);
     try {
-      const result = await api<{ disputeId: string }>(`/orders/${params.id}/dispute`, {
-        method: 'POST',
-        body: JSON.stringify({
-          reason: String(data.get('reason') ?? 'other'),
-          details: String(data.get('details') ?? ''),
-        }),
-      });
-      setMessage(`Dispute ${result.disputeId} opened. The download stays locked.`);
+      const result = await api<{ disputeId: string; txBase64: string | null }>(
+        `/orders/${params.id}/dispute`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            reason: String(data.get('reason') ?? 'other'),
+            details: String(data.get('details') ?? ''),
+          }),
+        },
+      );
+      if (result.txBase64) {
+        // Freeze the on-chain escrow too, so release cannot run when the window ends.
+        setMessage(`Dispute ${result.disputeId} opened. Approve the escrow freeze in your wallet.`);
+        try {
+          await wallet.signAndSend(result.txBase64);
+        } catch {
+          // Signing can be retried: a fresh transaction comes from /dispute/tx.
+          const retry = await api<{ onChain: boolean; txBase64: string | null }>(
+            `/orders/${params.id}/dispute/tx`,
+            { method: 'POST' },
+          );
+          if (retry.txBase64) await wallet.signAndSend(retry.txBase64);
+        }
+      }
+      setMessage(`Dispute ${result.disputeId} opened. The escrow is frozen and downloads pause.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open the dispute');
     } finally {
@@ -56,8 +75,9 @@ export default function DisputePage() {
         </Link>
         <h1 className="mt-3 text-[28px] font-semibold tracking-[-0.025em]">Open a dispute</h1>
         <p className="mt-2 text-ink-2">
-          Release is paused as soon as you submit, and the download stays locked. If the dispute is
-          upheld you are refunded. If it is rejected, the order returns to payout.
+          You sign one transaction that freezes the on-chain escrow, so release cannot pay the
+          creator. Downloads pause while the dispute is open. If it is upheld the escrow refunds you
+          in full; if it is rejected, the order returns to payout.
         </p>
       </div>
       <fieldset className="m-0 space-y-2 border-0 p-0">

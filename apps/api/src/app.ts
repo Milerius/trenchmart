@@ -48,6 +48,8 @@ import {
 import { fromBase64, sendRaw } from '@trenchmart/chain';
 import { cachedSolUsd, fetchCoinGeckoSolUsd, type PriceCache } from './price';
 import type { Env } from './env';
+import { BlobUnavailableError } from './blob';
+import { EscrowError } from './escrow';
 import {
   activeBond,
   applyPayment,
@@ -65,6 +67,7 @@ import {
   loadConfig,
   markBatchSent,
   openDispute,
+  disputeTx,
   proposePayouts,
   quoteListing,
   releaseOrders,
@@ -123,6 +126,12 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   app.onError((err, c) => {
     if (err instanceof HttpError) {
       return c.json({ error: { code: err.code, message: err.message } }, err.status as 400);
+    }
+    if (err instanceof EscrowError) {
+      return c.json({ error: { code: err.code, message: err.message } }, err.status as 400);
+    }
+    if (err instanceof BlobUnavailableError) {
+      return c.json({ error: { code: 'STORAGE_UNAVAILABLE', message: err.message } }, 503);
     }
     console.error(err);
     return c.json({ error: { code: 'INTERNAL', message: 'Internal error' } }, 500);
@@ -495,8 +504,16 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.post('/orders/:id/download', async (c) => {
     const user = requireUser(c);
     const order = await ownOrder(deps, c.req.param('id'), user.id as string);
-    if (order.status !== 'released') {
-      throw new HttpError(403, 'ESCROW_LOCKED', 'downloads unlock after escrow releases the funds');
+    // Payment confirmed in escrow is enough to download. The funds stay locked until the
+    // escrow window ends, so a buyer can still dispute; a disputed order cannot download.
+    if (order.status !== 'paid' && order.status !== 'released') {
+      throw new HttpError(
+        403,
+        'ESCROW_LOCKED',
+        order.status === 'disputed'
+          ? 'downloads are paused while the dispute is open'
+          : 'downloads unlock once payment is confirmed in escrow',
+      );
     }
     const license =
       await deps.sql`select 1 from licenses where order_id = ${order.id} and wallet = ${user.wallet}`;
@@ -550,14 +567,19 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.post('/orders/:id/dispute', async (c) => {
     const user = requireUser(c);
     const body = await bodyOf(disputeBody, await c.req.json());
-    const id = await openDispute(
+    const opened = await openDispute(
       deps,
       c.req.param('id'),
       user.id as string,
       body.reason,
       body.details,
     );
-    return c.json({ disputeId: id });
+    return c.json({ disputeId: opened.id, txBase64: opened.txBase64 });
+  });
+
+  api.post('/orders/:id/dispute/tx', async (c) => {
+    const user = requireUser(c);
+    return c.json(await disputeTx(deps, c.req.param('id'), user.id as string));
   });
 
   api.post('/listings/:slug/report', async (c) => {
@@ -614,14 +636,13 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (amount < 1_000_000_000n || amount > 5_000_000_000n) {
       throw new HttpError(400, 'BOND_RANGE', 'bond must be between 1 and 5 SOL');
     }
-    const inserted = await deps.sql<{ id: string }[]>`
-      insert into bonds (user_id, amount, tx_sig, status)
-      values (${user.id}, ${amount}, ${'pending-' + crypto.randomUUID()}, 'pending')
-      returning id
-    `;
-    const id = inserted[0]?.id;
-    if (!id) throw new HttpError(500, 'INTERNAL', 'bond insert failed');
+    // Build the transaction first: if the RPC or blockhash fails, no pending row is left behind.
+    const id = crypto.randomUUID();
     const tx = await buildVaultTx(deps, user.wallet as string, amount, bondMemo(id));
+    await deps.sql`
+      insert into bonds (id, user_id, amount, tx_sig, status)
+      values (${id}, ${user.id}, ${amount}, ${'pending-' + id}, 'pending')
+    `;
     return c.json(jsonSafe({ bondId: id, memo: bondMemo(id), amount, ...tx }));
   });
 

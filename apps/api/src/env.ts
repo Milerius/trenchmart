@@ -29,6 +29,15 @@ export type Env = {
   sandboxBudgetMs: number;
   landingStats: 'auto' | 'mock' | 'real';
   solUsdOverride: string;
+  /** trench_escrow program. Empty keeps the legacy vault-transfer checkout (dev only). */
+  /** Optional ClamAV REST shim; see packages/scanner/src/av.ts. */
+  clamavUrl: string;
+  clamavToken: string;
+  escrowProgramId: string;
+  /** Resolver pubkey stored in every escrow; must match the secret when both are set. */
+  escrowResolver: string;
+  /** Resolver secret key (JSON array or base58). Signs release, refund, reject_dispute. */
+  escrowResolverSecret: string;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
 
@@ -85,6 +94,11 @@ export function readEnv(source: Record<string, string | undefined> = process.env
         ? source.LANDING_STATS
         : 'auto',
     solUsdOverride: blank(source.SOL_USD_OVERRIDE),
+    clamavUrl: blank(source.CLAMAV_URL),
+    clamavToken: blank(source.CLAMAV_TOKEN),
+    escrowProgramId: blank(source.ESCROW_PROGRAM_ID),
+    escrowResolver: blank(source.ESCROW_RESOLVER),
+    escrowResolverSecret: blank(source.ESCROW_RESOLVER_SECRET),
     r2:
       accountId && accessKeyId && secretAccessKey
         ? {

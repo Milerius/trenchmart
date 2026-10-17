@@ -480,12 +480,12 @@ test('buyer connects, browses, buys into escrow, releases and downloads', async 
       await page.goto(`${SITE}/me/purchases`);
       await expect(page.getByTestId('dashboard')).toBeVisible();
       await shot(page, 'buyer-07-purchases');
-      // Escrow releases on a timer (escrowHours, 48h by default); there is no buyer-side early
-      // release. A locked button means the order is paid and in escrow.
+      // A paid order downloads at once while the funds stay in escrow until the window ends.
+      // A locked button means the order is disputed.
       const button = page.getByTestId('download-button').first();
       await expect(button).toBeVisible({ timeout: 30_000 });
       if ((await button.getAttribute('data-state')) === 'locked')
-        throw new Error(`SKIP: order in escrow, download ${await button.innerText()}`);
+        throw new Error(`SKIP: download locked: ${await button.innerText()}`);
       const download = page.waitForEvent('download', { timeout: 60_000 });
       await button.click();
       const file = await download;

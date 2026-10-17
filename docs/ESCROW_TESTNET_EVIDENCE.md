@@ -2,6 +2,12 @@
 
 Cluster: devnet. RPC: `https://api.devnet.solana.com`. Mainnet was not used.
 
+> Note (2026-10): `release` now refuses a `Disputed` escrow (it used to allow a permissionless
+> release of a disputed escrow after `escrow_until`). Because the upgrade authority of the
+> program below is not available, the fixed build is deployed under a new id,
+> `Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw`, which the app now uses. The evidence below is
+> for the earlier build.
+
 Program [`7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM`](https://explorer.solana.com/address/7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM?cluster=devnet). Program data account `93cVchc4nRAbWeEk6YWyBBVCS8ULkde6omakJm7HiV1x` holds 0.89690956 SOL. Deployed in slot 511998341.
 
 | Step            | Transaction                                                                                                                                                                                                                          |

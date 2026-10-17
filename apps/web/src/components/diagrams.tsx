@@ -77,7 +77,7 @@ export function PurchaseDiagram() {
       steps={[
         'Buyer opens a live listing',
         `API quotes the fee and opens a pending order for ${protocol.orderTtlMinutes} minutes`,
-        'Buyer signs a SOL transfer into the Squads vault',
+        'Buyer signs one transaction that creates and funds the order escrow',
         `Order is paid and held for ${protocol.escrowHours} hours`,
         'Release pays the seller, or a dispute can refund the buyer',
       ]}

@@ -57,7 +57,29 @@ Tests: zero price, OG (total == price), rounding never makes `sum(split) != netF
 
 Build the tx server-side with `@solana/web3.js` (or `@solana/kit`), return base64; client deserializes and calls `wallet.sendTransaction`. Price snapshot is locked into the order; price edits don't affect pending orders.
 
-## Escrow vault (POC)
+## Order escrow (trench_escrow program)
+
+With `ESCROW_PROGRAM_ID` set, `POST /orders` returns one transaction for the buyer to sign:
+`initialize` (creates the PDA `["escrow", order uuid bytes]` with seller, resolver, the four
+bucket wallets, price, fee and rebate bps, split bps, `expires_at` and `escrow_until =
+expires_at + escrow_hours`), `fund` (moves the quoted total into the PDA) and a `tm:<id8>` memo.
+`/orders/:id/submitted` marks the order paid only when the tx succeeded with that memo and the
+account is owned by the program, is `Paid`, holds the full total and carries exactly those
+terms. The buyer can download at once; the funds stay in the PDA.
+
+The API holds the resolver key (`ESCROW_RESOLVER_SECRET`, Worker secret). The cron sends
+`release` after `escrow_until` (the program pays the seller and the buckets directly, so payout
+rows are recorded `sent` with the release signature). A dispute inside the window returns an
+`open_dispute` tx the buyer signs, which freezes the escrow: the program refuses `release` from
+`Disputed`. Resolution sends `refund` (upheld) or `reject_dispute` (rejected). An upheld
+dispute whose `open_dispute` never reached the chain answers 409 `DISPUTE_NOT_ONCHAIN`.
+
+Operational notes: each bucket wallet must hold the rent-exempt minimum (≈ 0.00089 SOL) or a
+small fee split makes `release` fail; the resolver pays release, refund and reject fees; the
+escrow account keeps its rent (≈ 0.0027 SOL, paid by the buyer) because the program has no close
+instruction. Bonds and verification fees still go to the vault below.
+
+## Escrow vault (bonds and verification fees)
 
 - `VAULT_ADDRESS` = a Squads multisig vault PDA. The API **never** holds a key that can move vault funds.
 - The `ledger` table tracks what portion of the vault belongs to whom. Invariant (checked hourly, alert on mismatch): `on-chain vault balance ≥ sum(ledger where account='vault')`.

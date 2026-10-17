@@ -270,6 +270,32 @@ await expectFail(
   'IllegalTransition',
 );
 
+// Release is permissionless after the window, so a Disputed escrow must never release:
+// only the resolver can move it (refund or reject_dispute).
+const frozenGroup = parties();
+const frozenUntil = Math.floor(Date.now() / 1000) + 6;
+const frozenEscrow = await initialize(orderId(), frozenGroup, future, frozenUntil);
+await program.methods
+  .fund()
+  .accounts({
+    buyer: provider.wallet.publicKey,
+    escrow: frozenEscrow,
+    systemProgram: SystemProgram.programId,
+  })
+  .rpc();
+await program.methods
+  .openDispute()
+  .accounts({ buyer: provider.wallet.publicKey, escrow: frozenEscrow })
+  .rpc();
+while (Math.floor(Date.now() / 1000) <= frozenUntil + 2) {
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+}
+await expectFail(
+  () => program.methods.release().accounts(releaseAccounts(frozenEscrow, frozenGroup)).rpc(),
+  'IllegalTransition',
+);
+assert.equal(statusName((await program.account.escrow.fetch(frozenEscrow)).status), 'disputed');
+
 const stranger = Keypair.generate();
 await expectFail(
   () =>

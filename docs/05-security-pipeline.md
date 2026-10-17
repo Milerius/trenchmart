@@ -27,22 +27,22 @@ Pure function: `scan(file: {name, bytes}, category) → { engineVer, checks: Che
 
 ### Rules for `userscript` / JS in `alerts`
 
-| rule_id                      | Result    | Triggers                                                                                                                                                                                                                                             |
-| ---------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `header-valid`               | fail      | Missing/invalid `==UserScript==` block, no `@match`/`@include`                                                                                                                                                                                       |
-| `match-scope`                | warn      | `@match *://*/*`, `<all_urls>`, or `@include *`                                                                                                                                                                                                      |
-| `no-eval`                    | fail      | `eval(`, `new Function(`, `setTimeout/setInterval` with string arg, `import()` of non-literal                                                                                                                                                        |
-| `no-remote-code`             | fail      | `@require` from hosts outside allowlist (`cdn.jsdelivr.net`, `cdnjs.cloudflare.com`, `unpkg.com`) or without SRI hash; `<script src>` injection; `document.createElement('script')` with dynamic src                                                 |
-| `no-obfuscation`             | fail      | Heuristics: string-array rotator pattern, > 30% of identifiers matching `_0x[0-9a-f]+`, entropy of string literals > 5.5 bits/char over > 2 KB, single line > 5000 chars, `atob`+`eval`/Function chains                                              |
-| `no-sign-transaction`        | fail      | Member access or call of `signTransaction`, `signAllTransactions`, `signAndSendTransaction`, `sendTransaction`, `signMessage`; access to `window.solana`, `window.phantom`, `window.backpack`, `window.solflare`, `window.ethereum`                  |
-| `no-key-access`              | fail      | Strings or regex matching base58 64-byte secret-key pattern, `"privateKey"`, `"secretKey"`, `"mnemonic"`, `"seed"` used as property; reading `localStorage`/`sessionStorage`/`indexedDB` keys containing `key`, `wallet`, `seed`, `phrase`, `secret` |
-| `no-clipboard-read`          | fail      | `navigator.clipboard.readText`/`read`                                                                                                                                                                                                                |
-| `no-clipboard-write-address` | warn      | `clipboard.writeText` (address-swap attacks) — reviewer must check                                                                                                                                                                                   |
-| `network-declared`           | warn      | `fetch`, `XMLHttpRequest`, `GM_xmlhttpRequest`, `GM.xmlHttpRequest`, `WebSocket`, `navigator.sendBeacon`, `new Image().src=` to a host not in `@connect`, or dynamic URL                                                                             |
-| `network-allowlist`          | warn      | Any outbound host at all (lists hosts for the report)                                                                                                                                                                                                |
-| `no-dom-wallet-tamper`       | warn      | Selectors/text replacement targeting address fields, "Confirm", "Approve", wallet popups                                                                                                                                                             |
-| `grant-minimal`              | warn      | `@grant` includes `GM_cookie`, `GM_download`, `unsafeWindow` without need                                                                                                                                                                            |
-| `deps`                       | pass/warn | Lists `@require`s with SRI; warn if any                                                                                                                                                                                                              |
+| rule_id                      | Result    | Triggers                                                                                                                                                                                                                                                                       |
+| ---------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `header-valid`               | fail      | Missing/invalid `==UserScript==` block, no `@match`/`@include`                                                                                                                                                                                                                 |
+| `match-scope`                | warn      | `@match *://*/*`, `<all_urls>`, or `@include *`                                                                                                                                                                                                                                |
+| `no-eval`                    | fail      | `eval(`, `new Function(`, `setTimeout/setInterval` with string arg, `import()` of non-literal                                                                                                                                                                                  |
+| `no-remote-code`             | fail      | `@require` from hosts outside allowlist (`cdn.jsdelivr.net`, `cdnjs.cloudflare.com`, `unpkg.com`) or without SRI hash; `<script src>` injection; `document.createElement('script')` with dynamic src                                                                           |
+| `no-obfuscation`             | fail      | Heuristics: string-array rotator (`X.push(X.shift())` on one array, with a ≥ 10 string array or `while (!![])`), > 30% of identifiers matching `_0x[0-9a-f]+`, entropy of string literals > 5.5 bits/char over > 2 KB, single line > 5000 chars, `atob`+`eval`/Function chains |
+| `no-sign-transaction`        | fail      | Member access or call of `signTransaction`, `signAllTransactions`, `signAndSendTransaction`, `sendTransaction`, `signMessage`; access to `window.solana`, `window.phantom`, `window.backpack`, `window.solflare`, `window.ethereum`                                            |
+| `no-key-access`              | fail      | Strings or regex matching base58 64-byte secret-key pattern, `"privateKey"`, `"secretKey"`, `"mnemonic"`, `"seed"` used as property; reading `localStorage`/`sessionStorage`/`indexedDB` keys containing `key`, `wallet`, `seed`, `phrase`, `secret`                           |
+| `no-clipboard-read`          | fail      | `navigator.clipboard.readText`/`read`                                                                                                                                                                                                                                          |
+| `no-clipboard-write-address` | warn      | `clipboard.writeText` (address-swap attacks) — reviewer must check                                                                                                                                                                                                             |
+| `network-declared`           | warn      | `fetch`, `XMLHttpRequest`, `GM_xmlhttpRequest`, `GM.xmlHttpRequest`, `WebSocket`, `navigator.sendBeacon`, `new Image().src=` to a host not in `@connect`, or dynamic URL                                                                                                       |
+| `network-allowlist`          | warn      | Any outbound host at all (lists hosts for the report)                                                                                                                                                                                                                          |
+| `no-dom-wallet-tamper`       | warn      | Selectors/text replacement targeting address fields, "Confirm", "Approve", wallet popups                                                                                                                                                                                       |
+| `grant-minimal`              | warn      | `@grant` includes `GM_cookie`, `GM_download`, `unsafeWindow` without need                                                                                                                                                                                                      |
+| `deps`                       | pass/warn | Lists `@require`s with SRI; warn if any                                                                                                                                                                                                                                        |
 
 ### Rules for data files
 
@@ -56,7 +56,37 @@ Pure function: `scan(file: {name, bytes}, category) → { engineVer, checks: Che
 
 `summary` = worst of results (`fail > warn > pass`). Store every check as a `scan_checks` row with locations (line/col/snippet ≤ 200 chars). Bump `engineVer` whenever rules change; re-scan live versions in the background and flag regressions to admins.
 
-## 3 · Sandbox run (`apps/sandbox`, VPS)
+### Antivirus (`av-signatures`, every file and every zip entry)
+
+`packages/scanner/src/av.ts` runs inside the Worker. It fails a file on an exact SHA-256 match
+(EICAR plus any hashes passed as `blockedSha256`), on native executables (PE, ELF, Mach-O
+magic), on the EICAR string, and on string signatures of known crypto-targeting families
+(Inferno/Angel/Pink/Monkey/Venom/MS drainer kits, CLINKSINK, CoinHive, CryptoLoot,
+WebMinePool, `stratum+tcp://`, CryptoNight wasm). It warns on common exfiltration channels
+(Telegram bot API, Discord webhooks), since legit alert tools use them too. When `CLAMAV_URL`
+is configured the uploaded file is also posted to a ClamAV REST shim; an unreachable or
+malformed answer is a `warn`, never a pass.
+
+Limits, stated plainly: this is a small curated signature set, not a full antivirus. It has no
+heuristics engine, no unpacking and no emulation, so a novel, repacked or lightly modified
+sample will not match. The static rules, the sandbox and the AI review remain the main
+defence for scripts; this pass catches known-bad payloads cheaply and early.
+
+## 3 · Sandbox run (QuickJS-wasm, inline in the Worker)
+
+The Worker runs each userscript in a QuickJS engine compiled to wasm
+(`packages/scanner/src/isolate.ts`), with a 128 MB memory limit, a 15 s wall budget, an
+interrupt handler and a 60 s virtual clock that fires timers, rAF and DOMContentLoaded. The
+script sees a browser-like page (DOM element factory, `location` from `@match`, storage,
+`structuredClone`, `URL`, `TextEncoder`, GM APIs, observers, wallet providers). Nothing leaves
+the isolate: `fetch`, XHR, WebSocket, beacons, script and image `src` are recorded by host and
+fail closed. Verdicts: wallet signing calls or provider overwrites, a timeout or OOM fail; script
+errors, network attempts or clipboard use warn (the AI then asks the creator to explain); a
+clean run passes. A script that throws never passes (`sandbox-runtime`). If the engine itself
+cannot start, or an external runner answers non-2xx, the version goes to `needs_creator` with
+`resume_step = 'sandbox'` and no verdict: the creator retries the review.
+
+### Legacy external runner (`apps/sandbox`, VPS)
 
 Only for `userscript` and JS `alerts`. Loop: poll `GET /internal/sandbox/next` every 10s.
 

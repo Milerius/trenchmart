@@ -137,7 +137,7 @@ test('connected Trencher sees 60% off the fee and the AI verification split', as
   await expect(page.getByTestId('buy')).toHaveText('Pay into escrow');
 });
 
-test('downloads stay locked until escrow releases', async ({ page }) => {
+test('downloads open once paid in escrow and lock during a dispute', async ({ page }) => {
   const now = Date.now();
   const order = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
     id,
@@ -169,9 +169,10 @@ test('downloads stay locked until escrow releases', async ({ page }) => {
   await page.goto('/me/purchases');
   const buttons = page.getByTestId('download-button');
   await expect(buttons).toHaveCount(3);
-  await expect(buttons.nth(0)).toHaveAttribute('data-state', 'locked');
-  await expect(buttons.nth(0)).toBeDisabled();
-  await expect(buttons.nth(0)).toContainText('Unlocks in 41h');
+  await expect(buttons.nth(0)).toHaveAttribute('data-state', 'ready');
+  await expect(buttons.nth(0)).toBeEnabled();
+  await expect(buttons.nth(1)).toHaveAttribute('data-state', 'locked');
+  await expect(buttons.nth(1)).toBeDisabled();
   await expect(buttons.nth(1)).toContainText('Locked during dispute');
   await expect(buttons.nth(2)).toHaveAttribute('data-state', 'ready');
   await expect(buttons.nth(2)).toBeEnabled();

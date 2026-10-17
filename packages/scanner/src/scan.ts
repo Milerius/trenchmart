@@ -1,3 +1,4 @@
+import { signatureScan, type ClamAvClient } from './av';
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 import bs58 from 'bs58';
@@ -5,7 +6,7 @@ import { unzipSync } from 'fflate';
 import { arrayBufferOf, filterPresetSchema } from '@trenchmart/shared';
 import { listZip, unsafeZipPath, unixModeIsSymlink, type ZipEntryMeta } from './zip';
 
-export const ENGINE_VER = 'scanner@1.0.0';
+export const ENGINE_VER = 'scanner@1.1.0';
 
 export type CheckResult = 'pass' | 'warn' | 'fail' | 'na';
 
@@ -42,6 +43,10 @@ export type ScanOptions = {
   maxWalletRows?: number;
   maxZipEntries?: number;
   maxUncompressed?: number;
+  /** Extra SHA-256 hashes to reject outright. */
+  blockedSha256?: string[];
+  /** Optional remote antivirus (ClamAV). Runs on the uploaded file, not on zip entries. */
+  antivirus?: ClamAvClient;
 };
 
 const DEFAULT_ALLOW = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'unpkg.com'];
@@ -82,11 +87,35 @@ type AstNode = acorn.Node & {
   right?: AstNode;
   init?: AstNode;
   elements?: Array<AstNode | null>;
+  operator?: string;
+  argument?: AstNode;
   loc?: { start: { line: number; column: number } };
 };
 
 function emptyDeclared(): Declared {
   return { match: [], include: [], grant: [], connect: [], require: [] };
+}
+
+function memberName(node: AstNode | undefined): string | null {
+  if (node?.type !== 'MemberExpression') return null;
+  const prop = node.property;
+  if (!node.computed) return prop?.name ?? null;
+  return typeof prop?.value === 'string' ? prop.value : null;
+}
+
+/** True for `X.push(X.shift())` with the same plain identifier as both receivers. */
+function isRotation(call: AstNode): boolean {
+  const callee = call.callee;
+  if (memberName(callee) !== 'push' || call.arguments?.length !== 1) return false;
+  const inner = call.arguments[0];
+  if (inner?.type !== 'CallExpression' || memberName(inner.callee) !== 'shift') return false;
+  const outerObj = callee?.object;
+  const innerObj = inner.callee?.object;
+  return (
+    outerObj?.type === 'Identifier' &&
+    innerObj?.type === 'Identifier' &&
+    outerObj.name === innerObj.name
+  );
 }
 
 function check(
@@ -250,6 +279,11 @@ function scanJs(
   const domHits: ScanLocation[] = [];
   const identTotal = { n: 0, obf: 0 };
   const stringLiterals: string[] = [];
+  // obfuscator.io style string-array rotation: the same array is rotated in place with
+  // X.push(X.shift()) (or X['push'](X['shift']())) until a checksum matches.
+  const rotatorHits: ScanLocation[] = [];
+  let largestStringArray = 0;
+  let truthyArrayLoop = false;
 
   const locNode = (node: AstNode): ScanLocation => {
     const line = node.loc?.start.line ?? 1;
@@ -267,9 +301,29 @@ function scanJs(
         const n = node as AstNode;
         if (typeof n.value === 'string') stringLiterals.push(n.value);
       },
+      ArrayExpression(node) {
+        const elements = ((node as AstNode).elements ?? []) as (AstNode | null)[];
+        const strings = elements.filter(
+          (item) => item?.type === 'Literal' && typeof item.value === 'string',
+        ).length;
+        if (elements.length > 0 && strings / elements.length >= 0.9)
+          largestStringArray = Math.max(largestStringArray, strings);
+      },
+      UnaryExpression(node) {
+        // `!![]` is the obfuscator.io spelling of `true` in `while (!![])`.
+        const n = node as AstNode;
+        if (
+          n.operator === '!' &&
+          n.argument?.type === 'UnaryExpression' &&
+          n.argument.operator === '!' &&
+          n.argument.argument?.type === 'ArrayExpression'
+        )
+          truthyArrayLoop = true;
+      },
       CallExpression(node) {
         const n = node as AstNode;
         const callee = n.callee;
+        if (isRotation(n)) rotatorHits.push(locNode(n));
         const fn = nameOf(callee);
         if (fn === 'eval') evalHits.push(locNode(n));
         if (
@@ -453,7 +507,7 @@ function scanJs(
     obfReasons.push('string literal entropy is above 5.5 bits/char');
   if (/atob\s*\(/.test(text) && /eval\s*\(|Function\s*\(/.test(text))
     obfReasons.push('atob combined with eval or Function');
-  if (/\.shift\(\)/.test(text) && /\.push\(/.test(text) && stringLiterals.length > 20)
+  if (rotatorHits.length > 0 && (largestStringArray >= 10 || truthyArrayLoop))
     obfReasons.push('string-array rotator pattern');
   checks.push(
     obfReasons.length
@@ -785,7 +839,40 @@ function extCategory(name: string, fallback: string): string {
   return fallback;
 }
 
+async function avCheck(
+  file: { name: string; bytes: Uint8Array },
+  opts: ScanOptions,
+): Promise<ScanCheck> {
+  const findings = await signatureScan(file.bytes, opts.blockedSha256 ?? []);
+  const remote = opts.antivirus ? await opts.antivirus(file) : null;
+  const failed = findings.filter((f) => f.severity === 'fail').map((f) => f.signature);
+  if (remote?.status === 'infected') failed.push(`ClamAV: ${remote.signature ?? 'unknown'}`);
+  const warned = findings.filter((f) => f.severity === 'warn').map((f) => f.signature);
+  if (remote?.status === 'error') warned.push(remote.detail ?? 'ClamAV service error');
+  const engines = remote ? 'signature scan and ClamAV' : 'signature scan';
+  if (failed.length)
+    return check(
+      'av-signatures',
+      'fail',
+      'Antivirus',
+      `Known malware signature: ${failed.join(', ')}.`,
+    );
+  if (warned.length)
+    return check('av-signatures', 'warn', 'Antivirus', `Needs review: ${warned.join(', ')}.`);
+  return check('av-signatures', 'pass', 'Antivirus', `No known malware signature (${engines}).`);
+}
+
 export async function scan(
+  file: { name: string; bytes: Uint8Array },
+  category: string,
+  opts: ScanOptions = {},
+): Promise<ScanOutput> {
+  const out = await scanContent(file, category, opts);
+  const checks = [...out.checks, await avCheck(file, opts)];
+  return { ...out, checks, summary: summarize(checks) };
+}
+
+async function scanContent(
   file: { name: string; bytes: Uint8Array },
   category: string,
   opts: ScanOptions = {},
@@ -900,7 +987,10 @@ async function scanZip(
     if (!bytes) continue;
     const hash = await sha256(bytes);
     declared.files.push({ path: entry.name, sha256: hash, size: bytes.length });
-    const child = await scan({ name: entry.name, bytes }, extCategory(entry.name, 'filter'), opts);
+    const child = await scan({ name: entry.name, bytes }, extCategory(entry.name, 'filter'), {
+      ...opts,
+      antivirus: undefined,
+    });
     for (const c of child.checks) {
       checks.push({
         ...c,

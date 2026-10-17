@@ -7,7 +7,7 @@ mod state;
 use fee::{quote, split_fee, FeeError};
 use state::Status;
 
-declare_id!("7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM");
+declare_id!("Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw");
 
 #[program]
 pub mod trench_escrow {
@@ -85,6 +85,13 @@ pub mod trench_escrow {
     }
 
     pub fn release(ctx: Context<Release>) -> Result<()> {
+        // Release is permissionless after the window, so it must only ever move funds out of
+        // Paid. A Disputed escrow leaves only through the resolver (refund or reject_dispute);
+        // the generic Disputed -> Released edge exists for reject_dispute on a released order.
+        require!(
+            ctx.accounts.escrow.status == EscrowStatus::Paid,
+            EscrowError::IllegalTransition
+        );
         transition(ctx.accounts.escrow.status, EscrowStatus::Released)?;
         let now = Clock::get()?.unix_timestamp;
         require!(

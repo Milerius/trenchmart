@@ -13,3 +13,4 @@ evidence
 .data
 video/node_modules
 video/out
+packages/scanner/src/__fixtures__

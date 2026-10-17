@@ -1,7 +1,11 @@
 import { createSql } from '@trenchmart/db';
-import { fetchTransaction, latestBlockhash } from '@trenchmart/chain';
+import { configureSandboxWasm } from '@trenchmart/scanner';
+// workerd cannot fetch the QuickJS engine at runtime; wrangler bundles it as a compiled module.
+// The package's exports map hides the .wasm path, and wrangler's CompiledWasm rule needs it.
+import quickjsWasm from '../node_modules/@jitl/quickjs-wasmfile-release-sync/dist/emscripten-module.wasm';
+import { accountData, fetchTransaction, latestBlockhash, sendAndConfirm } from '@trenchmart/chain';
 import { createApp, type PriceCacheBox } from './app';
-import { filesystemBlob } from './blob';
+import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
 import { readEnv } from './env';
 import { expireOrders, proposePayouts, releaseOrders } from './logic';
 
@@ -12,6 +16,9 @@ type Binding = Record<string, unknown> & {
   // terminates TLS to Supabase (whose CA workerd cannot verify) and pools connections.
   HYPERDRIVE?: { connectionString: string };
   SCAN_QUEUE?: { send(body: unknown): Promise<void> };
+  // R2 bucket for uploads and licensed copies. workerd's node:fs is a per-request VFS,
+  // so a disk-backed store loses every upload between requests.
+  FILES?: R2BucketLike;
 };
 
 type Ctx = { waitUntil: (p: Promise<unknown>) => void };
@@ -20,6 +27,7 @@ type Ctx = { waitUntil: (p: Promise<unknown>) => void };
 // another in workerd ("Cannot perform I/O on behalf of a different request"), so every
 // fetch and scheduled invocation opens its own postgres.js client and closes it afterwards.
 const priceCache: PriceCacheBox = { value: null };
+configureSandboxWasm(quickjsWasm);
 
 export function databaseUrl(env: Binding): string | undefined {
   return env.HYPERDRIVE?.connectionString || env.DATABASE_URL || undefined;
@@ -39,11 +47,17 @@ function depsFor(env: Binding, url: string) {
   const sql = createSql(url, { max: 5 });
   return {
     sql,
-    blob: filesystemBlob(parsed.blobDir, parsed.sessionSecret, parsed.apiUrl),
+    blob: env.FILES
+      ? r2Blob(env.FILES, parsed.sessionSecret, parsed.apiUrl)
+      : unavailableBlob(parsed.sessionSecret, parsed.apiUrl),
     env: parsed,
     now: () => new Date(),
     getTx: (signature: string) => fetchTransaction(parsed.rpcUrl, signature),
     blockhash: () => latestBlockhash(parsed.rpcUrl),
+    escrowChain: {
+      account: (address: string) => accountData(parsed.rpcUrl, address),
+      sendAndConfirm: (tx: Uint8Array) => sendAndConfirm(parsed.rpcUrl, tx),
+    },
   };
 }
 

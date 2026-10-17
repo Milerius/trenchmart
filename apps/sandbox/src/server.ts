@@ -33,7 +33,15 @@ const server = createServer(async (req, res) => {
     timeoutMs?: number;
   };
   const timeoutMs = Math.min(body.timeoutMs ?? SANDBOX_BUDGET_MS, 20_000);
-  const result = runIsolatedSandbox(body.source ?? '', Date.now(), { timeoutMs });
+  let result;
+  try {
+    result = await runIsolatedSandbox(body.source ?? '', Date.now(), { timeoutMs });
+  } catch (err) {
+    // Engine failure, not a verdict: the API turns a non-2xx into a retryable review.
+    res.writeHead(503, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: (err as Error).message }));
+    return;
+  }
   res.writeHead(200, { 'content-type': 'application/json' });
   res.end(JSON.stringify({ ...result, toolchainCache, memoryMb: SANDBOX_MEMORY_MB }));
 });

@@ -23,7 +23,7 @@ export default function EscrowDocsPage() {
       <DocHeader
         kicker="Escrow"
         title="The escrow program"
-        lede="trench_escrow is an Anchor program on devnet. Live checkout pays the Squads vault and tracks the same states in Postgres. The program is built and tested in CI."
+        lede="trench_escrow is an Anchor program on devnet. Every checkout creates and funds an escrow account in one buyer-signed transaction; the API verifies the account before it marks the order paid. The program is built and tested in CI."
       />
       <FactGrid
         facts={[
@@ -69,9 +69,12 @@ export default function EscrowDocsPage() {
         <p>
           The resolver pubkey is stored at initialize. Refund and reject_dispute require that pubkey
           as a signer. Refund pays the deposit back only when disputed_from is paid, because a
-          release has already moved the lamports out of the account. On the live ledger path, an
-          operator resolves the dispute in the API, and a refund after release is funded from the
-          creator bond and then the safety bucket.
+          release has already moved the lamports out of the account. The API holds the resolver key:
+          its cron sends release after escrow_until, and resolving a dispute sends refund or
+          reject_dispute. Release only moves funds out of paid, so a disputed escrow cannot be
+          released. A refund after release is funded from the creator bond and then the safety
+          bucket. Release pays every bucket directly, so each bucket wallet must already hold the
+          rent-exempt minimum.
         </p>
       </DocSection>
     </article>

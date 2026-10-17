@@ -16,12 +16,12 @@ import {
 } from '@trenchmart/shared';
 
 /** Devnet program id from programs/trench_escrow/src/lib.rs. */
-export const ESCROW_PROGRAM_ID = '7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM';
+export const ESCROW_PROGRAM_ID = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
 export const ESCROW_CLUSTER = 'devnet';
 export const CONTACT_EMAIL = 'support@trenchmart.fun';
 export const AI_AGENT_ID = 'trenchmart-ai-v1';
 export const AI_ENGINE = 'ai-verifier@1.0.0';
-export const SCANNER_ENGINE = 'scanner@1.0.0';
+export const SCANNER_ENGINE = 'scanner@1.1.0';
 /** Matches the `limit 15` payout batch in apps/api/src/logic.ts. */
 export const PAYOUT_BATCH_LIMIT = 15;
 export const CREATOR_COMMISSION_BPS = 0;

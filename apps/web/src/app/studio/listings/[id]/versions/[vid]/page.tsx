@@ -81,6 +81,8 @@ const OUTCOME_WORDS: Record<string, string> = {
   approve: 'Approved: behaviour matches the listing',
   request_changes: 'Changes requested',
   reject: 'Rejected',
+  retry: 'Sandbox unavailable, nothing was decided',
+  error: 'Sandbox could not run: retry the review',
 };
 
 function describe(event: ReviewEvent | undefined, fallback: string): string {
@@ -218,6 +220,10 @@ export default function VersionPage() {
   const outcome = [...events].reverse().find((event) => event.versionStatus);
   const sandbox = [...events].reverse().find((event) => event.log);
   const status = outcome?.versionStatus ?? view?.version.status;
+  // An infrastructure failure leaves no sandbox scan and no new AI verdict: offer a retry.
+  const sandboxRetry = outcome
+    ? outcome.decision === 'retry'
+    : view?.version.resume_step === 'sandbox' && !view.checks.some((c) => c.kind === 'sandbox');
   const byStep = new Map(events.filter((e) => e.step !== 'done').map((e) => [e.step, e]));
   const totalMs = events
     .filter((e) => e.step !== 'done' && e.status !== 'running')
@@ -375,7 +381,27 @@ export default function VersionPage() {
           </ButtonLink>
         </Panel>
       ) : null}
-      {status === 'needs_creator' ? (
+      {status === 'needs_creator' && sandboxRetry ? (
+        <Panel tone="warn" data-testid="review-outcome" className="space-y-3 p-5">
+          <p className="m-0 font-semibold">Sandbox unavailable</p>
+          <p className="m-0 text-sm text-ink-2">
+            {outcome?.reason ??
+              'The sandbox could not run this time. This is not a verdict on your file; retry the review.'}
+          </p>
+          <Button
+            data-testid="retry-review"
+            disabled={running}
+            onClick={() =>
+              void stream(`/api/v1/studio/versions/${params.vid}/review?stream=1`).catch(
+                (err: Error) => setMessage(err.message),
+              )
+            }
+          >
+            Retry review
+          </Button>
+        </Panel>
+      ) : null}
+      {status === 'needs_creator' && !sandboxRetry ? (
         <Panel tone="warn" data-testid="review-outcome" className="space-y-4 p-5">
           <div>
             <p className="m-0 font-semibold">Changes requested</p>

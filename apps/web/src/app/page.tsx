@@ -141,7 +141,7 @@ export default function HomePage() {
               ],
               [
                 'Download on release',
-                'When escrow releases, the download unlocks: a copy watermarked to your wallet.',
+                'Once payment is confirmed in escrow, download a copy watermarked to your wallet.',
               ],
             ].map(([title, body], index) => (
               <li
@@ -256,8 +256,8 @@ export default function HomePage() {
                 `The creator is paid only after ${escrowHours} hours with no dispute. A dispute freezes the funds until it is settled.`,
               ],
               [
-                'Squads multisig vault',
-                'Escrowed SOL sits in a Squads multisig vault. The app holds no key that can move it; payouts need multisig signers.',
+                'On-chain escrow program',
+                'Each order is a program account on Solana. Only the program moves the SOL: to the creator after the window, or back to you on an upheld dispute.',
               ],
               [
                 'Sandboxed AI review',
