@@ -36,12 +36,15 @@ import {
   submittedBody,
   verifyBody,
   verifyJsonBody,
+  reuploadBody,
   versionBody,
   batchSentBody,
+  txBroadcastBody,
   stripWatermark,
   formatSol,
   moneyView,
 } from '@trenchmart/shared';
+import { fromBase64, sendRaw } from '@trenchmart/chain';
 import { cachedSolUsd, fetchCoinGeckoSolUsd, type PriceCache } from './price';
 import type { Env } from './env';
 import {
@@ -165,6 +168,24 @@ export function createApp(deps: Deps): App {
 
   const api = new Hono<{ Variables: Vars }>();
   api.get('/health', (c) => c.json({ ok: true, cluster: deps.env.cluster }));
+
+  api.post('/tx/send', async (c) => {
+    requireUser(c);
+    const body = await bodyOf(txBroadcastBody, await c.req.json());
+    let bytes: Uint8Array;
+    try {
+      bytes = fromBase64(body.txBase64);
+    } catch {
+      throw new HttpError(400, 'BAD_TX', 'transaction is not base64');
+    }
+    if (bytes.length < 64) throw new HttpError(400, 'BAD_TX', 'transaction is too short');
+    try {
+      const signature = await sendRaw(deps.env.rpcUrl, bytes);
+      return c.json({ signature });
+    } catch (err) {
+      throw new HttpError(502, 'RPC', err instanceof Error ? err.message : 'broadcast failed');
+    }
+  });
 
   api.get('/files', async (c) => serveFile(c, deps, 'GET'));
   api.put('/files', async (c) => serveFile(c, deps, 'PUT'));
@@ -369,6 +390,33 @@ export function createApp(deps: Deps): App {
       limit 10
     `;
     return c.json(jsonSafe(rows));
+  });
+
+  api.get('/creators/:handle', async (c) => {
+    const handle = c.req.param('handle').replace(/^@/, '');
+    const users = await deps.sql<Record<string, any>[]>`
+      select id, handle, wallet, x_handle from users
+      where handle = ${handle} or x_handle = ${handle}
+      limit 1
+    `;
+    const creator = users[0];
+    if (!creator) throw new HttpError(404, 'NOT_FOUND', 'creator not found');
+    const listings = await deps.sql<Record<string, any>[]>`
+      select l.*, u.handle from listings l join users u on u.id = l.creator_id
+      where l.creator_id = ${creator.id} and l.delisted_at is null and l.paused_at is null
+        and l.live_version_id is not null
+      order by l.created_at desc
+    `;
+    const bond = await activeBond(deps.sql, creator.id as string);
+    return c.json(
+      jsonSafe({
+        handle: creator.handle,
+        wallet: creator.wallet,
+        xHandle: creator.x_handle,
+        bond,
+        listings: listings.map((listing) => publicListing(listing)),
+      }),
+    );
   });
 
   api.post('/orders/quote', async (c) => {
@@ -710,6 +758,56 @@ export function createApp(deps: Deps): App {
       Record<string, any>[]
     >`select status, r2_key, sha256 from versions where id = ${version.id}`;
     return c.json({ ...(fresh[0] ?? {}), review: last });
+  });
+
+  api.post('/studio/versions/:id/review', async (c) => {
+    const user = requireUser(c);
+    const version = await ownVersion(deps, c.req.param('id'), user.id as string);
+    if (version.status === 'rejected') {
+      throw new HttpError(403, 'NO_APPEAL', 'a rejected version has no appeal');
+    }
+    const stream =
+      c.req.query('stream') === '1' || (c.req.header('accept') ?? '').includes('text/event-stream');
+    if (stream) {
+      return streamSSE(c, async (events) => {
+        for await (const event of reviewVersion(deps, version.id as string)) {
+          await events.writeSSE({ event: event.step, data: JSON.stringify(jsonSafe(event)) });
+        }
+      });
+    }
+    return c.json(jsonSafe(await finishVersion(deps, version.id as string)));
+  });
+
+  api.post('/studio/versions/:id/reupload', async (c) => {
+    const user = requireUser(c);
+    const version = await ownVersion(deps, c.req.param('id'), user.id as string);
+    if (version.status !== 'needs_creator') {
+      throw new HttpError(400, 'NOT_PAUSED', 'upload a fix when the AI requests changes');
+    }
+    const body = await bodyOf(reuploadBody, await c.req.json());
+    const bytes = Uint8Array.from(atob(body.contentBase64), (char) => char.charCodeAt(0));
+    const hash = await sha256Hex(bytes);
+    const key = `blobs/${hash}`;
+    await deps.blob.put(key, bytes);
+    const sameBytes = hash === version.sha256;
+    if (!sameBytes) {
+      await deps.sql`delete from scans where version_id = ${version.id} and kind = 'static'`;
+    }
+    await deps.sql`
+      update versions set file_name = ${body.fileName}, file_size = ${bytes.length}, sha256 = ${hash},
+        r2_key = ${key}, status = 'scanning'
+      where id = ${version.id}
+    `;
+    return c.json({
+      versionId: version.id,
+      sha256: hash,
+      resumeStep: sameBytes ? (version.resume_step ?? 'static') : version.resume_step,
+    });
+  });
+
+  api.post('/studio/versions/:id/appeal', (c) => {
+    requireUser(c);
+    throw new HttpError(404, 'NO_APPEAL', 'AI review has no human appeal');
   });
 
   api.get('/studio/versions/:id', async (c) => {

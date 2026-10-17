@@ -13,3 +13,4 @@ minimumReleaseAgeExclude:
   - turbo@2.11.9
 allowBuilds:
   esbuild: true
+  workerd: true

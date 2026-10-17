@@ -25,10 +25,18 @@ export type Env = {
   escrowHoursOverride: string;
   rateLimitPerMin: number;
   sandboxMode: 'inline' | 'external';
+  sandboxRunnerUrl: string;
+  sandboxBudgetMs: number;
   landingStats: 'auto' | 'mock' | 'real';
   solUsdOverride: string;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
+
+function sandboxBudget(value: string | undefined): number {
+  const parsed = Number(value || 15_000);
+  if (!Number.isFinite(parsed)) return 15_000;
+  return Math.min(20_000, Math.max(10_000, Math.round(parsed)));
+}
 
 function blank(value: string | undefined): string {
   const trimmed = value?.trim() ?? '';
@@ -70,6 +78,8 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     escrowHoursOverride: source.ESCROW_HOURS_OVERRIDE ?? '',
     rateLimitPerMin: Number(source.RATE_LIMIT_PER_MIN || 120),
     sandboxMode: source.SANDBOX_MODE === 'external' ? 'external' : 'inline',
+    sandboxRunnerUrl: blank(source.SANDBOX_RUNNER_URL),
+    sandboxBudgetMs: sandboxBudget(source.SANDBOX_BUDGET_MS),
     landingStats:
       source.LANDING_STATS === 'mock' || source.LANDING_STATS === 'real'
         ? source.LANDING_STATS

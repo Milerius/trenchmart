@@ -113,6 +113,9 @@ describe('owner product decisions', () => {
       source: 'override',
       fetchedAt: now.toISOString(),
     });
+    const top = await app.request('/api/v1/creators/top');
+    expect(top.status).toBe(200);
+    expect(Array.isArray(await top.json())).toBe(true);
   });
 
   it('issues a signed download only after escrow release', async () => {
@@ -265,6 +268,8 @@ describe('owner product decisions', () => {
     expect(text).toContain('event: sandbox');
     expect(text).toContain('event: ai');
     expect(text).toContain('"versionStatus":"live"');
+    expect(text).toContain('"durationMs"');
+    expect(text).toContain('"egress":"blocked"');
     const queued = await sql<{ count: number }[]>`select count(*)::int as count from sandbox_jobs`;
     expect(queued[0]?.count).toBe(0);
     const human = await app.request(
@@ -280,10 +285,94 @@ describe('owner product decisions', () => {
       },
     );
     expect(human.status).toBe(404);
+    const unsigned = await app.request('/api/v1/tx/send', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ txBase64: 'aa' }),
+    });
+    expect(unsigned.status).toBe(401);
+    const missing = await app.request('/api/v1/creators/nobody');
+    expect(missing.status).toBe(404);
     const queue = await app.request('/api/v1/internal/sandbox/next', {
       headers: { authorization: 'internal' },
     });
     const queueBody = (await queue.json()) as { queued: boolean };
     expect(queueBody.queued).toBe(false);
+    await sql`update versions set status = 'needs_creator', resume_step = 'sandbox' where id = ${uploaded.versionId}`;
+    const resumed = await app.request(
+      `/api/v1/studio/versions/${uploaded.versionId}/review?stream=1`,
+      {
+        method: 'POST',
+        headers: { cookie, accept: 'text/event-stream' },
+      },
+    );
+    expect(resumed.status).toBe(200);
+    const again = await resumed.text();
+    expect(again).toContain('"step":"static"');
+    expect(again).toContain('"status":"skipped"');
+    expect(again).toContain('event: sandbox');
+  });
+
+  it('rejects with the exact reason and refuses a human appeal', async () => {
+    const app = await appFor();
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    await sql`
+      update users set roles = roles || '{creator}'::user_role[], x_handle = 'dev_degen', x_user_id = 'dev:dev_degen'
+      where wallet = ${creator.publicKey}
+    `;
+    const user = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
+    const userId = user[0]?.id;
+    if (!userId) throw new Error('creator missing after login');
+    await sql`
+      insert into bonds (user_id, amount, tx_sig, status) values (${userId}, ${5_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+    `;
+    await sql`update config set value = '0'::jsonb where key = 'verification_fee_lamports'`;
+    const hostile = `${clean}\nwindow.solana.signTransaction({ tx: 1 });\n`;
+    const listing = await app.request('/api/v1/studio/listings', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Hostile pack',
+        summary: 'Should be rejected.',
+        description: 'Signing call.',
+        category: 'userscript',
+        priceLamports: '1000000000',
+      }),
+    });
+    const created = (await listing.json()) as { id: string };
+    const version = await app.request(`/api/v1/studio/listings/${created.id}/versions`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        semver: '1.0.0',
+        changelog: 'bad',
+        fileName: 'bad.user.js',
+        fileSize: hostile.length,
+      }),
+    });
+    const uploaded = (await version.json()) as { versionId: string; uploadUrl: string };
+    const target = new URL(uploaded.uploadUrl);
+    await app.request(`${target.pathname}${target.search}`, {
+      method: 'PUT',
+      body: new TextEncoder().encode(hostile),
+    });
+    const streamed = await app.request(
+      `/api/v1/studio/versions/${uploaded.versionId}/complete?stream=1`,
+      {
+        method: 'POST',
+        headers: { cookie, accept: 'text/event-stream' },
+      },
+    );
+    const text = await streamed.text();
+    expect(text).toContain('"versionStatus":"rejected"');
+    expect(text).toContain('signTransaction');
+    const appeal = await app.request(`/api/v1/studio/versions/${uploaded.versionId}/appeal`, {
+      method: 'POST',
+      headers: { cookie },
+    });
+    expect(appeal.status).toBe(404);
   });
 });

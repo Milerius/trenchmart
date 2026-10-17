@@ -15,7 +15,6 @@ test-results
 *.log
 .DS_Store
 tsconfig.tsbuildinfo
-apps/web/next-env.d.ts
 .data/
 target/
 .anchor/

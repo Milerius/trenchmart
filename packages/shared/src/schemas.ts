@@ -45,6 +45,11 @@ export const listingBody = z.object({
 
 export const listingPatch = listingBody.partial();
 
+export const reuploadBody = z.object({
+  fileName: z.string().min(1).max(180),
+  contentBase64: z.string().min(1).max(20_000_000),
+});
+
 export const versionBody = z.object({
   semver: z.string().regex(/^\d+\.\d+\.\d+$/),
   changelog: z.string().max(10_000).default(''),
@@ -99,6 +104,10 @@ export const buybackBody = z.object({
 });
 
 export const batchSentBody = z.object({ txSig: txSigSchema });
+
+export const txBroadcastBody = z.object({
+  txBase64: z.string().min(80).max(20_000),
+});
 
 export const configValueBody = z.object({ value: z.unknown() });
 

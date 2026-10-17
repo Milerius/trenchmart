@@ -40,7 +40,8 @@ import {
   toBase64,
   type ChainTx,
 } from '@trenchmart/chain';
-import { runIsolatedSandbox, type IsolatedSandboxResult } from './sandbox';
+import { dispatchSandbox, type SandboxQueue } from './dispatch';
+import type { IsolatedSandboxResult } from './sandbox';
 import type { BlobStore } from './blob';
 import type { Env } from './env';
 
@@ -61,6 +62,7 @@ export type Deps = {
   now: () => Date;
   getTx: (signature: string) => Promise<ChainTx | null>;
   blockhash: () => Promise<{ blockhash: string; lastValidBlockHeight: number }>;
+  sandboxQueue?: SandboxQueue;
 };
 
 type Row = Record<string, any>;
@@ -667,22 +669,37 @@ function needsSandbox(category: string, fileName: string): boolean {
   return category === 'userscript' || (category === 'alerts' && /\.js$/i.test(fileName));
 }
 
+export type ReviewStep = 'static' | 'sandbox' | 'ai' | 'done';
+
 export type ReviewEvent = {
-  step: 'static' | 'sandbox' | 'ai' | 'done';
-  status: 'running' | 'done';
+  step: ReviewStep;
+  status: 'running' | 'done' | 'skipped';
+  startedAt: string;
+  finishedAt?: string;
+  durationMs: number;
   summary?: string;
   verdict?: string;
   decision?: string;
   versionStatus?: string;
+  reason?: string;
+  resumeStep?: 'static' | 'sandbox' | 'ai' | null;
+  log?: IsolatedSandboxResult;
 };
 
 export async function finishVersion(deps: Deps, versionId: string): Promise<ReviewEvent> {
-  let last: ReviewEvent = { step: 'done', status: 'done' };
+  let last: ReviewEvent = {
+    step: 'done',
+    status: 'done',
+    startedAt: deps.now().toISOString(),
+    durationMs: 0,
+  };
   for await (const event of reviewVersion(deps, versionId)) last = event;
   return last;
 }
 
-/** Static scan, isolated sandbox, and the AI agent run in this call. Nothing waits on a queue. */
+type CheckRow = { ruleId: string; result: string; title: string; detail: string };
+
+/** Static scan and the sandbox start together. A runner is webhooks, not a 10s poll. */
 export async function* reviewVersion(deps: Deps, versionId: string): AsyncGenerator<ReviewEvent> {
   const rows = await deps.sql<Row[]>`
     select v.*, l.category, l.creator_id, l.id as listing_id
@@ -694,7 +711,164 @@ export async function* reviewVersion(deps: Deps, versionId: string): AsyncGenera
   const bytes = await deps.blob.get(version.r2_key as string);
   if (!bytes) throw new HttpError(400, 'FILE_MISSING', 'upload is missing');
   const config = await loadConfig(deps);
-  yield { step: 'static', status: 'running' };
+  const startedAt = deps.now().toISOString();
+  const resume = resumeOf(version.resume_step);
+  const priorStatic = await deps.sql<{ summary: string }[]>`
+    select summary from scans where version_id = ${versionId} and kind = 'static' and summary = 'pass' limit 1
+  `;
+  const priorSandbox = await deps.sql<{ summary: string }[]>`
+    select summary from scans where version_id = ${versionId} and kind = 'sandbox' limit 1
+  `;
+  const skipStatic = resume !== 'static' && priorStatic.length > 0;
+  const sandboxNeeded = needsSandbox(version.category as string, version.file_name as string);
+  const skipSandbox = resume === 'ai' && priorSandbox.length > 0;
+
+  if (skipStatic) {
+    yield { step: 'static', status: 'skipped', startedAt, durationMs: 0, summary: 'pass' };
+  } else {
+    yield { step: 'static', status: 'running', startedAt, durationMs: 0 };
+  }
+  if (!sandboxNeeded) {
+    yield { step: 'sandbox', status: 'skipped', startedAt, durationMs: 0, verdict: 'na' };
+  } else if (skipSandbox) {
+    yield {
+      step: 'sandbox',
+      status: 'skipped',
+      startedAt,
+      durationMs: 0,
+      verdict: priorSandbox[0]?.summary ?? 'pass',
+    };
+  } else {
+    yield { step: 'sandbox', status: 'running', startedAt, durationMs: 0 };
+  }
+
+  const staticWork = skipStatic
+    ? Promise.resolve(null)
+    : timed(async () => storeStaticScan(deps, version, versionId, bytes, config));
+  const sandboxWork =
+    sandboxNeeded && !skipSandbox
+      ? timed(() =>
+          dispatchSandbox({
+            runnerUrl: deps.env.sandboxRunnerUrl,
+            token: deps.env.internalToken,
+            versionId,
+            fileName: version.file_name as string,
+            source: new TextDecoder().decode(bytes),
+            timeoutMs: deps.env.sandboxBudgetMs,
+            nowMs: deps.now().getTime(),
+            queue: deps.sandboxQueue,
+          }).catch((err: unknown) => failedSandbox(err, deps.env.sandboxBudgetMs)),
+        )
+      : Promise.resolve(null);
+
+  const [staticTimed, sandboxTimed] = await Promise.all([staticWork, sandboxWork]);
+  const finishedAt = deps.now().toISOString();
+  let checks: CheckRow[] = [];
+  let summary = 'pass';
+  if (staticTimed) {
+    checks = staticTimed.value.checks;
+    summary = staticTimed.value.summary;
+    yield {
+      step: 'static',
+      status: 'done',
+      startedAt,
+      finishedAt,
+      durationMs: staticTimed.durationMs,
+      summary,
+    };
+  } else {
+    const stored = await deps.sql<Row[]>`
+      select sc.rule_id, sc.result, sc.title, sc.detail
+      from scan_checks sc join scans s on s.id = sc.scan_id
+      where s.version_id = ${versionId} and s.kind = 'static'
+    `;
+    checks = stored.map((check) => ({
+      ruleId: check.rule_id as string,
+      result: check.result as string,
+      title: check.title as string,
+      detail: check.detail as string,
+    }));
+  }
+
+  let sandboxVerdict: 'pass' | 'warn' | 'fail' | undefined;
+  let sandboxWalletCalls: string[] | undefined;
+  if (sandboxTimed) {
+    await recordSandbox(deps, versionId, sandboxTimed.value);
+    sandboxVerdict = sandboxTimed.value.verdict;
+    sandboxWalletCalls = sandboxTimed.value.walletCalls;
+    yield {
+      step: 'sandbox',
+      status: 'done',
+      startedAt,
+      finishedAt,
+      durationMs: sandboxTimed.value.durationMs || sandboxTimed.durationMs,
+      verdict: sandboxVerdict,
+      log: sandboxTimed.value,
+    };
+  } else if (skipSandbox) {
+    sandboxVerdict = (priorSandbox[0]?.summary as 'pass' | 'warn' | 'fail') ?? 'pass';
+  }
+
+  const aiStarted = Date.now();
+  yield { step: 'ai', status: 'running', startedAt, durationMs: 0 };
+  const outcome = await decideWithAgent(
+    deps,
+    version,
+    checks,
+    summary,
+    sandboxVerdict,
+    sandboxWalletCalls,
+  );
+  const aiDone = {
+    step: 'ai' as const,
+    status: 'done' as const,
+    startedAt,
+    finishedAt,
+    durationMs: Date.now() - aiStarted,
+    decision: outcome.decision,
+    versionStatus: outcome.versionStatus,
+    reason: outcome.reason,
+    resumeStep: outcome.resumeStep,
+  };
+  yield aiDone;
+  yield { ...aiDone, step: 'done' };
+}
+
+async function timed<T>(work: () => Promise<T>): Promise<{ value: T; durationMs: number }> {
+  const start = Date.now();
+  const value = await work();
+  return { value, durationMs: Math.max(0, Date.now() - start) };
+}
+
+function resumeOf(value: unknown): 'static' | 'sandbox' | 'ai' {
+  return value === 'sandbox' || value === 'ai' ? value : 'static';
+}
+
+function failedSandbox(err: unknown, timeoutMs: number): IsolatedSandboxResult {
+  const message = err instanceof Error ? err.message : 'sandbox dispatch failed';
+  return {
+    mode: 'vm-isolate',
+    durationMs: 0,
+    requests: [],
+    walletCalls: [],
+    clipboard: [],
+    storageReads: [],
+    errors: [message],
+    verdict: 'fail',
+    notes: message,
+    egress: 'blocked',
+    limits: { timeoutMs, memoryMb: 128 },
+    log: [message],
+  };
+}
+
+async function storeStaticScan(
+  deps: Deps,
+  version: Row,
+  versionId: string,
+  bytes: Uint8Array,
+  config: AppConfig,
+): Promise<{ summary: string; checks: CheckRow[] }> {
   const output = await scan(
     { name: version.file_name as string, bytes },
     version.category as string,
@@ -720,41 +894,14 @@ export async function* reviewVersion(deps: Deps, versionId: string): AsyncGenera
   const hash = await sha256Hex(bytes);
   version.sha256 = hash;
   await deps.sql`update versions set declared = ${deps.sql.json(output.declared as never)}, sha256 = ${hash} where id = ${versionId}`;
-  yield { step: 'static', status: 'done', summary: output.summary };
-
-  let sandboxVerdict: 'pass' | 'warn' | 'fail' | undefined;
-  let sandboxWalletCalls: string[] | undefined;
-  if (needsSandbox(version.category as string, version.file_name as string)) {
-    yield { step: 'sandbox', status: 'running' };
-    const isolated = runIsolatedSandbox(new TextDecoder().decode(bytes), deps.now().getTime());
-    await recordSandbox(deps, versionId, isolated);
-    sandboxVerdict = isolated.verdict;
-    sandboxWalletCalls = isolated.walletCalls;
-    yield { step: 'sandbox', status: 'done', verdict: isolated.verdict };
-  } else {
-    yield { step: 'sandbox', status: 'done', verdict: 'na' };
-  }
-
-  yield { step: 'ai', status: 'running' };
-  const outcome = await decideWithAgent(
-    deps,
-    version,
-    output.checks,
-    output.summary,
-    sandboxVerdict,
-    sandboxWalletCalls,
-  );
-  yield {
-    step: 'ai',
-    status: 'done',
-    decision: outcome.decision,
-    versionStatus: outcome.versionStatus,
-  };
-  yield {
-    step: 'done',
-    status: 'done',
-    decision: outcome.decision,
-    versionStatus: outcome.versionStatus,
+  return {
+    summary: output.summary,
+    checks: output.checks.map((check) => ({
+      ruleId: check.ruleId,
+      result: check.result,
+      title: check.title,
+      detail: check.detail,
+    })),
   };
 }
 
@@ -886,7 +1033,12 @@ async function decideWithAgent(
   summary: string,
   sandboxVerdict?: 'pass' | 'warn' | 'fail',
   sandboxWalletCalls?: string[],
-): Promise<{ decision: string; versionStatus: string }> {
+): Promise<{
+  decision: string;
+  versionStatus: string;
+  reason: string;
+  resumeStep: 'static' | 'sandbox' | 'ai' | null;
+}> {
   const decision = runAiVerifier({
     checks,
     creatorNote: version.creator_note as string | null,
@@ -919,15 +1071,37 @@ async function decideWithAgent(
         first_live_at = coalesce(first_live_at, ${deps.now()})
       where id = ${version.listing_id}
     `;
+    await deps.sql`update versions set resume_step = null where id = ${version.id}`;
     await notify(deps.sql, version.creator_id as string, 'live', { versionId: version.id });
-    return { decision: decision.decision, versionStatus: 'live' };
+    return {
+      decision: decision.decision,
+      versionStatus: 'live',
+      reason: decision.notes,
+      resumeStep: null,
+    };
   }
   if (decision.decision === 'reject') {
-    await deps.sql`update versions set status = 'rejected' where id = ${version.id}`;
-    return { decision: decision.decision, versionStatus: 'rejected' };
+    await deps.sql`update versions set status = 'rejected', resume_step = null where id = ${version.id}`;
+    return {
+      decision: decision.decision,
+      versionStatus: 'rejected',
+      reason: decision.notes,
+      resumeStep: null,
+    };
   }
-  await deps.sql`update versions set status = 'needs_creator' where id = ${version.id}`;
-  return { decision: decision.decision, versionStatus: 'needs_creator' };
+  const resumeStep =
+    summary === 'warn' || summary === 'fail'
+      ? 'static'
+      : sandboxVerdict === 'warn' || sandboxVerdict === 'fail'
+        ? 'sandbox'
+        : 'ai';
+  await deps.sql`update versions set status = 'needs_creator', resume_step = ${resumeStep} where id = ${version.id}`;
+  return {
+    decision: decision.decision,
+    versionStatus: 'needs_creator',
+    reason: decision.notes,
+    resumeStep,
+  };
 }
 
 export async function watermarked(

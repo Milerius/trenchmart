@@ -5,7 +5,9 @@ import { filesystemBlob } from './blob';
 import { readEnv } from './env';
 import { expireOrders, proposePayouts, releaseOrders } from './logic';
 
-type Binding = Record<string, string | undefined>;
+type Binding = Record<string, string | undefined> & {
+  SCAN_QUEUE?: { send(body: unknown): Promise<void> };
+};
 
 let cached: ReturnType<typeof createApp> | null = null;
 
@@ -22,6 +24,7 @@ function appFor(env: Binding) {
     now: () => new Date(),
     getTx: (signature) => fetchTransaction(parsed.rpcUrl, signature),
     blockhash: () => latestBlockhash(parsed.rpcUrl),
+    sandboxQueue: env.SCAN_QUEUE,
   });
   return cached;
 }
