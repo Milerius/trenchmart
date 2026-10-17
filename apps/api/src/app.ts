@@ -46,9 +46,23 @@ import {
   moneyView,
 } from '@trenchmart/shared';
 import { fromBase64, sendRaw } from '@trenchmart/chain';
-import { cachedSolUsd, fetchCoinGeckoSolUsd, type PriceCache } from './price';
+import { cachedSolUsd, fetchSolUsd, type PriceCache } from './price';
 import type { Env } from './env';
 import { BlobUnavailableError } from './blob';
+import {
+  contentBody,
+  deleteImage,
+  isUuid,
+  mediaResponse,
+  mediaUrl,
+  publicContent,
+  reviewContentBody,
+  reviewContent,
+  saveDraft,
+  studioContent,
+  uploadImage,
+} from './content';
+import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
 import { EscrowError } from './escrow';
 import {
   activeBond,
@@ -116,7 +130,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       nowMs: deps.now().getTime(),
       cache: priceCache.value,
       override: deps.env.solUsdOverride,
-      fetchUsd: deps.env.solUsdOverride ? undefined : fetchCoinGeckoSolUsd,
+      fetchUsd: deps.env.solUsdOverride ? undefined : () => fetchSolUsd(),
     });
     priceCache.value = quote.cache;
     return quote;
@@ -370,8 +384,15 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         creator: creatorCard(listing, bond),
         security,
         preview: await previewOf(deps, security?.r2Key),
+        content: await publicContent(deps, listing.id as string),
       }),
     );
+  });
+
+  // Seller images. Public once they are on an approved page; the owner can preview drafts.
+  api.get('/media/:id', async (c) => {
+    const user = c.get('user');
+    return mediaResponse(deps, c.req.param('id'), (user?.id as string | undefined) ?? null);
   });
 
   api.get('/listings/:slug/versions', async (c) => {
@@ -682,6 +703,63 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       ) returning id
     `;
     return c.json({ id: inserted[0]?.id, slug });
+  });
+
+  api.get('/studio/listings/:id/content', async (c) => {
+    const user = requireUser(c);
+    const listing = await ownListingParam(deps, c.req.param('id'), user.id as string);
+    const content = await studioContent(deps, listing);
+    const cover = content.draft.coverImageId ?? content.draft.gallery[0]?.imageId ?? null;
+    return c.json(
+      jsonSafe({
+        listing: {
+          ...publicListing(listing),
+          handle: user.handle,
+          cover: cover ? { url: mediaUrl(cover), alt: '' } : null,
+          imageCount: content.draft.gallery.length,
+        },
+        ...content,
+      }),
+    );
+  });
+
+  api.put('/studio/listings/:id/content', async (c) => {
+    const user = requireUser(c);
+    const listing = await ownListingParam(deps, c.req.param('id'), user.id as string);
+    const body = await bodyOf(contentBody, await c.req.json());
+    const draft = await saveDraft(deps, listing.id as string, body);
+    return c.json({ ok: true, draft });
+  });
+
+  api.post('/studio/listings/:id/content/review', async (c) => {
+    const user = requireUser(c);
+    const listing = await ownListingParam(deps, c.req.param('id'), user.id as string);
+    const text = await c.req.text();
+    const body = await bodyOf(reviewContentBody, text ? JSON.parse(text) : {});
+    return c.json(
+      jsonSafe(await reviewContent(deps, listing.id as string, user.id as string, body.note)),
+    );
+  });
+
+  api.post('/studio/listings/:id/images', async (c) => {
+    const user = requireUser(c);
+    const listing = await ownListingParam(deps, c.req.param('id'), user.id as string);
+    const declared = Number(c.req.header('content-length') ?? '0');
+    if (declared > IMAGE_MAX_BYTES) {
+      throw new HttpError(413, 'IMAGE_TOO_LARGE', 'images are limited to 3 MB');
+    }
+    // Chunked uploads carry no content-length, so the limit is enforced while reading too.
+    const bytes = await readCapped(c.req.raw.body, IMAGE_MAX_BYTES);
+    return c.json(await uploadImage(deps, listing.id as string, user.id as string, bytes));
+  });
+
+  api.delete('/studio/listings/:id/images/:imageId', async (c) => {
+    const user = requireUser(c);
+    const listing = await ownListingParam(deps, c.req.param('id'), user.id as string);
+    const imageId = c.req.param('imageId');
+    if (!isUuid(imageId)) throw new HttpError(404, 'NOT_FOUND', 'image not found');
+    await deleteImage(deps, listing.id as string, imageId);
+    return c.json({ ok: true });
   });
 
   api.patch('/studio/listings/:id', async (c) => {
@@ -1186,6 +1264,38 @@ async function ownListing(deps: Deps, id: string, userId: string) {
   return listing;
 }
 
+async function readCapped(
+  body: ReadableStream<Uint8Array> | null,
+  max: number,
+): Promise<Uint8Array> {
+  if (!body) return new Uint8Array(0);
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > max) {
+      await reader.cancel().catch(() => undefined);
+      throw new HttpError(413, 'IMAGE_TOO_LARGE', 'images are limited to 3 MB');
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+async function ownListingParam(deps: Deps, id: string, userId: string) {
+  if (!isUuid(id)) throw new HttpError(404, 'NOT_FOUND', 'listing not found');
+  return ownListing(deps, id, userId);
+}
+
 async function ownVersion(deps: Deps, id: string, userId: string) {
   const rows = await deps.sql<Record<string, any>[]>`
     select v.* from versions v join listings l on l.id = v.listing_id
@@ -1249,7 +1359,11 @@ async function searchListings(
             ? 'l.rating_avg desc nulls last'
             : 'l.sales_7d desc';
   const rows = await deps.sql<Record<string, any>[]>`
-    select l.*, u.handle from listings l join users u on u.id = l.creator_id
+    select l.*, u.handle,
+      c.live->>'coverImageId' as cover_image_id,
+      coalesce(jsonb_array_length(c.live->'gallery'), 0)::int as image_count
+    from listings l join users u on u.id = l.creator_id
+    left join listing_content c on c.listing_id = l.id
     where l.delisted_at is null and l.paused_at is null and l.live_version_id is not null
       and (${query.category ?? null}::text is null or l.category::text = ${query.category ?? null})
       and (${query.terminal ?? null}::text is null or ${query.terminal ?? null} = any(l.terminals))
@@ -1265,7 +1379,18 @@ async function searchListings(
       );
       if (until > deps.now()) lockedUntil = until.toISOString();
     }
-    return { ...publicListing(listing), handle: listing.handle, lockedUntil };
+    return {
+      ...publicListing(listing),
+      handle: listing.handle,
+      lockedUntil,
+      cover: listing.cover_image_id
+        ? {
+            url: mediaUrl(listing.cover_image_id as string),
+            alt: `${listing.title as string} cover`,
+          }
+        : null,
+      imageCount: listing.image_count as number,
+    };
   });
 }
 

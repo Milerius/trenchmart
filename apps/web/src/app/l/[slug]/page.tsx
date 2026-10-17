@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { categoryMeta, quote as quoteFor } from '@trenchmart/shared';
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
+import { Gallery, type GalleryImage } from '@/components/gallery';
+import { Markdown } from '@/components/markdown';
 import {
   Button,
   ButtonLink,
@@ -54,7 +56,16 @@ type Listing = {
   } | null;
   creator: { handle: string | null; wallet: string; bondLamports: string };
   preview: string | null;
+  /** Approved rich content. Drafts never reach the public listing. */
+  content?: {
+    readme: string;
+    howto: string;
+    requirements: string;
+    gallery: GalleryImage[];
+  } | null;
 };
+
+type VersionNote = { semver: string; changelog: string; created_at: string; status: string };
 
 type Quote = {
   price: string;
@@ -66,8 +77,15 @@ type Quote = {
 };
 
 type Step = 'idle' | 'quoting' | 'signing' | 'confirming' | 'done' | 'failed';
-type Tab = 'security' | 'overview' | 'reviews';
-const TABS: Tab[] = ['security', 'overview', 'reviews'];
+type Tab = 'overview' | 'howto' | 'changelog' | 'security' | 'reviews';
+const TABS: Tab[] = ['overview', 'howto', 'changelog', 'security', 'reviews'];
+const TAB_LABEL: Record<Tab, string> = {
+  overview: 'Overview',
+  howto: 'How to use',
+  changelog: 'Changelog',
+  security: 'Security',
+  reviews: 'Reviews',
+};
 
 export default function ListingPage() {
   const params = useParams<{ slug: string }>();
@@ -76,7 +94,8 @@ export default function ListingPage() {
   const centsPerSol = useSolUsd();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loadError, setLoadError] = useState<'missing' | 'failed' | null>(null);
-  const [tab, setTab] = useState<Tab>('security');
+  const [tab, setTab] = useState<Tab>('overview');
+  const [versions, setVersions] = useState<VersionNote[]>([]);
   const [reviews, setReviews] = useState<{ rating: number; body: string }[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [step, setStep] = useState<Step>('idle');
@@ -94,6 +113,9 @@ export default function ListingPage() {
     void api<{ rating: number; body: string }[]>(`/listings/${params.slug}/reviews`)
       .then(setReviews)
       .catch(() => setReviews([]));
+    void api<VersionNote[]>(`/listings/${params.slug}/versions`)
+      .then(setVersions)
+      .catch(() => setVersions([]));
   }
 
   useEffect(load, [params.slug]);
@@ -241,6 +263,10 @@ export default function ListingPage() {
           {listing.terminals.length ? <span>{listing.terminals.join(' · ')}</span> : null}
         </p>
 
+        {listing.content?.gallery.length ? (
+          <Gallery images={listing.content.gallery} title={listing.title} />
+        ) : null}
+
         {security ? (
           <Panel
             tone={verified ? 'ok' : 'warn'}
@@ -267,7 +293,7 @@ export default function ListingPage() {
         <div
           role="tablist"
           aria-label="Listing details"
-          className="mt-8 flex gap-1 border-b border-line"
+          className="mt-8 flex gap-1 overflow-x-auto border-b border-line"
         >
           {TABS.map((name) => (
             <button
@@ -279,14 +305,14 @@ export default function ListingPage() {
               aria-controls={`panel-${name}`}
               tabIndex={tab === name ? 0 : -1}
               onKeyDown={onTabKey}
-              className={`-mb-px border-b-2 px-4 py-2.5 text-sm capitalize transition-colors ${
+              className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm transition-colors ${
                 tab === name
                   ? 'border-accent text-ink'
                   : 'border-transparent text-muted hover:text-ink'
               }`}
               onClick={() => setTab(name)}
             >
-              {name}
+              {TAB_LABEL[name]}
               {name === 'reviews' && reviews.length ? ` (${reviews.length})` : ''}
             </button>
           ))}
@@ -294,10 +320,16 @@ export default function ListingPage() {
         <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="pt-5">
           {tab === 'security' ? <SecurityPanel listing={listing} /> : null}
           {tab === 'overview' ? (
-            <p className="m-0 max-w-2xl whitespace-pre-wrap leading-relaxed text-ink-2">
-              {listing.description}
-            </p>
+            listing.content?.readme ? (
+              <Markdown source={listing.content.readme} className="max-w-3xl" />
+            ) : (
+              <p className="m-0 max-w-2xl whitespace-pre-wrap leading-relaxed text-ink-2">
+                {listing.description}
+              </p>
+            )
           ) : null}
+          {tab === 'howto' ? <HowToPanel content={listing.content} /> : null}
+          {tab === 'changelog' ? <ChangelogPanel versions={versions} /> : null}
           {tab === 'reviews' ? (
             <ul className="m-0 space-y-2 p-0">
               <li className="list-none text-sm text-muted">
@@ -511,6 +543,49 @@ function SecurityPanel({ listing }: { listing: Listing }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function HowToPanel({ content }: { content: Listing['content'] }) {
+  if (!content?.howto && !content?.requirements) {
+    return <p className="m-0 text-muted">The creator hasn&apos;t added an install guide yet.</p>;
+  }
+  return (
+    <div className="grid items-start gap-6 xl:grid-cols-[1fr_260px]">
+      {content.howto ? <Markdown source={content.howto} className="max-w-3xl" /> : <span />}
+      {content.requirements ? (
+        <Panel tone="info" className="p-4">
+          <Label>Requirements</Label>
+          <Markdown source={content.requirements} className="mt-2 text-sm" />
+        </Panel>
+      ) : null}
+    </div>
+  );
+}
+
+function ChangelogPanel({ versions }: { versions: VersionNote[] }) {
+  if (!versions.length) return <p className="m-0 text-muted">No released versions yet.</p>;
+  return (
+    <ol className="m-0 space-y-3 p-0">
+      {versions.map((version, index) => (
+        <li
+          key={version.semver}
+          className="flex list-none gap-4 rounded-card border border-line bg-surface p-4"
+        >
+          <Square tone={index === 0 ? 'ok' : 'neutral'}>{index === 0 ? '✓' : '·'}</Square>
+          <div className="min-w-0 flex-1">
+            <p className="m-0 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-sm font-semibold text-ink">v{version.semver}</span>
+              {index === 0 ? <Tag tone="ok">LATEST</Tag> : null}
+              <span className="font-mono text-[11px] text-muted">{utc(version.created_at)}</span>
+            </p>
+            {version.changelog ? (
+              <Markdown source={version.changelog} links={false} className="mt-2 text-sm" />
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 

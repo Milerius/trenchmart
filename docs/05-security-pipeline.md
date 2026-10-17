@@ -146,3 +146,49 @@ Note: the sandbox is evidence, not proof (scripts can be time- or user-triggered
 | `Bond staked N SOL`    | active bond amount                                    |
 | `Disputes lost N`      | count upheld disputes                                 |
 | `Identity: X + wallet` | x linked                                              |
+
+## Listing pages (README, How to use, gallery)
+
+Seller-written pages are untrusted input and go through their own review before buyers see them.
+
+**Storage.** `listing_content.draft` holds what the seller is editing; only `listing_content.live`
+is ever returned by the public API. Saving a draft never changes the live page, so a page stays
+up while a new draft is reviewed.
+
+**Images** (`packages/scanner/src/image.ts`, called from `apps/api/src/content.ts`; max 12 in the gallery, 3 MB each, 40 uploads per listing):
+
+- The type comes from the file's magic bytes (PNG, JPEG, WebP). The client's Content-Type is ignored;
+  SVG, GIF, HTML and polyglots are refused.
+- Dimensions are 16–8192 px per side and at most 40 MP.
+- Metadata is removed by rewriting the container: PNG keeps only rendering chunks (each CRC is
+  checked); JPEG drops APP1 (EXIF/XMP), APP3–13, APP15 and comments; WebP drops EXIF/XMP chunks.
+  Bytes after the end of the image are dropped. Known limitation: the EXIF orientation flag goes
+  with the rest of EXIF, so a phone photo can show rotated.
+- Stored in R2 at `media/<sha256>.<ext>` and served from `/api/v1/media/:id` with the sniffed
+  Content-Type, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`,
+  `Content-Disposition: inline`, `Cross-Origin-Resource-Policy: same-site`. An image is public only
+  once a live page references it; until then only the owner can load it (`private, no-store`).
+
+**Markdown** is parsed (CommonMark + GFM) into a whitelisted tree and rendered as React elements;
+it never goes through `innerHTML`. Raw HTML shows as text. Links are limited to http(s), mailto,
+relative paths and anchors, and external links get `rel="noopener noreferrer nofollow ugc"`.
+Images may only point at our own `/api/v1/media/<id>`; anything else becomes an
+"External image removed" chip, so pages cannot hotlink trackers. Version changelogs are not
+reviewed, so they render with links switched off.
+
+**Review** (`packages/scanner/src/content.ts`, engine `content@1.0.0`) runs on submit:
+
+| Check                    | Fails on                                                                                            | Warns on                          |
+| ------------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------- |
+| content-link-scheme      | `javascript:`, `data:`, `vbscript:`, `file:` links, also written as plain text                      |                                   |
+| content-html             | script-capable HTML (`<script>`, `on*=` handlers, iframes, SVG, forms)                              | other raw HTML                    |
+| content-phishing         | lookalike brand domains (homoglyphs, one edit away), punycode, `user@host` links, blocklisted hosts |                                   |
+| content-link-hygiene     |                                                                                                     | shorteners, bare IPs, plain http  |
+| content-offsite-download | executables and extensions (`.exe`, `.msi`, `.crx`, `.xpi`, …)                                      | file hosts, archives, loose `.js` |
+| content-secret-request   | asking for a seed phrase or private key                                                             |                                   |
+| content-images           | images from another listing                                                                         | remote images                     |
+
+The checks feed the same AI verifier used for files: a failure rejects, a warning needs a creator
+explanation of at least 20 characters, and the decision is signed as
+`trenchmart-ai-attest:v1:content-<listingId>:<sha256 of the draft>:<decision>:<time>`. On approval the
+draft is copied to `live` together with the list of media ids it references.
