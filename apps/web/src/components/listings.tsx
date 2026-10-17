@@ -41,7 +41,7 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
     <Link
       data-testid="listing-card"
       href={`/l/${listing.slug}`}
-      className="group flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface transition-colors hover:border-line-strong"
+      className="motion-card group flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface hover:border-line-strong"
     >
       <div
         className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3"

@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { NetworkBanner } from '@/components/ui';
+import { api } from '@/lib/api';
 import { tierChip, usePublicConfig } from '@/lib/config';
 import { useWallet, WalletProvider } from '@/lib/wallet';
 
@@ -29,21 +30,47 @@ export function Logo() {
   );
 }
 
+const TICKER_FACTS = [
+  'Solana devnet · live',
+  'Holders: up to 100% off the 5% fee',
+  'Creators: 0% commission',
+  'Every version scanned, sandboxed and AI-verified',
+];
+
 function Ticker() {
+  const [items, setItems] = useState(TICKER_FACTS);
+
+  useEffect(() => {
+    void api<{ title: string }[]>('/listings')
+      .then((rows) => {
+        const titles = rows
+          .map((row) => row.title)
+          .filter(Boolean)
+          .slice(0, 8)
+          .map((title) => `Listing · ${title}`);
+        if (titles.length) setItems([...TICKER_FACTS, ...titles]);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const row = (copy: string) =>
+    items.map((item, index) => (
+      <span key={`${copy}-${index}`} className="inline-flex items-center gap-2 whitespace-nowrap">
+        <span className="live-dot h-1.5 w-1.5 rounded-full bg-accent" />
+        {item}
+      </span>
+    ));
+
   return (
-    <div className="hidden border-b border-line-soft bg-inset font-mono text-xs text-muted sm:block">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-7 gap-y-1 px-6 py-2">
-        <span className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
-          Solana devnet · live
+    <div
+      data-testid="ticker"
+      className="hidden h-8 overflow-hidden border-b border-line-soft bg-inset font-mono text-xs text-muted sm:block"
+    >
+      <div data-testid="ticker-track" className="ticker-track h-8 items-center px-6">
+        <span className="ticker-set inline-flex items-center gap-8">{row('a')}</span>
+        <span className="ticker-set inline-flex items-center gap-8" aria-hidden="true">
+          {row('b')}
         </span>
-        <span>
-          Holders: <span className="text-ink">up to 100% off the 5% fee</span>
-        </span>
-        <span>
-          Creators: <span className="text-ink">0% commission</span>
-        </span>
-        <span className="ml-auto">Every version scanned, sandboxed and AI-verified in seconds</span>
       </div>
     </div>
   );
@@ -92,7 +119,7 @@ function Nav() {
               key={link.href}
               href={link.href}
               aria-current={active(link.href) ? 'page' : undefined}
-              className={`rounded-lg px-3 py-2.5 whitespace-nowrap ${active(link.href) ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'}`}
+              className={`motion-nav rounded-lg px-3 py-2.5 whitespace-nowrap ${active(link.href) ? 'bg-surface-2 text-ink' : 'text-muted hover:bg-surface-2 hover:text-ink'}`}
             >
               {link.label}
             </Link>
@@ -139,7 +166,7 @@ function Nav() {
           <button
             data-testid="connect"
             type="button"
-            className="h-11 rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover disabled:opacity-100"
+            className="motion-press h-11 rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover disabled:opacity-100"
             onClick={() => void (wallet.session ? wallet.logout() : wallet.connect())}
             disabled={wallet.busy}
             aria-busy={wallet.busy || undefined}
@@ -153,7 +180,11 @@ function Nav() {
         </div>
       </div>
       {wallet.error ? (
-        <p role="alert" className="mx-auto max-w-7xl px-6 pb-3 text-sm text-danger">
+        <p
+          role="alert"
+          data-testid="toast"
+          className="toast mx-auto max-w-7xl px-6 pb-3 text-sm text-danger"
+        >
           {wallet.error}
         </p>
       ) : null}

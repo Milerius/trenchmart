@@ -42,8 +42,9 @@ export default function CreatorPage() {
   if (!profile) {
     return (
       <div className="space-y-4" aria-busy="true">
-        <p className="text-muted">Loading creator…</p>
-        <Skeleton className="h-9 w-1/3" />
+        <p className="sr-only">Loading creator…</p>
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-40 w-full" />
       </div>
     );
   }

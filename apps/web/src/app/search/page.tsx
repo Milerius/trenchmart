@@ -54,7 +54,15 @@ function Results() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<p className="text-muted">Searching…</p>}>
+    <Suspense
+      fallback={
+        <div aria-busy="true" className="space-y-3">
+          <p className="sr-only">Searching…</p>
+          <span className="skeleton block h-8 w-48" />
+          <span className="skeleton block h-36 w-full" />
+        </div>
+      }
+    >
       <Results />
     </Suspense>
   );

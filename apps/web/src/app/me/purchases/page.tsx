@@ -130,7 +130,7 @@ export default function PurchasesPage() {
       ) : null}
 
       {message ? (
-        <Panel tone="info" role="status" className="p-3 text-sm">
+        <Panel tone="info" role="status" data-testid="toast" className="toast p-3 text-sm">
           {message}
         </Panel>
       ) : null}
