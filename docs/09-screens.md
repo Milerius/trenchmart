@@ -6,7 +6,7 @@ Four screens are fully designed (`design/*.dc.html`). Others below are specified
 
 ### 1. Home & browse — `/` (`design/Main.dc.html`)
 
-1. **Top ticker**: "Solana · live", `$TRENCH [PRICE]`, "Holder tier unlocks: up to 100% fee rebate", right: "Every listing scanned + human-reviewed before it goes live".
+1. **Top ticker**: "Solana devnet · live", `$TRENCH [PRICE]`, "Holders: up to 100% off the 5% fee", right: "Every version scanned, sandboxed and AI-verified before it goes live". A devnet banner sits above it (see `docs/ux-guidelines.md`).
 2. **Nav**: logo, Explore / Sell / $TRENCH / Creators, search (focus with `/`), tier chip, wallet button (or "Connect wallet").
 3. **Hero** (2 columns): pill "Solana first · more chains later"; H1 "The verified edge, / for sale."; lead copy; buttons "Browse the market" (primary) + "Sell your tooling". Right: featured listing as a `CodeWindow` showing its header, permission ticks and a filter snippet, footer with title/creator/price → links to listing.
 4. **Trust strip**: Static + sandbox scan · Human review · Hash-pinned versions · Escrowed payouts.

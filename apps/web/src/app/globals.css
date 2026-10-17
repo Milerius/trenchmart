@@ -1,18 +1,46 @@
 @import 'tailwindcss';
 
+/* Values mirror design/tokens.json v2.1. Text tokens are >= 4.5:1 on surface; line-control >= 3:1. */
 @theme {
   --color-bg: #0a0b0a;
   --color-inset: #0e100e;
   --color-surface: #121412;
   --color-surface-2: #161916;
   --color-line: #262a26;
+  --color-line-soft: #1e221e;
+  --color-line-strong: #343a34;
+  --color-line-control: #646c63;
   --color-ink: #edefea;
+  --color-ink-2: #b4bab2;
   --color-muted: #9ba19a;
-  --color-faint: #6e756d;
+  --color-faint: #868d86;
+  --color-decor: #6e756d;
   --color-accent: #c6f432;
+  --color-accent-hover: #ddff7a;
   --color-onaccent: #0a0b0a;
-  --font-sans: Geist, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --color-accent-bg: #141a08;
+  --color-accent-line: #2e3a12;
+  --color-accent-label: #9faf86;
+  --color-accent-body: #c9d0be;
+  --color-warn: #f5a524;
+  --color-warn-bg: #1c160a;
+  --color-warn-line: #3a2c0e;
+  --color-danger: #ff8a7a;
+  --color-danger-bg: #1f1210;
+  --color-danger-line: #4a2620;
+  --color-info: #7cc4ff;
+  --color-info-bg: #0f1620;
+  --color-info-line: #1e3448;
+  --font-sans: var(--font-geist-sans), Geist, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace;
+  --radius-tag: 6px;
+  --radius-ctl: 10px;
+  --radius-card: 14px;
+  --radius-panel: 16px;
+}
+
+html {
+  scroll-padding-bottom: 96px;
 }
 
 body {
@@ -20,6 +48,9 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer base {
@@ -38,6 +69,32 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid #c6f432;
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #161916 0%, #1e221e 50%, #161916 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  * {
+    transition: none !important;
+  }
 }

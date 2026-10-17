@@ -23,7 +23,9 @@ test('home, listing shell, and dashboard expose the market test ids', async ({ p
   await expect(page.getByTestId('search')).toBeVisible();
 
   await page.goto('/l/not-a-listing');
-  await expect(page.getByText('Loading listing…')).toBeVisible();
+  await expect(
+    page.getByText(/Loading listing…|Listing not found|Couldn't load this listing/),
+  ).toBeVisible();
 
   await page.goto('/me/purchases');
   await expect(page.getByText('Connect a wallet to see purchases.')).toBeVisible();

@@ -1,0 +1,313 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>08 · Dashboard concept v2</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap"><style>:root{
+  --bg:#0A0B0A;--inset:#0E100E;--surface:#121412;--surface-2:#161916;
+  --line:#262A26;--line-soft:#1E221E;--line-strong:#343A34;--line-control:#646C63;
+  --text:#EDEFEA;--text-2:#B4BAB2;--muted:#9BA19A;--faint:#868D86;--decor:#6E756D;
+  --accent:#C6F432;--accent-hover:#DDFF7A;--on-accent:#0A0B0A;--accent-bg:#141A08;--accent-line:#2E3A12;--accent-label:#9FAF86;--accent-body:#C9D0BE;
+  --warn:#F5A524;--warn-bg:#1C160A;--warn-line:#3A2C0E;
+  --danger:#FF8A7A;--danger-bg:#1F1210;--danger-line:#4A2620;
+  --info:#7CC4FF;--info-bg:#0F1620;--info-line:#1E3448;
+  --violet:#C9A2FF;--teal:#6EE7C8;
+  --mono:'Geist Mono',ui-monospace,monospace;--sans:'Geist',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.grow{flex:1;min-width:0}
+.ml{margin-left:auto}
+.muted{color:var(--muted)}.t2{color:var(--text-2)}.faint{color:var(--faint)}.acc{color:var(--accent)}.warn{color:var(--warn)}.danger{color:var(--danger)}.info{color:var(--info)}
+.lbl{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.inset{background:var(--inset);border:1px solid var(--line-soft);border-radius:10px}
+.pad{padding:20px}.pad-s{padding:14px}
+.acc-panel{background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:16px}
+.warn-panel{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:14px}
+.danger-panel{background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:14px}
+.info-panel{background:var(--info-bg);border:1px solid var(--info-line);border-radius:14px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:10px;font:600 14px var(--sans);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.secondary{background:transparent;color:var(--text);border-color:var(--line-control)}
+.btn.ghost{background:transparent;color:var(--text-2)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger-line)}
+.btn.xl{height:52px;font-size:16px;border-radius:12px;font-weight:700}
+.btn.lg{height:48px}.btn.sm{height:36px;padding:0 12px;font-size:13px}
+.btn.block{width:100%}
+.btn[disabled],.btn.is-disabled{background:var(--surface-2);color:var(--faint);border-color:var(--line);cursor:not-allowed}
+.focus{outline:2px solid var(--accent);outline-offset:2px}
+/* tags + badges */
+.tag{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--mono);padding:3px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--text-2);white-space:nowrap}
+.tag.ok{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent)}
+.tag.wait{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tag.bad{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.tag.inf{background:var(--info-bg);border-color:var(--info-line);color:var(--info)}
+.tag.dark{background:var(--bg);border-color:transparent}
+.pill{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;font-size:13px;border:1px solid var(--line-control);background:var(--surface);color:var(--text-2)}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2)}
+.input{height:44px;background:var(--inset);border:1px solid var(--line-control);border-radius:10px;color:var(--text);padding:0 12px;font-size:14px;display:flex;align-items:center}
+.input.err{border-color:var(--danger)}
+.help{font-size:12px;color:var(--muted)}.help.err{color:var(--danger)}
+/* rows */
+.kv{display:flex;justify-content:space-between;gap:12px;font:13px var(--mono)}
+.kv .k{color:var(--muted);font-family:var(--sans)}
+.hr{height:1px;background:var(--line-soft)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.sq{flex:0 0 22px;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:700 12px var(--sans);color:var(--on-accent)}
+.sq.ok{background:var(--accent)}.sq.w{background:var(--warn)}.sq.x{background:var(--danger)}.sq.i{background:var(--info)}.sq.n{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-control)}
+/* skeleton */
+.sk{background:linear-gradient(90deg,#161916 0%,#1E221E 50%,#161916 100%);border-radius:6px}
+/* chrome */
+.netbar{background:#1C160A;border-bottom:1px solid var(--warn-line);color:var(--warn);font:12px var(--mono);text-align:center;padding:6px 16px}
+.ticker{border-bottom:1px solid var(--line-soft);background:var(--inset);font:12px var(--mono);color:var(--muted)}
+.ticker .wrap{padding:8px 24px;display:flex;flex-wrap:wrap;gap:8px 28px;align-items:center}
+.nav{border-bottom:1px solid var(--line-soft)}
+.nav .wrap{padding:14px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.logo{display:flex;gap:10px;align-items:center;color:var(--text);font-weight:700;font-size:18px;letter-spacing:-.02em}
+.logo i{width:32px;height:32px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.navlinks{display:flex;gap:4px}
+.navlinks a{padding:10px 12px;border-radius:8px;color:var(--muted);font-size:14px}
+.navlinks a.on{color:var(--text);background:var(--surface-2)}
+.search{flex:1 1 240px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line-control);border-radius:10px;padding:0 14px;height:44px;color:var(--muted);font-size:14px}
+.kbd{font:11px var(--mono);border:1px solid var(--line-control);border-radius:4px;padding:1px 6px;color:var(--muted)}
+.tierchip{display:flex;gap:6px;align-items:center;height:44px;padding:0 12px;border:1px solid var(--accent-line);background:var(--accent-bg);border-radius:10px;font:12px var(--mono);color:var(--accent)}
+.h-hero{font-size:clamp(40px,6vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:700}
+.h1{font-size:40px;line-height:1.05;letter-spacing:-.03em;font-weight:700}
+.h2{font-size:28px;letter-spacing:-.02em;font-weight:700}
+.h3{font-size:20px;letter-spacing:-.01em;font-weight:600}
+.lead{font-size:17px;color:var(--text-2)}
+.meta{font-size:13px;color:var(--muted)}
+.grid{display:grid;gap:16px}
+.g-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+/* artboards for exploration sheets */
+.sheet{padding:40px;display:flex;flex-direction:column;gap:28px}
+.sheet-h{display:flex;gap:16px;align-items:baseline;border-bottom:1px solid var(--line-soft);padding-bottom:16px}
+.sheet-h h1{font-size:28px;letter-spacing:-.02em}
+.board{display:flex;flex-direction:column;gap:10px}
+.board>.cap{font:12px var(--mono);color:var(--muted)}
+.frame{border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--bg)}
+.phone{width:390px;border:1px solid var(--line-strong);border-radius:28px;overflow:hidden;background:var(--bg)}
+.note{font-size:13px;color:var(--text-2);border-left:2px solid var(--accent);padding:2px 0 2px 12px}
+.q{font-size:13px;color:var(--warn);border-left:2px solid var(--warn);padding:2px 0 2px 12px}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+</style>
+<style>
+.boards{display:flex;gap:28px;align-items:flex-start}
+.desk{width:1400px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.stat{padding:16px;display:flex;flex-direction:column;gap:4px}
+.stat .v{font:600 24px var(--mono)}
+.stat .us{font:500 13px var(--mono);color:var(--t2)}
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+table.t th{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:12px 16px;background:var(--surface)}
+table.t td{padding:14px 16px;border-top:1px solid var(--line-soft);vertical-align:middle}
+table.t .n{text-align:right;font-family:var(--mono);white-space:nowrap}
+table.t .n .meta{font-size:12px}
+.pipe{display:flex;gap:3px}
+.pipe i{width:22px;height:6px;border-radius:3px;background:var(--line)}
+.pipe i.d{background:var(--accent)}.pipe i.w{background:var(--warn)}.pipe i.x{background:var(--danger)}.pipe i.i{background:var(--info)}
+.bar{height:8px;border-radius:4px;background:var(--line-soft);overflow:hidden}.bar i{display:block;height:8px;background:var(--accent)}
+.live{display:flex;flex-direction:column;gap:0}
+.step{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line-soft)}
+.step:first-child{border-top:0}
+.step .tm{font:500 12px var(--mono);color:var(--t2)}
+.log{background:#070807;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:12px/1.6 var(--mono);color:var(--t2);margin:2px 0 6px 38px}
+.log .ok{color:var(--accent)}.log .run{color:var(--info)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--info);display:inline-block;box-shadow:0 0 0 4px rgba(124,196,255,.15)}
+.m .wrap{padding:0 16px}
+.src{font:500 12px var(--mono);color:var(--muted)}
+</style></head><body><div class="sheet">
+<div class="sheet-h"><span class="lbl acc">08 · concept v2</span><h1>Creator dashboard: real numbers, live AI review</h1><span class="ml meta">/studio · creator @signalboy · Trencher tier · USD at $180.00/SOL</span></div>
+<div class="boards">
+<div class="board desk"><span class="cap">Desktop · /studio · loaded from GET /me/studio</span><div class="frame">
+  <div data-x="net"></div><div data-x="nav" data-active="Sell" data-state="connected"></div>
+  <main class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:22px">
+    <div class="row" style="align-items:baseline"><h1 class="h1" style="font-size:34px">Creator studio</h1><span class="meta">@signalboy · 3 listings</span><span class="src ml">updated 12s ago · USD ≈ at $180.00/SOL</span><button class="btn primary">New listing</button></div>
+    <div class="warn-panel row" style="padding:14px 16px;gap:12px;flex-wrap:nowrap" role="status"><span class="sq w">!</span><div class="grow col" style="gap:0"><b>1 version needs your explanation</b><span class="t2" style="font-size:13px">KOL Buy Alerts Config v1.1.0: the sandbox saw a request to api.telegram.org that isn't declared in @connect. Declare the host or explain it, and the AI re-checks right away.</span></div><button class="btn primary sm">Fix now</button></div>
+    <div class="stats" data-testid="studio-stats">
+      <div class="card stat"><span class="lbl">Earned · 30d</span><span class="v" data-l="13600000000"></span><span class="us" data-u="13600000000"></span><span class="meta">18 sales · 0% commission</span></div>
+      <div class="card stat"><span class="lbl">In escrow</span><span class="v" data-l="2400000000"></span><span class="us" data-u="2400000000"></span><span class="meta">4 orders · next release 6h 12m</span></div>
+      <div class="card stat"><span class="lbl">Next payout</span><span class="v" data-l="1200000000"></span><span class="us" data-u="1200000000"></span><span class="meta">2 orders · multisig signs daily</span></div>
+      <div class="card stat"><span class="lbl">Bond locked</span><span class="v" data-l="5000000000"></span><span class="us" data-u="5000000000"></span><span class="meta">alerts category · 5 / 5 SOL</span></div>
+      <div class="card stat"><span class="lbl">Disputes</span><span class="v">0 open</span><span class="us">0 lost all time</span><span class="meta">bond never slashed</span></div>
+    </div>
+    <div class="row" style="align-items:flex-start;gap:24px;flex-wrap:nowrap">
+      <div class="grow col" style="gap:20px">
+        <div class="card pad col" style="gap:6px" data-testid="live-review" aria-live="polite">
+          <div class="row" style="gap:10px"><span class="dot" aria-hidden="true"></span><b>Pump.fun Migration Pinger v0.9.0 · AI review running</b><span class="tag inf ml">◑ 00:11 ELAPSED</span></div>
+          <span class="meta" style="margin:-2px 0 6px">You can leave this page. The listing goes live the moment the verdict is approve.</span>
+          <div class="live" role="list">
+            <div class="step" role="listitem"><span class="sq ok">✓</span><span>Received and hashed <span class="mono meta">sha256 4e1a…90bc · 18.2 KB</span></span><span class="tm">0.4s</span></div>
+            <div class="step" role="listitem"><span class="sq ok">✓</span><span>Static checks <span class="meta">14 / 14 passed · no eval, no key access, @connect matches</span></span><span class="tm">2.1s</span></div>
+            <div class="step" role="listitem"><span class="sq i">◑</span><span><b>Running in an isolated sandbox</b> <span class="meta">headless browser on pump.fun · network recorded</span></span><span class="tm">8.6s</span></div>
+          </div>
+          <div class="log" aria-label="Sandbox log">
+            <div><span class="ok">✓</span> page loaded · pump.fun/board</div>
+            <div><span class="ok">✓</span> script injected · 0 console errors</div>
+            <div><span class="ok">✓</span> request → frontend-api.pump.fun (declared)</div>
+            <div><span class="run">›</span> waiting for a migration event…</div>
+          </div>
+          <div class="live" role="list">
+            <div class="step" role="listitem"><span class="sq n">4</span><span class="t2">AI verdict <span class="meta">reads the scan, sandbox log and your notes</span></span><span class="tm">—</span></div>
+            <div class="step" role="listitem"><span class="sq n">5</span><span class="t2">Live on your listing</span><span class="tm">—</span></div>
+          </div>
+        </div>
+      </div>
+      <aside class="col" style="flex:0 0 400px;gap:16px">
+        <div class="card pad col" style="gap:12px"><b>Trust requirements</b>
+          <div class="kv"><span class="k">Wallet signature</span><span class="acc">✓ signed</span></div>
+          <div class="kv"><span class="k">X account</span><span class="acc">✓ @signalboy</span></div>
+          <div class="kv"><span class="k">Creator bond · alerts</span><span class="mono">5.00 SOL · ≈ $900.00</span></div><div class="bar"><i style="width:100%"></i></div>
+          <div class="kv"><span class="k">Verification fee</span><span><s class="muted">0.25 SOL ≈ $45.00</s> <span class="acc">free · Trencher</span></span></div>
+          <p class="help">Your bond can be slashed to refund buyers if a listing is proven malicious. It unlocks 30 days after your last listing is delisted.</p>
+          <div class="row"><button class="btn secondary sm">Top up bond</button><button class="btn ghost sm">Withdraw…</button></div></div>
+        <div class="info-panel pad col" style="gap:8px"><span class="lbl info">How AI verification works</span><span class="t2" style="font-size:13px">Upload a version the way you'd send a prompt. The AI checks the code, runs it in an isolated sandbox and gives a verdict while you watch, usually within a minute. If it rejects or asks for a note, the reason is specific: fix it and upload again. Every verdict is signed and shown on your listing.</span></div>
+      </aside>
+    </div>
+        <div class="card" style="overflow:hidden"><div class="row" style="padding:14px 16px"><b>Listings</b><span class="meta ml">Pipeline: received · static checks · sandbox · AI verdict · live</span></div>
+          <table class="t" data-testid="studio-listings"><thead><tr><th>Listing</th><th>Version</th><th>Pipeline</th><th>Status</th><th class="n">Price</th><th class="n">Sales 30d</th><th class="n">Earned 30d</th></tr></thead><tbody>
+          <tr><td><b>KOL Buy Alerts Config</b></td><td class="mono">v1.1.0</td><td><div class="pipe"><i class="d"></i><i class="d"></i><i class="w"></i><i></i><i></i></div></td><td><span class="tag wait">! NEEDS YOUR NOTE</span><div class="meta" style="font-size:12px">paused at sandbox · 14s in</div></td><td class="n" data-lu="600000000"></td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><b>KOL Buy Alerts Config</b><div class="meta">live version</div></td><td class="mono">v1.0.2</td><td><div class="pipe"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i></div></td><td><span class="tag ok">✓ LIVE</span><div class="meta" style="font-size:12px">verified in 27s</div></td><td class="n" data-lu="600000000"></td><td class="n">11</td><td class="n" data-lu="6600000000"></td></tr>
+          <tr><td><b>Pump.fun Migration Pinger</b></td><td class="mono">v0.9.0</td><td><div class="pipe"><i class="d"></i><i class="d"></i><i class="i"></i><i></i><i></i></div></td><td><span class="tag inf">◑ AI REVIEW · 00:11</span><div class="meta" style="font-size:12px">sandbox running</div></td><td class="n" data-lu="400000000"></td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><b>Discord Whale Feed</b></td><td class="mono">v2.0.0</td><td><div class="pipe"><i class="d"></i><i class="d"></i><i class="x"></i><i></i><i></i></div></td><td><span class="tag bad">× REJECTED</span><div class="meta" style="font-size:12px">in 19s · calls signTransaction · <a>fix and re-upload</a></div></td><td class="n" data-lu="1000000000"></td><td class="n">7</td><td class="n" data-lu="7000000000"></td></tr>
+          </tbody><tfoot><tr><td colspan="5" class="meta" style="padding:12px 16px;border-top:1px solid var(--line)">Totals come from released orders. In-escrow sales show up after release.</td><td class="n" style="padding:12px 16px;border-top:1px solid var(--line)">18</td><td class="n" style="padding:12px 16px;border-top:1px solid var(--line)" data-lu="13600000000"></td></tr></tfoot></table></div>
+    <div class="row" style="align-items:flex-start;gap:24px;flex-wrap:nowrap">
+      <div class="grow col">
+        <div class="card" style="overflow:hidden"><div class="row" style="padding:14px 16px"><b>Payouts</b><a class="ml" style="font-size:13px">Export CSV</a></div>
+          <table class="t"><thead><tr><th>Batch</th><th>Orders</th><th class="n">Amount</th><th>Status</th><th>Tx</th></tr></thead><tbody>
+          <tr><td class="mono">pb_0412</td><td>2</td><td class="n" data-lu="1200000000"></td><td><span class="tag wait">◷ PROPOSED</span></td><td class="meta">waiting for multisig</td></tr>
+          <tr><td class="mono">pb_0409</td><td>5</td><td class="n" data-lu="3000000000"></td><td><span class="tag ok">✓ SENT</span></td><td><a class="mono" style="font-size:13px">3xQe…7hLd ↗</a></td></tr>
+          </tbody></table></div>
+      </div>
+      <aside class="col" style="flex:0 0 400px">
+        <div class="card pad col" style="gap:10px"><span class="lbl">States for this page</span>
+          <div class="row" style="gap:8px"><span class="sk" style="width:90px;height:22px;display:inline-block"></span><span class="sk" style="width:60px;height:14px;display:inline-block"></span><span class="meta ml">loading: skeleton, never a fake number</span></div>
+          <div class="row" style="gap:8px"><span class="mono">0.00 SOL</span><span class="mono meta">≈ $0.00</span><span class="meta ml">no sales yet: real zero</span></div>
+          <div class="danger-panel row" style="padding:10px 12px;gap:8px;flex-wrap:nowrap" role="alert"><span class="sq x">×</span><span style="font-size:13px">Couldn't load your numbers.</span><button class="btn secondary sm ml">Retry</button></div>
+          <div class="row" style="gap:8px"><span class="mono">2.40 SOL</span><span class="mono faint">USD unavailable</span><span class="meta ml">price feed down: SOL stays</span></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div></div>
+<div class="col" style="gap:28px">
+<div class="board"><span class="cap">Phone · 390 · /studio</span><div class="phone m">
+  <div data-x="mnav" data-state="connected"></div>
+  <main class="wrap" style="padding-top:16px;padding-bottom:20px;display:flex;flex-direction:column;gap:12px">
+    <div class="row"><h1 style="font-size:26px;letter-spacing:-.03em">Studio</h1><button class="btn primary sm ml">New</button></div>
+    <div class="warn-panel row" style="padding:12px;gap:10px;flex-wrap:nowrap"><span class="sq w">!</span><span style="font-size:13px">1 version needs your note</span><button class="btn primary sm ml">Fix</button></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px">
+      <div class="card stat"><span class="lbl">Earned 30d</span><span class="v" style="font-size:18px" data-l="13600000000"></span><span class="us" data-u="13600000000"></span></div>
+      <div class="card stat"><span class="lbl">In escrow</span><span class="v" style="font-size:18px" data-l="2400000000"></span><span class="us" data-u="2400000000"></span></div>
+    </div>
+    <div class="card pad-s col" style="gap:8px" aria-live="polite"><div class="row"><span class="dot" aria-hidden="true"></span><b>Migration Pinger</b><span class="tag inf ml">◑ 00:11</span></div>
+      <div class="row" style="gap:8px;font-size:13px"><span class="sq ok">✓</span>Static checks 14/14<span class="tm mono meta ml">2.1s</span></div>
+      <div class="row" style="gap:8px;font-size:13px"><span class="sq i">◑</span><b>Sandbox running</b><span class="tm mono meta ml">8.6s</span></div>
+      <div class="pipe"><i class="d"></i><i class="d"></i><i class="i"></i><i></i><i></i></div></div>
+    <div class="card pad-s col" style="gap:8px"><div class="row"><b>KOL Buy Alerts</b><span class="tag wait ml">! NOTE</span></div><div class="pipe"><i class="d"></i><i class="d"></i><i class="w"></i><i></i><i></i></div><span class="meta">v1.1.0 · paused at sandbox · 14s in</span></div>
+    <div class="card pad-s col" style="gap:6px"><div class="row"><b>Payout pb_0412</b><span class="tag wait ml">◷ PROPOSED</span></div><div class="kv"><span class="k">Amount</span><span class="mono">1.20 SOL · ≈ $216.00</span></div></div>
+  </main>
+</div></div>
+<div class="board"><span class="cap">Empty · first visit</span><div class="card pad col" style="width:390px;gap:12px">
+  <b style="font-size:18px">Sell your first tool</b><span class="meta">Three things before your first upload. Each one takes about a minute.</span>
+  <div class="row" style="gap:10px;flex-wrap:nowrap"><span class="sq ok">✓</span>Sign in with your wallet</div>
+  <div class="row" style="gap:10px;flex-wrap:nowrap"><span class="sq n">2</span>Link your X account</div>
+  <div class="row" style="gap:10px;flex-wrap:nowrap"><span class="sq n">3</span>Stake a bond (1–5 SOL ≈ $180–$900 by category, OG −50%)</div>
+  <button class="btn primary lg block">Link X</button><span class="help">Creators keep 100% of the list price. Buyers pay the 5% fee. Your first AI review starts the second you upload.</span></div></div>
+</div>
+</div>
+<p class="note">v2, owner decisions applied. <b>Real values only:</b> every tile and table cell is computed from studio API data, with skeletons while loading, a real 0.00 when there are no sales, and an error with Retry. It never shows sample numbers (only the landing page does that). <b>USD next to every SOL amount</b>, marked "≈" with the rate in the header. If the price feed fails, the SOL amount stays and USD says "unavailable". <b>AI review is live:</b> a running version shows steps with seconds and a sandbox log, not a queue. <b>No human appeal:</b> a rejection gives the specific reason and a "fix and re-upload" path. Earned totals only count released orders, which matches the release-then-download rule.</p>
+</div><script>(function () {
+  const lock = '<svg class="i" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+  const shield = '<svg class="i" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>';
+  const logoSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0B0A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 L9 8 L13 14 L16 9 L20 18"/></svg>';
+  window.ICON = { lock, shield };
+  const parts = {
+    net: () => '<div class="netbar">DEVNET · test SOL only · nothing here has real value</div>',
+    ticker: () => '<div class="ticker"><div class="wrap"><span class="row" style="gap:8px"><span class="dot"></span>Solana devnet · live</span><span>$TRENCH <span style="color:var(--text)">[PRICE]</span></span><span>Holders: <span style="color:var(--text)">up to 100% off the 5% fee</span></span><span class="ml">Every version scanned, sandboxed and AI-verified before it goes live</span></div></div>',
+    nav: (el) => {
+      const a = el.dataset.active || '';
+      const st = el.dataset.state || 'connected';
+      const links = ['Explore', 'Sell', '$TRENCH', 'Purchases'].map((n) => `<a class="${n === a ? 'on' : ''}">${n}</a>`).join('');
+      const right = st === 'connected'
+        ? '<span class="tierchip">Trencher · 60% off fees</span><button class="btn primary">7xKp…a9Fq</button>'
+        : '<button class="btn primary">Connect wallet</button>';
+      return `<header class="nav"><div class="wrap"><a class="logo"><i>${logoSvg}</i>trenchmart</a><nav class="navlinks">${links}</nav><label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="grow">Search scripts, wallet lists, filters, creators…</span><span class="kbd">/</span></label>${right}</div></header>`;
+    },
+    mnav: (el) => {
+      const st = el.dataset.state || 'connected';
+      const right = st === 'connected' ? '<button class="btn primary sm">7xKp…a9Fq</button>' : '<button class="btn primary sm">Connect</button>';
+      return `<div class="netbar" style="font-size:11px">DEVNET · test SOL only</div><header class="nav"><div class="wrap" style="padding:12px 16px;gap:10px"><a class="logo" style="font-size:16px"><i style="width:28px;height:28px">${logoSvg}</i>trenchmart</a><span class="ml"></span><button class="btn secondary sm" aria-label="Search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>${right}</div></header>`;
+    },
+    foot: () => '<footer style="margin-top:56px;border-top:1px solid var(--line-soft)"><div class="wrap row" style="padding:24px;gap:16px 28px;font-size:13px;color:var(--muted)"><b style="color:var(--text)">trenchmart</b><a class="muted">Security policy</a><a class="muted">How AI verification works</a><a class="muted">Report a listing</a><a class="muted">Docs</a><span class="ml">Not financial advice. Tools don\'t guarantee profits.</span></div></footer>',
+  };
+  const REBATE = { none: 0n, scout: 2500n, trencher: 6000n, og: 10000n };
+  const sol = (l) => {
+    const s = l.toString().padStart(10, '0');
+    let frac = s.slice(-9).replace(/0+$/, '');
+    if (frac.length < 2) frac = frac.padEnd(2, '0');
+    return `${s.slice(0, -9).replace(/^0+(?=\d)/, '')}.${frac}`;
+  };
+  const quote = (price, tier) => {
+    const fee = (price * 500n) / 10000n;
+    const rebate = (fee * REBATE[tier]) / 10000n;
+    return { price, fee, rebate, total: price + fee - rebate };
+  };
+  const RATE_CENTS = 18000n;
+  const usd = (l) => {
+    const c = (l * RATE_CENTS) / 1000000000n;
+    if (c < 1n) return '< $0.01';
+    const d = (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `≈ ${d}.${(c % 100n).toString().padStart(2, '0')}`;
+  };
+  window.TM = { sol, quote, usd };
+  const CAT = {
+    USERSCRIPT: ['#C6F432', '#141A10'], 'WALLET LIST': ['#7CC4FF', '#0F1620'], FILTER: ['#F5A524', '#1C160A'],
+    SETUP: ['#C9A2FF', '#18121F'], STRATEGY: ['#6EE7C8', '#0E1A17'], ALERTS: ['#FF8A7A', '#1F1210'],
+  };
+  const L = [
+    ['USERSCRIPT', 'Axiom · GMGN', 'Sniper Filter Pack v2', '@dev_degen', '4.9', 412, 1500000000n, 'ok', '5'],
+    ['WALLET LIST', 'GMGN · Photon · Axiom', '120 Early Wallets (Q4)', '@onchainsleuth', '4.7', 268, 2000000000n, 'ok', '2'],
+    ['FILTER', 'Photon', 'Migration Sniper Presets', '@pumpwatch', '4.6', 190, 800000000n, 'ok', '1'],
+    ['SETUP', 'Axiom · BullX', 'Full Trench Desk Setup', '@nightshift', '4.8', 96, 3500000000n, 'ok', '5'],
+    ['USERSCRIPT', 'Axiom', 'Bundle Detector Overlay', '@rugradar', '4.9', 533, 1200000000n, 'ok', '5'],
+    ['STRATEGY', 'Any terminal', 'Copy-Trade Exit Playbook', '@calmape', '4.5', 74, 1000000000n, 'ok', '1'],
+    ['ALERTS', 'Telegram · Padre', 'KOL Buy Alerts Config', '@signalboy', '4.4', 58, 600000000n, 'ok', '5'],
+    ['USERSCRIPT', 'GMGN · BullX', 'Dev Wallet History Tooltip', '@dev_degen', '4.8', 301, 900000000n, 'ok', '5'],
+  ];
+  window.TM.listings = L;
+  const card = (l, tier) => {
+    const [type, compat, title, by, rating, sold, price, st, bond] = l;
+    const [c, bg] = CAT[type];
+    const badge = st === 'ok' ? '<span class="tag ok ml">✓ AI-VERIFIED</span>' : st === 'locked' ? '<span class="tag inf ml">◷ HOLDERS 48H</span>' : '<span class="tag wait ml">◷ IN AI REVIEW</span>';
+    const q = tier ? quote(price, tier) : null;
+    const priceLine = q
+      ? `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(q.total)} SOL</span><span class="mono acc" style="font-size:12px">you pay · ${tier === 'none' ? 'incl. 5% fee' : tier[0].toUpperCase() + tier.slice(1) + ' rate'}</span></div><span class="mono meta" style="font-size:12px;margin-top:-6px">${usd(q.total)}</span>`
+      : `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(price)} SOL</span><span class="mono meta" style="font-size:12px">${usd(price)} · list price</span></div><span class="mono faint" style="font-size:12px;margin-top:-6px">+ 5% fee · your tier can cut it</span>`;
+    return `<a class="card" data-testid="listing-card" style="display:flex;flex-direction:column;overflow:hidden;color:var(--text)"><div style="height:112px;background:${bg};padding:14px;display:flex;flex-direction:column;justify-content:space-between;border-bottom:1px solid var(--line-soft)"><div class="row" style="gap:6px"><span class="tag dark" style="color:${c}">${type}</span>${badge}</div><span class="mono t2" style="font-size:12px">${compat}</span></div><div style="padding:14px;display:flex;flex-direction:column;gap:8px"><div class="col" style="gap:2px"><b>${title}</b><span class="meta">${by} · bond ${bond} SOL · ${sold} sold · ★ ${rating}</span></div>${priceLine}</div></a>`;
+  };
+  window.TM.card = card;
+  parts.preview = (el) => el.dataset.compact
+    ? `<div class="info-panel col" data-testid="preview-notice" role="note" style="padding:14px;gap:10px"><div class="row" style="gap:10px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><b style="font-size:14px">Preview prices</b></div><span class="t2" style="font-size:13px">These are list prices. Connect to see your exact price with your $TRENCH tier discount.</span><button class="btn primary block">Connect to see your price</button></div>`
+    : `<div class="info-panel row" data-testid="preview-notice" role="note" style="padding:12px 16px;gap:12px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><div class="grow col" style="gap:0"><b style="font-size:14px">Preview prices</b><span class="t2" style="font-size:13px">You're seeing list prices. Connect your wallet to see your exact price with your $TRENCH tier discount (up to 100% off the 5% fee).</span></div><button class="btn primary sm">Connect to see your price</button></div>`;
+  parts.cards = (el) => {
+    const n = Number(el.dataset.n || 8);
+    const tier = el.dataset.tier || '';
+    const cols = el.dataset.cols ? `grid-template-columns:repeat(${el.dataset.cols},1fr)` : '';
+    return `<div class="grid g-cards" style="${cols}">${L.slice(0, n).map((l) => card(l, tier)).join('')}</div>`;
+  };
+  document.querySelectorAll('[data-x]').forEach((el) => { el.outerHTML = parts[el.dataset.x](el); });
+})();
+</script>
+<script>
+const {sol,usd}=window.TM;
+document.querySelectorAll('[data-l]').forEach(e=>e.textContent=sol(BigInt(e.dataset.l))+' SOL');
+document.querySelectorAll('[data-u]').forEach(e=>e.textContent=usd(BigInt(e.dataset.u)));
+document.querySelectorAll('[data-lu]').forEach(e=>{const l=BigInt(e.dataset.lu);e.innerHTML=sol(l)+' SOL<div class="meta">'+usd(l)+'</div>'});
+</script></body></html>

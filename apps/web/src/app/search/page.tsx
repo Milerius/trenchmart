@@ -3,39 +3,58 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ListingGrid, type Listing } from '@/components/listings';
+import { Label, PreviewNotice } from '@/components/ui';
 import { api } from '@/lib/api';
+import { usePublicConfig, useSolUsd } from '@/lib/config';
+import { useWallet } from '@/lib/wallet';
 
 function Results() {
   const params = useSearchParams();
   const q = params.get('q') ?? '';
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [cents, setCents] = useState<string | null>(null);
+  const wallet = useWallet();
+  const config = usePublicConfig();
+  const cents = useSolUsd();
+  const [listings, setListings] = useState<Listing[] | null>(null);
 
   useEffect(() => {
     const query = new URLSearchParams();
     if (q) query.set('q', q);
+    setListings(null);
     void api<Listing[]>(`/listings?${query.toString()}`)
       .then(setListings)
       .catch(() => setListings([]));
-    void api<{ centsPerSol: string | null }>('/prices/sol').then((price) =>
-      setCents(price.centsPerSol),
-    );
-  }, [q]);
+  }, [q, wallet.session?.wallet]);
 
   return (
-    <section>
-      <h1 className="text-3xl">Search</h1>
-      <p className="mt-2 text-muted">{q ? `Results for “${q}”` : 'All live listings'}</p>
-      <div className="mt-6">
-        <ListingGrid listings={listings} centsPerSol={cents} />
+    <section className="space-y-6">
+      <div>
+        <Label>Search</Label>
+        <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
+          {q ? `Results for “${q}”` : 'All live listings'}
+        </h1>
+        {listings ? (
+          <p className="m-0 mt-1 text-sm text-muted">
+            {listings.length} AI-verified listing{listings.length === 1 ? '' : 's'}
+          </p>
+        ) : null}
       </div>
+      {!wallet.session ? <PreviewNotice onConnect={() => void wallet.connect()} /> : null}
+      <ListingGrid
+        listings={listings ?? []}
+        loading={listings === null}
+        centsPerSol={cents}
+        config={config}
+        tier={wallet.session?.tier}
+        emptyTitle={q ? `Nothing matches “${q}”` : undefined}
+        emptyBody={q ? 'Try a terminal name, a category, or fewer words.' : undefined}
+      />
     </section>
   );
 }
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<p>Searching…</p>}>
+    <Suspense fallback={<p className="text-muted">Searching…</p>}>
       <Results />
     </Suspense>
   );

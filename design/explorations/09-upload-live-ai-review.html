@@ -1,0 +1,307 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>09 · Upload as a prompt, live AI review</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap"><style>:root{
+  --bg:#0A0B0A;--inset:#0E100E;--surface:#121412;--surface-2:#161916;
+  --line:#262A26;--line-soft:#1E221E;--line-strong:#343A34;--line-control:#646C63;
+  --text:#EDEFEA;--text-2:#B4BAB2;--muted:#9BA19A;--faint:#868D86;--decor:#6E756D;
+  --accent:#C6F432;--accent-hover:#DDFF7A;--on-accent:#0A0B0A;--accent-bg:#141A08;--accent-line:#2E3A12;--accent-label:#9FAF86;--accent-body:#C9D0BE;
+  --warn:#F5A524;--warn-bg:#1C160A;--warn-line:#3A2C0E;
+  --danger:#FF8A7A;--danger-bg:#1F1210;--danger-line:#4A2620;
+  --info:#7CC4FF;--info-bg:#0F1620;--info-line:#1E3448;
+  --violet:#C9A2FF;--teal:#6EE7C8;
+  --mono:'Geist Mono',ui-monospace,monospace;--sans:'Geist',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.grow{flex:1;min-width:0}
+.ml{margin-left:auto}
+.muted{color:var(--muted)}.t2{color:var(--text-2)}.faint{color:var(--faint)}.acc{color:var(--accent)}.warn{color:var(--warn)}.danger{color:var(--danger)}.info{color:var(--info)}
+.lbl{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.inset{background:var(--inset);border:1px solid var(--line-soft);border-radius:10px}
+.pad{padding:20px}.pad-s{padding:14px}
+.acc-panel{background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:16px}
+.warn-panel{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:14px}
+.danger-panel{background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:14px}
+.info-panel{background:var(--info-bg);border:1px solid var(--info-line);border-radius:14px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:10px;font:600 14px var(--sans);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.secondary{background:transparent;color:var(--text);border-color:var(--line-control)}
+.btn.ghost{background:transparent;color:var(--text-2)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger-line)}
+.btn.xl{height:52px;font-size:16px;border-radius:12px;font-weight:700}
+.btn.lg{height:48px}.btn.sm{height:36px;padding:0 12px;font-size:13px}
+.btn.block{width:100%}
+.btn[disabled],.btn.is-disabled{background:var(--surface-2);color:var(--faint);border-color:var(--line);cursor:not-allowed}
+.focus{outline:2px solid var(--accent);outline-offset:2px}
+/* tags + badges */
+.tag{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--mono);padding:3px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--text-2);white-space:nowrap}
+.tag.ok{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent)}
+.tag.wait{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tag.bad{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.tag.inf{background:var(--info-bg);border-color:var(--info-line);color:var(--info)}
+.tag.dark{background:var(--bg);border-color:transparent}
+.pill{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;font-size:13px;border:1px solid var(--line-control);background:var(--surface);color:var(--text-2)}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2)}
+.input{height:44px;background:var(--inset);border:1px solid var(--line-control);border-radius:10px;color:var(--text);padding:0 12px;font-size:14px;display:flex;align-items:center}
+.input.err{border-color:var(--danger)}
+.help{font-size:12px;color:var(--muted)}.help.err{color:var(--danger)}
+/* rows */
+.kv{display:flex;justify-content:space-between;gap:12px;font:13px var(--mono)}
+.kv .k{color:var(--muted);font-family:var(--sans)}
+.hr{height:1px;background:var(--line-soft)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.sq{flex:0 0 22px;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:700 12px var(--sans);color:var(--on-accent)}
+.sq.ok{background:var(--accent)}.sq.w{background:var(--warn)}.sq.x{background:var(--danger)}.sq.i{background:var(--info)}.sq.n{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-control)}
+/* skeleton */
+.sk{background:linear-gradient(90deg,#161916 0%,#1E221E 50%,#161916 100%);border-radius:6px}
+/* chrome */
+.netbar{background:#1C160A;border-bottom:1px solid var(--warn-line);color:var(--warn);font:12px var(--mono);text-align:center;padding:6px 16px}
+.ticker{border-bottom:1px solid var(--line-soft);background:var(--inset);font:12px var(--mono);color:var(--muted)}
+.ticker .wrap{padding:8px 24px;display:flex;flex-wrap:wrap;gap:8px 28px;align-items:center}
+.nav{border-bottom:1px solid var(--line-soft)}
+.nav .wrap{padding:14px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.logo{display:flex;gap:10px;align-items:center;color:var(--text);font-weight:700;font-size:18px;letter-spacing:-.02em}
+.logo i{width:32px;height:32px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.navlinks{display:flex;gap:4px}
+.navlinks a{padding:10px 12px;border-radius:8px;color:var(--muted);font-size:14px}
+.navlinks a.on{color:var(--text);background:var(--surface-2)}
+.search{flex:1 1 240px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line-control);border-radius:10px;padding:0 14px;height:44px;color:var(--muted);font-size:14px}
+.kbd{font:11px var(--mono);border:1px solid var(--line-control);border-radius:4px;padding:1px 6px;color:var(--muted)}
+.tierchip{display:flex;gap:6px;align-items:center;height:44px;padding:0 12px;border:1px solid var(--accent-line);background:var(--accent-bg);border-radius:10px;font:12px var(--mono);color:var(--accent)}
+.h-hero{font-size:clamp(40px,6vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:700}
+.h1{font-size:40px;line-height:1.05;letter-spacing:-.03em;font-weight:700}
+.h2{font-size:28px;letter-spacing:-.02em;font-weight:700}
+.h3{font-size:20px;letter-spacing:-.01em;font-weight:600}
+.lead{font-size:17px;color:var(--text-2)}
+.meta{font-size:13px;color:var(--muted)}
+.grid{display:grid;gap:16px}
+.g-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+/* artboards for exploration sheets */
+.sheet{padding:40px;display:flex;flex-direction:column;gap:28px}
+.sheet-h{display:flex;gap:16px;align-items:baseline;border-bottom:1px solid var(--line-soft);padding-bottom:16px}
+.sheet-h h1{font-size:28px;letter-spacing:-.02em}
+.board{display:flex;flex-direction:column;gap:10px}
+.board>.cap{font:12px var(--mono);color:var(--muted)}
+.frame{border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--bg)}
+.phone{width:390px;border:1px solid var(--line-strong);border-radius:28px;overflow:hidden;background:var(--bg)}
+.note{font-size:13px;color:var(--text-2);border-left:2px solid var(--accent);padding:2px 0 2px 12px}
+.q{font-size:13px;color:var(--warn);border-left:2px solid var(--warn);padding:2px 0 2px 12px}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+</style>
+<style>
+.boards{display:flex;gap:28px;align-items:flex-start}
+.desk{width:1400px}
+.composer{border:1px solid var(--border-control);border-radius:16px;background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:14px}
+.composer.focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(198,244,50,.18)}
+.drop{border:1px dashed var(--border-control);border-radius:12px;padding:22px;display:flex;gap:14px;align-items:center;background:#0E100E}
+.file{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#0E100E;font:13px var(--mono)}
+.step{display:grid;grid-template-columns:28px 1fr 64px;gap:12px;align-items:start;padding:12px 0;border-top:1px solid var(--line-soft)}
+.step:first-child{border-top:0}
+.step .tm{font:500 12px var(--mono);color:var(--t2);text-align:right;padding-top:3px}
+.step .sub{font-size:13px;color:var(--t2)}
+.chk{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 16px;margin-top:8px;font:12px var(--mono);color:var(--t2)}
+.chk span:before{content:'✓ ';color:var(--accent)}
+.chk span.w:before{content:'! ';color:var(--warn)}
+.log{background:#070807;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:12px/1.65 var(--mono);color:var(--t2);margin-top:8px}
+.log .ok{color:var(--accent)}.log .run{color:var(--info)}.log .w{color:var(--warn)}.log .x{color:var(--danger)}.log .ts{color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--info);display:inline-block;box-shadow:0 0 0 4px rgba(124,196,255,.15)}
+.prog{height:6px;border-radius:3px;background:var(--line-soft);overflow:hidden}.prog i{display:block;height:6px;background:var(--info)}
+.out{flex:1 1 0;min-width:0}
+.verdict{font:600 13px var(--mono);letter-spacing:.02em}
+.m .wrap{padding:0 16px}
+</style></head><body><div class="sheet">
+<div class="sheet-h"><span class="lbl acc">09 · concept</span><h1>Upload like a prompt, watch the AI review live</h1><span class="ml meta">/studio/new · creator @signalboy · Trencher tier · no queue, no "come back later"</span></div>
+<div class="boards">
+<div class="col" style="gap:28px;flex:0 0 1400px">
+<div class="board desk"><span class="cap">Desktop · /studio/new · 00:14 after drop, sandbox streaming</span><div class="frame">
+  <div data-x="net"></div><div data-x="nav" data-active="Sell" data-state="connected"></div>
+  <main class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:20px">
+    <div class="row" style="align-items:baseline"><h1 class="h1" style="font-size:34px">New listing</h1><span class="meta">Drop a file and the AI starts checking it right away. Fill in the details while it runs.</span></div>
+    <div class="row" style="align-items:flex-start;gap:24px;flex-wrap:nowrap">
+      <section class="grow col" style="gap:16px;min-width:0">
+        <div class="composer" data-testid="upload-composer">
+          <div class="file"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4"/></svg>migration-pinger.user.js<span class="meta">· 18.2 KB · sha256 4e1a…90bc</span><span class="tag ok ml">FROZEN</span></div>
+          <label class="col" style="gap:6px;font-size:13px;color:var(--t2)">Note for the AI <span class="meta" style="font-size:12px">(optional now, needed if a check asks)</span>
+            <textarea class="input" rows="2" style="height:auto;padding:10px 12px;resize:vertical">Pings Telegram when a pump.fun token migrates. Reads the board page only, no wallet access.</textarea></label>
+          <div class="row" style="gap:8px"><span class="meta">Each new version runs the full review again.</span><button class="btn secondary sm ml">Replace file</button><button class="btn ghost sm">Stop review</button></div>
+        </div>
+        <div class="card pad col" style="gap:0" data-testid="live-review" aria-live="polite" aria-busy="true">
+          <div class="row" style="gap:10px;padding-bottom:10px"><span class="dot" aria-hidden="true"></span><b>AI review running</b><span class="meta">step 3 of 5</span><span class="tag inf ml">◑ 00:14</span></div>
+          <div class="prog" aria-hidden="true"><i style="width:52%"></i></div>
+          <div role="list" style="margin-top:6px">
+            <div class="step" role="listitem"><span class="sq ok">✓</span><div><b>Received and hashed</b><div class="sub">The file is frozen: buyers get exactly these bytes.</div></div><span class="tm">0.4s</span></div>
+            <div class="step" role="listitem"><span class="sq ok">✓</span><div><b>Static checks · 14 / 14 passed</b>
+              <div class="chk"><span>no drainer signatures</span><span>no key or seed access</span><span>no signTransaction</span><span>no eval or remote code</span><span>@connect matches requests</span><span>metadata block valid</span></div></div><span class="tm">2.1s</span></div>
+            <div class="step" role="listitem"><span class="sq i">◑</span><div><b>Running in an isolated sandbox</b><div class="sub">Fresh browser, fake wallet that logs every call and never signs, network recorded. Target 2 of 2.</div>
+              <div class="log" role="log" aria-label="Sandbox log">
+                <div><span class="ts">00:03.0</span> <span class="ok">✓</span> sandbox up · chromium · fake wallet attached</div>
+                <div><span class="ts">00:04.2</span> <span class="ok">✓</span> axiom.trade/pulse loaded · script injected</div>
+                <div><span class="ts">00:07.9</span> <span class="ok">✓</span> GET frontend-api.pump.fun/coins (declared)</div>
+                <div><span class="ts">00:09.1</span> <span class="ok">✓</span> wallet calls: 0 · console errors: 0</div>
+                <div><span class="ts">00:10.4</span> <span class="ok">✓</span> gmgn.ai/?chain=sol loaded · script injected</div>
+                <div><span class="ts">00:13.8</span> <span class="run">›</span> scrolling the board, waiting for a migration event…</div>
+              </div></div><span class="tm">11.6s</span></div>
+            <div class="step" role="listitem"><span class="sq n">4</span><div><b class="t2">AI verdict</b><div class="sub">Reads the checks, the sandbox log and your note, then signs approve, request changes or reject.</div></div><span class="tm">—</span></div>
+            <div class="step" role="listitem"><span class="sq n">5</span><div><b class="t2">Live</b><div class="sub">Attestation published, listing public, buyers can pay.</div></div><span class="tm">—</span></div>
+          </div>
+          <p class="help" style="margin:10px 0 0">Usually done in under a minute. You can keep editing details, or leave: we'll notify you the moment there's a verdict.</p>
+        </div>
+      </section>
+      <aside class="col" style="flex:0 0 400px;gap:16px">
+        <form class="card pad col" style="gap:12px"><b>Listing details</b>
+          <label class="col" style="gap:6px;font-size:13px;color:var(--t2)">Title<input class="input" value="Pump.fun Migration Pinger"></label>
+          <label class="col" style="gap:6px;font-size:13px;color:var(--t2)">Category<select class="input"><option>Alerts &amp; bots</option></select></label>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px">
+            <label class="col" style="gap:6px;font-size:13px;color:var(--t2)">Price (SOL)<input class="input mono" value="0.40" inputmode="decimal"><span class="mono meta" style="font-size:12px">≈ $72.00 · you keep all of it</span></label>
+            <label class="col" style="gap:6px;font-size:13px;color:var(--t2)">License<select class="input"><option>1 wallet</option></select></label>
+          </div>
+          <div class="inset col" style="gap:6px;padding:12px;border-radius:10px">
+            <div class="kv"><span class="k">Buyer pays (no tier)</span><span class="mono">0.42 SOL · ≈ $75.60</span></div>
+            <div class="kv"><span class="k">Buyer pays (OG)</span><span class="mono">0.40 SOL · ≈ $72.00</span></div>
+            <div class="kv"><span class="k">You receive</span><b class="mono acc">0.40 SOL · ≈ $72.00</b></div>
+          </div>
+          <span class="help">Saved as you type. Publishing waits for the AI verdict, not for this form.</span>
+        </form>
+        <div class="card pad col" style="gap:10px"><b>Before it can go live</b>
+          <div class="kv"><span class="k">Wallet signature</span><span class="acc">✓ signed</span></div>
+          <div class="kv"><span class="k">X account</span><span class="acc">✓ @signalboy</span></div>
+          <div class="kv"><span class="k">Bond · alerts</span><span class="mono">5.00 SOL · ≈ $900.00 ✓</span></div>
+          <div class="kv"><span class="k">Verification fee</span><span><s class="muted">0.25 SOL ≈ $45.00</s> <span class="acc">free · Trencher</span></span></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div></div>
+<div class="row" style="gap:20px;align-items:flex-start;flex-wrap:nowrap">
+<div class="board out"><span class="cap">Outcome · approved at 00:27</span><div class="card pad col" style="gap:10px;border-color:#2E3A12" role="status">
+  <div class="row"><span class="sq ok">✓</span><span class="verdict acc">APPROVED · LIVE</span><span class="tm mono meta ml">00:27 total</span></div>
+  <span class="t2" style="font-size:14px">"Reads pump.fun board data and posts to the creator's declared Telegram host. No wallet calls, no undeclared hosts across 2 sandbox targets."</span>
+  <div class="kv"><span class="k">Attestation</span><span class="mono" style="font-size:12px">trenchmart-ai-v1 · sig 9b2f…e4c1</span></div>
+  <div class="row" style="gap:8px"><button class="btn primary sm">View listing</button><button class="btn secondary sm">Share on X</button></div></div></div>
+<div class="board out"><span class="cap">Outcome · needs your note at 00:14 (paused, not queued)</span><div class="warn-panel pad col" style="gap:10px" role="status">
+  <div class="row"><span class="sq w">!</span><span class="verdict" style="color:var(--warn)">REQUEST CHANGES</span><span class="tm mono meta ml">paused at step 3</span></div>
+  <span class="t2" style="font-size:14px">The sandbox saw <span class="mono">POST api.telegram.org/bot…/sendMessage</span>, which isn't in your <span class="mono">@connect</span>. Declare the host or explain the call.</span>
+  <textarea class="input" rows="3" style="height:auto;padding:10px 12px" aria-label="Explain this call">Sends alerts to the buyer's own Telegram bot. The token is entered by the buyer and only goes to api.telegram.org.</textarea>
+  <span class="help">At least 20 characters. "ok" or "lgtm" gets sent back.</span>
+  <div class="row" style="gap:8px"><button class="btn primary sm">Send note · re-check</button><button class="btn secondary sm">Declare @connect host</button></div>
+  <span class="meta" style="font-size:12px">Re-check resumes from step 3. It doesn't start over or wait in line.</span></div></div>
+<div class="board out"><span class="cap">Outcome · rejected at 00:19</span><div class="danger-panel pad col" style="gap:10px" role="alert">
+  <div class="row"><span class="sq x">×</span><span class="verdict" style="color:var(--danger)">REJECTED</span><span class="tm mono meta ml">00:19 total</span></div>
+  <span class="t2" style="font-size:14px">The script called <span class="mono">signTransaction</span> on the wallet during the sandbox run (gmgn.ai, 00:16.2). Tools on TrenchMart must never ask a buyer's wallet to sign.</span>
+  <div class="log" style="margin:0"><div><span class="ts">00:16.2</span> <span class="x">×</span> window.solana.signTransaction(…) · blocked, not signed</div></div>
+  <div class="row" style="gap:8px"><button class="btn primary sm">Fix and upload a new version</button><button class="btn ghost sm">See full report</button></div>
+  <span class="meta" style="font-size:12px">Your listing details stay saved. Only the file changes.</span></div></div>
+</div>
+</div>
+<div class="board"><span class="cap">Phone · 390 · streaming</span><div class="phone m">
+  <div data-x="mnav" data-state="connected"></div>
+  <main class="wrap" style="padding-top:16px;padding-bottom:20px;display:flex;flex-direction:column;gap:12px">
+    <h1 style="font-size:24px;letter-spacing:-.03em;margin:0">New listing</h1>
+    <div class="file" style="font-size:12px">migration-pinger.user.js<span class="tag ok ml">FROZEN</span></div>
+    <div class="card pad-s col" style="gap:8px" aria-live="polite"><div class="row"><span class="dot" aria-hidden="true"></span><b>AI review</b><span class="tag inf ml">◑ 00:14</span></div>
+      <div class="prog"><i style="width:52%"></i></div>
+      <div class="row" style="gap:8px;font-size:13px;flex-wrap:nowrap"><span class="sq ok">✓</span>Hashed and frozen<span class="mono meta ml">0.4s</span></div>
+      <div class="row" style="gap:8px;font-size:13px;flex-wrap:nowrap"><span class="sq ok">✓</span>Static checks 14/14<span class="mono meta ml">2.1s</span></div>
+      <div class="row" style="gap:8px;font-size:13px;flex-wrap:nowrap"><span class="sq i">◑</span><b>Sandbox · target 2/2</b><span class="mono meta ml">11.6s</span></div>
+      <div class="log" style="margin:0;font-size:11px"><div><span class="ok">✓</span> wallet calls: 0</div><div><span class="run">›</span> waiting for a migration event…</div></div>
+      <div class="row" style="gap:8px;font-size:13px;flex-wrap:nowrap"><span class="sq n">4</span><span class="t2">AI verdict</span></div>
+      <div class="row" style="gap:8px;font-size:13px;flex-wrap:nowrap"><span class="sq n">5</span><span class="t2">Live</span></div>
+    </div>
+    <button class="btn secondary block">Fill in details while it runs</button>
+    <span class="help">Usually under a minute. Leave anytime: we'll notify you.</span>
+  </main>
+</div></div>
+</div>
+<p class="note">Owner decision 4: upload works like sending a prompt. The file is hashed and frozen on drop, and the review starts right away with no submit-and-wait queue. Every step streams with seconds-level timings and the sandbox shows a live log, so the creator sees evidence rather than a spinner. The listing form fills in in parallel, and publishing waits only for the verdict. "Request changes" pauses the run and resumes from that step after the note; it doesn't restart. A rejection names the exact call and gives a fix path, with no human appeal (decision 1). If a step runs past 60s the UI says "taking longer than usual · still on step 3", never "in queue". All five steps map to the version statuses uploading → scanning → needs_creator → in_review → live / rejected.</p>
+<p class="q">Note for the build agent: docs/05 has the sandbox polling every 10s and spending 3 minutes on each target. To feel instant, dispatch on upload (push, not poll), keep about 10–20s per target, and stream step events (SSE or Supabase Realtime) to this card. This is a backend change, so I've flagged it rather than made it.</p>
+</div><script>(function () {
+  const lock = '<svg class="i" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+  const shield = '<svg class="i" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>';
+  const logoSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0B0A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 L9 8 L13 14 L16 9 L20 18"/></svg>';
+  window.ICON = { lock, shield };
+  const parts = {
+    net: () => '<div class="netbar">DEVNET · test SOL only · nothing here has real value</div>',
+    ticker: () => '<div class="ticker"><div class="wrap"><span class="row" style="gap:8px"><span class="dot"></span>Solana devnet · live</span><span>$TRENCH <span style="color:var(--text)">[PRICE]</span></span><span>Holders: <span style="color:var(--text)">up to 100% off the 5% fee</span></span><span class="ml">Every version scanned, sandboxed and AI-verified before it goes live</span></div></div>',
+    nav: (el) => {
+      const a = el.dataset.active || '';
+      const st = el.dataset.state || 'connected';
+      const links = ['Explore', 'Sell', '$TRENCH', 'Purchases'].map((n) => `<a class="${n === a ? 'on' : ''}">${n}</a>`).join('');
+      const right = st === 'connected'
+        ? '<span class="tierchip">Trencher · 60% off fees</span><button class="btn primary">7xKp…a9Fq</button>'
+        : '<button class="btn primary">Connect wallet</button>';
+      return `<header class="nav"><div class="wrap"><a class="logo"><i>${logoSvg}</i>trenchmart</a><nav class="navlinks">${links}</nav><label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="grow">Search scripts, wallet lists, filters, creators…</span><span class="kbd">/</span></label>${right}</div></header>`;
+    },
+    mnav: (el) => {
+      const st = el.dataset.state || 'connected';
+      const right = st === 'connected' ? '<button class="btn primary sm">7xKp…a9Fq</button>' : '<button class="btn primary sm">Connect</button>';
+      return `<div class="netbar" style="font-size:11px">DEVNET · test SOL only</div><header class="nav"><div class="wrap" style="padding:12px 16px;gap:10px"><a class="logo" style="font-size:16px"><i style="width:28px;height:28px">${logoSvg}</i>trenchmart</a><span class="ml"></span><button class="btn secondary sm" aria-label="Search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>${right}</div></header>`;
+    },
+    foot: () => '<footer style="margin-top:56px;border-top:1px solid var(--line-soft)"><div class="wrap row" style="padding:24px;gap:16px 28px;font-size:13px;color:var(--muted)"><b style="color:var(--text)">trenchmart</b><a class="muted">Security policy</a><a class="muted">How AI verification works</a><a class="muted">Report a listing</a><a class="muted">Docs</a><span class="ml">Not financial advice. Tools don\'t guarantee profits.</span></div></footer>',
+  };
+  const REBATE = { none: 0n, scout: 2500n, trencher: 6000n, og: 10000n };
+  const sol = (l) => {
+    const s = l.toString().padStart(10, '0');
+    let frac = s.slice(-9).replace(/0+$/, '');
+    if (frac.length < 2) frac = frac.padEnd(2, '0');
+    return `${s.slice(0, -9).replace(/^0+(?=\d)/, '')}.${frac}`;
+  };
+  const quote = (price, tier) => {
+    const fee = (price * 500n) / 10000n;
+    const rebate = (fee * REBATE[tier]) / 10000n;
+    return { price, fee, rebate, total: price + fee - rebate };
+  };
+  const RATE_CENTS = 18000n;
+  const usd = (l) => {
+    const c = (l * RATE_CENTS) / 1000000000n;
+    if (c < 1n) return '< $0.01';
+    const d = (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `≈ ${d}.${(c % 100n).toString().padStart(2, '0')}`;
+  };
+  window.TM = { sol, quote, usd };
+  const CAT = {
+    USERSCRIPT: ['#C6F432', '#141A10'], 'WALLET LIST': ['#7CC4FF', '#0F1620'], FILTER: ['#F5A524', '#1C160A'],
+    SETUP: ['#C9A2FF', '#18121F'], STRATEGY: ['#6EE7C8', '#0E1A17'], ALERTS: ['#FF8A7A', '#1F1210'],
+  };
+  const L = [
+    ['USERSCRIPT', 'Axiom · GMGN', 'Sniper Filter Pack v2', '@dev_degen', '4.9', 412, 1500000000n, 'ok', '5'],
+    ['WALLET LIST', 'GMGN · Photon · Axiom', '120 Early Wallets (Q4)', '@onchainsleuth', '4.7', 268, 2000000000n, 'ok', '2'],
+    ['FILTER', 'Photon', 'Migration Sniper Presets', '@pumpwatch', '4.6', 190, 800000000n, 'ok', '1'],
+    ['SETUP', 'Axiom · BullX', 'Full Trench Desk Setup', '@nightshift', '4.8', 96, 3500000000n, 'ok', '5'],
+    ['USERSCRIPT', 'Axiom', 'Bundle Detector Overlay', '@rugradar', '4.9', 533, 1200000000n, 'ok', '5'],
+    ['STRATEGY', 'Any terminal', 'Copy-Trade Exit Playbook', '@calmape', '4.5', 74, 1000000000n, 'ok', '1'],
+    ['ALERTS', 'Telegram · Padre', 'KOL Buy Alerts Config', '@signalboy', '4.4', 58, 600000000n, 'ok', '5'],
+    ['USERSCRIPT', 'GMGN · BullX', 'Dev Wallet History Tooltip', '@dev_degen', '4.8', 301, 900000000n, 'ok', '5'],
+  ];
+  window.TM.listings = L;
+  const card = (l, tier) => {
+    const [type, compat, title, by, rating, sold, price, st, bond] = l;
+    const [c, bg] = CAT[type];
+    const badge = st === 'ok' ? '<span class="tag ok ml">✓ AI-VERIFIED</span>' : st === 'locked' ? '<span class="tag inf ml">◷ HOLDERS 48H</span>' : '<span class="tag wait ml">◷ IN AI REVIEW</span>';
+    const q = tier ? quote(price, tier) : null;
+    const priceLine = q
+      ? `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(q.total)} SOL</span><span class="mono acc" style="font-size:12px">you pay · ${tier === 'none' ? 'incl. 5% fee' : tier[0].toUpperCase() + tier.slice(1) + ' rate'}</span></div><span class="mono meta" style="font-size:12px;margin-top:-6px">${usd(q.total)}</span>`
+      : `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(price)} SOL</span><span class="mono meta" style="font-size:12px">${usd(price)} · list price</span></div><span class="mono faint" style="font-size:12px;margin-top:-6px">+ 5% fee · your tier can cut it</span>`;
+    return `<a class="card" data-testid="listing-card" style="display:flex;flex-direction:column;overflow:hidden;color:var(--text)"><div style="height:112px;background:${bg};padding:14px;display:flex;flex-direction:column;justify-content:space-between;border-bottom:1px solid var(--line-soft)"><div class="row" style="gap:6px"><span class="tag dark" style="color:${c}">${type}</span>${badge}</div><span class="mono t2" style="font-size:12px">${compat}</span></div><div style="padding:14px;display:flex;flex-direction:column;gap:8px"><div class="col" style="gap:2px"><b>${title}</b><span class="meta">${by} · bond ${bond} SOL · ${sold} sold · ★ ${rating}</span></div>${priceLine}</div></a>`;
+  };
+  window.TM.card = card;
+  parts.preview = (el) => el.dataset.compact
+    ? `<div class="info-panel col" data-testid="preview-notice" role="note" style="padding:14px;gap:10px"><div class="row" style="gap:10px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><b style="font-size:14px">Preview prices</b></div><span class="t2" style="font-size:13px">These are list prices. Connect to see your exact price with your $TRENCH tier discount.</span><button class="btn primary block">Connect to see your price</button></div>`
+    : `<div class="info-panel row" data-testid="preview-notice" role="note" style="padding:12px 16px;gap:12px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><div class="grow col" style="gap:0"><b style="font-size:14px">Preview prices</b><span class="t2" style="font-size:13px">You're seeing list prices. Connect your wallet to see your exact price with your $TRENCH tier discount (up to 100% off the 5% fee).</span></div><button class="btn primary sm">Connect to see your price</button></div>`;
+  parts.cards = (el) => {
+    const n = Number(el.dataset.n || 8);
+    const tier = el.dataset.tier || '';
+    const cols = el.dataset.cols ? `grid-template-columns:repeat(${el.dataset.cols},1fr)` : '';
+    return `<div class="grid g-cards" style="${cols}">${L.slice(0, n).map((l) => card(l, tier)).join('')}</div>`;
+  };
+  document.querySelectorAll('[data-x]').forEach((el) => { el.outerHTML = parts[el.dataset.x](el); });
+})();
+</script></body></html>

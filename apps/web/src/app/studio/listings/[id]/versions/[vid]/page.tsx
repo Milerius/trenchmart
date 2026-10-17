@@ -1,7 +1,19 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import {
+  Button,
+  ButtonLink,
+  Label,
+  Panel,
+  Skeleton,
+  Square,
+  StatusTag,
+  Tag,
+  type Tone,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 
 type SandboxLog = {
@@ -46,9 +58,24 @@ const STEP_LABEL: Record<string, string> = {
   done: 'Done',
 };
 
+const PIPELINE: [string, string][] = [
+  ['static', 'Rules for eval, remote code, key access, obfuscation and declared hosts'],
+  ['sandbox', 'Runs in an isolated browser sandbox; every request and wallet call is logged'],
+  ['ai', 'AI compares what the file does with what the listing says'],
+];
+
 function seconds(durationMs: number | undefined): string {
   if (durationMs === undefined) return '';
   return `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+function stepTone(event: ReviewEvent | undefined): Tone {
+  if (!event) return 'neutral';
+  if (event.status === 'running') return 'info';
+  const value = (event.verdict ?? event.decision ?? event.status).toLowerCase();
+  if (/(fail|reject|error)/.test(value)) return 'danger';
+  if (/(warn|needs|changes)/.test(value)) return 'warn';
+  return 'ok';
 }
 
 export default function VersionPage() {
@@ -58,6 +85,8 @@ export default function VersionPage() {
   const [note, setNote] = useState('');
   const [message, setMessage] = useState('');
   const [running, setRunning] = useState(false);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   async function load() {
     setView(await api<VersionView>(`/studio/versions/${params.vid}`));
@@ -66,6 +95,7 @@ export default function VersionPage() {
   async function stream(path: string) {
     setRunning(true);
     setEvents([]);
+    setStartedAt(Date.now());
     const response = await fetch(path, {
       method: 'POST',
       headers: { accept: 'text/event-stream' },
@@ -108,6 +138,7 @@ export default function VersionPage() {
       }
     }
     setRunning(false);
+    setNow(Date.now());
     await load();
   }
 
@@ -127,6 +158,12 @@ export default function VersionPage() {
       void stream(path).catch((err: Error) => setMessage(err.message));
     }
   }, [view, params.vid]);
+
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(timer);
+  }, [running]);
 
   async function explain() {
     const result = await api<{ status: string }>(`/studio/versions/${params.vid}/explain`, {
@@ -151,92 +188,221 @@ export default function VersionPage() {
   const outcome = [...events].reverse().find((event) => event.versionStatus);
   const sandbox = [...events].reverse().find((event) => event.log);
   const status = outcome?.versionStatus ?? view?.version.status;
+  const byStep = new Map(events.filter((e) => e.step !== 'done').map((e) => [e.step, e]));
+  const totalMs = events
+    .filter((e) => e.step !== 'done' && e.status !== 'running')
+    .reduce((sum, e) => sum + (e.durationMs ?? 0), 0);
+  const elapsed = startedAt ? (running ? now - startedAt : totalMs || now - startedAt) : 0;
 
   return (
-    <section data-testid="studio" className="space-y-4">
-      <h1 className="text-3xl">Live AI review</h1>
-      <p className="text-sm text-muted">
-        The file is checked as soon as it is uploaded. Static checks and the sandbox run together.
-        There is no human appeal.
-      </p>
+    <section data-testid="studio" className="mx-auto max-w-4xl space-y-6">
+      <div>
+        <Link href="/studio" className="text-sm text-muted hover:text-ink">
+          ← Studio
+        </Link>
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Live AI review</h1>
+            <p className="m-0 mt-1 max-w-2xl text-ink-2">
+              Your file is checked the moment it lands. Static checks and the sandbox run together,
+              then AI verification gives its verdict. Most reviews finish in seconds.
+            </p>
+          </div>
+          <div className="text-right" aria-live="off">
+            <Label>{running ? 'Elapsed' : 'Review time'}</Label>
+            <p className="tabular m-0 font-mono text-2xl font-semibold">
+              {startedAt ? `${(elapsed / 1000).toFixed(1)}s` : '—'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {view ? (
-        <p className="text-sm">
-          {view.version.file_name} · {view.version.semver} · {view.version.status}
-          {view.version.resume_step ? ` · resumes from ${view.version.resume_step}` : ''}
-        </p>
-      ) : null}
-      <ol aria-label="Live AI review" aria-live="polite" className="space-y-2">
-        {events
-          .filter((event) => event.step !== 'done')
-          .map((event) => (
-            <li
-              key={`${event.step}-${event.status}`}
-              data-testid="review-step"
-              className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-line px-3 py-2 text-sm"
-            >
-              <span>
-                {STEP_LABEL[event.step] ?? event.step} · {event.status}
-                {event.verdict ? ` · ${event.verdict}` : ''}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-line bg-surface px-4 py-3 font-mono text-[13px]">
+          <span className="text-ink">{view.version.file_name}</span>
+          <span className="text-muted">v{view.version.semver}</span>
+          <span className="text-muted" title={view.version.sha256}>
+            sha256 {view.version.sha256.slice(0, 10)}…
+          </span>
+          <span className="ml-auto">
+            <StatusTag status={status ?? view.version.status} />
+          </span>
+          {view.version.resume_step ? (
+            <span className="w-full text-xs text-muted">
+              Resumes from {STEP_LABEL[view.version.resume_step] ?? view.version.resume_step}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <Skeleton className="h-12 w-full" />
+      )}
+
+      <ol aria-label="Live AI review" aria-live="polite" className="m-0 space-y-2 p-0">
+        {PIPELINE.map(([step, description], index) => {
+          const event = byStep.get(step);
+          const tone = stepTone(event);
+          const isRunning = event?.status === 'running';
+          const content = (
+            <>
+              <Square tone={tone}>
+                {isRunning ? (
+                  <span className="animate-spin">◑</span>
+                ) : tone === 'ok' ? (
+                  '✓'
+                ) : tone === 'warn' ? (
+                  '!'
+                ) : tone === 'danger' ? (
+                  '×'
+                ) : (
+                  index + 1
+                )}
+              </Square>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">
+                  {STEP_LABEL[step]}
+                  {event ? (
+                    <span className="font-normal text-ink-2">
+                      {' '}
+                      · {event.status}
+                      {event.verdict ? ` · ${event.verdict}` : ''}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="block text-[13px] text-muted">
+                  {event?.summary ?? description}
+                </span>
               </span>
-              <span data-testid="review-timing" className="font-mono text-muted">
-                {seconds(event.durationMs)}
+            </>
+          );
+          return event ? (
+            <li
+              key={step}
+              data-testid="review-step"
+              data-step={step}
+              data-status={event.status}
+              className={`grid list-none grid-cols-[auto_1fr_auto] items-center gap-3 rounded-card border px-4 py-3 ${
+                isRunning ? 'border-info-line bg-info-bg' : 'border-line bg-surface'
+              }`}
+            >
+              {content}
+              <span data-testid="review-timing" className="tabular font-mono text-sm text-ink-2">
+                {isRunning ? 'running…' : seconds(event.durationMs)}
               </span>
             </li>
-          ))}
+          ) : (
+            <li
+              key={step}
+              className="grid list-none grid-cols-[auto_1fr_auto] items-center gap-3 rounded-card border border-line-soft px-4 py-3 opacity-80"
+            >
+              {content}
+              <span className="font-mono text-sm text-muted">{running ? 'queued' : ''}</span>
+            </li>
+          );
+        })}
       </ol>
+
       {sandbox?.log ? (
-        <pre
-          data-testid="sandbox-log"
-          className="overflow-auto rounded-xl border border-line bg-inset p-3 text-xs"
-        >
-          {sandbox.log.egress === 'blocked' ? 'egress blocked\n' : ''}
-          {(sandbox.log.log ?? []).join('\n')}
-          {(sandbox.log.walletCalls ?? []).length
-            ? `\nwallet ${sandbox.log.walletCalls?.join(', ')}`
-            : ''}
-          {(sandbox.log.requests ?? [])
-            .map((item) => `\n${item.method} ${item.host} blocked`)
-            .join('')}
-        </pre>
-      ) : null}
-      {status === 'live' ? <p data-testid="review-outcome">Approved and live</p> : null}
-      {status === 'needs_creator' ? (
-        <div data-testid="review-outcome" className="space-y-3">
-          <p>Changes requested</p>
-          <p className="text-sm">{outcome?.reason ?? view?.review?.notes}</p>
-          <textarea
-            className="w-full rounded-md border border-line bg-inset px-3 py-2"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="Explain the warning, at least 20 characters"
-          />
-          <button
-            type="button"
-            className="rounded-md border border-line px-3 py-2"
-            onClick={() => void explain().catch((err: Error) => setMessage(err.message))}
+        <div className="overflow-hidden rounded-card border border-line bg-inset">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-4 py-2">
+            <Label>Sandbox log</Label>
+            <Tag tone={sandbox.log.egress === 'blocked' ? 'warn' : 'neutral'}>
+              EGRESS {String(sandbox.log.egress ?? 'logged').toUpperCase()}
+            </Tag>
+            <Tag tone={(sandbox.log.walletCalls ?? []).length ? 'danger' : 'ok'}>
+              {(sandbox.log.walletCalls ?? []).length} WALLET CALLS
+            </Tag>
+            <Tag tone="neutral">{(sandbox.log.requests ?? []).length} HOSTS</Tag>
+          </div>
+          <pre
+            data-testid="sandbox-log"
+            className="m-0 max-h-72 overflow-auto p-4 font-mono text-xs leading-relaxed text-ink-2"
           >
-            Save note and resume
-          </button>
-          <label className="block text-sm">
-            Upload a fixed file
-            <input
-              type="file"
-              className="mt-1 block"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void replaceFile(file).catch((err: Error) => setMessage(err.message));
-              }}
-            />
-          </label>
+            {sandbox.log.egress === 'blocked' ? 'egress blocked\n' : ''}
+            {(sandbox.log.log ?? []).join('\n')}
+            {(sandbox.log.walletCalls ?? []).length
+              ? `\nwallet ${sandbox.log.walletCalls?.join(', ')}`
+              : ''}
+            {(sandbox.log.requests ?? [])
+              .map((item) => `\n${item.method} ${item.host} blocked`)
+              .join('')}
+          </pre>
         </div>
+      ) : null}
+
+      {status === 'live' ? (
+        <Panel
+          tone="ok"
+          data-testid="review-outcome"
+          className="flex flex-wrap items-center gap-4 p-5"
+        >
+          <Square tone="ok">✓</Square>
+          <div className="min-w-0 flex-1">
+            <p className="m-0 font-semibold">Approved and live</p>
+            <p className="m-0 text-sm text-accent-body">
+              AI-verified{totalMs ? ` in ${(totalMs / 1000).toFixed(1)}s` : ''}. Buyers see the
+              checks and the pinned hash on your listing.
+            </p>
+          </div>
+          <ButtonLink href="/studio" variant="secondary">
+            Back to studio
+          </ButtonLink>
+        </Panel>
+      ) : null}
+      {status === 'needs_creator' ? (
+        <Panel tone="warn" data-testid="review-outcome" className="space-y-4 p-5">
+          <div>
+            <p className="m-0 font-semibold">Changes requested</p>
+            <p className="m-0 mt-1 text-sm text-ink-2">{outcome?.reason ?? view?.review?.notes}</p>
+          </div>
+          <div>
+            <label htmlFor="creator-note" className="text-sm font-medium">
+              Explain the warning
+            </label>
+            <textarea
+              id="creator-note"
+              rows={3}
+              className="mt-2 w-full rounded-ctl border border-line-control bg-inset px-3 py-2 text-sm"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Explain the warning, at least 20 characters"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="secondary"
+              disabled={running}
+              onClick={() => void explain().catch((err: Error) => setMessage(err.message))}
+            >
+              Save note and resume
+            </Button>
+            <label className="text-sm text-ink-2">
+              or upload a fixed file
+              <input
+                type="file"
+                className="mt-1 block text-sm"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void replaceFile(file).catch((err: Error) => setMessage(err.message));
+                }}
+              />
+            </label>
+          </div>
+        </Panel>
       ) : null}
       {status === 'rejected' ? (
-        <div data-testid="review-outcome">
-          <p>Rejected</p>
-          <p className="text-sm">{outcome?.reason ?? view?.review?.notes}</p>
-        </div>
+        <Panel tone="danger" data-testid="review-outcome" className="p-5">
+          <p className="m-0 font-semibold">Rejected</p>
+          <p className="m-0 mt-1 text-sm text-ink-2">{outcome?.reason ?? view?.review?.notes}</p>
+          <p className="m-0 mt-3 text-[13px] text-muted">
+            Fix the issue above and upload a new version. Each version is reviewed the same way.
+          </p>
+        </Panel>
       ) : null}
-      {message ? <p>{message}</p> : null}
+      {message ? (
+        <p role="status" className="m-0 text-sm text-ink-2">
+          {message}
+        </p>
+      ) : null}
     </section>
   );
 }
