@@ -1,0 +1,34 @@
+{
+  "voice": "af_heart",
+  "speed": 1.05,
+  "lines": [
+    { "id": "01-hook-a", "frame": 36, "maxSec": 1.6, "text": "Some of these are drainers." },
+    { "id": "02-hook-b", "frame": 88, "maxSec": 1.6, "text": "Not on TrenchMart." },
+    {
+      "id": "03-list",
+      "frame": 150,
+      "maxSec": 4.0,
+      "text": "Creators list scripts, bot configs and wallet trackers."
+    },
+    {
+      "id": "04-scan",
+      "frame": 296,
+      "maxSec": 4.0,
+      "text": "Every upload gets AI-verified in a sandbox, in seconds."
+    },
+    {
+      "id": "05-escrow",
+      "frame": 440,
+      "maxSec": 4.0,
+      "text": "Buyers pay in SOL, straight into on-chain escrow."
+    },
+    {
+      "id": "06-unlock",
+      "frame": 596,
+      "maxSec": 3.8,
+      "text": "When escrow releases, the download unlocks."
+    },
+    { "id": "07-outro-a", "frame": 744, "maxSec": 1.0, "text": "TrenchMart." },
+    { "id": "08-outro-b", "frame": 774, "maxSec": 2.4, "text": "Buy the edge. Skip the rug." }
+  ]
+}
