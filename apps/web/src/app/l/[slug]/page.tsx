@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { categoryMeta } from '@trenchmart/shared';
-import { FeeBreakdown } from '@/components/fees';
+import { categoryMeta, quote as quoteFor } from '@trenchmart/shared';
+import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import {
   Button,
   ButtonLink,
+  buttonClass,
   EmptyState,
   ErrorState,
   Label,
@@ -97,6 +98,17 @@ export default function ListingPage() {
 
   useEffect(load, [params.slug]);
 
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
+  useEffect(() => {
+    const aside = document.getElementById('checkout');
+    if (!aside) return;
+    const observer = new IntersectionObserver(([entry]) =>
+      setCheckoutVisible(entry?.isIntersecting ?? false),
+    );
+    observer.observe(aside);
+    return () => observer.disconnect();
+  }, [listing]);
+
   async function buy() {
     if (!listing) return;
     setMessage('');
@@ -170,6 +182,11 @@ export default function ListingPage() {
   const busy = step === 'quoting' || step === 'signing' || step === 'confirming';
   const escrowHours = config?.escrowHours ?? 48;
   const rating = listing.ratingAvg ? Number(listing.ratingAvg) : null;
+  const fees = config ?? DEFAULT_FEES;
+  const youPay = quote
+    ? BigInt(quote.total)
+    : quoteFor(BigInt(listing.price), fees.feeBps, tier ? (fees.tierRebateBps[tier] ?? 0) : 0)
+        .total;
 
   function onTabKey(event: KeyboardEvent<HTMLButtonElement>) {
     const index = TABS.indexOf(tab);
@@ -186,7 +203,7 @@ export default function ListingPage() {
   }
 
   return (
-    <article className="grid items-start gap-10 lg:grid-cols-[1fr_400px]">
+    <article className="grid items-start gap-10 pb-24 lg:grid-cols-[1fr_400px] lg:pb-0">
       <div className="min-w-0">
         <nav aria-label="Breadcrumb" className="text-sm text-muted">
           <Link href="/" className="hover:text-ink">
@@ -304,6 +321,7 @@ export default function ListingPage() {
       </div>
 
       <aside
+        id="checkout"
         data-testid="checkout"
         aria-label="Checkout"
         className="rounded-panel border border-line bg-surface lg:sticky lg:top-6"
@@ -377,6 +395,19 @@ export default function ListingPage() {
           </p>
         </div>
       </aside>
+
+      <div
+        hidden={checkoutVisible}
+        className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-surface px-4 py-3 lg:hidden"
+      >
+        <div className="flex min-w-0 flex-col">
+          <Label>{tier ? 'You pay' : 'You pay before discount'}</Label>
+          <Money lamports={youPay} centsPerSol={centsPerSol} strong className="text-sm" />
+        </div>
+        <a href="#checkout" className={buttonClass('primary', 'md')}>
+          Review and buy
+        </a>
+      </div>
     </article>
   );
 }
