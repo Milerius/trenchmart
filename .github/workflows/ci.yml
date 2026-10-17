@@ -141,6 +141,9 @@ jobs:
           fi
           bash .github/scripts/anchor-toolchain.sh
           export PATH="$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.local/bin:$PATH"
+          mkdir -p target/deploy
+          solana-keygen new --no-bip39-passphrase --force -o target/deploy/trench_escrow-keypair.json
+          anchor keys sync
           anchor build
 
   anchor-test:
@@ -148,19 +151,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
-      - name: anchor test
+      - id: gate
+        run: |
+          if [ -f programs/trench_escrow/Cargo.toml ]; then
+            echo present=true >> "$GITHUB_OUTPUT"
+          else
+            echo present=false >> "$GITHUB_OUTPUT"
+            echo "programs/trench_escrow is not present; skipping anchor test."
+          fi
+      - if: steps.gate.outputs.present == 'true'
+        uses: pnpm/action-setup@v6.1.0
+      - if: steps.gate.outputs.present == 'true'
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - if: steps.gate.outputs.present == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.gate.outputs.present == 'true'
+        name: anchor test
         run: |
           set -euo pipefail
-          if [ ! -f programs/trench_escrow/Cargo.toml ]; then
-            echo "programs/trench_escrow is not present; skipping anchor test."
-            exit 0
-          fi
           bash .github/scripts/anchor-toolchain.sh
           export PATH="$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.local/bin:$PATH"
-          mkdir -p target/deploy
+          mkdir -p "$HOME/.config/solana" target/deploy
+          solana-keygen new --no-bip39-passphrase --force -o "$HOME/.config/solana/id.json"
           solana-keygen new --no-bip39-passphrase --force -o target/deploy/trench_escrow-keypair.json
           anchor keys sync
-          anchor test
+          anchor test --validator legacy
 
   clippy:
     name: clippy
@@ -209,7 +227,7 @@ jobs:
           curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.99.1 --profile minimal
           source "$HOME/.cargo/env"
           cargo install cargo-audit --version 0.22.2 --locked
-          cargo audit --manifest-path programs/trench_escrow/Cargo.toml
+          cargo audit
 
   ci-ok:
     name: ci-ok

@@ -15,6 +15,8 @@ export default tseslint.config(
       'playwright-report/**',
       'test-results/**',
       'apps/web/AGENTS.md',
+      'target/**',
+      '.anchor/**',
     ],
   },
   js.configs.recommended,

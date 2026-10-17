@@ -16,4 +16,6 @@ Pinned on 2026-10-17 to the newest stable releases that build together. No night
 
 The Anchor program is exercised in CI. It is not the custody path. Production escrow is a Squads vault plus the off-chain ledger.
 
+Anchor CLI 1.2.1 runs `anchor test` on surfpool by default. Surfpool is not part of Agave 4.3.2, so CI passes `--validator legacy` and uses `solana-test-validator`. `cargo audit` reads the workspace `Cargo.lock` from the repo root; it has no `--manifest-path` flag.
+
 Development and the escrow verification refuse `mainnet` and `mainnet-beta` cluster names and any RPC URL that contains `mainnet`.

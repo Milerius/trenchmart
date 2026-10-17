@@ -1,0 +1,26 @@
+[toolchain]
+anchor_version = "1.2.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+trench_escrow = "7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM"
+
+[programs.localnet]
+trench_escrow = "7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "pnpm exec tsx tests/trench_escrow.ts"
+
+[hooks]
+
+[test]
+startup_wait = 30000
+shutdown_wait = 2000
+upgradeable = false

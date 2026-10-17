@@ -14,6 +14,8 @@ minimumReleaseAgeExclude:
 allowBuilds:
   esbuild: true
   workerd: true
+  bufferutil: false
+  utf-8-validate: false
 # glob 10.2–10.4 is GHSA-5j98-mcp5-4vw2 via @node-minify. 10.5.0 is the patched 10.x line.
 overrides:
   glob@>=10.2.0 <10.5.0: 10.5.0
