@@ -1,0 +1,266 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>04 · Marketplace concept v2</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap"><style>:root{
+  --bg:#0A0B0A;--inset:#0E100E;--surface:#121412;--surface-2:#161916;
+  --line:#262A26;--line-soft:#1E221E;--line-strong:#343A34;--line-control:#646C63;
+  --text:#EDEFEA;--text-2:#B4BAB2;--muted:#9BA19A;--faint:#868D86;--decor:#6E756D;
+  --accent:#C6F432;--accent-hover:#DDFF7A;--on-accent:#0A0B0A;--accent-bg:#141A08;--accent-line:#2E3A12;--accent-label:#9FAF86;--accent-body:#C9D0BE;
+  --warn:#F5A524;--warn-bg:#1C160A;--warn-line:#3A2C0E;
+  --danger:#FF8A7A;--danger-bg:#1F1210;--danger-line:#4A2620;
+  --info:#7CC4FF;--info-bg:#0F1620;--info-line:#1E3448;
+  --violet:#C9A2FF;--teal:#6EE7C8;
+  --mono:'Geist Mono',ui-monospace,monospace;--sans:'Geist',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.grow{flex:1;min-width:0}
+.ml{margin-left:auto}
+.muted{color:var(--muted)}.t2{color:var(--text-2)}.faint{color:var(--faint)}.acc{color:var(--accent)}.warn{color:var(--warn)}.danger{color:var(--danger)}.info{color:var(--info)}
+.lbl{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.inset{background:var(--inset);border:1px solid var(--line-soft);border-radius:10px}
+.pad{padding:20px}.pad-s{padding:14px}
+.acc-panel{background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:16px}
+.warn-panel{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:14px}
+.danger-panel{background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:14px}
+.info-panel{background:var(--info-bg);border:1px solid var(--info-line);border-radius:14px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:10px;font:600 14px var(--sans);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.secondary{background:transparent;color:var(--text);border-color:var(--line-control)}
+.btn.ghost{background:transparent;color:var(--text-2)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger-line)}
+.btn.xl{height:52px;font-size:16px;border-radius:12px;font-weight:700}
+.btn.lg{height:48px}.btn.sm{height:36px;padding:0 12px;font-size:13px}
+.btn.block{width:100%}
+.btn[disabled],.btn.is-disabled{background:var(--surface-2);color:var(--faint);border-color:var(--line);cursor:not-allowed}
+.focus{outline:2px solid var(--accent);outline-offset:2px}
+/* tags + badges */
+.tag{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--mono);padding:3px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--text-2);white-space:nowrap}
+.tag.ok{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent)}
+.tag.wait{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tag.bad{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.tag.inf{background:var(--info-bg);border-color:var(--info-line);color:var(--info)}
+.tag.dark{background:var(--bg);border-color:transparent}
+.pill{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;font-size:13px;border:1px solid var(--line-control);background:var(--surface);color:var(--text-2)}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2)}
+.input{height:44px;background:var(--inset);border:1px solid var(--line-control);border-radius:10px;color:var(--text);padding:0 12px;font-size:14px;display:flex;align-items:center}
+.input.err{border-color:var(--danger)}
+.help{font-size:12px;color:var(--muted)}.help.err{color:var(--danger)}
+/* rows */
+.kv{display:flex;justify-content:space-between;gap:12px;font:13px var(--mono)}
+.kv .k{color:var(--muted);font-family:var(--sans)}
+.hr{height:1px;background:var(--line-soft)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.sq{flex:0 0 22px;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:700 12px var(--sans);color:var(--on-accent)}
+.sq.ok{background:var(--accent)}.sq.w{background:var(--warn)}.sq.x{background:var(--danger)}.sq.i{background:var(--info)}.sq.n{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-control)}
+/* skeleton */
+.sk{background:linear-gradient(90deg,#161916 0%,#1E221E 50%,#161916 100%);border-radius:6px}
+/* chrome */
+.netbar{background:#1C160A;border-bottom:1px solid var(--warn-line);color:var(--warn);font:12px var(--mono);text-align:center;padding:6px 16px}
+.ticker{border-bottom:1px solid var(--line-soft);background:var(--inset);font:12px var(--mono);color:var(--muted)}
+.ticker .wrap{padding:8px 24px;display:flex;flex-wrap:wrap;gap:8px 28px;align-items:center}
+.nav{border-bottom:1px solid var(--line-soft)}
+.nav .wrap{padding:14px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.logo{display:flex;gap:10px;align-items:center;color:var(--text);font-weight:700;font-size:18px;letter-spacing:-.02em}
+.logo i{width:32px;height:32px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.navlinks{display:flex;gap:4px}
+.navlinks a{padding:10px 12px;border-radius:8px;color:var(--muted);font-size:14px}
+.navlinks a.on{color:var(--text);background:var(--surface-2)}
+.search{flex:1 1 240px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line-control);border-radius:10px;padding:0 14px;height:44px;color:var(--muted);font-size:14px}
+.kbd{font:11px var(--mono);border:1px solid var(--line-control);border-radius:4px;padding:1px 6px;color:var(--muted)}
+.tierchip{display:flex;gap:6px;align-items:center;height:44px;padding:0 12px;border:1px solid var(--accent-line);background:var(--accent-bg);border-radius:10px;font:12px var(--mono);color:var(--accent)}
+.h-hero{font-size:clamp(40px,6vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:700}
+.h1{font-size:40px;line-height:1.05;letter-spacing:-.03em;font-weight:700}
+.h2{font-size:28px;letter-spacing:-.02em;font-weight:700}
+.h3{font-size:20px;letter-spacing:-.01em;font-weight:600}
+.lead{font-size:17px;color:var(--text-2)}
+.meta{font-size:13px;color:var(--muted)}
+.grid{display:grid;gap:16px}
+.g-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+/* artboards for exploration sheets */
+.sheet{padding:40px;display:flex;flex-direction:column;gap:28px}
+.sheet-h{display:flex;gap:16px;align-items:baseline;border-bottom:1px solid var(--line-soft);padding-bottom:16px}
+.sheet-h h1{font-size:28px;letter-spacing:-.02em}
+.board{display:flex;flex-direction:column;gap:10px}
+.board>.cap{font:12px var(--mono);color:var(--muted)}
+.frame{border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--bg)}
+.phone{width:390px;border:1px solid var(--line-strong);border-radius:28px;overflow:hidden;background:var(--bg)}
+.note{font-size:13px;color:var(--text-2);border-left:2px solid var(--accent);padding:2px 0 2px 12px}
+.q{font-size:13px;color:var(--warn);border-left:2px solid var(--warn);padding:2px 0 2px 12px}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+</style>
+<style>
+.boards{display:flex;gap:28px;align-items:flex-start}
+.desk{width:1400px}
+.side{flex:0 0 240px;display:flex;flex-direction:column;gap:20px}
+.side h3{font:11px var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:8px}
+.chk{display:flex;gap:10px;align-items:center;height:36px;font-size:14px;color:var(--text-2)}
+.chk i{width:18px;height:18px;border-radius:5px;border:1px solid var(--line-control);display:grid;place-items:center;font:700 11px var(--sans);font-style:normal}
+.chk i.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.states{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.st{min-height:260px}
+.m .wrap{padding:0 16px}
+</style></head><body><div class="sheet">
+<div class="sheet-h"><span class="lbl acc">04 · concept v2</span><h1>Marketplace: browse, filter, and every state</h1><span class="ml meta">Connected as Trencher · cards show what you pay</span></div>
+<div class="boards">
+<div class="board desk"><span class="cap">Desktop · /explore?terminal=Axiom · connected (Trencher)</span><div class="frame">
+  <div data-x="net"></div><div data-x="nav" data-active="Explore"></div>
+  <main class="wrap" style="padding-top:32px;display:flex;flex-direction:column;gap:20px">
+    <div class="row" style="align-items:baseline"><h1 class="h1" style="font-size:34px">Explore</h1><span class="meta">8 listings · every listing here passed AI verification</span>
+      <div class="ml row" style="gap:8px"><span class="meta">Sort</span><span class="input" style="height:36px;min-width:170px;font-size:13px">Trending (7d sales) ▾</span></div></div>
+    <div class="row" role="group" aria-label="Filter by terminal" style="gap:6px"><span class="pill">All</span><span class="pill on" aria-pressed="true">Axiom</span><span class="pill">GMGN</span><span class="pill">Photon</span><span class="pill">BullX</span><span class="pill">Padre</span><span class="pill">Trojan</span>
+      <span class="ml meta row" style="gap:8px">Active: <span class="tag">Axiom ×</span><span class="tag">No wallet permissions ×</span><a style="font-size:13px">Clear all</a></span></div>
+    <div class="row" style="align-items:flex-start;gap:24px">
+      <aside class="side">
+        <div><h3>Category</h3>
+          <div class="chk"><i class="on">✓</i>Userscripts <span class="ml mono meta">3</span></div><div class="chk"><i></i>Wallet lists <span class="ml mono meta">1</span></div><div class="chk"><i></i>Terminal filters <span class="ml mono meta">1</span></div><div class="chk"><i></i>Full setups <span class="ml mono meta">1</span></div><div class="chk"><i></i>Strategies <span class="ml mono meta">1</span></div><div class="chk"><i></i>Alerts &amp; bots <span class="ml mono meta">1</span></div></div>
+        <div><h3>Trust</h3><div class="chk"><i></i>Creator bond ≥ 5 SOL</div><div class="chk"><i></i>No outbound calls</div><div class="chk"><i class="on">✓</i>No wallet permissions</div><div class="chk"><i></i>0 disputes lost</div></div>
+        <div><h3>Price (list)</h3><div class="row" style="gap:8px"><span class="input mono" style="width:100px;font-size:13px">0</span><span class="meta">to</span><span class="input mono" style="width:100px;font-size:13px">5 SOL</span></div><p class="help" style="margin-top:6px">Filters use the list price. What you pay is on each card.</p></div>
+        <div class="acc-panel" style="padding:14px;border-radius:12px;font-size:13px;color:var(--accent-body)">Prices shown at your <b class="acc">Trencher</b> rate: list price + 5% fee − 60% of the fee.</div>
+      </aside>
+      <div class="grow col" style="gap:16px">
+        <div data-x="cards" data-n="6" data-tier="trencher" data-cols="3"></div>
+        <div class="row" style="justify-content:center"><button class="btn secondary">Load more</button></div>
+      </div>
+    </div>
+  </main>
+  <div data-x="foot"></div>
+</div></div>
+<div class="board"><span class="cap">Phone · 390 · filters as a sheet</span><div class="phone m">
+  <div data-x="mnav"></div>
+  <main class="wrap" style="padding-top:18px;padding-bottom:18px;display:flex;flex-direction:column;gap:14px">
+    <h1 style="font-size:28px;letter-spacing:-.03em">Explore</h1>
+    <div class="row" style="gap:6px;flex-wrap:nowrap;overflow:hidden"><button class="btn secondary sm">Filters · 2</button><span class="pill on">Axiom</span><span class="pill">GMGN</span><span class="pill">Photon</span></div>
+    <div id="m1" class="col"></div>
+  </main>
+  <div style="border-top:1px solid var(--line-strong);background:var(--surface);border-radius:20px 20px 0 0;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="width:40px;height:4px;border-radius:2px;background:var(--line-control);align-self:center"></div>
+    <div class="row"><b>Filters</b><a class="ml" style="font-size:13px">Clear all</a></div>
+    <div class="row" style="gap:6px"><span class="pill on">Userscripts</span><span class="pill">Wallet lists</span><span class="pill">Filters</span><span class="pill">Setups</span></div>
+    <div class="chk"><i class="on">✓</i>No wallet permissions</div>
+    <button class="btn primary lg block">Show 3 listings</button>
+  </div>
+</div></div>
+</div>
+
+<div class="col" style="gap:12px"><span class="lbl">States · same grid, same card size, so nothing jumps</span>
+<div class="states">
+  <div class="card pad st col"><span class="lbl">Loading · skeleton</span>
+    <div class="row" style="gap:12px;align-items:stretch">
+      <div class="card grow" style="overflow:hidden"><div class="sk" style="height:112px;border-radius:0"></div><div class="col" style="padding:14px;gap:8px"><div class="sk" style="height:14px;width:70%"></div><div class="sk" style="height:12px;width:90%"></div><div class="sk" style="height:16px;width:40%"></div></div></div>
+      <div class="card grow" style="overflow:hidden"><div class="sk" style="height:112px;border-radius:0"></div><div class="col" style="padding:14px;gap:8px"><div class="sk" style="height:14px;width:60%"></div><div class="sk" style="height:12px;width:80%"></div><div class="sk" style="height:16px;width:45%"></div></div></div>
+    </div>
+    <span class="help">aria-busy="true" on the grid · one polite "Loading listings" message · skeletons skip the animation under prefers-reduced-motion</span></div>
+  <div class="card pad st col" style="align-items:flex-start;justify-content:center"><span class="lbl">Empty · no match</span>
+    <svg class="i muted" style="width:36px;height:36px" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6"/></svg>
+    <b style="font-size:18px">No listings for "bonk sniper" on Padre</b>
+    <span class="meta">Try another terminal or remove a trust filter. Only live, AI-verified listings appear here.</span>
+    <div class="row"><button class="btn secondary sm">Clear filters</button><button class="btn ghost sm">Request this tool</button></div></div>
+  <div class="danger-panel pad st col" style="align-items:flex-start;justify-content:center"><span class="lbl danger">Error · API unreachable</span>
+    <b style="font-size:18px">Couldn't load listings</b>
+    <span class="t2" style="font-size:13px">The marketplace API didn't respond. Your wallet and any open orders aren't affected.</span>
+    <div class="row"><button class="btn secondary sm">Try again</button><span class="mono faint" style="font-size:11px">ref 7f2c · 503</span></div></div>
+</div>
+<div class="states">
+  <div class="col"><span class="lbl">Holder-only window (non-holder)</span><div id="lock"></div></div>
+  <div class="col" style="grid-column:span 2"><span class="lbl">Logged out · preview notice above the grid, list price + USD on cards</span><div data-x="preview"></div><div class="grid" style="grid-template-columns:1fr 1fr" id="out"></div></div>
+</div></div>
+<p class="note">v2, owner decisions applied: buyers only see live listings, because AI review finishes in seconds and there is no "in review" queue to show. Logged-out visitors get a "Preview prices" notice above the grid; cards show list price + USD and "your tier can cut it". Every price shows USD. Earlier decisions stand: connected cards show <b>what you pay</b> at your tier, filters use list price so results don't reshuffle, and empty and error states always offer a next action.</p>
+</div>
+<script>(function () {
+  const lock = '<svg class="i" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+  const shield = '<svg class="i" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>';
+  const logoSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0B0A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 L9 8 L13 14 L16 9 L20 18"/></svg>';
+  window.ICON = { lock, shield };
+  const parts = {
+    net: () => '<div class="netbar">DEVNET · test SOL only · nothing here has real value</div>',
+    ticker: () => '<div class="ticker"><div class="wrap"><span class="row" style="gap:8px"><span class="dot"></span>Solana devnet · live</span><span>$TRENCH <span style="color:var(--text)">[PRICE]</span></span><span>Holders: <span style="color:var(--text)">up to 100% off the 5% fee</span></span><span class="ml">Every version scanned, sandboxed and AI-verified before it goes live</span></div></div>',
+    nav: (el) => {
+      const a = el.dataset.active || '';
+      const st = el.dataset.state || 'connected';
+      const links = ['Explore', 'Sell', '$TRENCH', 'Purchases'].map((n) => `<a class="${n === a ? 'on' : ''}">${n}</a>`).join('');
+      const right = st === 'connected'
+        ? '<span class="tierchip">Trencher · 60% off fees</span><button class="btn primary">7xKp…a9Fq</button>'
+        : '<button class="btn primary">Connect wallet</button>';
+      return `<header class="nav"><div class="wrap"><a class="logo"><i>${logoSvg}</i>trenchmart</a><nav class="navlinks">${links}</nav><label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="grow">Search scripts, wallet lists, filters, creators…</span><span class="kbd">/</span></label>${right}</div></header>`;
+    },
+    mnav: (el) => {
+      const st = el.dataset.state || 'connected';
+      const right = st === 'connected' ? '<button class="btn primary sm">7xKp…a9Fq</button>' : '<button class="btn primary sm">Connect</button>';
+      return `<div class="netbar" style="font-size:11px">DEVNET · test SOL only</div><header class="nav"><div class="wrap" style="padding:12px 16px;gap:10px"><a class="logo" style="font-size:16px"><i style="width:28px;height:28px">${logoSvg}</i>trenchmart</a><span class="ml"></span><button class="btn secondary sm" aria-label="Search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>${right}</div></header>`;
+    },
+    foot: () => '<footer style="margin-top:56px;border-top:1px solid var(--line-soft)"><div class="wrap row" style="padding:24px;gap:16px 28px;font-size:13px;color:var(--muted)"><b style="color:var(--text)">trenchmart</b><a class="muted">Security policy</a><a class="muted">How AI verification works</a><a class="muted">Report a listing</a><a class="muted">Docs</a><span class="ml">Not financial advice. Tools don\'t guarantee profits.</span></div></footer>',
+  };
+  const REBATE = { none: 0n, scout: 2500n, trencher: 6000n, og: 10000n };
+  const sol = (l) => {
+    const s = l.toString().padStart(10, '0');
+    let frac = s.slice(-9).replace(/0+$/, '');
+    if (frac.length < 2) frac = frac.padEnd(2, '0');
+    return `${s.slice(0, -9).replace(/^0+(?=\d)/, '')}.${frac}`;
+  };
+  const quote = (price, tier) => {
+    const fee = (price * 500n) / 10000n;
+    const rebate = (fee * REBATE[tier]) / 10000n;
+    return { price, fee, rebate, total: price + fee - rebate };
+  };
+  const RATE_CENTS = 18000n;
+  const usd = (l) => {
+    const c = (l * RATE_CENTS) / 1000000000n;
+    if (c < 1n) return '< $0.01';
+    const d = (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `≈ ${d}.${(c % 100n).toString().padStart(2, '0')}`;
+  };
+  window.TM = { sol, quote, usd };
+  const CAT = {
+    USERSCRIPT: ['#C6F432', '#141A10'], 'WALLET LIST': ['#7CC4FF', '#0F1620'], FILTER: ['#F5A524', '#1C160A'],
+    SETUP: ['#C9A2FF', '#18121F'], STRATEGY: ['#6EE7C8', '#0E1A17'], ALERTS: ['#FF8A7A', '#1F1210'],
+  };
+  const L = [
+    ['USERSCRIPT', 'Axiom · GMGN', 'Sniper Filter Pack v2', '@dev_degen', '4.9', 412, 1500000000n, 'ok', '5'],
+    ['WALLET LIST', 'GMGN · Photon · Axiom', '120 Early Wallets (Q4)', '@onchainsleuth', '4.7', 268, 2000000000n, 'ok', '2'],
+    ['FILTER', 'Photon', 'Migration Sniper Presets', '@pumpwatch', '4.6', 190, 800000000n, 'ok', '1'],
+    ['SETUP', 'Axiom · BullX', 'Full Trench Desk Setup', '@nightshift', '4.8', 96, 3500000000n, 'ok', '5'],
+    ['USERSCRIPT', 'Axiom', 'Bundle Detector Overlay', '@rugradar', '4.9', 533, 1200000000n, 'ok', '5'],
+    ['STRATEGY', 'Any terminal', 'Copy-Trade Exit Playbook', '@calmape', '4.5', 74, 1000000000n, 'ok', '1'],
+    ['ALERTS', 'Telegram · Padre', 'KOL Buy Alerts Config', '@signalboy', '4.4', 58, 600000000n, 'ok', '5'],
+    ['USERSCRIPT', 'GMGN · BullX', 'Dev Wallet History Tooltip', '@dev_degen', '4.8', 301, 900000000n, 'ok', '5'],
+  ];
+  window.TM.listings = L;
+  const card = (l, tier) => {
+    const [type, compat, title, by, rating, sold, price, st, bond] = l;
+    const [c, bg] = CAT[type];
+    const badge = st === 'ok' ? '<span class="tag ok ml">✓ AI-VERIFIED</span>' : st === 'locked' ? '<span class="tag inf ml">◷ HOLDERS 48H</span>' : '<span class="tag wait ml">◷ IN AI REVIEW</span>';
+    const q = tier ? quote(price, tier) : null;
+    const priceLine = q
+      ? `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(q.total)} SOL</span><span class="mono acc" style="font-size:12px">you pay · ${tier === 'none' ? 'incl. 5% fee' : tier[0].toUpperCase() + tier.slice(1) + ' rate'}</span></div><span class="mono meta" style="font-size:12px;margin-top:-6px">${usd(q.total)}</span>`
+      : `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(price)} SOL</span><span class="mono meta" style="font-size:12px">${usd(price)} · list price</span></div><span class="mono faint" style="font-size:12px;margin-top:-6px">+ 5% fee · your tier can cut it</span>`;
+    return `<a class="card" data-testid="listing-card" style="display:flex;flex-direction:column;overflow:hidden;color:var(--text)"><div style="height:112px;background:${bg};padding:14px;display:flex;flex-direction:column;justify-content:space-between;border-bottom:1px solid var(--line-soft)"><div class="row" style="gap:6px"><span class="tag dark" style="color:${c}">${type}</span>${badge}</div><span class="mono t2" style="font-size:12px">${compat}</span></div><div style="padding:14px;display:flex;flex-direction:column;gap:8px"><div class="col" style="gap:2px"><b>${title}</b><span class="meta">${by} · bond ${bond} SOL · ${sold} sold · ★ ${rating}</span></div>${priceLine}</div></a>`;
+  };
+  window.TM.card = card;
+  parts.preview = (el) => el.dataset.compact
+    ? `<div class="info-panel col" data-testid="preview-notice" role="note" style="padding:14px;gap:10px"><div class="row" style="gap:10px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><b style="font-size:14px">Preview prices</b></div><span class="t2" style="font-size:13px">These are list prices. Connect to see your exact price with your $TRENCH tier discount.</span><button class="btn primary block">Connect to see your price</button></div>`
+    : `<div class="info-panel row" data-testid="preview-notice" role="note" style="padding:12px 16px;gap:12px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><div class="grow col" style="gap:0"><b style="font-size:14px">Preview prices</b><span class="t2" style="font-size:13px">You're seeing list prices. Connect your wallet to see your exact price with your $TRENCH tier discount (up to 100% off the 5% fee).</span></div><button class="btn primary sm">Connect to see your price</button></div>`;
+  parts.cards = (el) => {
+    const n = Number(el.dataset.n || 8);
+    const tier = el.dataset.tier || '';
+    const cols = el.dataset.cols ? `grid-template-columns:repeat(${el.dataset.cols},1fr)` : '';
+    return `<div class="grid g-cards" style="${cols}">${L.slice(0, n).map((l) => card(l, tier)).join('')}</div>`;
+  };
+  document.querySelectorAll('[data-x]').forEach((el) => { el.outerHTML = parts[el.dataset.x](el); });
+})();
+</script>
+<script>
+document.getElementById('m1').innerHTML=TM.listings.slice(0,2).map(l=>TM.card(l,'trencher')).join('');
+const lk=[...TM.listings[3]];lk[7]='locked';
+document.getElementById('lock').innerHTML=TM.card(lk,'none').replace(/<div class="row" style="gap:8px;align-items:baseline">[\s\S]*<\/a>$/,'<div class="row" style="gap:8px"><span class="mono" style="font-size:17px;font-weight:600">3.675 SOL</span><span class="tag inf ml">Opens to all in 31h 12m</span></div><span class="mono meta" style="font-size:12px;margin-top:-6px">≈ $661.50</span><span class="help">Scout tier or higher can buy now. <span class="acc">How tiers work</span></span></div></a>');
+document.getElementById('out').innerHTML=TM.card(TM.listings[0],'')+TM.card(TM.listings[1],'');
+</script>
+</body></html>
