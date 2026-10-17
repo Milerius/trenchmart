@@ -13,3 +13,9 @@ bucket_name = "trenchmart-files"
 [[queues.producers]]
 binding = "SCAN_QUEUE"
 queue = "scan-static"
+
+# Encrypted, pooled Postgres. Create the config and uncomment (see docs/DEPLOY_DATABASE.md).
+# Without it the Worker falls back to the DATABASE_URL secret.
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "<hyperdrive config id>"

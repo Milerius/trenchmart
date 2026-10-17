@@ -187,6 +187,7 @@ Every other setting has a working local default. See [`.env.example`](.env.examp
 | Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/)       |
 | Brand assets           | [`brand/`](brand/): logo mark, wordmark (dark and light), X avatar and header, favicon. `pnpm brand` re-renders the PNGs         |
 | Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                                    |
+| Database deploy        | [`docs/DEPLOY_DATABASE.md`](docs/DEPLOY_DATABASE.md): Supabase, Hyperdrive, per-request connections, RLS                         |
 | Costs and budget       | [`docs/11-costs.md`](docs/11-costs.md) · [`docs/12-budget.md`](docs/12-budget.md) · [`DEPLOYMENT_COSTS.md`](DEPLOYMENT_COSTS.md) |
 | Brief for build agents | [`AGENT_PROMPT.md`](AGENT_PROMPT.md)                                                                                             |
 
