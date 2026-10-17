@@ -7,6 +7,7 @@ import {
   runAiVerifier,
   combineVerdicts,
   llmConfigured,
+  LLM_EXCERPT_CHARS,
   runLlmReview,
   RULES_ENGINE,
   type LlmVerdict,
@@ -1400,16 +1401,27 @@ async function modelVerdict(
   sandboxVerdict?: 'pass' | 'warn' | 'fail',
   sandboxWalletCalls?: string[],
 ): Promise<{ verdict: LlmVerdict | null; note: string | null }> {
-  const config = { ...deps.env.llm, fetch: deps.llmFetch };
+  const config = {
+    ...deps.env.llm,
+    reasoningEffort: deps.env.llm.reasoningEffort || undefined,
+    fetch: deps.llmFetch,
+  };
   if (!llmConfigured(config) || rules.decision === 'reject') return { verdict: null, note: null };
   try {
     const listing = (
-      await deps.sql<
-        Row[]
-      >`select title, description from listings where id = ${version.listing_id}`
+      await deps.sql<Row[]>`
+        select l.title, l.description, l.summary, c.live as content
+        from listings l left join listing_content c on c.listing_id = l.id
+        where l.id = ${version.listing_id}
+      `
     )[0];
+    const content = (listing?.content ?? {}) as { readme?: unknown; howto?: unknown };
+    const docs = [listing?.summary, content.readme, content.howto]
+      .filter((part): part is string => typeof part === 'string' && part.length > 0)
+      .join('\n\n');
     const bytes = await deps.blob.get(version.r2_key as string);
-    const excerpt = bytes ? new TextDecoder().decode(bytes.slice(0, 24_000)) : '';
+    const text = bytes ? new TextDecoder().decode(bytes) : '';
+    const excerpt = text.slice(0, LLM_EXCERPT_CHARS);
     const hosts = checks
       .filter((check) => check.ruleId === 'sandbox-network' && check.result !== 'pass')
       .map((check) => check.detail);
@@ -1418,7 +1430,10 @@ async function modelVerdict(
       description: String(listing?.description ?? ''),
       declared: version.declared,
       fileName: String(version.file_name),
+      docs,
       fileExcerpt: excerpt,
+      fileTotalChars: text.length,
+      creatorNote: (version.creator_note as string | null) ?? null,
       checks,
       sandbox: {
         verdict: sandboxVerdict ?? null,
@@ -1426,7 +1441,11 @@ async function modelVerdict(
         hosts,
       },
     });
-    return { verdict, note: null };
+    const coverage =
+      text.length > LLM_EXCERPT_CHARS
+        ? ` (The model saw the first ${LLM_EXCERPT_CHARS} of ${text.length} characters.)`
+        : '';
+    return { verdict: { ...verdict, notes: `${verdict.notes}${coverage}` }, note: null };
   } catch (err) {
     return {
       verdict: null,

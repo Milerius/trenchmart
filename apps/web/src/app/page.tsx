@@ -83,8 +83,8 @@ export default function HomePage() {
             style={{ animationDelay: '150ms' }}
           >
             Buy and sell trading scripts, terminal filters and wallet lists. Every version is
-            scanned, scripts also run in a sandbox, and a rules engine decides in seconds. Your SOL
-            waits in escrow until the trade is done.
+            scanned, scripts also run in a sandbox, and an AI review (rules engine plus an LLM)
+            decides in under a minute. Your SOL waits in escrow until the trade is done.
           </p>
           <div className="rise mt-8 flex flex-wrap gap-3" style={{ animationDelay: '210ms' }}>
             <ButtonLink href="#market" size="lg">
@@ -261,7 +261,7 @@ export default function HomePage() {
               ],
               [
                 'Sandboxed automated review',
-                'Each file is statically scanned; scripts also run in an isolated sandbox with logged network calls. A rules engine then decides.',
+                'Each file is statically scanned; scripts also run in an isolated sandbox with logged network calls. A rules engine and an LLM then review it; the stricter verdict wins.',
               ],
             ].map(([title, body]) => (
               <div

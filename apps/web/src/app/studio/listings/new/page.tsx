@@ -236,7 +236,7 @@ export default function NewListingPage() {
             {[
               ['Static checks', 'eval, remote code, key access, hosts'],
               ['Sandbox run', 'isolated, network and wallet calls logged'],
-              ['Verdict', 'rules engine decision on the checks'],
+              ['AI verdict', 'rules engine plus LLM; the stricter wins'],
             ].map(([title, detail], index) => (
               <li key={title} className="flex list-none gap-3">
                 <Square>{index + 1}</Square>

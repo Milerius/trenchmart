@@ -81,11 +81,15 @@ export default function SellersDocsPage() {
           call is a reject.
         </p>
         <p>
-          {protocol.aiAgentId} ({protocol.aiEngine}) then decides. A failing check rejects the
-          version. Warnings need a creator note of at least 20 characters that is not a trivial
-          reply such as “ok” or “lgtm”; otherwise the verdict is request_changes. A clean file is
-          approved. There is no human reviewer. An approval carries an HMAC attestation over the
-          version id, sha256, decision, and time.
+          {protocol.aiAgentId} ({protocol.aiEngine}) then decides. The rules engine (
+          {protocol.rulesEngine}) gives a verdict, and an LLM ({protocol.aiModel}) reads your file
+          against the listing and gives its own. The stricter verdict wins: the model can turn an
+          approval into request_changes or reject, never the reverse. If the model is unavailable,
+          the rules verdict stands and the report says so. A failing check rejects the version.
+          Warnings need a creator note of at least 20 characters that is not a trivial reply such as
+          “ok” or “lgtm”; otherwise the verdict is request_changes. A clean file is approved. There
+          is no human reviewer. An approval carries an HMAC attestation over the version id, sha256,
+          decision, and time.
         </p>
         <p>Version status moves only along these edges.</p>
         <ul data-testid="version-edges" className="m-0 grid gap-1 p-0 font-mono text-sm text-ink">

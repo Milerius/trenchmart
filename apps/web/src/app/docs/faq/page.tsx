@@ -27,7 +27,7 @@ const QA: [string, string][] = [
   ],
   [
     'Who reviews listings?',
-    `An automated reviewer, ${protocol.aiAgentId}: static checks, a sandboxed run and a rules engine. No language model is configured yet, and each listing's signed scan report names the engine that reviewed it. There is no human verifier role.`,
+    `An automated reviewer, ${protocol.aiAgentId}: static checks, a sandboxed run, a rules engine and an LLM (${protocol.aiModel}, reasoning effort ${protocol.aiReasoningEffort}) that reads the code against the listing. The stricter of the two verdicts wins, so the model can only make a verdict stricter. Each listing's signed scan report names the engine and model that reviewed it. There is no human verifier role.`,
   ],
   [
     'Where do I write about an order?',
