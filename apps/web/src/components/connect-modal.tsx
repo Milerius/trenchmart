@@ -10,43 +10,46 @@ import {
   type WalletChoice,
 } from '@/lib/wallet-catalog';
 import type { MobileWalletId } from '@/lib/wallet-detect';
+import { bundledWalletLogo } from '@/lib/wallet-logos';
 
-const MARK: Record<string, { fill: string; letter: string; ink: string }> = {
-  phantom: { fill: '#AB9FF2', letter: 'P', ink: '#0A0B0A' },
-  walletconnect: { fill: '#3B99FC', letter: 'W', ink: '#0A0B0A' },
-  solflare: { fill: '#FC822B', letter: 'S', ink: '#0A0B0A' },
-  trust: { fill: '#0500FF', letter: 'T', ink: '#EDEFEA' },
-  glow: { fill: '#14F195', letter: 'G', ink: '#0A0B0A' },
-  coinbase: { fill: '#0052FF', letter: 'C', ink: '#EDEFEA' },
-  backpack: { fill: '#E33E3F', letter: 'B', ink: '#EDEFEA' },
-};
-
-function Mark({ id, name }: { id: string; name: string }) {
-  const mark = MARK[id] ?? {
-    fill: '#262A26',
-    letter: name.slice(0, 1).toUpperCase(),
-    ink: '#EDEFEA',
-  };
+/** Letter tile for a Wallet Standard wallet that is not in the catalog and has no icon. */
+function Mark({ name }: { name: string }) {
   return (
-    <svg viewBox="0 0 36 36" className="h-9 w-9 shrink-0 rounded-ctl" aria-hidden="true">
-      <rect width="36" height="36" rx="10" fill={mark.fill} />
+    <svg
+      viewBox="0 0 36 36"
+      className="h-9 w-9 shrink-0 rounded-ctl"
+      aria-hidden="true"
+      data-logo="generic"
+    >
+      <rect width="36" height="36" rx="10" fill="#262A26" />
       <text
         x="18"
         y="24"
         textAnchor="middle"
         fontSize="16"
         fontWeight="700"
-        fill={mark.ink}
+        fill="#EDEFEA"
         fontFamily="Geist, ui-sans-serif, system-ui, sans-serif"
       >
-        {mark.letter}
+        {name.slice(0, 1).toUpperCase()}
       </text>
     </svg>
   );
 }
 
-function markKey(id: string): string {
-  return id.startsWith('open-') ? id.slice(5) : id;
+/** Installed wallet's own icon first, then the bundled official logo, then a letter tile. */
+function WalletLogo({ id, name, icon }: { id: string; name: string; icon?: string | null }) {
+  const bundled = bundledWalletLogo(id);
+  const src = icon ?? bundled;
+  if (!src) return <Mark name={name} />;
+  return (
+    <img
+      src={src}
+      alt=""
+      data-logo={icon ? 'wallet' : 'bundled'}
+      className="h-9 w-9 shrink-0 rounded-ctl object-cover"
+    />
+  );
 }
 
 const DEEPLINK_ID: Record<string, MobileWalletId | undefined> = {
@@ -57,10 +60,7 @@ const DEEPLINK_ID: Record<string, MobileWalletId | undefined> = {
 };
 
 function RowIcon({ choice }: { choice: WalletChoice }) {
-  if (choice.icon) {
-    return <img src={choice.icon} alt="" className="h-9 w-9 shrink-0 rounded-ctl object-cover" />;
-  }
-  return <Mark id={markKey(choice.id)} name={choice.name} />;
+  return <WalletLogo id={choice.id} name={choice.name} icon={choice.icon} />;
 }
 
 function SearchIcon() {
@@ -381,7 +381,7 @@ function DeeplinkList({ deeplinks }: { deeplinks: Partial<Record<MobileWalletId,
         return (
           <li key={id}>
             <a data-testid={`wallet-deeplink-${id}`} href={href} className={ROW}>
-              <Mark id={id} name={name} />
+              <WalletLogo id={id} name={name} />
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{name}</span>
             </a>
           </li>
