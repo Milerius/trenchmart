@@ -1,0 +1,57 @@
+import React from 'react';
+import { AbsoluteFill, Html5Audio, Sequence, staticFile, useCurrentFrame } from 'remotion';
+import { lin } from './anim';
+import { Background, Hud, Ticker } from './ui/layout';
+import { Hook } from './scenes/Hook';
+import { ListScene } from './scenes/List';
+import { ScanScene } from './scenes/Scan';
+import { EscrowScene } from './scenes/Escrow';
+import { UnlockScene } from './scenes/Unlock';
+import { Outro } from './scenes/Outro';
+import { BEATS } from './timeline';
+
+const STEP_STARTS = [BEATS.list.from, BEATS.scan.from, BEATS.escrow.from, BEATS.unlock.from];
+
+export type PromoMix = 'full' | 'music-sfx';
+export type PromoProps = { mix: PromoMix };
+
+const MIX_FILES: Record<PromoMix, string> = {
+  full: 'audio/promo-full.flac',
+  'music-sfx': 'audio/promo-music-sfx.flac',
+};
+
+export const Promo: React.FC<PromoProps> = ({ mix }) => {
+  const frame = useCurrentFrame();
+  const hudOpacity = Math.min(
+    lin(frame, BEATS.list.from + 4, BEATS.list.from + 16),
+    1 - lin(frame, BEATS.outro.from - 6, BEATS.outro.from + 4),
+  );
+  const step = STEP_STARTS.filter((s) => frame >= s + 6).length - 1;
+
+  return (
+    <AbsoluteFill>
+      <Background />
+      {(Object.keys(BEATS) as (keyof typeof BEATS)[]).map((k) => {
+        const { from, dur } = BEATS[k];
+        const Scene = SCENES[k];
+        return (
+          <Sequence key={k} from={from} durationInFrames={dur} name={k}>
+            <Scene dur={dur} />
+          </Sequence>
+        );
+      })}
+      <Hud step={Math.max(0, step)} opacity={hudOpacity} />
+      <Ticker />
+      <Html5Audio src={staticFile(MIX_FILES[mix])} />
+    </AbsoluteFill>
+  );
+};
+
+const SCENES: Record<keyof typeof BEATS, React.FC<{ dur: number }>> = {
+  hook: Hook,
+  list: ListScene,
+  scan: ScanScene,
+  escrow: EscrowScene,
+  unlock: UnlockScene,
+  outro: Outro,
+};
