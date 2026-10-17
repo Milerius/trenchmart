@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Tag } from '@/components/ui';
 import {
@@ -348,7 +349,15 @@ export function ConnectModal({
               <p className="m-0 mt-3 text-sm text-muted">No wallets match that search.</p>
             ) : null}
             <p className="m-0 mt-4 text-center text-[12px] leading-5 text-muted">
-              By connecting, you agree to the Terms of Service and Privacy Policy.
+              By connecting, you agree to the{' '}
+              <Link href="/terms" className="text-ink underline underline-offset-2">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="text-ink underline underline-offset-2">
+                Privacy Policy
+              </Link>
+              .
             </p>
           </>
         ) : null}
