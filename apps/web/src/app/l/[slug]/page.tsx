@@ -2,9 +2,29 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { moneyText, solText } from '@/lib/money';
+import { useEffect, useState, type KeyboardEvent } from 'react';
+import { categoryMeta } from '@trenchmart/shared';
+import { FeeBreakdown } from '@/components/fees';
+import {
+  Button,
+  ButtonLink,
+  EmptyState,
+  ErrorState,
+  Label,
+  LockIcon,
+  Money,
+  Panel,
+  PreviewNotice,
+  ShieldIcon,
+  Skeleton,
+  Square,
+  StatusTag,
+  Tag,
+  utc,
+} from '@/components/ui';
+import { ApiError, api } from '@/lib/api';
+import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
+import { solText } from '@/lib/money';
 import { useWallet } from '@/lib/wallet';
 
 type Listing = {
@@ -18,12 +38,18 @@ type Listing = {
   price: string;
   license: string;
   holderOnly: boolean;
+  sales7d?: number;
+  ratingAvg?: string | null;
+  ratingCount?: number;
   security: {
     semver: string;
     sha256: string;
     summary: string;
+    passed?: number;
+    total?: number;
     checks: { ruleId: string; result: string; title: string; detail: string }[];
-    review: { agentId: string; decision: string } | null;
+    declared?: Record<string, string[]>;
+    review: { agentId: string; decision: string; signedAt?: string } | null;
   } | null;
   creator: { handle: string | null; wallet: string; bondLamports: string };
   preview: string | null;
@@ -38,30 +64,48 @@ type Quote = {
   totalUsd: { usdCents: string | null };
 };
 
+type Step = 'idle' | 'quoting' | 'signing' | 'confirming' | 'done' | 'failed';
+type Tab = 'security' | 'overview' | 'reviews';
+const TABS: Tab[] = ['security', 'overview', 'reviews'];
+
 export default function ListingPage() {
   const params = useParams<{ slug: string }>();
   const wallet = useWallet();
+  const config = usePublicConfig();
+  const centsPerSol = useSolUsd();
   const [listing, setListing] = useState<Listing | null>(null);
-  const [tab, setTab] = useState<'security' | 'overview' | 'reviews'>('security');
+  const [loadError, setLoadError] = useState<'missing' | 'failed' | null>(null);
+  const [tab, setTab] = useState<Tab>('security');
   const [reviews, setReviews] = useState<{ rating: number; body: string }[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [step, setStep] = useState<Step>('idle');
   const [message, setMessage] = useState('');
   const [orderId, setOrderId] = useState('');
 
-  useEffect(() => {
+  function load() {
+    setLoadError(null);
     void api<Listing>(`/listings/${params.slug}`)
       .then(setListing)
-      .catch(() => setListing(null));
+      .catch((err) => {
+        setListing(null);
+        setLoadError(err instanceof ApiError && err.status === 404 ? 'missing' : 'failed');
+      });
     void api<{ rating: number; body: string }[]>(`/listings/${params.slug}/reviews`)
       .then(setReviews)
       .catch(() => setReviews([]));
-  }, [params.slug]);
+  }
+
+  useEffect(load, [params.slug]);
 
   async function buy() {
     if (!listing) return;
     setMessage('');
     try {
-      if (!wallet.session) await wallet.connect();
+      if (!wallet.session) {
+        await wallet.connect();
+        return;
+      }
+      setStep('quoting');
       const priced = await api<Quote>('/orders/quote', {
         method: 'POST',
         body: JSON.stringify({ listingId: listing.id }),
@@ -72,130 +116,366 @@ export default function ListingPage() {
         body: JSON.stringify({ listingId: listing.id }),
       });
       setOrderId(created.orderId);
+      setStep('signing');
       const signature = await wallet.signAndSend(created.txBase64);
+      setStep('confirming');
       await api(`/orders/${created.orderId}/submitted`, {
         method: 'POST',
         body: JSON.stringify({ txSig: signature }),
       });
+      setStep('done');
       setMessage('Payment seen. Download unlocks after escrow releases.');
     } catch (err) {
+      setStep('failed');
       setMessage(err instanceof Error ? err.message : 'checkout failed');
     }
   }
 
-  if (!listing) return <p>Loading listing…</p>;
+  if (loadError === 'missing') {
+    return (
+      <EmptyState
+        title="Listing not found"
+        body="It may have been delisted, or the link is wrong."
+        action={<ButtonLink href="/search">Browse the market</ButtonLink>}
+      />
+    );
+  }
+  if (loadError === 'failed') {
+    return (
+      <ErrorState
+        title="Couldn't load this listing"
+        body="The marketplace API didn't respond. Your wallet and funds are not affected."
+        onRetry={load}
+      />
+    );
+  }
+  if (!listing) {
+    return (
+      <div aria-busy="true" className="grid gap-8 lg:grid-cols-[1fr_380px]">
+        <div className="space-y-4">
+          <p className="text-muted">Loading listing…</p>
+          <Skeleton className="h-9 w-2/3" />
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+        <Skeleton className="h-80 w-full" />
+      </div>
+    );
+  }
+
+  const meta = categoryMeta(listing.category);
+  const security = listing.security;
+  const verified = security?.review?.decision === 'approve';
+  const tier = wallet.session?.tier;
+  const busy = step === 'quoting' || step === 'signing' || step === 'confirming';
+  const escrowHours = config?.escrowHours ?? 48;
+  const rating = listing.ratingAvg ? Number(listing.ratingAvg) : null;
+
+  function onTabKey(event: KeyboardEvent<HTMLButtonElement>) {
+    const index = TABS.indexOf(tab);
+    const next =
+      event.key === 'ArrowRight'
+        ? (index + 1) % TABS.length
+        : event.key === 'ArrowLeft'
+          ? (index + TABS.length - 1) % TABS.length
+          : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    setTab(TABS[next]!);
+    document.getElementById(`tab-${TABS[next]}`)?.focus();
+  }
 
   return (
-    <article className="grid gap-8 lg:grid-cols-[1fr_320px]">
-      <div>
-        <p className="text-sm text-muted">
-          <Link href="/">Explore</Link> /{' '}
-          <Link href={`/c/${listing.category}`}>{listing.category}</Link>
+    <article className="grid items-start gap-10 lg:grid-cols-[1fr_400px]">
+      <div className="min-w-0">
+        <nav aria-label="Breadcrumb" className="text-sm text-muted">
+          <Link href="/" className="hover:text-ink">
+            Explore
+          </Link>{' '}
+          /{' '}
+          <Link href={`/c/${listing.category}`} className="hover:text-ink">
+            {meta.label}
+          </Link>
+        </nav>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span
+            className="rounded-tag border border-line px-2 py-0.5 font-mono text-[11px] font-semibold"
+            style={{ color: meta.color, background: meta.bg }}
+          >
+            {meta.tag}
+          </span>
+          {verified ? <StatusTag status="live" /> : <Tag tone="warn">NOT VERIFIED</Tag>}
+          {listing.holderOnly ? <Tag tone="info">HOLDER-ONLY</Tag> : null}
+        </div>
+        <h1 className="mt-3 text-[34px] font-semibold leading-tight tracking-[-0.03em]">
+          {listing.title}
+        </h1>
+        <p className="mt-2 text-[17px] text-ink-2">{listing.summary}</p>
+        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+          <CreatorLink creator={listing.creator} />
+          {listing.sales7d ? <span>{listing.sales7d} sold this week</span> : null}
+          {rating ? (
+            <span>
+              <span aria-hidden="true">★</span> {rating.toFixed(1)}
+              <span className="sr-only"> out of 5</span>
+              {listing.ratingCount ? ` · ${listing.ratingCount} reviews` : ''}
+            </span>
+          ) : null}
+          {listing.terminals.length ? <span>{listing.terminals.join(' · ')}</span> : null}
         </p>
-        <h1 className="mt-3 text-3xl">{listing.title}</h1>
-        <p className="mt-2 text-muted">{listing.summary}</p>
-        <p className="mt-2 text-sm">
-          {listing.security?.review ? `AI verified · v${listing.security.semver}` : 'Not verified'}
-          {listing.terminals.length ? ` · ${listing.terminals.join(', ')}` : ''}
-        </p>
-        <div className="mt-6 flex gap-2">
-          {(['security', 'overview', 'reviews'] as const).map((name) => (
+
+        {security ? (
+          <Panel
+            tone={verified ? 'ok' : 'warn'}
+            className="mt-6 flex flex-wrap items-center gap-4 p-4"
+          >
+            <ShieldIcon className={verified ? 'text-accent' : 'text-warn'} />
+            <div className="min-w-0 flex-1">
+              <p className="m-0 font-semibold">
+                {verified ? 'AI-verified' : 'Verification pending'} · v{security.semver}
+              </p>
+              <p className="m-0 text-[13px] text-accent-body">
+                {security.passed ?? security.checks.filter((c) => c.result === 'pass').length} of{' '}
+                {security.total ?? security.checks.length} checks passed
+                {security.review?.signedAt ? ` · signed ${utc(security.review.signedAt)}` : ''}
+                {security.review ? ` · ${security.review.agentId}` : ''}
+              </p>
+            </div>
+            <span className="font-mono text-xs text-accent-label" title={security.sha256}>
+              SHA-256 {security.sha256.slice(0, 8)}…{security.sha256.slice(-6)}
+            </span>
+          </Panel>
+        ) : null}
+
+        <div
+          role="tablist"
+          aria-label="Listing details"
+          className="mt-8 flex gap-1 border-b border-line"
+        >
+          {TABS.map((name) => (
             <button
               key={name}
+              id={`tab-${name}`}
+              role="tab"
               type="button"
-              className="rounded-md border border-line px-3 py-1 text-sm"
+              aria-selected={tab === name}
+              aria-controls={`panel-${name}`}
+              tabIndex={tab === name ? 0 : -1}
+              onKeyDown={onTabKey}
+              className={`-mb-px border-b-2 px-4 py-2.5 text-sm capitalize transition-colors ${
+                tab === name
+                  ? 'border-accent text-ink'
+                  : 'border-transparent text-muted hover:text-ink'
+              }`}
               onClick={() => setTab(name)}
             >
               {name}
+              {name === 'reviews' && reviews.length ? ` (${reviews.length})` : ''}
             </button>
           ))}
         </div>
-        {tab === 'security' ? (
-          <ul className="mt-4 space-y-2">
-            {(listing.security?.checks ?? []).map((check) => (
-              <li key={check.ruleId} className="rounded-lg border border-line p-3 text-sm">
-                <span className="font-mono text-xs">{check.result}</span> {check.title}
-                <p className="text-muted">{check.detail}</p>
-              </li>
-            ))}
-            {listing.preview ? (
-              <pre className="mt-4 overflow-auto text-xs text-muted">{listing.preview}</pre>
-            ) : null}
-          </ul>
-        ) : null}
-        {tab === 'overview' ? (
-          <p className="mt-4 whitespace-pre-wrap">{listing.description}</p>
-        ) : null}
-        {tab === 'reviews' ? (
-          <ul className="mt-4 space-y-2">
-            <li className="text-sm text-muted">
-              Only wallets that bought this listing can review it.
-            </li>
-            {reviews.map((review, index) => (
-              <li key={index} className="rounded-lg border border-line p-3">
-                {review.rating}/5 — {review.body}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-      <aside data-testid="checkout" className="h-fit rounded-xl border border-line bg-surface p-4">
-        <p className="font-mono text-2xl">{solText(listing.price)}</p>
-        {quote ? (
-          <dl className="mt-4 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <dt>List</dt>
-              <dd>{solText(quote.price)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Fee</dt>
-              <dd>{solText(quote.fee)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Rebate</dt>
-              <dd>{solText(quote.rebate)}</dd>
-            </div>
-            <div className="flex justify-between font-medium">
-              <dt>You pay</dt>
-              <dd>{moneyText(quote.total, quote.totalUsd.usdCents)}</dd>
-            </div>
-            <p data-testid="tier-pill" className="text-xs text-muted">
-              Tier {quote.tier}
+        <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="pt-5">
+          {tab === 'security' ? <SecurityPanel listing={listing} /> : null}
+          {tab === 'overview' ? (
+            <p className="m-0 max-w-2xl whitespace-pre-wrap leading-relaxed text-ink-2">
+              {listing.description}
             </p>
-          </dl>
-        ) : null}
-        <button
-          data-testid="buy"
-          type="button"
-          className="mt-4 w-full rounded-md bg-accent py-3 text-onaccent"
-          onClick={() => void buy()}
-        >
-          Buy with SOL
-        </button>
-        <p className="mt-3 text-xs text-muted">
-          Escrow holds funds until the trade finishes. The file stays locked until release.
-        </p>
-        {listing.holderOnly ? <p className="mt-2 text-xs">Holder-only listing.</p> : null}
-        <p className="mt-2 text-xs">License: {listing.license}</p>
-        {orderId ? (
-          <p className="mt-3 text-sm">
-            Order <Link href="/me/purchases">{orderId.slice(0, 8)}</Link>
+          ) : null}
+          {tab === 'reviews' ? (
+            <ul className="m-0 space-y-2 p-0">
+              <li className="list-none text-sm text-muted">
+                Only wallets that bought this listing can review it.
+              </li>
+              {reviews.map((review, index) => (
+                <li
+                  key={index}
+                  className="list-none rounded-card border border-line bg-surface p-4"
+                >
+                  <span className="font-mono text-sm text-accent">
+                    {'★'.repeat(review.rating)}
+                    <span className="sr-only">{review.rating} out of 5</span>
+                  </span>
+                  <p className="m-0 mt-1 text-sm text-ink-2">{review.body}</p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      </div>
+
+      <aside
+        data-testid="checkout"
+        aria-label="Checkout"
+        className="rounded-panel border border-line bg-surface lg:sticky lg:top-6"
+      >
+        <div className="border-b border-line-soft p-5">
+          <Label>Price</Label>
+          <div className="mt-1 text-2xl font-semibold">
+            <Money lamports={listing.price} centsPerSol={centsPerSol} strong />
+          </div>
+          {tier ? (
+            <p className="mt-1 text-[13px] text-ink-2">
+              Your tier: <span className="text-accent">{TIER_LABEL[tier] ?? tier}</span>
+            </p>
+          ) : null}
+        </div>
+        <div className="space-y-4 p-5">
+          {!wallet.session ? <PreviewNotice compact /> : null}
+          <FeeBreakdown
+            price={listing.price}
+            config={config}
+            tier={tier}
+            centsPerSol={centsPerSol}
+            quoted={quote}
+          />
+          {quote ? (
+            <p data-testid="tier-pill" className="m-0 text-xs text-muted">
+              Quote locked for tier {TIER_LABEL[quote.tier] ?? quote.tier}
+            </p>
+          ) : null}
+          {step !== 'idle' ? <CheckoutProgress step={step} escrowHours={escrowHours} /> : null}
+          {step === 'done' ? (
+            <ButtonLink href="/me/purchases" variant="secondary" className="w-full">
+              View order {orderId.slice(0, 8)} in Purchases
+            </ButtonLink>
+          ) : (
+            <Button
+              data-testid="buy"
+              size="lg"
+              className="w-full"
+              disabled={busy || wallet.busy}
+              aria-busy={busy || undefined}
+              onClick={() => void buy()}
+            >
+              {buyLabel(step, !!wallet.session, wallet.busy)}
+            </Button>
+          )}
+          {message && step === 'failed' ? (
+            <p role="alert" className="m-0 text-sm text-danger">
+              {message}
+            </p>
+          ) : null}
+          {message && step === 'done' ? (
+            <p role="status" className="sr-only">
+              {message}
+            </p>
+          ) : null}
+          <ul className="m-0 space-y-2 p-0 text-[13px] text-ink-2">
+            <li className="flex list-none gap-2">
+              <ShieldIcon className="h-4 w-4 shrink-0 text-accent" />
+              Held in escrow for {escrowHours}h. Dispute any time in that window.
+            </li>
+            <li className="flex list-none gap-2">
+              <span className="shrink-0 text-muted">
+                <LockIcon />
+              </span>
+              Download unlocks after escrow releases. Watermarked to your wallet.
+            </li>
+          </ul>
+          <p className="m-0 border-t border-line-soft pt-3 text-xs text-muted">
+            License: {listing.license} · creator bond {solText(listing.creator.bondLamports)}
           </p>
-        ) : null}
-        {message ? <p className="mt-3 text-sm">{message}</p> : null}
-        {message && orderId && !message.includes('Payment') ? null : null}
-        <CreatorLink creator={listing.creator} />
+        </div>
       </aside>
     </article>
+  );
+}
+
+function buyLabel(step: Step, connected: boolean, connecting: boolean): string {
+  if (connecting) return 'Check your wallet…';
+  if (!connected) return 'Connect wallet to buy';
+  if (step === 'quoting') return 'Locking your price…';
+  if (step === 'signing') return 'Approve in your wallet…';
+  if (step === 'confirming') return 'Confirming on devnet…';
+  if (step === 'failed') return 'Try again';
+  return 'Pay into escrow';
+}
+
+const PROGRESS: [Exclude<Step, 'idle' | 'failed'>, string][] = [
+  ['quoting', 'Price locked'],
+  ['signing', 'Signed in wallet'],
+  ['confirming', 'Confirmed on devnet'],
+  ['done', 'Paid · in escrow'],
+];
+
+function CheckoutProgress({ step, escrowHours }: { step: Step; escrowHours: number }) {
+  const current = PROGRESS.findIndex(([key]) => key === step);
+  return (
+    <ol
+      aria-label="Checkout progress"
+      className="m-0 space-y-2 rounded-ctl border border-line-soft bg-inset p-3"
+    >
+      {PROGRESS.map(([key, label], index) => {
+        const done = step === 'done' || index < current;
+        const active = index === current && step !== 'done';
+        return (
+          <li key={key} className="flex list-none items-center gap-2.5 text-[13px]">
+            <Square tone={done ? 'ok' : active ? 'info' : 'neutral'}>
+              {done ? '✓' : active ? '◑' : index + 1}
+            </Square>
+            <span className={done || active ? 'text-ink' : 'text-muted'}>{label}</span>
+          </li>
+        );
+      })}
+      {step === 'done' ? (
+        <li className="list-none pt-1 text-[13px] text-accent-body">
+          Your SOL is in escrow for {escrowHours}h. The download unlocks when it releases.
+        </li>
+      ) : null}
+    </ol>
+  );
+}
+
+function SecurityPanel({ listing }: { listing: Listing }) {
+  const security = listing.security;
+  if (!security) return <p className="text-muted">No verified version yet.</p>;
+  const declared = Object.entries(security.declared ?? {}).filter(([, values]) => values.length);
+  return (
+    <div className="space-y-6">
+      <ul className="m-0 grid gap-2 p-0 md:grid-cols-2">
+        {security.checks.map((check) => (
+          <li
+            key={check.ruleId}
+            className="flex list-none items-start gap-3 rounded-card border border-line bg-surface p-3"
+          >
+            <StatusTag status={check.result} />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">{check.title}</span>
+              <span className="block text-[13px] text-muted">{check.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {declared.length ? (
+        <div>
+          <Label>Declared permissions</Label>
+          <dl className="m-0 mt-2 grid gap-x-6 gap-y-1 font-mono text-[13px] sm:grid-cols-[auto_1fr]">
+            {declared.map(([key, values]) => (
+              <div key={key} className="contents">
+                <dt className="text-muted">@{key}</dt>
+                <dd className="m-0 text-ink-2">{values.join(', ')}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
+      {listing.preview ? (
+        <div>
+          <Label>Preview</Label>
+          <pre className="mt-2 overflow-auto rounded-card border border-line bg-inset p-4 font-mono text-xs leading-relaxed text-ink-2">
+            {listing.preview}
+          </pre>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 function CreatorLink({ creator }: { creator: Listing['creator'] }) {
   const handle = creator.handle ?? creator.wallet;
   return (
-    <p className="mt-4 text-sm">
-      <Link href={`/u/${handle}`}>@{creator.handle ?? handle.slice(0, 4)}</Link>
-      <span className="text-muted"> · bond {solText(creator.bondLamports)}</span>
-    </p>
+    <Link href={`/u/${handle}`} className="text-ink-2 hover:text-ink">
+      @{creator.handle ?? handle.slice(0, 4)}
+    </Link>
   );
 }

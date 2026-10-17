@@ -3,8 +3,10 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ListingGrid, type Listing } from '@/components/listings';
+import { ButtonLink, EmptyState, Label, Money, Skeleton, Tag } from '@/components/ui';
 import { api } from '@/lib/api';
-import { solText } from '@/lib/money';
+import { usePublicConfig, useSolUsd } from '@/lib/config';
+import { useWallet } from '@/lib/wallet';
 
 type Profile = {
   handle: string | null;
@@ -16,31 +18,64 @@ type Profile = {
 
 export default function CreatorPage() {
   const params = useParams<{ handle: string }>();
+  const wallet = useWallet();
+  const config = usePublicConfig();
+  const cents = useSolUsd();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [missing, setMissing] = useState(false);
-  const [cents, setCents] = useState<string | null>(null);
 
   useEffect(() => {
     void api<Profile>(`/creators/${params.handle}`)
       .then(setProfile)
       .catch(() => setMissing(true));
-    void api<{ centsPerSol: string | null }>('/prices/sol').then((price) =>
-      setCents(price.centsPerSol),
-    );
   }, [params.handle]);
 
-  if (missing) return <p>Creator not found.</p>;
-  if (!profile) return <p>Loading creator…</p>;
-  return (
-    <section>
-      <h1 className="text-3xl">@{profile.handle ?? profile.wallet.slice(0, 4)}</h1>
-      <p className="mt-2 text-sm text-muted">
-        Bond {solText(profile.bond)}
-        {profile.xHandle ? ` · X @${profile.xHandle}` : ''}
-      </p>
-      <div className="mt-6">
-        <ListingGrid listings={profile.listings} centsPerSol={cents} />
+  if (missing) {
+    return (
+      <EmptyState
+        title="Creator not found."
+        body="The handle may have changed."
+        action={<ButtonLink href="/creators">All creators</ButtonLink>}
+      />
+    );
+  }
+  if (!profile) {
+    return (
+      <div className="space-y-4" aria-busy="true">
+        <p className="text-muted">Loading creator…</p>
+        <Skeleton className="h-9 w-1/3" />
       </div>
+    );
+  }
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 rounded-panel border border-line bg-surface p-6">
+        <div>
+          <Label>Creator</Label>
+          <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
+            @{profile.handle ?? profile.wallet.slice(0, 4)}
+          </h1>
+          <p className="m-0 mt-1 font-mono text-xs text-muted">
+            {profile.wallet.slice(0, 4)}…{profile.wallet.slice(-4)}
+            {profile.xHandle ? ` · X @${profile.xHandle}` : ''}
+          </p>
+        </div>
+        <div className="text-right">
+          <Label>Bond posted</Label>
+          <div className="mt-1">
+            <Money lamports={profile.bond} centsPerSol={cents} strong stacked />
+          </div>
+          <Tag tone="ok" className="mt-2">
+            {profile.listings.length} AI-VERIFIED LISTING{profile.listings.length === 1 ? '' : 'S'}
+          </Tag>
+        </div>
+      </div>
+      <ListingGrid
+        listings={profile.listings}
+        centsPerSol={cents}
+        config={config}
+        tier={wallet.session?.tier}
+      />
     </section>
   );
 }

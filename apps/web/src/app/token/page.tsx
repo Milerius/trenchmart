@@ -1,129 +1,148 @@
 'use client';
 
-import { quote, solToLamports } from '@trenchmart/shared';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { solText } from '@/lib/money';
+import { solToLamports } from '@trenchmart/shared';
+import { useState } from 'react';
+import { DEFAULT_FEES, FeeBreakdown, TIER_ORDER, TierTable } from '@/components/fees';
+import { Label } from '@/components/ui';
+import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
+import { useWallet } from '@/lib/wallet';
 
-type PublicConfig = {
-  feeBps: number;
-  tierRebateBps: Record<string, number>;
-  tierThresholds: Record<string, string>;
-  feeSplitBps: Record<string, number>;
+const SPLIT: Record<string, [string, string]> = {
+  buyback: [
+    '$TRENCH buyback',
+    'Buys $TRENCH on a published schedule, with the transactions posted.',
+  ],
+  ai_verification: [
+    'AI verification',
+    'Pays for automated review: static checks, sandbox runs and AI verdicts.',
+  ],
+  ops: ['Operations', 'Running the marketplace.'],
+  safety: [
+    'Safety fund',
+    "Backs refunds for upheld disputes when the creator's bond doesn't cover them.",
+  ],
 };
 
 export default function TokenPage() {
-  const [config, setConfig] = useState<PublicConfig | null>(null);
+  const config = usePublicConfig();
+  const centsPerSol = useSolUsd();
+  const wallet = useWallet();
   const [price, setPrice] = useState('1.5');
   const [tier, setTier] = useState('trencher');
+  const fees = config ?? DEFAULT_FEES;
 
-  useEffect(() => {
-    void api<PublicConfig>('/config/public')
-      .then(setConfig)
-      .catch(() => setConfig(null));
-  }, []);
-
-  const rebateBps = config?.tierRebateBps[tier] ?? 0;
-  let quoted: ReturnType<typeof quote> | null = null;
+  let lamports: string | null;
   try {
-    if (config) quoted = quote(solToLamports(price || '0'), config.feeBps, rebateBps);
+    lamports = solToLamports(price || '0').toString();
   } catch {
-    quoted = null;
+    lamports = null;
   }
 
   return (
-    <article className="space-y-8">
-      <header>
-        <p className="text-xs uppercase text-accent">$TRENCH · fair launch on pump.fun</p>
-        <h1 className="mt-3 text-4xl">Fees fund the token. The token cuts your fees.</h1>
+    <article className="space-y-14">
+      <header className="max-w-3xl">
+        <Label className="text-accent-label">$TRENCH · fair launch on pump.fun</Label>
+        <h1 className="mt-3 text-[40px] font-semibold leading-tight tracking-[-0.03em]">
+          Fees fund the token. The token cuts your fees.
+        </h1>
+        <p className="mt-4 text-[17px] text-ink-2">
+          Buyers pay a {fees.feeBps / 100}% fee on top of the listing price. Holding $TRENCH cuts
+          it: Scout 25% off, Trencher 60% off, OG pays nothing. Creators pay 0% commission at every
+          tier.
+        </p>
       </header>
-      <section className="grid gap-3 sm:grid-cols-3">
-        <Tile label="Platform fee" value={config ? `${config.feeBps / 100}%` : '—'} />
-        <Tile label="Max rebate" value="100%" />
-        <Tile
-          label="Buyback split"
-          value={config ? `${(config.feeSplitBps.buyback ?? 0) / 100}%` : '—'}
-        />
+
+      <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <div className="rounded-panel border border-line bg-surface p-5">
+          <h2 className="m-0 text-lg font-semibold">Holder tiers</h2>
+          <TierTable config={config} current={wallet.session?.tier} className="mt-3" />
+          <div className="mt-5 border-t border-line-soft pt-4">
+            <Label>Minimum balance to qualify</Label>
+            <ul className="m-0 mt-2 flex flex-wrap gap-2 p-0">
+              {Object.entries(
+                config?.tierThresholds ?? { scout: '[X]', trencher: '[Y]', og: '[Z]' },
+              ).map(([name, threshold]) => (
+                <li
+                  key={name}
+                  data-testid="tier-pill"
+                  className="list-none rounded-full border border-line-control px-3 py-1 font-mono text-[13px] text-ink-2"
+                >
+                  {TIER_LABEL[name] ?? name} · {threshold}
+                </li>
+              ))}
+            </ul>
+            <p className="m-0 mt-2 text-xs text-muted">
+              Thresholds stay disabled until the owner sets real numbers. Placeholders are shown as
+              proposed. Your tier uses your lowest balance over the last{' '}
+              {config?.tierWindowHours ?? 72} hours.
+            </p>
+          </div>
+        </div>
+
+        <section
+          data-testid="savings-calculator"
+          className="rounded-panel border border-line bg-surface p-5"
+        >
+          <h2 className="m-0 text-lg font-semibold">Savings calculator</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-medium">
+              List price (SOL)
+              <input
+                className="mt-1.5 w-full rounded-ctl border border-line-control bg-inset px-3 py-2 font-mono text-sm"
+                inputMode="decimal"
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+              />
+            </label>
+            <label className="block text-sm font-medium">
+              Tier preview
+              <select
+                className="mt-1.5 w-full rounded-ctl border border-line-control bg-inset px-3 py-2 text-sm"
+                value={tier}
+                onChange={(event) => setTier(event.target.value)}
+              >
+                {TIER_ORDER.map((name) => (
+                  <option key={name} value={name}>
+                    {TIER_LABEL[name]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="mt-5">
+            {lamports ? (
+              <FeeBreakdown
+                price={lamports}
+                config={config}
+                tier={tier}
+                centsPerSol={centsPerSol}
+                showSplit={false}
+              />
+            ) : (
+              <p className="m-0 text-sm text-muted">Enter a SOL amount with up to 9 decimals.</p>
+            )}
+          </div>
+        </section>
       </section>
+
       <section>
-        <h2 className="text-xl">Where every fee goes</h2>
-        <p className="mt-2 text-sm text-muted">
-          The 25% AI verification bucket funds automated review credits. There is no human verifier
-          payout.
+        <h2 className="m-0 text-[24px] font-semibold tracking-[-0.02em]">Where every fee goes</h2>
+        <p className="mt-2 max-w-2xl text-ink-2">
+          The net fee, after your tier discount, is split four ways. The AI verification bucket
+          funds automated review, not people.
         </p>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          {Object.entries(config?.feeSplitBps ?? {}).map(([bucket, bps]) => (
-            <li key={bucket} className="rounded-xl border border-line p-4">
-              {bucket.replace('_', ' ')} · {bps / 100}%
+        <ul className="m-0 mt-6 grid gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
+          {Object.entries(fees.feeSplitBps).map(([bucket, bps]) => (
+            <li key={bucket} className="list-none rounded-card border border-line bg-surface p-5">
+              <span className="tabular font-mono text-2xl font-semibold text-accent">
+                {bps / 100}%
+              </span>
+              <span className="mt-2 block font-semibold">{SPLIT[bucket]?.[0] ?? bucket}</span>
+              <span className="mt-1 block text-[13px] text-ink-2">{SPLIT[bucket]?.[1]}</span>
             </li>
           ))}
         </ul>
-      </section>
-      <section>
-        <h2 className="text-xl">Holder tiers</h2>
-        <p className="mt-2 text-sm text-muted">
-          Thresholds stay disabled until the owner sets real numbers. Placeholders are shown as
-          proposed.
-        </p>
-        <ul className="mt-4 flex flex-wrap gap-2">
-          {Object.entries(
-            config?.tierThresholds ?? { scout: '[X]', trencher: '[Y]', og: '[Z]' },
-          ).map(([name, threshold]) => (
-            <li
-              key={name}
-              data-testid="tier-pill"
-              className="rounded-full border border-line px-3 py-1 text-sm"
-            >
-              {name} · {threshold}
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section
-        data-testid="savings-calculator"
-        className="rounded-xl border border-line bg-surface p-4"
-      >
-        <h2 className="text-xl">Savings calculator</h2>
-        <label className="mt-4 block text-sm">
-          List price (SOL)
-          <input
-            className="mt-1 w-full rounded-md border border-line bg-inset px-3 py-2"
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-          />
-        </label>
-        <label className="mt-3 block text-sm">
-          Tier preview
-          <select
-            className="mt-1 w-full rounded-md border border-line bg-inset px-3 py-2"
-            value={tier}
-            onChange={(event) => setTier(event.target.value)}
-          >
-            {['none', 'scout', 'trencher', 'og'].map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {quoted ? (
-          <p className="mt-4 font-mono text-sm">
-            Fee {solText(quoted.fee)} · rebate {solText(quoted.rebate)} · you pay{' '}
-            {solText(quoted.total)}
-          </p>
-        ) : (
-          <p className="mt-4 text-sm text-muted">Enter a SOL amount with up to 9 decimals.</p>
-        )}
       </section>
     </article>
-  );
-}
-
-function Tile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-line p-4">
-      <p className="text-xs uppercase text-muted">{label}</p>
-      <p className="mt-2 font-mono text-2xl">{value}</p>
-    </div>
   );
 }
