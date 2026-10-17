@@ -160,6 +160,19 @@ export function assertDevnetChain(chain: string): void {
   if (chain !== DEVNET_CHAIN) throw new Error('Refusing to sign outside devnet');
 }
 
+/**
+ * Wallets whose `solana:signIn` signs text the server did not issue. Trust Wallet (26.x) always
+ * adds `Version: 1` and `Chain ID: mainnet` to the message, so its signed bytes never match the
+ * nonce message and the user had to approve a second prompt from the signMessage fallback.
+ * These wallets sign the server text with `signMessage`, which they still show as a sign-in request.
+ */
+const SIGN_IN_ADDS_FIELDS = [/^trust(\s+wallet)?$/i];
+
+/** False when the wallet's `solana:signIn` is known to change the server's sign-in text. */
+export function signInKeepsMessage(walletName: string): boolean {
+  return !SIGN_IN_ADDS_FIELDS.some((pattern) => pattern.test(walletName.trim()));
+}
+
 function pickAccount(accounts: readonly StandardAccount[]): StandardAccount | null {
   return accounts.find((account) => account.chains.includes(DEVNET_CHAIN)) ?? accounts[0] ?? null;
 }
@@ -191,7 +204,9 @@ export async function signerFromStandardWallet(
   }
   const account = pickAccount(accounts);
   if (!account) throw new Error(`${wallet.name} did not return an account`);
-  const signIn = featureMethod<SignInMethod>(wallet.features['solana:signIn'], 'signIn');
+  const signIn = signInKeepsMessage(wallet.name)
+    ? featureMethod<SignInMethod>(wallet.features['solana:signIn'], 'signIn')
+    : null;
   // Phantom checks the account by identity against its current account object, so pass
   // the wallet's own instance when it still lists this address.
   const current = () =>

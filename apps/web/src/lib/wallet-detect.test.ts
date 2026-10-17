@@ -8,6 +8,7 @@ import {
   pickSolanaWallet,
   readInjectedProvider,
   signerFromStandardWallet,
+  signInKeepsMessage,
   signSignInMessage,
   siwsInputFromMessage,
   walletErrorMessage,
@@ -414,6 +415,64 @@ describe('standard wallet signIn and account identity', () => {
     expect(out.address).toBe(ADDRESS);
     await signer.signMessage(new Uint8Array([1]));
     expect(phantom.signMessage.mock.calls[0]?.[0].account).toBe(own);
+  });
+});
+
+/** What Trust Wallet 26.41 signs for a signIn input: the SIWS text plus Version and Chain ID. */
+function trustFormat(input: Parameters<typeof phantomFormat>[0]): string {
+  return phantomFormat(input).replace(`\nNonce: `, `\nVersion: 1\nChain ID: mainnet\nNonce: `);
+}
+
+describe('wallets whose signIn changes the message', () => {
+  it('knows Trust adds fields and the other Solana wallets do not', () => {
+    expect(signInKeepsMessage('Trust')).toBe(false);
+    expect(signInKeepsMessage('Trust Wallet')).toBe(false);
+    for (const name of ['Phantom', 'Backpack', 'Solflare', 'Trustless']) {
+      expect(signInKeepsMessage(name)).toBe(true);
+    }
+  });
+
+  it('asks Trust to sign once, with signMessage, instead of signIn plus a fallback prompt', async () => {
+    // Regression: Trust's signIn result never matched the nonce message (it adds Version and
+    // Chain ID), so connecting showed two sign-in prompts before /auth/verify.
+    const trust = wallet('Trust', ['solana:mainnet']);
+    const own = account(ADDRESS, ['solana:mainnet']);
+    trust.connect.mockResolvedValue({ accounts: [own] });
+    const signIn = vi.fn(async (input: Parameters<typeof phantomFormat>[0]) => [
+      {
+        account: own,
+        signedMessage: new TextEncoder().encode(trustFormat(input)),
+        signature: new Uint8Array(64).fill(9),
+      },
+    ]);
+    trust.features['solana:signIn'] = { version: '1.0.0', signIn };
+    const signer = await signerFromStandardWallet(trust);
+    expect(signer.signIn).toBeUndefined();
+    await signSignInMessage(signer, SIWS);
+    expect(signIn).not.toHaveBeenCalled();
+    expect(trust.signMessage).toHaveBeenCalledTimes(1);
+    expect(trust.signMessage.mock.calls[0]?.[0].message).toEqual(new TextEncoder().encode(SIWS));
+  });
+
+  it('keeps signIn for Backpack and Solflare, which rebuild the exact text', async () => {
+    for (const name of ['Backpack', 'Solflare']) {
+      const w = wallet(name);
+      const own = account(ADDRESS, [DEVNET_CHAIN]);
+      w.connect.mockResolvedValue({ accounts: [own] });
+      const signIn = vi.fn(async (input: Parameters<typeof phantomFormat>[0]) => [
+        {
+          account: own,
+          signedMessage: new TextEncoder().encode(phantomFormat(input)),
+          signature: new Uint8Array(64).fill(9),
+        },
+      ]);
+      w.features['solana:signIn'] = { version: '1.0.0', signIn };
+      const signer = await signerFromStandardWallet(w);
+      const signature = await signSignInMessage(signer, SIWS);
+      expect(Array.from(signature)).toEqual(new Array(64).fill(9));
+      expect(signIn).toHaveBeenCalledTimes(1);
+      expect(w.signMessage).not.toHaveBeenCalled();
+    }
   });
 });
 
