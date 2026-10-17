@@ -3,7 +3,7 @@ import { renderSVG } from 'uqr';
 /** Remembered wallet id. The picker never connects this wallet on its own. */
 export const LAST_WALLET_KEY = 'tm.last-wallet';
 
-export type CatalogKind = 'wallet' | 'walletconnect';
+export type CatalogKind = 'wallet' | 'walletconnect' | 'deeplink';
 
 export type CatalogEntry = {
   id: string;
@@ -63,6 +63,34 @@ export const WALLET_CATALOG: readonly CatalogEntry[] = [
     installUrl: 'https://backpack.app/download',
     popular: false,
     kind: 'wallet',
+  },
+  {
+    id: 'open-phantom',
+    name: 'Open in Phantom',
+    installUrl: null,
+    popular: false,
+    kind: 'deeplink',
+  },
+  {
+    id: 'open-solflare',
+    name: 'Open in Solflare',
+    installUrl: null,
+    popular: false,
+    kind: 'deeplink',
+  },
+  {
+    id: 'open-trust',
+    name: 'Open in Trust',
+    installUrl: null,
+    popular: false,
+    kind: 'deeplink',
+  },
+  {
+    id: 'open-backpack',
+    name: 'Open in Backpack',
+    installUrl: null,
+    popular: false,
+    kind: 'deeplink',
   },
 ];
 
@@ -138,9 +166,15 @@ export function buildWalletChoices(input: {
   detected: readonly DetectedWalletInfo[];
   query: string;
   lastUsedId: string | null;
+  /** When false, the WalletConnect row is omitted. Deep links stay. */
+  walletConnect?: boolean;
 }): WalletChoice[] {
+  const catalog =
+    input.walletConnect === false
+      ? WALLET_CATALOG.filter((entry) => entry.kind !== 'walletconnect')
+      : WALLET_CATALOG;
   const byId = new Map(input.detected.map((item) => [item.id, item]));
-  const rows: WalletChoice[] = WALLET_CATALOG.map((entry) => {
+  const rows: WalletChoice[] = catalog.map((entry) => {
     const found = byId.get(entry.id);
     return {
       id: entry.id,
@@ -153,7 +187,7 @@ export function buildWalletChoices(input: {
     };
   });
   for (const extra of input.detected) {
-    if (WALLET_CATALOG.some((entry) => entry.id === extra.id)) continue;
+    if (catalog.some((entry) => entry.id === extra.id)) continue;
     rows.push({
       id: extra.id,
       name: extra.name,
@@ -177,6 +211,19 @@ export function buildWalletChoices(input: {
       return a.index - b.index;
     })
     .map((item) => item.row);
+}
+
+/**
+ * Read `localStorage` itself inside the try. Evaluating `window.localStorage`
+ * throws SecurityError when storage is blocked, before getItem or setItem run.
+ */
+export function safeLocalStorage(scope: object | null | undefined): Storage | null {
+  try {
+    if (!scope) return null;
+    return (scope as { localStorage?: Storage }).localStorage ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function readLastWallet(

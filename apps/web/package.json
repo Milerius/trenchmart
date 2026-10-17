@@ -15,6 +15,7 @@
     "@trenchmart/shared": "workspace:*",
     "@wallet-standard/app": "1.1.1",
     "@wallet-standard/base": "1.1.1",
+    "@walletconnect/universal-provider": "2.26.0",
     "bs58": "6.0.0",
     "next": "16.4.2",
     "react": "19.3.1",

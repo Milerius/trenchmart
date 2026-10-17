@@ -8,6 +8,7 @@ import {
   type DetectedWalletInfo,
   type WalletChoice,
 } from '@/lib/wallet-catalog';
+import type { MobileWalletId } from '@/lib/wallet-detect';
 
 const MARK: Record<string, { fill: string; letter: string; ink: string }> = {
   phantom: { fill: '#AB9FF2', letter: 'P', ink: '#0A0B0A' },
@@ -43,11 +44,22 @@ function Mark({ id, name }: { id: string; name: string }) {
   );
 }
 
+function markKey(id: string): string {
+  return id.startsWith('open-') ? id.slice(5) : id;
+}
+
+const DEEPLINK_ID: Record<string, MobileWalletId | undefined> = {
+  'open-phantom': 'phantom',
+  'open-solflare': 'solflare',
+  'open-trust': 'trust',
+  'open-backpack': 'backpack',
+};
+
 function RowIcon({ choice }: { choice: WalletChoice }) {
   if (choice.icon) {
     return <img src={choice.icon} alt="" className="h-9 w-9 shrink-0 rounded-ctl object-cover" />;
   }
-  return <Mark id={choice.id} name={choice.name} />;
+  return <Mark id={markKey(choice.id)} name={choice.name} />;
 }
 
 function SearchIcon() {
@@ -105,22 +117,32 @@ export function ConnectModal({
   error,
   detected,
   lastUsedId,
-  mobileUrl,
+  walletConnect,
+  deeplinks,
+  wcUri,
   onClose,
   onConnect,
+  onWalletConnect,
+  onLeaveWalletConnect,
 }: {
   open: boolean;
   busy: boolean;
   error: string;
   detected: readonly DetectedWalletInfo[];
   lastUsedId: string | null;
-  mobileUrl: string | null;
+  walletConnect: boolean;
+  deeplinks: Partial<Record<MobileWalletId, string>>;
+  wcUri: string | null;
   onClose: () => void;
   onConnect: (id: string) => void;
+  onWalletConnect: () => void;
+  onLeaveWalletConnect: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const onLeaveRef = useRef(onLeaveWalletConnect);
   onCloseRef.current = onClose;
+  onLeaveRef.current = onLeaveWalletConnect;
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'help' | 'walletconnect'>('list');
 
@@ -151,6 +173,7 @@ export function ConnectModal({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (busy) return;
+        if (view === 'walletconnect') onLeaveRef.current();
         if (view === 'list') onCloseRef.current();
         else setView('list');
         return;
@@ -181,8 +204,8 @@ export function ConnectModal({
 
   if (!open) return null;
 
-  const choices = buildWalletChoices({ detected, query, lastUsedId });
-  const qr = view === 'walletconnect' && mobileUrl ? walletConnectQr(mobileUrl) : null;
+  const choices = buildWalletChoices({ detected, query, lastUsedId, walletConnect });
+  const qr = view === 'walletconnect' && wcUri ? walletConnectQr(wcUri) : null;
   const title =
     view === 'help'
       ? 'About signing in'
@@ -192,6 +215,7 @@ export function ConnectModal({
 
   function goBack() {
     if (busy) return;
+    if (view === 'walletconnect') onLeaveWalletConnect();
     if (view === 'list') onClose();
     else setView('list');
   }
@@ -252,8 +276,9 @@ export function ConnectModal({
               and nothing is approved.
             </p>
             <p className="m-0">
-              Installed wallets are the ones this browser can see. Any other row opens that
-              wallet&apos;s install page. WalletConnect opens a QR code for a phone.
+              Installed wallets are the ones this browser can see. Any other wallet opens its
+              install page. WalletConnect shows a pairing code a phone wallet can scan. Open in
+              Phantom, Solflare, Trust, or Backpack opens this page in that app.
             </p>
           </div>
         ) : null}
@@ -261,27 +286,27 @@ export function ConnectModal({
         {view === 'walletconnect' ? (
           <div className="mt-5 space-y-4 text-sm text-ink-2">
             <p className="m-0">
-              Scan with your phone, or open TrenchMart in Phantom. You&apos;ll sign one message.
-              Nothing moves and nothing is approved.
+              Scan this code with Phantom, Solflare, Trust, Backpack, or another WalletConnect
+              wallet on Devnet. You&apos;ll sign one message. Nothing moves and nothing is approved.
             </p>
+            {error ? (
+              <p role="alert" className="m-0 text-sm text-danger">
+                {error}
+              </p>
+            ) : null}
             {qr ? (
               <div
                 data-testid="wallet-qr"
+                data-pairing={wcUri?.startsWith('wc:') ? 'wc' : 'other'}
                 className="mx-auto w-fit rounded-ctl bg-white p-3"
                 dangerouslySetInnerHTML={{ __html: qr }}
               />
             ) : (
-              <p className="m-0">This page can&apos;t be opened from a wallet browser.</p>
+              <p data-testid="wallet-qr-pending" className="m-0">
+                Preparing a pairing code…
+              </p>
             )}
-            {mobileUrl ? (
-              <a
-                data-testid="wallet-deeplink"
-                href={mobileUrl}
-                className="flex h-12 items-center justify-center rounded-ctl bg-accent font-semibold text-onaccent hover:bg-accent-hover"
-              >
-                Open in Phantom
-              </a>
-            ) : null}
+            <DeeplinkList deeplinks={deeplinks} />
           </div>
         ) : null}
 
@@ -309,8 +334,12 @@ export function ConnectModal({
                   <ChoiceRow
                     choice={choice}
                     busy={busy}
+                    deeplinks={deeplinks}
                     onConnect={onConnect}
-                    onWalletConnect={() => setView('walletconnect')}
+                    onWalletConnect={() => {
+                      onWalletConnect();
+                      setView('walletconnect');
+                    }}
                   />
                 </li>
               ))}
@@ -328,14 +357,41 @@ export function ConnectModal({
   );
 }
 
+function DeeplinkList({ deeplinks }: { deeplinks: Partial<Record<MobileWalletId, string>> }) {
+  const items: readonly [MobileWalletId, string][] = [
+    ['phantom', 'Open in Phantom'],
+    ['solflare', 'Open in Solflare'],
+    ['trust', 'Open in Trust'],
+    ['backpack', 'Open in Backpack'],
+  ];
+  return (
+    <ul className="m-0 list-none space-y-2 p-0">
+      {items.map(([id, name]) => {
+        const href = deeplinks[id];
+        if (!href) return null;
+        return (
+          <li key={id}>
+            <a data-testid={`wallet-deeplink-${id}`} href={href} className={ROW}>
+              <Mark id={id} name={name} />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{name}</span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function ChoiceRow({
   choice,
   busy,
+  deeplinks,
   onConnect,
   onWalletConnect,
 }: {
   choice: WalletChoice;
   busy: boolean;
+  deeplinks: Partial<Record<MobileWalletId, string>>;
   onConnect: (id: string) => void;
   onWalletConnect: () => void;
 }) {
@@ -350,6 +406,21 @@ function ChoiceRow({
     </>
   );
   const testId = `wallet-option-${choice.id}`;
+  const deeplink = DEEPLINK_ID[choice.id];
+  if (choice.kind === 'deeplink' && deeplink && deeplinks[deeplink]) {
+    return (
+      <a
+        data-testid={testId}
+        data-wallet={choice.id}
+        data-installed="false"
+        href={deeplinks[deeplink]}
+        className={ROW}
+      >
+        {body}
+      </a>
+    );
+  }
+  if (choice.kind === 'deeplink') return null;
   if (!choice.installed && choice.kind === 'wallet' && choice.installUrl) {
     return (
       <a

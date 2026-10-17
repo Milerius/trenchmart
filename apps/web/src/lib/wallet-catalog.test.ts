@@ -5,10 +5,14 @@ import {
   catalogIdFor,
   detectedIdFor,
   readLastWallet,
+  safeLocalStorage,
   safeWalletIcon,
   walletConnectQr,
   writeLastWallet,
 } from './wallet-catalog';
+
+const OPEN_NAMES = ['Open in Phantom', 'Open in Solflare', 'Open in Trust', 'Open in Backpack'];
+const OPEN_IDS = ['open-phantom', 'open-solflare', 'open-trust', 'open-backpack'];
 
 describe('buildWalletChoices', () => {
   it('lists every catalog wallet when nothing is installed, Phantom first with Popular', () => {
@@ -21,6 +25,7 @@ describe('buildWalletChoices', () => {
       'Glow',
       'Coinbase',
       'Backpack',
+      ...OPEN_NAMES,
     ]);
     expect(rows.every((row) => !row.installed)).toBe(true);
     expect(rows[0]).toMatchObject({
@@ -48,6 +53,7 @@ describe('buildWalletChoices', () => {
       'trust',
       'glow',
       'coinbase',
+      ...OPEN_IDS,
     ]);
     expect(rows.filter((row) => row.installed).map((row) => row.id)).toEqual([
       'solflare',
@@ -78,7 +84,18 @@ describe('buildWalletChoices', () => {
       lastUsedId: null,
     });
     expect(rows[0]).toMatchObject({ id: 'other:nightly', name: 'Nightly', installed: true });
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(12);
+  });
+
+  it('hides WalletConnect when the project id is off and keeps the app links', () => {
+    const rows = buildWalletChoices({
+      detected: [],
+      query: '',
+      lastUsedId: null,
+      walletConnect: false,
+    });
+    expect(rows.map((row) => row.id)).not.toContain('walletconnect');
+    expect(rows.map((row) => row.id).slice(-4)).toEqual(OPEN_IDS);
   });
 
   it('filters by the search box without forgetting installed-first order', () => {
@@ -93,6 +110,9 @@ describe('buildWalletChoices', () => {
       'WalletConnect',
       'Coinbase',
       'Backpack',
+      'Open in Phantom',
+      'Open in Solflare',
+      'Open in Backpack',
     ]);
   });
 });
@@ -122,6 +142,20 @@ describe('safeWalletIcon', () => {
     ).toBeNull();
     expect(safeWalletIcon('javascript:alert(1)')).toBeNull();
     expect(safeWalletIcon(undefined)).toBeNull();
+  });
+});
+
+describe('safeLocalStorage', () => {
+  it('returns null when reading localStorage throws', () => {
+    const scope = {};
+    Object.defineProperty(scope, 'localStorage', {
+      get() {
+        throw new Error('SecurityError');
+      },
+    });
+    expect(safeLocalStorage(scope)).toBeNull();
+    expect(safeLocalStorage(null)).toBeNull();
+    expect(readLastWallet(safeLocalStorage(scope))).toBeNull();
   });
 });
 

@@ -121,9 +121,21 @@ test('opens the wallet picker and keeps every wallet when none is installed', as
   await expect(modal).toBeVisible();
   await expect(modal).toHaveAttribute('data-state', 'list');
   await expect(modal.getByRole('heading', { name: 'Select your wallet' })).toBeVisible();
-  const order = ['phantom', 'walletconnect', 'solflare', 'trust', 'glow', 'coinbase', 'backpack'];
+  const order = [
+    'phantom',
+    'walletconnect',
+    'solflare',
+    'trust',
+    'glow',
+    'coinbase',
+    'backpack',
+    'open-phantom',
+    'open-solflare',
+    'open-trust',
+    'open-backpack',
+  ];
   const rows = modal.locator('[data-wallet]');
-  await expect(rows).toHaveCount(7);
+  await expect(rows).toHaveCount(11);
   await expect(rows).toHaveText([
     /Phantom/,
     /WalletConnect/,
@@ -132,6 +144,10 @@ test('opens the wallet picker and keeps every wallet when none is installed', as
     /Glow/,
     /Coinbase/,
     /Backpack/,
+    /Open in Phantom/,
+    /Open in Solflare/,
+    /Open in Trust/,
+    /Open in Backpack/,
   ]);
   for (const id of order) {
     await expect(modal.locator(`[data-wallet=${id}]`)).toHaveAttribute('data-installed', 'false');
@@ -139,6 +155,22 @@ test('opens the wallet picker and keeps every wallet when none is installed', as
   const phantom = modal.getByTestId('wallet-option-phantom');
   await expect(phantom).toContainText('Popular');
   await expect(phantom).toHaveAttribute('href', 'https://phantom.com/download');
+  const openPhantom = await modal.getByTestId('wallet-option-open-phantom').getAttribute('href');
+  expect(openPhantom).toContain('https://phantom.app/ul/browse/');
+  expect(decodeURIComponent(openPhantom ?? '')).toContain('http://127.0.0.1:3000');
+  expect(openPhantom).not.toContain('mainnet');
+  await expect(modal.getByTestId('wallet-option-open-solflare')).toHaveAttribute(
+    'href',
+    /solflare\.com\/ul\/v1\/browse\//,
+  );
+  await expect(modal.getByTestId('wallet-option-open-trust')).toHaveAttribute(
+    'href',
+    /link\.trustwallet\.com\/open_url\?coin_id=501/,
+  );
+  await expect(modal.getByTestId('wallet-option-open-backpack')).toHaveAttribute(
+    'href',
+    /backpack\.app\/ul\/v1\/browse\//,
+  );
   await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
   await expect(walletAlert(page)).toHaveCount(0);
   await modal.getByTestId('wallet-search').fill('glow');
@@ -278,6 +310,108 @@ test('signs in with the explicit test adapter when a test sets it', async ({ pag
   await expect(page.getByTestId('connect')).toHaveText(label);
 });
 
+test('opens the picker when localStorage itself throws', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('blocked', 'SecurityError');
+      },
+    });
+  });
+  await page.goto('/');
+  await page.getByTestId('connect').click();
+  await expect(page.getByTestId('connect-modal')).toBeVisible();
+  await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
+});
+
+test('does not remember a wallet when sign-in fails', async ({ page }) => {
+  await page.addInitScript(installStandardWallet, { address: ADDRESS, delayMs: 0 });
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Sign in required' } }),
+    }),
+  );
+  await page.route('**/api/v1/auth/nonce', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: `Sign in to TrenchMart\n${ADDRESS}` }),
+    }),
+  );
+  await page.route('**/api/v1/auth/verify', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'bad signature' } }),
+    }),
+  );
+  await page.goto('/');
+  await chooseInstalled(page, 'phantom');
+  await expect(page.getByTestId('connect-modal')).toContainText('bad signature');
+  await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
+  const remembered = await page.evaluate((key) => localStorage.getItem(key), LAST_WALLET_KEY);
+  expect(remembered).toBeNull();
+});
+
+test('hides WalletConnect when the project id is cleared', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { __TRENCHMART_WC_PROJECT_ID__?: string }).__TRENCHMART_WC_PROJECT_ID__ =
+      '';
+  });
+  await page.goto('/');
+  await page.getByTestId('connect').click();
+  await expect(page.getByTestId('wallet-option-walletconnect')).toHaveCount(0);
+  await expect(page.getByTestId('wallet-option-open-phantom')).toBeVisible();
+});
+
+test('signs in through a mocked WalletConnect relay', async ({ page }) => {
+  const hits: string[] = [];
+  await page.addInitScript((address) => {
+    const scope = window as unknown as {
+      __TRENCHMART_WC_MOCK__?: { uri: string; address: string };
+    };
+    scope.__TRENCHMART_WC_MOCK__ = {
+      uri: 'wc:mock-topic@2?relay-protocol=irn&symKey=aa',
+      address,
+    };
+  }, ADDRESS);
+  await page.route(/walletconnect\.(com|org)|web3modal\.org|reown\.com/, (route) => {
+    hits.push(route.request().url());
+    return route.abort();
+  });
+  await mockSignIn(page, ADDRESS);
+  await page.goto('/');
+  await page.getByTestId('connect').click();
+  await page.getByTestId('wallet-option-walletconnect').click();
+  const qr = page.getByTestId('wallet-qr');
+  await expect(qr).toBeVisible();
+  await expect(qr).toHaveAttribute('data-pairing', 'wc');
+  await expect(page.getByTestId('wallet-deeplink-phantom')).toBeVisible();
+  await expect(page.getByTestId('wallet-deeplink-solflare')).toHaveAttribute(
+    'href',
+    /solflare\.com\/ul\/v1\/browse\//,
+  );
+  await expect(page.getByTestId('wallet-deeplink-trust')).toHaveAttribute(
+    'href',
+    /link\.trustwallet\.com\/open_url\?coin_id=501/,
+  );
+  await expect(page.getByTestId('wallet-deeplink-backpack')).toHaveAttribute(
+    'href',
+    /backpack\.app\/ul\/v1\/browse\//,
+  );
+  expect(hits).toEqual([]);
+  await page.evaluate(() => {
+    (window as unknown as { __TRENCHMART_WC_APPROVE__?: () => void }).__TRENCHMART_WC_APPROVE__?.();
+  });
+  await expect(page.getByTestId('connect')).toHaveText('F6rq…zpD7');
+  expect(hits).toEqual([]);
+  const remembered = await page.evaluate((key) => localStorage.getItem(key), LAST_WALLET_KEY);
+  expect(remembered).toBe('walletconnect');
+});
+
 const iphone = devices['iPhone 13'];
 
 test.describe('mobile', () => {
@@ -289,19 +423,15 @@ test.describe('mobile', () => {
     hasTouch: iphone.hasTouch,
   });
 
-  test('offers a Phantom deeplink from WalletConnect when no wallet is injected', async ({
-    page,
-  }) => {
+  test('opens TrenchMart in Phantom, Solflare, Trust, or Backpack', async ({ page }) => {
     await page.route('https://phantom.app/**', (route) =>
       route.fulfill({ status: 200, contentType: 'text/html', body: '<p>phantom</p>' }),
     );
     await page.goto('/');
     await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
     await page.getByTestId('connect').click();
-    await page.getByTestId('wallet-option-walletconnect').click();
-    await expect(page.getByTestId('wallet-qr')).toBeVisible();
-    const link = page.getByTestId('wallet-deeplink');
-    await expect(link).toHaveText('Open in Phantom');
+    const link = page.getByTestId('wallet-option-open-phantom');
+    await expect(link).toHaveText(/Open in Phantom/);
     await link.click();
     await expect(page).toHaveURL(/https:\/\/phantom\.app\/ul\/browse\//);
     const opened = new URL(page.url());

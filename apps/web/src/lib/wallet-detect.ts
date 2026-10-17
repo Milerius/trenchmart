@@ -145,17 +145,44 @@ export function isLikelyMobile(userAgent: string, maxTouchPoints = 0): boolean {
   return /Macintosh/i.test(userAgent) && maxTouchPoints > 1;
 }
 
-/** Open the current page inside Phantom's in-app browser, where the provider exists. */
-export function phantomBrowseUrl(pageUrl: string): string {
+export type MobileWalletId = 'phantom' | 'solflare' | 'trust' | 'backpack';
+
+function assertBrowsablePage(pageUrl: string): URL {
   const url = new URL(pageUrl);
   const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
   if (url.protocol !== 'https:' && !loopback) {
-    throw new Error('Refusing to open a Phantom deeplink for this page');
+    throw new Error('Refusing to open a wallet deeplink for this page');
   }
   if (loopback && url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('Refusing to open a Phantom deeplink for this page');
+    throw new Error('Refusing to open a wallet deeplink for this page');
   }
-  return `https://phantom.app/ul/browse/${encodeURIComponent(url.href)}?ref=${encodeURIComponent(url.origin)}`;
+  return url;
+}
+
+/**
+ * Open the current page inside a wallet's in-app browser, where its provider exists.
+ * Phantom, Solflare, and Backpack use their documented browse links. Trust uses the
+ * official open-url link with SLIP-44 coin id 501 (Solana).
+ */
+export function mobileBrowseUrl(wallet: MobileWalletId, pageUrl: string): string {
+  const url = assertBrowsablePage(pageUrl);
+  const target = encodeURIComponent(url.href);
+  const ref = encodeURIComponent(url.origin);
+  switch (wallet) {
+    case 'phantom':
+      return `https://phantom.app/ul/browse/${target}?ref=${ref}`;
+    case 'solflare':
+      return `https://solflare.com/ul/v1/browse/${target}?ref=${ref}`;
+    case 'backpack':
+      return `https://backpack.app/ul/v1/browse/${target}?ref=${ref}`;
+    case 'trust':
+      return `https://link.trustwallet.com/open_url?coin_id=501&url=${target}`;
+  }
+}
+
+/** Open the current page inside Phantom's in-app browser, where the provider exists. */
+export function phantomBrowseUrl(pageUrl: string): string {
+  return mobileBrowseUrl('phantom', pageUrl);
 }
 
 export function assertDevnetChain(chain: string): void {
