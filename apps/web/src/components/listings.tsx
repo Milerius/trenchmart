@@ -17,6 +17,9 @@ export type Listing = {
   ratingAvg?: string | null;
   sales7d?: number;
   lockedUntil?: string | null;
+  /** Seller-chosen cover from the listing gallery (approved content only). */
+  cover?: { url: string; alt: string } | null;
+  imageCount?: number;
 };
 
 export type Pricing = {
@@ -43,6 +46,7 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
       href={`/l/${listing.slug}`}
       className="motion-card group flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface hover:border-line-strong"
     >
+      <CardCover listing={listing} color={meta.color} bg={meta.bg} tag={meta.tag} />
       <div
         className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3"
         style={{ background: meta.bg }}
@@ -93,6 +97,51 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
         </span>
       </div>
     </Link>
+  );
+}
+
+function CardCover({
+  listing,
+  color,
+  bg,
+  tag,
+}: {
+  listing: Listing;
+  color: string;
+  bg: string;
+  tag: string;
+}) {
+  return (
+    <div
+      data-testid="card-cover"
+      className="relative aspect-[16/10] overflow-hidden border-b border-line-soft bg-inset"
+    >
+      {listing.cover ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={listing.cover.url}
+          alt={listing.cover.alt}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          className="grid h-full w-full place-items-center"
+          style={{ background: `radial-gradient(120% 90% at 20% 0%, ${bg} 0%, transparent 60%)` }}
+        >
+          <span className="font-mono text-[13px] font-semibold tracking-[0.2em]" style={{ color }}>
+            {tag}
+          </span>
+        </div>
+      )}
+      {listing.imageCount && listing.imageCount > 1 ? (
+        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-tag border border-line bg-bg/80 px-2 py-0.5 font-mono text-[11px] text-ink-2 backdrop-blur">
+          <span aria-hidden="true">▦</span> {listing.imageCount}
+          <span className="sr-only"> images</span>
+        </span>
+      ) : null}
+    </div>
   );
 }
 
