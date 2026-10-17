@@ -267,3 +267,24 @@ test('live AI review streams each step to an outcome', async ({ page }) => {
   await expect(page.getByTestId('studio')).not.toContainText(/human|appeal/i);
   await expectNoSeriousAxe(page);
 });
+
+test('retro hero motion respects prefers-reduced-motion', async ({ page }) => {
+  await stubApi(page, { '/listings': [LISTING], '/config/public': CONFIG });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const hero = page.getByTestId('hero');
+  const motion = () =>
+    hero.evaluate((el) => ({
+      beam: getComputedStyle(el, '::before').animationName,
+      cursor: getComputedStyle(el.querySelector('.cursor-block')!).animationName,
+      scanlines: getComputedStyle(el, '::after').backgroundImage,
+    }));
+  await expect.poll(motion).toMatchObject({ beam: 'crt-beam', cursor: 'cursor-blink' });
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const reduced = await motion();
+  expect(reduced.beam).toBe('none');
+  expect(reduced.cursor).toBe('none');
+  expect(reduced.scanlines).toContain('repeating-linear-gradient');
+  await expectNoSeriousAxe(page);
+});
