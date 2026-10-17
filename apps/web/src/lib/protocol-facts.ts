@@ -26,7 +26,11 @@ export const PRIVATE_CONTACT_URL = 'https://github.com/Milerius/trenchmart/secur
 export const AI_AGENT_ID = 'trenchmart-review-v1';
 export const AI_ENGINE = 'rules@1.0.0+llm';
 export const RULES_ENGINE = 'rules@1.0.0';
-/** The language model the API is configured with (LLM_MODEL). /verify shows the live value. */
+/**
+ * Intended production model settings (LLM_MODEL, LLM_REASONING_EFFORT), used in copy only.
+ * The live values are at /api/v1/transparency and on /verify; a given report may show a
+ * rules-only review (model skipped or unavailable) or a different model.
+ */
 export const AI_MODEL = 'gpt-5.6-luna';
 export const AI_REASONING_EFFORT = 'medium';
 export const SCANNER_ENGINE = 'scanner@1.1.0';
