@@ -4,6 +4,7 @@ import { ease, lin, springAt } from '../anim';
 import { C, MONO } from '../theme';
 import { WORDMARK_D, WORDMARK_TRANSFORM } from '../ui/brand-paths';
 import { Headline, useWide } from '../ui/layout';
+import { OUTRO } from '../timeline';
 
 const VB_W = 328.47;
 const DIM_LINE = '#3A4A16';
@@ -15,8 +16,8 @@ const BuildLogo: React.FC<{ width: number }> = ({ width }) => {
   const tile = springAt(frame, 0, 11);
   const chevron = ease(frame, 8, 20);
   const trench = ease(frame, 14, 30);
-  const slide = ease(frame, 28, 48);
-  const reveal = ease(frame, 32, 52);
+  const slide = ease(frame, OUTRO.wordmark - 2, OUTRO.wordmark + 18);
+  const reveal = ease(frame, OUTRO.wordmark + 2, OUTRO.wordmark + 22);
   const shift = ((VB_W - 64) / 2) * unit * (1 - slide);
 
   return (
@@ -114,8 +115,8 @@ export const Outro: React.FC<{ dur: number }> = ({ dur }) => {
   const frame = useCurrentFrame();
   const { height } = useVideoConfig();
   const wide = useWide();
-  const url = springAt(frame, 74, 16);
-  const meta = ease(frame, 86, 98);
+  const url = springAt(frame, OUTRO.url, 16);
+  const meta = ease(frame, OUTRO.url + 12, OUTRO.url + 24);
   const caret = Math.floor(frame / 9) % 2 === 0;
   const glow = ease(frame, 0, 40) * 0.1;
   const tagSize = wide ? 84 : 76;
@@ -134,6 +135,7 @@ export const Outro: React.FC<{ dur: number }> = ({ dur }) => {
           justifyContent: 'center',
           flexDirection: 'column',
           marginTop: wide ? -40 : -10,
+          transform: `scale(${1 + 0.035 * lin(frame, 40, dur)})`,
         }}
       >
         <BuildLogo width={wide ? 760 : 700} />
@@ -141,7 +143,7 @@ export const Outro: React.FC<{ dur: number }> = ({ dur }) => {
         <Headline
           size={tagSize}
           dur={dur + 100}
-          delay={48}
+          delay={OUTRO.tagline}
           align="center"
           lines={[
             [

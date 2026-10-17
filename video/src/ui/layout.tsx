@@ -1,6 +1,14 @@
 import React from 'react';
-import { AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import { ease, easeIn, lin } from '../anim';
+import {
+  AbsoluteFill,
+  Easing,
+  Img,
+  interpolate,
+  staticFile,
+  useCurrentFrame,
+  useVideoConfig,
+} from 'remotion';
+import { clamp, ease, easeIn, lin } from '../anim';
 import { C, MONO, SANS } from '../theme';
 import { LogoMark } from './primitives';
 
@@ -220,7 +228,7 @@ export const Headline: React.FC<{
           {line.map((w, wi) => {
             const i = idx++;
             const inP = ease(frame, delay + 3 + i * 3, delay + 17 + i * 3);
-            const outP = easeIn(frame, dur - 14 + i * 1.2, dur - 4 + i * 1.2);
+            const outP = easeIn(frame, dur - 12 + i * 0.8, dur - 5 + i * 0.8);
             return (
               <span
                 key={wi}
@@ -274,9 +282,15 @@ export const Stage: React.FC<{
   headline: React.ReactNode;
   card: React.ReactNode;
   cardScale: { square: number; wide: number };
-  cardStyle?: React.CSSProperties;
-}> = ({ headline, card, cardScale, cardStyle }) => {
+  dur: number;
+}> = ({ headline, card, cardScale, dur }) => {
+  const frame = useCurrentFrame();
   const wide = useWide();
+  const scale = wide ? cardScale.wide : cardScale.square;
+  const exit = interpolate(frame, [dur - 15, dur - 2], [0, 1], {
+    ...clamp,
+    easing: Easing.inOut(Easing.cubic),
+  });
   return (
     <AbsoluteFill>
       <div
@@ -306,10 +320,15 @@ export const Stage: React.FC<{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          ...cardStyle,
+          opacity: 1 - exit,
+          filter: exit > 0.01 ? `blur(${exit * 8}px)` : undefined,
         }}
       >
-        <div style={{ transform: `scale(${wide ? cardScale.wide : cardScale.square})` }}>
+        <div
+          style={{
+            transform: `translateY(${-50 * exit}px) scale(${scale * (1 + 0.025 * (frame / dur) - 0.04 * exit)})`,
+          }}
+        >
           {card}
         </div>
       </div>

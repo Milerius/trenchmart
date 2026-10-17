@@ -1,18 +1,19 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
-import { clamp, ease, lin, sceneMotion, springAt } from '../anim';
+import { clamp, ease, lin, springAt } from '../anim';
 import { C, MONO, SANS } from '../theme';
 import { Shield, Spinner } from '../ui/icons';
 import { Headline, ScreenBackdrop, Stage, useWide } from '../ui/layout';
 import { Card, CheckBox, Label, Tag } from '../ui/primitives';
+import { SCAN } from '../timeline';
 
 const W = 540;
 
 const ROWS = [
-  { t: 'Static checks', d: '14 rules · 0 findings', s: '0.4 s', from: 14, to: 36 },
-  { t: 'Sandbox run', d: 'egress blocked · 0 wallet calls', s: '1.9 s', from: 36, to: 62 },
-  { t: 'AI verdict', d: 'behaviour matches the listing', s: '2.6 s', from: 62, to: 90 },
-];
+  { t: 'Static checks', d: '14 rules · 0 findings', s: '0.4 s' },
+  { t: 'Sandbox run', d: 'egress blocked · 0 wallet calls', s: '1.9 s' },
+  { t: 'AI verdict', d: 'behaviour matches the listing', s: '2.6 s' },
+].map((r, i) => ({ ...r, from: SCAN.rows[i][0], to: SCAN.rows[i][1] }));
 
 const CHECKS = [
   'Userscript header',
@@ -32,7 +33,7 @@ const CHECKS = [
   'Behaviour matches',
 ];
 
-const VERIFIED_AT = 92;
+const VERIFIED_AT = SCAN.verified;
 
 export const CheckFlipper: React.FC<{ size: number }> = ({ size }) => {
   const frame = useCurrentFrame();
@@ -70,8 +71,8 @@ export const ScanCard: React.FC = () => {
   const verified = frame >= VERIFIED_AT;
   const pop = springAt(frame, VERIFIED_AT, 10);
   const approved = springAt(frame, VERIFIED_AT + 4, 16);
-  const beam = lin(frame, 12, 90);
-  const beamOn = frame >= 12 && frame < 92;
+  const beam = lin(frame, ...SCAN.beam);
+  const beamOn = frame >= SCAN.beam[0] && frame < VERIFIED_AT;
 
   return (
     <div
@@ -249,13 +250,13 @@ export const ScanCard: React.FC = () => {
 };
 
 export const ScanScene: React.FC<{ dur: number }> = ({ dur }) => {
-  const frame = useCurrentFrame();
   const wide = useWide();
   return (
     <AbsoluteFill>
       <ScreenBackdrop src="06-live-ai-review.webp" dur={dur} />
-      <AbsoluteFill style={sceneMotion(frame, dur)}>
+      <AbsoluteFill>
         <Stage
+          dur={dur}
           cardScale={{ square: 1.38, wide: 1.6 }}
           headline={
             <Headline

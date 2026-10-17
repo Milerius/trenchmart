@@ -1,16 +1,15 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from 'remotion';
-import { clamp, ease, lin, sceneMotion, springAt } from '../anim';
+import { clamp, ease, lin, springAt } from '../anim';
 import { C, MONO, SANS } from '../theme';
 import { Check, Download, FileCode, Lock } from '../ui/icons';
 import { Headline, ScreenBackdrop, Stage, useWide } from '../ui/layout';
 import { Button, Card, ClickRing, Cursor, Tag } from '../ui/primitives';
+import { UNLOCK } from '../timeline';
 
 const W = 560;
-const FF_FROM = 12;
-const FF_TO = 54;
-const RELEASED = 58;
-const CLICK = 86;
+const [FF_FROM, FF_TO] = UNLOCK.fastForward;
+const { released: RELEASED, click: CLICK } = UNLOCK;
 
 export const UnlockCard: React.FC = () => {
   const frame = useCurrentFrame();
@@ -28,11 +27,11 @@ export const UnlockCard: React.FC = () => {
     : lin(left, 0, 41 * 3600 + 59 * 60, [0.75, 0.28]);
   const lockOpen = ease(frame, RELEASED, RELEASED + 8);
   const asDownload = frame >= RELEASED + 8;
-  const cursorP = ease(frame, 68, 84);
+  const cursorP = ease(frame, ...UNLOCK.cursor);
   const press = frame >= CLICK && frame < CLICK + 6 ? 1 : 0;
   const dl = springAt(frame, CLICK + 4, 16);
-  const dlProg = lin(frame, CLICK + 6, CLICK + 22);
-  const toast = springAt(frame, RELEASED + 6, 16);
+  const dlProg = lin(frame, ...UNLOCK.download);
+  const toast = springAt(frame, UNLOCK.toast, 16);
   const ff = frame >= FF_FROM && frame < FF_TO;
 
   const steps = [
@@ -267,7 +266,8 @@ export const UnlockCard: React.FC = () => {
         x={lin(cursorP, 0, 1, [W + 60, 128])}
         y={lin(cursorP, 0, 1, [420, 214])}
         press={press}
-        opacity={ease(frame, 66, 72) * (1 - lin(frame, 104, 112))}
+        opacity={ease(frame, UNLOCK.cursor[0] - 2, UNLOCK.cursor[0] + 4)}
+        away={ease(frame, CLICK + 5, CLICK + 18)}
       />
       <ClickRing x={130} y={222} t={lin(frame, CLICK, CLICK + 10)} />
     </div>
@@ -275,13 +275,13 @@ export const UnlockCard: React.FC = () => {
 };
 
 export const UnlockScene: React.FC<{ dur: number }> = ({ dur }) => {
-  const frame = useCurrentFrame();
   const wide = useWide();
   return (
     <AbsoluteFill>
       <ScreenBackdrop src="04-escrow-status.webp" dur={dur} />
-      <AbsoluteFill style={sceneMotion(frame, dur)}>
+      <AbsoluteFill>
         <Stage
+          dur={dur}
           cardScale={{ square: 1.38, wide: 1.55 }}
           headline={
             <Headline

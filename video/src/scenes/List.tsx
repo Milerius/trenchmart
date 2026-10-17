@@ -1,10 +1,11 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
-import { ease, lin, sceneMotion, springAt, typed } from '../anim';
+import { ease, lin, springAt, typed } from '../anim';
 import { C, MONO, SANS } from '../theme';
 import { FileCode, Spinner, Upload } from '../ui/icons';
 import { Headline, ScreenBackdrop, Stage, useWide } from '../ui/layout';
 import { Button, Card, ClickRing, Cursor, Label, Tag } from '../ui/primitives';
+import { LIST } from '../timeline';
 
 const W = 520;
 const TITLE = 'Bundle Detector Overlay';
@@ -75,16 +76,16 @@ export const ListCard: React.FC = () => {
   const frame = useCurrentFrame();
   const enter = springAt(frame, 0, 18);
 
-  const fly = springAt(frame, 12, 16);
-  const upload = lin(frame, 26, 44);
-  const shaN = typed(frame, '2e59f5ba…9ce957', 44, 54);
-  const title = typed(frame, TITLE, 52, 76);
-  const catPick = springAt(frame, 78, 14);
-  const price = lin(frame, 84, 100, [0, 1.2]);
-  const cursorP = ease(frame, 94, 112);
-  const click = lin(frame, 113, 122);
-  const pressed = frame >= 113 && frame < 119 ? 1 : 0;
-  const started = frame >= 117;
+  const fly = springAt(frame, LIST.fly, 16);
+  const upload = lin(frame, ...LIST.upload);
+  const shaN = typed(frame, '2e59f5ba…9ce957', ...LIST.sha);
+  const title = typed(frame, TITLE, ...LIST.title);
+  const catPick = springAt(frame, LIST.category, 14);
+  const price = lin(frame, ...LIST.price, [0, 1.2]);
+  const cursorP = ease(frame, ...LIST.cursor);
+  const click = lin(frame, LIST.click, LIST.click + 9);
+  const pressed = frame >= LIST.click && frame < LIST.click + 6 ? 1 : 0;
+  const started = frame >= LIST.click + 4;
 
   return (
     <div
@@ -279,24 +280,25 @@ export const ListCard: React.FC = () => {
         </div>
       </Card>
       <Cursor
-        x={lin(cursorP, 0, 1, [W + 40, W / 2 + 40])}
+        x={lin(cursorP, 0, 1, [W + 40, W / 2 + 6])}
         y={lin(cursorP, 0, 1, [500, 402])}
         press={pressed}
-        opacity={ease(frame, 92, 98) * (1 - lin(frame, 124, 130))}
+        opacity={ease(frame, 92, 98)}
+        away={ease(frame, LIST.click + 5, LIST.click + 19)}
       />
-      <ClickRing x={W / 2 + 42} y={404} t={click} />
+      <ClickRing x={W / 2 + 8} y={404} t={click} />
     </div>
   );
 };
 
 export const ListScene: React.FC<{ dur: number }> = ({ dur }) => {
-  const frame = useCurrentFrame();
   const wide = useWide();
   return (
     <AbsoluteFill>
       <ScreenBackdrop src="05-creator-dashboard.webp" dur={dur} />
-      <AbsoluteFill style={sceneMotion(frame, dur)}>
+      <AbsoluteFill>
         <Stage
+          dur={dur}
           cardScale={{ square: 1.34, wide: 1.6 }}
           headline={
             <Headline

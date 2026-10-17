@@ -150,22 +150,26 @@ export const Button: React.FC<{
   );
 };
 
-/** macOS-style pointer; (x, y) is the tip. `press` shrinks it slightly for a click. */
-export const Cursor: React.FC<{ x: number; y: number; press?: number; opacity?: number }> = ({
-  x,
-  y,
-  press = 0,
-  opacity = 1,
-}) => (
+/**
+ * macOS-style pointer; (x, y) is the tip. `press` shrinks it for a click and `away` (0 → 1)
+ * moves it off the label it just clicked and fades it out.
+ */
+export const Cursor: React.FC<{
+  x: number;
+  y: number;
+  press?: number;
+  opacity?: number;
+  away?: number;
+}> = ({ x, y, press = 0, opacity = 1, away = 0 }) => (
   <svg
     width={26}
     height={26}
     viewBox="0 0 24 24"
     style={{
       position: 'absolute',
-      left: x,
-      top: y,
-      opacity,
+      left: x + 90 * away,
+      top: y + 60 * away,
+      opacity: opacity * (1 - away),
       transform: `scale(${1 - 0.15 * press})`,
       transformOrigin: '3px 2px',
       filter: 'drop-shadow(0 2px 6px rgba(0,0,0,.6))',

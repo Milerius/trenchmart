@@ -1,8 +1,8 @@
 import React from 'react';
 import { Composition } from 'remotion';
 import './fonts';
-import { Promo, PROMO_FRAMES } from './Promo';
-import { FPS } from './theme';
+import { Promo } from './Promo';
+import { FPS, PROMO_FRAMES } from './timeline';
 
 export const Root: React.FC = () => (
   <>

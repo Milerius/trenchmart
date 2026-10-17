@@ -1,10 +1,11 @@
 import React from 'react';
 import { AbsoluteFill, random, useCurrentFrame } from 'remotion';
-import { ease, lin, sceneMotion, springAt } from '../anim';
+import { ease, lin, springAt } from '../anim';
 import { C, MONO, SANS } from '../theme';
 import { Lock, Shield, Spinner } from '../ui/icons';
 import { Headline, ScreenBackdrop, Stage, useWide } from '../ui/layout';
 import { Button, Card, ClickRing, Cursor, Label } from '../ui/primitives';
+import { ESCROW } from '../timeline';
 
 const BOX_W = 360;
 const VAULT_W = 250;
@@ -13,10 +14,7 @@ const H = 440;
 const BTN = { x: BOX_W / 2, y: 328 };
 const LOCK = { x: BOX_W + GAP + VAULT_W / 2, y: 102 };
 
-const CLICK = 60;
-const SIGNED = 74;
-const CONFIRMED = 88;
-const FUNDED = 106;
+const { click: CLICK, signed: SIGNED, confirmed: CONFIRMED, funded: FUNDED } = ESCROW;
 
 const Row: React.FC<{ k: string; v: string; accent?: boolean; show: number }> = ({
   k,
@@ -78,7 +76,7 @@ const PayButton: React.FC<{ frame: number }> = ({ frame }) => {
 const Particles: React.FC<{ frame: number }> = ({ frame }) => (
   <>
     {Array.from({ length: 22 }).map((_, i) => {
-      const start = SIGNED + 4 + i * 1.1;
+      const start = SIGNED + 4 + i * 0.8;
       const t = ease(frame, start, start + 16);
       if (t <= 0 || t >= 1) return null;
       const jx = (random(`px${i}`) - 0.5) * 120;
@@ -118,7 +116,7 @@ export const EscrowCard: React.FC = () => {
   const amount = lin(frame, SIGNED + 12, FUNDED, [0, 1.224]);
   const funded = frame >= FUNDED;
   const pulse = springAt(frame, FUNDED, 8);
-  const cursorP = ease(frame, 38, 56);
+  const cursorP = ease(frame, ...ESCROW.cursor);
   const secs = 48 * 3600 - 2 - Math.max(0, frame - FUNDED) / 30;
   const hh = String(Math.floor(secs / 3600)).padStart(2, '0');
   const mm = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
@@ -279,7 +277,8 @@ export const EscrowCard: React.FC = () => {
         x={lin(cursorP, 0, 1, [BOX_W + 120, BTN.x + 30])}
         y={lin(cursorP, 0, 1, [H + 60, BTN.y - 4])}
         press={frame >= CLICK && frame < CLICK + 6 ? 1 : 0}
-        opacity={ease(frame, 36, 42) * (1 - lin(frame, 72, 80))}
+        opacity={ease(frame, ESCROW.cursor[0] - 2, ESCROW.cursor[0] + 4)}
+        away={ease(frame, CLICK + 5, CLICK + 18)}
       />
       <ClickRing x={BTN.x + 32} y={BTN.y - 2} t={lin(frame, CLICK, CLICK + 10)} />
     </div>
@@ -287,13 +286,13 @@ export const EscrowCard: React.FC = () => {
 };
 
 export const EscrowScene: React.FC<{ dur: number }> = ({ dur }) => {
-  const frame = useCurrentFrame();
   const wide = useWide();
   return (
     <AbsoluteFill>
       <ScreenBackdrop src="03-checkout-fee-breakdown.webp" dur={dur} />
-      <AbsoluteFill style={sceneMotion(frame, dur)}>
+      <AbsoluteFill>
         <Stage
+          dur={dur}
           cardScale={{ square: 1.3, wide: 1.4 }}
           headline={
             <Headline

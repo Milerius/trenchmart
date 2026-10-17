@@ -3,6 +3,7 @@ import { AbsoluteFill, random, useCurrentFrame } from 'remotion';
 import { ease, lin, sceneMotion, springAt } from '../anim';
 import { C, SANS } from '../theme';
 import { useWide } from '../ui/layout';
+import { HOOK } from '../timeline';
 
 const STACK = ['Trading scripts.', 'Bot configs.', 'Wallet trackers.'];
 const BAD = 'Some are drainers.';
@@ -15,20 +16,20 @@ export const Hook: React.FC<{ dur: number }> = ({ dur }) => {
   const size = wide ? 124 : 96;
   const line = size * 1.06;
 
-  const badIn = springAt(frame, 34, 14);
-  const glitch = frame >= 34 && frame < 52;
+  const badIn = springAt(frame, HOOK.bad, 14);
+  const glitch = frame >= HOOK.bad && frame < HOOK.glitchEnd;
   const dx = glitch ? (random(`g${frame}`) - 0.5) * 14 : 0;
-  const backspace = Math.round(lin(frame, 56, 67, [BAD.length, 0]));
-  const goodN = Math.round(lin(frame, 70, 86, [0, GOOD_A.length + GOOD_B.length]));
-  const typingGood = frame >= 69;
-  const dim = ease(frame, 66, 80);
-  const blink = Math.floor(frame / 8) % 2 === 0 || (frame > 30 && frame < 92);
+  const backspace = Math.round(lin(frame, ...HOOK.backspace, [BAD.length, 0]));
+  const goodN = Math.round(lin(frame, ...HOOK.type, [0, GOOD_A.length + GOOD_B.length]));
+  const typingGood = frame >= HOOK.type[0] - 1;
+  const dim = ease(frame, ...HOOK.dim);
+  const blink = Math.floor(frame / 8) % 2 === 0 || (frame > 30 && frame < HOOK.type[1] + 6);
 
   return (
     <AbsoluteFill style={{ justifyContent: 'center', ...sceneMotion(frame, dur, 14) }}>
       <div style={{ paddingLeft: wide ? 180 : 80, marginTop: wide ? 0 : -10 }}>
         {STACK.map((t, i) => {
-          const p = springAt(frame, i === 0 ? -10 : 2 + i * 11, 15);
+          const p = springAt(frame, HOOK.lines[i], 15);
           return (
             <div
               key={t}
@@ -58,7 +59,7 @@ export const Hook: React.FC<{ dur: number }> = ({ dur }) => {
             display: 'flex',
             alignItems: 'center',
             whiteSpace: 'pre',
-            opacity: frame < 34 ? 0 : 1,
+            opacity: frame < HOOK.bad ? 0 : 1,
             transform: `translateY(${(1 - badIn) * 60}px) translateX(${dx}px)`,
           }}
         >

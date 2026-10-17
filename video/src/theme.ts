@@ -32,5 +32,3 @@ export const C = {
 
 export const SANS = 'Geist, system-ui, sans-serif';
 export const MONO = '"Geist Mono", ui-monospace, monospace';
-
-export const FPS = 30;

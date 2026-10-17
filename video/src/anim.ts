@@ -1,5 +1,5 @@
 import { Easing, interpolate, spring } from 'remotion';
-import { FPS } from './theme';
+import { FPS } from './timeline';
 
 export const clamp = { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } as const;
 

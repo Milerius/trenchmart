@@ -8,18 +8,7 @@ import { ScanScene } from './scenes/Scan';
 import { EscrowScene } from './scenes/Escrow';
 import { UnlockScene } from './scenes/Unlock';
 import { Outro } from './scenes/Outro';
-
-/** Scene start frames and lengths; neighbours overlap by 8 frames for the hand-off. */
-export const BEATS = {
-  hook: { from: 0, dur: 120 },
-  list: { from: 112, dur: 136 },
-  scan: { from: 240, dur: 150 },
-  escrow: { from: 382, dur: 140 },
-  unlock: { from: 514, dur: 134 },
-  outro: { from: 640, dur: 160 },
-} as const;
-
-export const PROMO_FRAMES = BEATS.outro.from + BEATS.outro.dur;
+import { BEATS } from './timeline';
 
 const STEP_STARTS = [BEATS.list.from, BEATS.scan.from, BEATS.escrow.from, BEATS.unlock.from];
 
