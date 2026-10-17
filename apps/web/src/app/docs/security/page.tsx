@@ -51,8 +51,10 @@ export default function SecurityDocsPage() {
           {protocol.aiReasoningEffort}). The model sees the listing text buyers read (summary,
           README, install guide), the first 40,000 characters of the file, your note and the check
           results, all as untrusted data. The stricter verdict wins, so the model can only make a
-          verdict stricter. Each signed report names the engine and model that reviewed the version;
-          if the model was unavailable, the engine is the rules engine alone.
+          verdict stricter. Each signed report names the engine and model that reviewed the version.
+          The model is skipped when the rules already reject, and if it is unavailable the rules
+          verdict stands; either way the report shows the rules engine alone. Live settings are on
+          /verify.
         </p>
       </DocSection>
       <DocSection id="downloads" title="Downloads and sessions">
