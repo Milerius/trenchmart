@@ -11,6 +11,7 @@ import {
   jsonSafe,
   listingsQuery,
   randomNonce,
+  bondToList,
   requiredBondLamports,
   signJwt,
   siwsExpiresAt,
@@ -50,6 +51,7 @@ import type { Env } from './env';
 import {
   activeBond,
   applyPayment,
+  grantCreatorRole,
   audit,
   buildVaultTx,
   createOrder,
@@ -583,7 +585,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const categories = await deps.sql<{ category: string }[]>`
       select distinct category from listings where creator_id = ${user.id} and delisted_at is null and live_version_id is not null
     `;
-    const required = requiredBondLamports(
+    const required = bondToList(
       categories.map((row) => row.category),
       config.bond_lamports_by_category,
       tier.tier,
@@ -592,6 +594,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const bond = await activeBond(deps.sql, user.id as string);
     return c.json(
       jsonSafe({
+        creator: ((user.roles as string[] | undefined) ?? []).includes('creator'),
         walletSigned: true,
         xLinked: Boolean(user.x_handle),
         bondRequired: required,
@@ -640,10 +643,12 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.post('/studio/listings', async (c) => {
     const user = requireUser(c);
-    requireRole(user, 'creator');
     if (!user.x_handle) throw new HttpError(400, 'X_REQUIRED', 'link an X handle first');
     const body = await bodyOf(listingBody, await c.req.json());
+    // The category bond is the gate (docs/06-payments-escrow.md). Meeting it makes the
+    // wallet a creator, so a creator is never blocked by a role it cannot request.
     await assertBond(deps, user, body.category);
+    await grantCreatorRole(deps.sql, user.id as string);
     const slug = await uniqueSlug(deps, body.title);
     const inserted = await deps.sql<{ id: string }[]>`
       insert into listings (
@@ -726,6 +731,26 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     });
     if (!result.ok) throw new HttpError(400, result.code, result.message);
     return c.json({ ok: true });
+  });
+
+  // A fresh unsigned fee transaction: the one returned at version creation carries a
+  // blockhash that expires after about a minute, so a retry needs a new one.
+  api.post('/studio/versions/:id/fee-tx', async (c) => {
+    const user = requireUser(c);
+    const version = await ownVersion(deps, c.req.param('id'), user.id as string);
+    const fee = version.vfee_lamports as bigint;
+    const feeTx =
+      fee > 0n && !version.vfee_sig
+        ? await buildVaultTx(
+            deps,
+            user.wallet as string,
+            fee,
+            verificationFeeMemo(version.id as string),
+          )
+        : null;
+    return c.json(
+      jsonSafe({ verificationFee: fee, paid: fee === 0n || Boolean(version.vfee_sig), feeTx }),
+    );
   });
 
   api.post('/studio/versions/:id/complete', async (c) => {

@@ -320,6 +320,14 @@ async function settleOrder(deps: Deps, orderId: string, txSig: string, tx: Chain
   return { ok: true as const };
 }
 
+/** Idempotent. A wallet becomes a creator once it meets the bond for a listing. */
+export async function grantCreatorRole(sql: Deps['sql'], userId: string): Promise<void> {
+  await sql`
+    update users set roles = roles || '{creator}'::user_role[]
+    where id = ${userId} and not ('creator' = any(roles))
+  `;
+}
+
 async function settleBond(deps: Deps, bondId: string, txSig: string, tx: ChainTx) {
   const rows = await deps.sql<Row[]>`select * from bonds where id = ${bondId}`;
   const bond = rows[0];
@@ -343,10 +351,7 @@ async function settleBond(deps: Deps, bondId: string, txSig: string, tx: ChainTx
   if (bond.status !== 'pending')
     return { ok: false, code: 'NOT_PENDING', message: 'bond is not pending' };
   await deps.sql`update bonds set status = 'active', tx_sig = ${txSig} where id = ${bondId}`;
-  await deps.sql`
-    update users set roles = roles || '{creator}'::user_role[]
-    where id = ${user.id} and not ('creator' = any(roles))
-  `;
+  await grantCreatorRole(deps.sql, user.id as string);
   await deps.sql`
     insert into ledger (account, delta, ref_type, ref_id)
     values ('vault', ${bond.amount}, 'bond', ${bondId}), (${'bond:' + user.id}, ${bond.amount}, 'bond', ${bondId})

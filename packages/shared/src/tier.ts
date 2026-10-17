@@ -110,3 +110,20 @@ export function requiredBondLamports(
   }
   return max;
 }
+
+/**
+ * Bond a creator needs to list: the bond for their live categories, and at least the
+ * cheapest category bond, because a new listing must meet its own category bond.
+ */
+export function bondToList(
+  liveCategories: string[],
+  byCategory: Record<string, bigint>,
+  tier: Tier,
+  ogDiscountBps: number,
+): bigint {
+  const live = requiredBondLamports(liveCategories, byCategory, tier, ogDiscountBps);
+  const cheapest = Object.keys(byCategory)
+    .map((category) => requiredBondLamports([category], byCategory, tier, ogDiscountBps))
+    .reduce<bigint | null>((min, value) => (min === null || value < min ? value : min), null);
+  return cheapest !== null && cheapest > live ? cheapest : live;
+}
