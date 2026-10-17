@@ -313,6 +313,110 @@ describe('owner product decisions', () => {
     expect(again).toContain('event: sandbox');
   });
 
+  it('lets a new creator list once the category bond is met, and keeps the fee gate', async () => {
+    const app = await appFor();
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    await sql`update users set x_handle = 'new_creator', x_user_id = 'dev:new_creator' where wallet = ${creator.publicKey}`;
+    const json = { cookie, 'content-type': 'application/json' };
+    await sql`update config set value = '250000000'::jsonb where key = 'verification_fee_lamports'`;
+    const listingJson = JSON.stringify({
+      title: 'Fresh Filter',
+      summary: 'A first listing.',
+      description: 'No wallet access.',
+      category: 'filter',
+      priceLamports: '1000000000',
+    });
+
+    // Requirements must not say "bond OK" while creating a listing still needs one.
+    const before = (await (
+      await app.request('/api/v1/studio/requirements', { headers: { cookie } })
+    ).json()) as { creator: boolean; bondRequired: string; bondOk: boolean };
+    expect(before.creator).toBe(false);
+    expect(BigInt(before.bondRequired)).toBeGreaterThan(0n);
+    expect(before.bondOk).toBe(false);
+
+    // Regression: this was 403 "creator role required", a role no endpoint could grant.
+    const blocked = await app.request('/api/v1/studio/listings', {
+      method: 'POST',
+      headers: json,
+      body: listingJson,
+    });
+    expect(blocked.status).toBe(400);
+    expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe(
+      'BOND_REQUIRED',
+    );
+
+    const user = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
+    await sql`
+      insert into bonds (user_id, amount, tx_sig, status)
+      values (${user[0]!.id}, ${BigInt(before.bondRequired)}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+    `;
+    const after = (await (
+      await app.request('/api/v1/studio/requirements', { headers: { cookie } })
+    ).json()) as { bondOk: boolean };
+    expect(after.bondOk).toBe(true);
+
+    const created = await app.request('/api/v1/studio/listings', {
+      method: 'POST',
+      headers: json,
+      body: listingJson,
+    });
+    expect(created.status).toBe(200);
+    const listing = (await created.json()) as { id: string };
+    const roles = await sql<
+      { roles: string[] }[]
+    >`select roles from users where id = ${user[0]!.id}`;
+    expect(roles[0]?.roles).toContain('creator');
+
+    const version = await app.request(`/api/v1/studio/listings/${listing.id}/versions`, {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        semver: '1.0.0',
+        changelog: 'first',
+        fileName: 'sniper.user.js',
+        fileSize: clean.length,
+      }),
+    });
+    expect(version.status).toBe(200);
+    const issued = (await version.json()) as {
+      versionId: string;
+      verificationFee: string;
+      feeTx: { txBase64: string } | null;
+    };
+    expect(BigInt(issued.verificationFee)).toBeGreaterThan(0n);
+    expect(issued.feeTx?.txBase64).toBeTruthy();
+
+    const unpaid = await app.request(`/api/v1/studio/versions/${issued.versionId}/complete`, {
+      method: 'POST',
+      headers: { cookie },
+    });
+    expect(unpaid.status).toBe(400);
+    expect(((await unpaid.json()) as { error: { code: string } }).error.code).toBe('FEE_REQUIRED');
+
+    // The client retries with a fresh fee transaction (the first blockhash may have expired).
+    const fresh = (await (
+      await app.request(`/api/v1/studio/versions/${issued.versionId}/fee-tx`, {
+        method: 'POST',
+        headers: { cookie },
+      })
+    ).json()) as { paid: boolean; feeTx: { txBase64: string } | null };
+    expect(fresh.paid).toBe(false);
+    expect(fresh.feeTx?.txBase64).toBeTruthy();
+
+    await sql`update versions set vfee_sig = ${bs58.encode(nacl.randomBytes(64))} where id = ${issued.versionId}`;
+    const settled = (await (
+      await app.request(`/api/v1/studio/versions/${issued.versionId}/fee-tx`, {
+        method: 'POST',
+        headers: { cookie },
+      })
+    ).json()) as { paid: boolean; feeTx: unknown };
+    expect(settled).toMatchObject({ paid: true, feeTx: null });
+  });
+
   it('rejects with the exact reason and refuses a human appeal', async () => {
     const app = await appFor();
     const creator = keypair();
