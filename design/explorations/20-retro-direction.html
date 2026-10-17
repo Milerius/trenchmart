@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>20 · Retro Solana direction (tokens v3)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap"
+    />
+    <style>
+      :root {
+        --bg: #0a0b0a; --inset: #0e100e; --surface: #121412; --surface-2: #161916;
+        --line: #262a26; --line-soft: #1e221e; --line-strong: #343a34; --line-control: #646c63;
+        --ink: #edefea; --ink-2: #b4bab2; --muted: #9ba19a;
+        --accent: #c6f432; --accent-bg: #141a08; --accent-line: #2e3a12; --accent-label: #9faf86;
+        --purple: #9945ff; --green: #14f195; --violet: #b98cff; --violet-bg: #160f22; --violet-line: #3a2560;
+        --warn: #f5a524; --warn-bg: #1c160a; --warn-line: #3a2c0e;
+        --danger: #ff8a7a; --danger-bg: #1f1210; --danger-line: #4a2620;
+        --info: #7cc4ff; --info-bg: #0f1620; --info-line: #1e3448;
+        --display: 'Space Mono', ui-monospace, monospace; --sans: 'Geist', system-ui, sans-serif; --mono: 'Geist Mono', ui-monospace, monospace;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+      main { width: 1440px; padding: 56px 64px 72px; }
+      h1, h2, h3 { font-family: var(--display); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+      h1 { font-size: 46px; line-height: 1.08; }
+      h2 { font-size: 22px; }
+      .kicker { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+      .label { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+      .muted { color: var(--ink-2); }
+      .grid { display: grid; gap: 20px; }
+      .card { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 20px; }
+      .crt { position: relative; isolation: isolate; }
+      .crt::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: inherit;
+        background: repeating-linear-gradient(to bottom, rgb(255 255 255 / .03) 0 1px, transparent 1px 3px); }
+      .crt-hero { background:
+          radial-gradient(120% 90% at 50% 0%, transparent 55%, rgb(0 0 0 / .55) 100%),
+          radial-gradient(60% 70% at 85% 20%, rgb(153 69 255 / .24), transparent 70%),
+          radial-gradient(50% 60% at 10% 90%, rgb(20 241 149 / .12), transparent 70%),
+          radial-gradient(rgb(198 244 50 / .1) 1px, transparent 1.5px) 0 0 / 22px 22px, var(--bg); }
+      .sol-text { background: linear-gradient(90deg, #b98cff 0%, #14f195 60%, #c6f432 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .sol-bar { background: linear-gradient(90deg, #9945ff 0%, #14f195 60%, #c6f432 100%); }
+      .sol-frame { border: 1px solid transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, linear-gradient(135deg, #9945ff 0%, #14f195 55%, #c6f432 100%) border-box; }
+      .glow { text-shadow: 0 0 18px rgb(198 244 50 / .35); }
+      .cursor { display: inline-block; width: .5em; height: .9em; margin-left: .12em; vertical-align: -.06em; background: var(--accent); box-shadow: 0 0 14px rgb(198 244 50 / .5); }
+      .btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 6px; font: 700 15px var(--display); white-space: nowrap; }
+      .btn-primary { background: var(--accent); color: #0a0b0a; box-shadow: 3px 3px 0 0 var(--purple); }
+      .btn-primary.hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 var(--purple); background: #ddff7a; }
+      .btn-primary.press { transform: translate(2px, 2px); box-shadow: 1px 1px 0 0 var(--purple); }
+      .btn-secondary { border: 1px solid var(--line-control); color: var(--ink); }
+      .btn-disabled { border: 1px solid var(--line); background: var(--surface-2); color: #868d86; }
+      .tag { display: inline-flex; gap: 4px; align-items: center; border: 1px solid; border-radius: 3px; padding: 2px 8px; font: 500 11px var(--mono); letter-spacing: .03em; }
+      .t-ok { color: var(--accent); border-color: var(--accent-line); background: var(--accent-bg); }
+      .t-violet { color: var(--violet); border-color: var(--violet-line); background: var(--violet-bg); }
+      .t-info { color: var(--info); border-color: var(--info-line); background: var(--info-bg); }
+      .t-warn { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg); }
+      .t-danger { color: var(--danger); border-color: var(--danger-line); background: var(--danger-bg); }
+      .bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--inset); border-bottom: 1px solid var(--line-soft); font: 12px var(--mono); color: var(--muted); }
+      .sq { display: flex; gap: 6px; } .sq i { width: 10px; height: 10px; display: block; }
+      .seg { display: flex; gap: 3px; height: 12px; } .seg i { flex: 1; border-radius: 1px; background: var(--line-strong); }
+      .seg i.on { background: var(--accent); box-shadow: 0 0 8px rgb(198 244 50 / .35); } .seg i.bad { background: var(--danger); }
+      .swatch { border-radius: 8px; border: 1px solid var(--line); overflow: hidden; }
+      .swatch .chip { height: 78px; }
+      .swatch .meta { padding: 10px 12px; background: var(--surface); font: 12px var(--mono); }
+      .rule { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 14px; color: var(--ink-2); }
+      .rule b { color: var(--ink); font-weight: 600; }
+      .yes { color: var(--accent); font-family: var(--mono); } .no { color: var(--danger); font-family: var(--mono); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div style="display: flex; justify-content: space-between; align-items: end; gap: 24px">
+        <div>
+          <p class="kicker" style="margin: 0">› 20 · design direction · tokens v3</p>
+          <h1 style="margin-top: 12px">Retro terminal, <span class="sol-text">Solana colours.</span><span class="cursor"></span></h1>
+          <p class="muted" style="max-width: 780px; margin: 14px 0 0; font-size: 17px">
+            Roman's brief: the retro Solana look that makes people click in crypto, without turning the product into a terminal.
+            Display type and frames go retro. Body copy, amounts and fees stay as readable as before.
+          </p>
+        </div>
+        <div class="sol-bar" style="width: 220px; height: 6px; border-radius: 3px"></div>
+      </div>
+
+      <section class="grid" style="grid-template-columns: repeat(8, 1fr); margin-top: 40px">
+        <div class="swatch"><div class="chip" style="background: #0a0b0a"></div><div class="meta">bg #0A0B0A<br /><span class="label">ground</span></div></div>
+        <div class="swatch"><div class="chip" style="background: #121412"></div><div class="meta">surface #121412<br /><span class="label">cards</span></div></div>
+        <div class="swatch"><div class="chip" style="background: #c6f432"></div><div class="meta">accent #C6F432<br /><span class="label">action · 15.4:1</span></div></div>
+        <div class="swatch"><div class="chip" style="background: #14f195"></div><div class="meta">sol-green #14F195<br /><span class="label">13.2:1</span></div></div>
+        <div class="swatch"><div class="chip" style="background: #9945ff"></div><div class="meta">sol-purple #9945FF<br /><span class="label" style="color: var(--warn)">4.37:1 · decor only</span></div></div>
+        <div class="swatch"><div class="chip" style="background: #b98cff"></div><div class="meta">violet #B98CFF<br /><span class="label">purple text · 7.75:1</span></div></div>
+        <div class="swatch"><div class="chip" style="background: #edefea"></div><div class="meta">ink #EDEFEA<br /><span class="label">17:1</span></div></div>
+        <div class="swatch"><div class="chip sol-bar"></div><div class="meta">gradient<br /><span class="label">text ≥ 24px only</span></div></div>
+      </section>
+
+      <section class="grid" style="grid-template-columns: 1.25fr 1fr; margin-top: 28px">
+        <div class="crt crt-hero" style="border: 1px solid var(--line); border-radius: 10px; padding: 36px 36px 32px; overflow: hidden">
+          <p class="kicker" style="margin: 0">› Solana marketplace · AI-verified · escrowed</p>
+          <h1 style="margin-top: 14px; font-size: 44px">The verified edge,<br /><span class="sol-text">for sale.</span><span class="cursor"></span></h1>
+          <p class="muted" style="margin: 14px 0 22px; max-width: 520px">
+            Body copy stays in Geist at 15–17px on the plain ground. Scanlines at 3% sit on top, a lime dot grid behind,
+            violet and green glows at the corners.
+          </p>
+          <div style="display: flex; gap: 14px"><span class="btn btn-primary">Browse the market</span><span class="btn btn-secondary">Sell your tooling</span></div>
+        </div>
+        <div class="grid" style="gap: 16px">
+          <div class="card crt">
+            <p class="label" style="margin: 0 0 10px">Type</p>
+            <div style="font: 700 34px/1.1 var(--display); letter-spacing: -0.02em">Space Mono 700</div>
+            <p class="muted" style="margin: 6px 0 14px; font-size: 13px">H1, H2, buttons, headline amounts, stat numbers</p>
+            <div style="font: 500 17px var(--sans)">Geist for body copy, card titles and forms, so reading never goes monospace.</div>
+            <div style="font: 12px var(--mono); color: var(--muted); margin-top: 10px">GEIST MONO · TAGS · LABELS · 9f2c…e41a · ≈ $216.00</div>
+          </div>
+          <div class="card crt">
+            <p class="label" style="margin: 0 0 12px">Stats with phosphor glow</p>
+            <div style="display: flex; gap: 40px">
+              <div><span class="label">Volume traded</span><div class="glow" style="font: 700 28px var(--display); color: var(--accent)">14.70 SOL</div><div style="font: 13px var(--mono); color: var(--muted)">≈ $2,646.00</div></div>
+              <div><span class="label">Queued payouts</span><div style="font: 700 28px var(--display); color: var(--violet)">2.40 SOL</div><div style="font: 13px var(--mono); color: var(--muted)">≈ $432.00</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top: 20px">
+        <div class="card crt">
+          <p class="label" style="margin: 0 0 14px">Buttons · pixel shadow</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 14px 16px">
+            <span class="btn btn-primary">Pay into escrow</span>
+            <span class="btn btn-primary hover">Hover</span>
+            <span class="btn btn-primary press">Pressed</span>
+            <span class="btn btn-secondary">Secondary</span>
+            <span class="btn btn-disabled"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Unlocks in 41h</span>
+          </div>
+          <p class="muted" style="font-size: 13px; margin: 14px 0 0">3px purple offset, 4px on hover, 1px pressed. No movement with reduced motion.</p>
+        </div>
+        <div class="card crt">
+          <p class="label" style="margin: 0 0 14px">Status tags · symbol + word + colour</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="tag t-ok">✓ AI-VERIFIED</span><span class="tag t-ok">● PAID · IN ESCROW</span><span class="tag t-danger">! DISPUTED</span>
+            <span class="tag t-violet">◷ QUEUED</span><span class="tag t-info">◷ IN MULTISIG</span><span class="tag t-warn">! NEEDS YOUR NOTE</span><span class="tag t-info">SAMPLE DATA</span>
+          </div>
+          <p class="muted" style="font-size: 13px; margin: 14px 0 0">Radius 3px. Tags stay Geist Mono 11px. New violet tone for $TRENCH and queued value.</p>
+        </div>
+        <div class="card crt">
+          <p class="label" style="margin: 0 0 14px">Segment meter · escrow</p>
+          <div class="seg" id="seg1"></div>
+          <div style="display: flex; justify-content: space-between; font: 12px var(--mono); color: var(--muted); margin: 8px 0 16px"><span>■ Paid</span><span>■ In escrow · 41h 59m left</span><span>□ Released</span></div>
+          <div class="seg" id="seg2"></div>
+          <div style="font: 12px var(--mono); color: var(--danger); margin-top: 8px">Disputed · release paused</div>
+        </div>
+      </section>
+
+      <section class="grid" style="grid-template-columns: 1.1fr 1fr; margin-top: 20px">
+        <div class="crt sol-frame" style="border-radius: 10px; overflow: hidden; box-shadow: 6px 6px 0 0 rgb(153 69 255 / .35)">
+          <div class="bar"><span class="sq"><i style="background: var(--purple)"></i><i style="background: var(--green)"></i><i style="background: var(--accent)"></i></span><span style="flex: 1">checkout · escrow on Solana devnet</span><span class="tag t-ok">✓ AI-VERIFIED</span></div>
+          <div style="padding: 18px 20px; display: grid; gap: 8px; font-size: 14px">
+            <div style="display: flex; justify-content: space-between"><span class="muted">Listing price</span><span style="font-family: var(--mono)">1.20 SOL <span style="color: var(--muted)">≈ $216.00</span></span></div>
+            <div style="display: flex; justify-content: space-between"><span class="muted">Buyer fee (5%)</span><span style="font-family: var(--mono)">0.06 SOL</span></div>
+            <div style="display: flex; justify-content: space-between"><span class="muted">Trencher discount (60% off the fee)</span><span style="font-family: var(--mono); color: var(--accent)">−0.036 SOL</span></div>
+            <div style="display: flex; justify-content: space-between"><span class="muted">Creator commission</span><span style="font-family: var(--mono); color: var(--accent)">0%</span></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px"><b style="font-family: var(--display)">You pay</b><span style="font: 700 20px var(--display)">1.224 SOL <span style="font: 14px var(--mono); color: var(--muted)">≈ $220.32</span></span></div>
+          </div>
+        </div>
+        <div class="card crt">
+          <p class="label" style="margin: 0 0 14px">Rules</p>
+          <div class="grid" style="gap: 10px">
+            <div class="rule"><span class="yes">✓</span><span><b>Retro frames, readable content.</b> Every amount, fee line and claim reads the same with the overlay switched off.</span></div>
+            <div class="rule"><span class="yes">✓</span><span><b>Gradient on payoff words only</b> ("for sale.", "Sell it."), at 24px and up. Decorative elsewhere.</span></div>
+            <div class="rule"><span class="yes">✓</span><span><b>Motion is optional.</b> Scan beam and cursor blink only run with no-preference; scanlines are static.</span></div>
+            <div class="rule"><span class="no">×</span><span><b>No purple text at #9945FF</b> (4.37:1). Use violet #B98CFF.</span></div>
+            <div class="rule"><span class="no">×</span><span><b>No monospace paragraphs, no glow on body text,</b> no blurred drop shadows, no emoji in the product.</span></div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script>
+      const fill = (id, n, cls) => {
+        const el = document.getElementById(id);
+        for (let i = 0; i < 24; i++) { const s = document.createElement('i'); if (i < n) s.className = cls; el.appendChild(s); }
+      };
+      fill('seg1', 9, 'on');
+      fill('seg2', 14, 'bad');
+    </script>
+  </body>
+</html>
