@@ -48,6 +48,8 @@ type VersionView = {
     sha256: string;
     creator_note: string | null;
     resume_step?: string | null;
+    vfee_lamports?: string | null;
+    vfee_sig?: string | null;
   };
   checks: { rule_id: string; result: string; title: string; detail: string; kind: string }[];
   review: { agent_id: string; decision: string; notes: string } | null;
@@ -178,9 +180,11 @@ export default function VersionPage() {
         : `/api/v1/studio/versions/${params.vid}/review?stream=1`;
       // A fee left unpaid (wallet closed, page reloaded) would make /complete fail with
       // FEE_REQUIRED, so settle it first. This is a no-op when it is paid or waived.
-      const ready = uploading
-        ? ensureVerificationFee({ api, versionId: params.vid, signAndSend: wallet.signAndSend })
-        : Promise.resolve(false);
+      const feeOpen = BigInt(view.version.vfee_lamports ?? '0') > 0n && !view.version.vfee_sig;
+      const ready =
+        uploading && feeOpen
+          ? ensureVerificationFee({ api, versionId: params.vid, signAndSend: wallet.signAndSend })
+          : Promise.resolve(false);
       void ready.then(() => stream(path)).catch((err: Error) => setMessage(err.message));
     }
   }, [view, params.vid]);
