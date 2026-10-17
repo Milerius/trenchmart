@@ -1,0 +1,54 @@
+name: phantom-live
+
+# Manual only: drives the real Phantom extension against a deployed site on devnet.
+on:
+  workflow_dispatch:
+    inputs:
+      site:
+        description: Site URL to test
+        default: https://trenchmart.fun
+
+permissions:
+  contents: read
+
+jobs:
+  phantom-live:
+    name: phantom live e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Download and unpack Phantom
+        run: |
+          curl -sSL -o phantom.crx "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=140.0.0.0&acceptformat=crx2,crx3&x=id%3Dbfnaelmomeimhlpmgjnjophhpkkoljpa%26uc"
+          python3 - <<'PY'
+          import io, struct, zipfile
+          d = open('phantom.crx', 'rb').read()
+          assert d[:4] == b'Cr24'
+          header = struct.unpack('<I', d[8:12])[0]
+          zipfile.ZipFile(io.BytesIO(d[12 + header:])).extractall('phantom-ext')
+          PY
+      - name: Run
+        env:
+          PHANTOM_LIVE: '1'
+          PHANTOM_EXT_DIR: ${{ github.workspace }}/phantom-ext
+          E2E_SITE_URL: ${{ inputs.site }}
+          E2E_RPC_URL: ${{ vars.E2E_RPC_URL || 'https://api.devnet.solana.com' }}
+          E2E_BUYER_SECRET: ${{ secrets.E2E_BUYER_SECRET }}
+          E2E_CREATOR_SECRET: ${{ secrets.E2E_CREATOR_SECRET }}
+          E2E_OUT_DIR: ${{ github.workspace }}/phantom-live
+        run: xvfb-run -a pnpm exec playwright test -c playwright.phantom.config.ts
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phantom-live
+          path: |
+            phantom-live
+            playwright-report/phantom-live
