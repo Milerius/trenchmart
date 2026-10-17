@@ -377,7 +377,9 @@ export default function StudioPage() {
                 </Requirement>
                 <Requirement ok title="AI verification fee">
                   <span className="mt-1 block text-[13px] text-ink-2">
-                    {requirements.feeWaived || requirements.verificationFee === '0' ? (
+                    {requirements.verificationFee === '0' ? (
+                      'Free right now'
+                    ) : requirements.feeWaived ? (
                       'Waived for your tier'
                     ) : (
                       <>

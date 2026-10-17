@@ -354,9 +354,9 @@ function LandingStats({ stats, failed }: { stats: Stats | null; failed: boolean 
     ? [
         ['Live listings', stats.listings.toLocaleString('en-US')],
         ['Verified creators', stats.creators.toLocaleString('en-US')],
-        ['Orders settled', stats.orders.toLocaleString('en-US')],
+        ['Orders paid', stats.orders.toLocaleString('en-US')],
         [
-          'Escrow volume',
+          'Volume traded',
           <Money
             key="v"
             lamports={stats.volume.lamports}
@@ -368,8 +368,8 @@ function LandingStats({ stats, failed }: { stats: Stats | null; failed: boolean 
     : [
         ['Live listings', null],
         ['Verified creators', null],
-        ['Orders settled', null],
-        ['Escrow volume', null],
+        ['Orders paid', null],
+        ['Volume traded', null],
       ];
   return (
     <section data-testid="dashboard" aria-label="Marketplace stats">

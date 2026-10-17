@@ -151,7 +151,7 @@ export default function PurchasesPage() {
         />
       ) : (
         <ul className="m-0 space-y-3 p-0">
-          {orders.map((order) => (
+          {sortForAttention(orders).map((order) => (
             <OrderRow
               key={order.id}
               order={order}
@@ -164,6 +164,13 @@ export default function PurchasesPage() {
       )}
     </section>
   );
+}
+
+const ATTENTION: Record<string, number> = { paid: 0, disputed: 1, released: 2 };
+
+/** Orders with live escrow first, so countdowns and disputes are seen before history. */
+function sortForAttention(orders: Order[]): Order[] {
+  return [...orders].sort((a, b) => (ATTENTION[a.status] ?? 3) - (ATTENTION[b.status] ?? 3));
 }
 
 function escrowCents(orders: Order[]) {
@@ -285,9 +292,11 @@ function EscrowTimeline({ order, now }: { order: Order; now: number }) {
       order.status === 'refunded' ? 'Refunded' : 'Released',
       order.released_at
         ? utc(order.released_at)
-        : order.escrow_until
-          ? `${utc(order.escrow_until)}`
-          : '—',
+        : order.status === 'disputed'
+          ? 'After the dispute is settled'
+          : order.escrow_until
+            ? `Scheduled ${utc(order.escrow_until)}`
+            : '—',
       finished,
     ],
     [
