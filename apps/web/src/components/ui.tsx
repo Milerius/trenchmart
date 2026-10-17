@@ -23,7 +23,7 @@ const DISABLED =
   'disabled:cursor-not-allowed disabled:border disabled:border-line disabled:bg-surface-2 disabled:text-faint disabled:hover:bg-surface-2';
 
 export function buttonClass(variant: Variant = 'primary', size: Size = 'md', extra = ''): string {
-  return `inline-flex items-center justify-center gap-2 rounded-ctl whitespace-nowrap transition-colors ${VARIANT[variant]} ${SIZE[size]} ${DISABLED} ${extra}`;
+  return `motion-press inline-flex items-center justify-center gap-2 rounded-ctl whitespace-nowrap ${VARIANT[variant]} ${SIZE[size]} ${DISABLED} ${extra}`;
 }
 
 export function Button({

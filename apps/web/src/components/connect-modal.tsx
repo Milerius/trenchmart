@@ -146,6 +146,24 @@ export function ConnectModal({
   onLeaveRef.current = onLeaveWalletConnect;
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'help' | 'walletconnect'>('list');
+  const [present, setPresent] = useState(false);
+  const [phase, setPhase] = useState<'closed' | 'open'>('closed');
+
+  useEffect(() => {
+    if (open) {
+      setPresent(true);
+      const frame = requestAnimationFrame(() => setPhase('open'));
+      return () => cancelAnimationFrame(frame);
+    }
+    setPhase('closed');
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) {
+      setPresent(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setPresent(false), 200);
+    return () => window.clearTimeout(timer);
+  }, [open]);
 
   useEffect(() => {
     if (open) return;
@@ -160,14 +178,14 @@ export function ConnectModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!present || !open) return;
     const root = dialogRef.current;
     const target =
       view === 'list'
         ? root?.querySelector<HTMLElement>('[data-testid=wallet-search]')
         : root?.querySelector<HTMLElement>('[data-testid=wallet-back]');
     target?.focus();
-  }, [open, view]);
+  }, [present, open, view]);
 
   useEffect(() => {
     if (!open) return;
@@ -203,7 +221,7 @@ export function ConnectModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [open, busy, view]);
 
-  if (!open) return null;
+  if (!present) return null;
 
   const choices = buildWalletChoices({ detected, query, lastUsedId, walletConnect });
   const qr = view === 'walletconnect' && wcUri ? walletConnectQr(wcUri) : null;
@@ -223,7 +241,8 @@ export function ConnectModal({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-4 sm:items-center"
+      data-phase={phase}
+      className="picker-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-4 sm:items-center"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) goBack();
       }}
@@ -236,7 +255,8 @@ export function ConnectModal({
         aria-busy={busy || undefined}
         data-testid="connect-modal"
         data-state={view}
-        className="max-h-[calc(100vh-2rem)] w-full max-w-[420px] overflow-y-auto rounded-panel border border-line bg-surface p-5"
+        data-phase={phase}
+        className="picker-panel max-h-[calc(100vh-2rem)] w-full max-w-[420px] overflow-y-auto rounded-panel border border-line bg-surface p-5"
       >
         <div className="flex items-center gap-2">
           <button

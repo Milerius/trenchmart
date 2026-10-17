@@ -165,7 +165,7 @@ export default function ListingPage() {
     return (
       <div aria-busy="true" className="grid gap-8 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
-          <p className="text-muted">Loading listing…</p>
+          <p className="sr-only">Loading listing…</p>
           <Skeleton className="h-9 w-2/3" />
           <Skeleton className="h-5 w-1/2" />
           <Skeleton className="h-40 w-full" />
@@ -351,7 +351,29 @@ export default function ListingPage() {
               Quote locked for tier {TIER_LABEL[quote.tier] ?? quote.tier}
             </p>
           ) : null}
-          {step !== 'idle' ? <CheckoutProgress step={step} escrowHours={escrowHours} /> : null}
+          {step !== 'idle' ? <CheckoutProgress step={step} /> : null}
+          {step === 'done' ? (
+            <div
+              data-testid="escrow-success"
+              className="escrow-success rounded-ctl border border-accent-line bg-accent-bg p-4"
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="escrow-check grid h-9 w-9 place-items-center rounded-full bg-accent font-mono text-sm font-bold text-onaccent"
+                >
+                  ✓
+                </span>
+                <div>
+                  <p className="m-0 font-semibold text-ink">Paid · in escrow</p>
+                  <p role="status" className="m-0 mt-1 text-sm text-ink-2">
+                    {message ||
+                      `Your SOL is in escrow for ${escrowHours}h. The download unlocks when it releases.`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {step === 'done' ? (
             <ButtonLink href="/me/purchases" variant="secondary" className="w-full">
               View order {orderId.slice(0, 8)} in Purchases
@@ -369,12 +391,7 @@ export default function ListingPage() {
             </Button>
           )}
           {message && step === 'failed' ? (
-            <p role="alert" className="m-0 text-sm text-danger">
-              {message}
-            </p>
-          ) : null}
-          {message && step === 'done' ? (
-            <p role="status" className="sr-only">
+            <p role="alert" data-testid="toast" className="toast m-0 text-sm text-danger">
               {message}
             </p>
           ) : null}
@@ -429,7 +446,7 @@ const PROGRESS: [Exclude<Step, 'idle' | 'failed'>, string][] = [
   ['done', 'Paid · in escrow'],
 ];
 
-function CheckoutProgress({ step, escrowHours }: { step: Step; escrowHours: number }) {
+function CheckoutProgress({ step }: { step: Step }) {
   const current = PROGRESS.findIndex(([key]) => key === step);
   return (
     <ol
@@ -448,11 +465,6 @@ function CheckoutProgress({ step, escrowHours }: { step: Step; escrowHours: numb
           </li>
         );
       })}
-      {step === 'done' ? (
-        <li className="list-none pt-1 text-[13px] text-accent-body">
-          Your SOL is in escrow for {escrowHours}h. The download unlocks when it releases.
-        </li>
-      ) : null}
     </ol>
   );
 }

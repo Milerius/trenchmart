@@ -90,11 +90,302 @@ body {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .skeleton {
-    animation: none;
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
-  * {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(36px, 18px, 0);
+  }
+}
+
+@keyframes particle {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(18px, -28px, 0);
+  }
+}
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes live-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.hero-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero-grid {
+  position: absolute;
+  inset: -1px;
+  background-image:
+    linear-gradient(to right, rgba(198, 244, 50, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(198, 244, 50, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 28% 40%, #000 15%, transparent 72%);
+}
+
+.hero-glow {
+  position: absolute;
+  top: -120px;
+  left: 8%;
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(198, 244, 50, 0.16), transparent 68%);
+}
+
+.hero-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #c6f432;
+  opacity: 0.45;
+}
+
+.hero-particle-a {
+  top: 18%;
+  left: 22%;
+}
+
+.hero-particle-b {
+  top: 62%;
+  left: 46%;
+}
+
+.hero-particle-c {
+  top: 30%;
+  right: 8%;
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  gap: 2rem;
+}
+
+.picker-backdrop,
+.picker-panel {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .route-fade {
+    animation: route-fade 0.28s ease;
+  }
+
+  .hero-glow {
+    animation: drift 16s ease-in-out infinite alternate;
+  }
+
+  .hero-particle-a {
+    animation: particle 9s ease-in-out infinite alternate;
+  }
+
+  .hero-particle-b {
+    animation: particle 12s ease-in-out infinite alternate;
+  }
+
+  .hero-particle-c {
+    animation: particle 10s ease-in-out infinite alternate;
+  }
+
+  .live-dot {
+    animation: live-pulse 1.8s ease-in-out infinite;
+  }
+
+  .ticker-track {
+    animation: ticker 42s linear infinite;
+  }
+
+  .motion-press {
+    transition:
+      transform 140ms ease,
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease;
+  }
+
+  .motion-press:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .motion-card {
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease;
+  }
+
+  .motion-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .motion-nav {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  [data-reveal='wait'] {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  [data-reveal='in'] {
+    animation: rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  [data-reveal='in'] .stagger > * {
+    animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  [data-reveal='in'] .stagger > *:nth-child(2) {
+    animation-delay: 70ms;
+  }
+
+  [data-reveal='in'] .stagger > *:nth-child(3) {
+    animation-delay: 140ms;
+  }
+
+  [data-reveal='in'] .stagger > *:nth-child(4) {
+    animation-delay: 210ms;
+  }
+
+  [data-reveal='wait'] .stagger > * {
+    opacity: 0;
+  }
+
+  .toast,
+  .escrow-success {
+    animation: toast-in 0.35s ease;
+  }
+
+  .escrow-check {
+    animation: pop 0.4s cubic-bezier(0.2, 0.9, 0.2, 1);
+  }
+
+  .picker-backdrop,
+  .picker-panel {
+    transition:
+      opacity 180ms ease,
+      transform 180ms ease;
+  }
+
+  .picker-backdrop[data-phase='closed'],
+  .picker-panel[data-phase='closed'] {
+    opacity: 0;
+  }
+
+  .picker-panel[data-phase='closed'] {
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+@keyframes route-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .ticker-track,
+  .hero-glow,
+  .hero-particle,
+  .live-dot,
+  .rise,
+  .route-fade,
+  .toast,
+  .escrow-success,
+  .escrow-check {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .ticker-set[aria-hidden='true'] {
+    display: none;
+  }
+
+  [data-reveal='wait'],
+  [data-reveal='wait'] .stagger > *,
+  [data-reveal='in'] {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  .picker-backdrop,
+  .picker-panel {
+    opacity: 1 !important;
+    transform: none !important;
     transition: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

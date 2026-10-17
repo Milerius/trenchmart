@@ -31,7 +31,10 @@ export default function SellPage() {
       </header>
       <ol className="m-0 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map(([title, body], index) => (
-          <li key={title} className="list-none rounded-card border border-line bg-surface p-5">
+          <li
+            key={title}
+            className="motion-card list-none rounded-card border border-line bg-surface p-5"
+          >
             <span className="font-mono text-xs text-accent">0{index + 1}</span>
             <h2 className="m-0 mt-3 text-base font-semibold">{title}</h2>
             <p className="m-0 mt-2 text-sm text-ink-2">{body}</p>
