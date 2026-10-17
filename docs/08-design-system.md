@@ -1,5 +1,7 @@
 # 08 · Design system
 
+> **Updated spec:** `docs/design-system.md` (tokens v2, components, states, test IDs) and `docs/ux-guidelines.md` (flows, copy, errors, a11y) supersede this page where they differ. Notable changes: `faint` is now `#868D86` (AA), new `border-control` `#646C63` for inputs and secondary buttons, new `info` tone, and the "verifiers" bucket is called **AI verification**.
+
 Look: dark trading terminal. Near-black ground, one lime accent, monospace for numbers and labels, thin 1px borders instead of shadows. Inspired by Tensor / Magic Eden density and pump.fun energy, but calmer and trust-forward.
 
 ## Color tokens
@@ -39,7 +41,7 @@ Category accents (used for the code label + card header tint):
 | Strategies   | `#6EE7C8` | `#0E1A17`      |
 | Alerts       | `#FF8A7A` | `#1F1210`      |
 
-Revenue split bar colors: buyback `#C6F432`, verifiers `#7CC4FF`, ops `#C9A2FF`, safety `#F5A524`, all with `#0A0B0A` text.
+Revenue split bar colors: buyback `#C6F432`, AI verification `#7CC4FF`, ops `#C9A2FF`, safety `#F5A524`, all with `#0A0B0A` text.
 
 ## Typography
 
