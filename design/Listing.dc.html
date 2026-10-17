@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Listing: Sniper Filter Pack v2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0A0B0A}
+a{color:#C6F432;text-decoration:none}a:hover{color:#DDFF7A}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #0A0B0A; color: #EDEFEA; font-family: 'Geist', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+<header style="border-bottom: 1px solid #1E221E">
+<div style="max-width: 1280px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center">
+<a href="Main.dc.html" style="display: flex; gap: 10px; align-items: center; color: #EDEFEA">
+<span style="width: 32px; height: 32px; border-radius: 8px; background: #C6F432; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0B0A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18 L9 8 L13 14 L16 9 L20 18"></path></svg></span>
+<span style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em">trenchmart</span>
+</a>
+<nav aria-label="Breadcrumb" style="font-size: 13px; color: #9BA19A; display: flex; gap: 8px; flex-wrap: wrap">
+<a href="Main.dc.html" style="color: #9BA19A">Explore</a><span aria-hidden="true">/</span><a href="Main.dc.html" style="color: #9BA19A">Userscripts</a><span aria-hidden="true">/</span><span style="color: #EDEFEA">Sniper Filter Pack v2</span>
+</nav>
+<button type="button" style="margin-left: auto; height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 600; font-size: 14px">7xKp…a9Fq</button>
+</div>
+</header>
+
+<main style="max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start">
+
+<!-- left column -->
+<div style="flex: 999 1 620px; min-width: 0; display: flex; flex-direction: column; gap: 28px">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: #141A10; color: #C6F432">USERSCRIPT</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: #141A10; color: #C6F432; border: 1px solid #2E3A12">✓ VERIFIED · v2.1.3</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: #121412; color: #B4BAB2; border: 1px solid #262A26">Axiom</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: #121412; color: #B4BAB2; border: 1px solid #262A26">GMGN</span>
+</div>
+<h1 style="margin: 0; font-size: 44px; line-height: 1.05; letter-spacing: -0.03em">Sniper Filter Pack v2</h1>
+<p style="margin: 0; color: #B4BAB2; font-size: 17px; max-width: 680px">Adds a filter rail to the new-pairs feed: dev holding, top-10 concentration, bundle flags and migration-only mode. One click to apply, saved per terminal.</p>
+<span style="font-size: 13px; color: #9BA19A">★ 4.9 · 412 sold · updated 3 days ago · sample data</span>
+</div>
+
+<!-- preview -->
+<div style="background: #121412; border: 1px solid #262A26; border-radius: 16px; overflow: hidden">
+<div style="padding: 12px 16px; border-bottom: 1px solid #1E221E; display: flex; gap: 10px; align-items: center; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA19A">
+<span>Preview · axiom.trade / pulse</span>
+<span style="margin-left: auto">screenshot placeholder</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; min-height: 300px">
+<div style="flex: 0 1 260px; border-right: 1px solid #1E221E; padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #0E100E">
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #C6F432">FILTER RAIL</span>
+<sc-for list="{{rail}}" as="r" hint-placeholder-count="5">
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 8px 10px; border: 1px solid #262A26; border-radius: 8px">
+<span style="color: #B4BAB2">{{r.k}}</span><span style="font-family: 'Geist Mono', monospace; color: #F5A524">{{r.v}}</span>
+</div>
+</sc-for>
+</div>
+<div style="flex: 1 1 300px; padding: 18px; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{pairs}}" as="p" hint-placeholder-count="5">
+<div style="display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 8px; background: #161916; font-family: 'Geist Mono', monospace; font-size: 12px">
+<span style="width: 24px; height: 24px; border-radius: 6px; background: {{p.c}}"></span>
+<span style="color: #EDEFEA; flex: 1">{{p.n}}</span>
+<span style="color: #9BA19A">{{p.age}}</span>
+<span style="color: {{p.fc}}">{{p.flag}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<!-- tabs -->
+<div role="tablist" aria-label="Listing sections" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #1E221E">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+<button type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}" style="{{t.style}}">{{t.name}}</button>
+</sc-for>
+</div>
+
+<sc-if value="{{showSec}}" hint-placeholder-val="{{ true }}">
+<section aria-label="Security report" style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 20px; border-radius: 14px; background: #141A08; border: 1px solid #2E3A12">
+<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"></path><path d="M8.5 12l2.5 2.5 4.5-5"></path></svg>
+<div style="flex: 1; min-width: 220px; display: flex; flex-direction: column">
+<span style="font-weight: 600; font-size: 18px">Passed · 9 of 9 checks</span>
+<span style="font-size: 13px; color: #C9D0BE">Scanned and reviewed for v2.1.3. Signed on-chain by verifier @sec_anon.</span>
+</div>
+<a href="#" style="font-family: 'Geist Mono', monospace; font-size: 12px">View attestation tx ↗</a>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px">
+<sc-for list="{{checks}}" as="c" hint-placeholder-count="9">
+<div style="display: flex; gap: 12px; padding: 14px; border-radius: 12px; background: #121412; border: 1px solid #262A26">
+<span style="flex: 0 0 22px; height: 22px; border-radius: 6px; background: {{c.bg}}; color: {{c.fg}}; display: grid; place-items: center; font-size: 12px; font-weight: 700">{{c.icon}}</span>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-weight: 600; font-size: 14px">{{c.t}}</span>
+<span style="font-size: 13px; color: #9BA19A">{{c.d}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="background: #121412; border: 1px solid #262A26; border-radius: 14px; overflow: hidden">
+<div style="padding: 12px 16px; border-bottom: 1px solid #1E221E; font-weight: 600; font-size: 14px">Permissions this script asks for</div>
+<div style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-family: 'Geist Mono', monospace; font-size: 13px">
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="color: #9BA19A">@match</span><span>axiom.trade/* · gmgn.ai/*</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="color: #9BA19A">@grant</span><span style="color: #C6F432">none</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="color: #9BA19A">@connect</span><span style="color: #C6F432">none</span></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="color: #9BA19A">sha256</span><span style="overflow-wrap: anywhere">9f3a…c21e (pinned)</span></div>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{showOverview}}" hint-placeholder-val="{{ false }}">
+<section style="display: flex; flex-direction: column; gap: 12px; color: #B4BAB2">
+<h2 style="margin: 0; font-size: 20px; color: #EDEFEA">What's inside</h2>
+<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px">
+<li>sniper-filter-pack.user.js (Tampermonkey / Violentmonkey)</li>
+<li>4 preset profiles: Conservative, Momentum, Migration, Degen</li>
+<li>Setup guide and video walkthrough</li>
+<li>Free updates for 6 months on this version line</li>
+</ul>
+</section>
+</sc-if>
+
+<sc-if value="{{showReviews}}" hint-placeholder-val="{{ false }}">
+<section style="display: flex; flex-direction: column; gap: 10px">
+<div style="padding: 14px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-size: 13px; color: #9BA19A">verified buyer · 4zQ…pL2</div><div>Bundle flag alone paid for it. Clean install, no weird permissions.</div></div>
+<div style="padding: 14px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-size: 13px; color: #9BA19A">verified buyer · 8Hn…x0K</div><div>Wish the presets synced across devices, otherwise solid.</div></div>
+<span style="font-size: 12px; color: #6E756D">Only wallets that bought this listing can review it.</span>
+</section>
+</sc-if>
+
+<sc-if value="{{showLog}}" hint-placeholder-val="{{ false }}">
+<section style="display: flex; flex-direction: column; gap: 8px; font-family: 'Geist Mono', monospace; font-size: 13px">
+<div style="display: flex; gap: 16px; padding: 12px; border-bottom: 1px solid #1E221E"><span style="color: #C6F432">v2.1.3</span><span style="color: #B4BAB2">Fix GMGN layout change · re-reviewed ✓</span></div>
+<div style="display: flex; gap: 16px; padding: 12px; border-bottom: 1px solid #1E221E"><span style="color: #9BA19A">v2.1.0</span><span style="color: #B4BAB2">Migration-only mode · reviewed ✓</span></div>
+<div style="display: flex; gap: 16px; padding: 12px"><span style="color: #9BA19A">v2.0.0</span><span style="color: #B4BAB2">Rewrite, preset profiles · reviewed ✓</span></div>
+</section>
+</sc-if>
+</div>
+
+<!-- buy box -->
+<aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="background: #121412; border: 1px solid #262A26; border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: baseline; gap: 10px">
+<span style="font-family: 'Geist Mono', monospace; font-size: 34px; font-weight: 600">{{price}}</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #9BA19A">total at your tier</span>
+</div>
+<div role="group" aria-label="Preview holder tier" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+<sc-for list="{{tiers}}" as="t" hint-placeholder-count="4">
+<button type="button" onClick="{{t.pick}}" aria-pressed="{{t.sel}}" style="{{t.style}}">{{t.name}}</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-family: 'Geist Mono', monospace">
+<div style="display: flex; justify-content: space-between"><span style="color: #9BA19A">List price</span><span>1.50 SOL</span></div>
+<div style="display: flex; justify-content: space-between"><span style="color: #9BA19A">Platform fee (5%)</span><span>0.075 SOL</span></div>
+<div style="display: flex; justify-content: space-between"><span style="color: #9BA19A">Holder rebate</span><span style="color: #C6F432">{{rebate}}</span></div>
+<div style="display: flex; justify-content: space-between; border-top: 1px solid #1E221E; padding-top: 8px; font-size: 14px"><span>You pay</span><span style="font-weight: 600">{{price}}</span></div>
+</div>
+<button type="button" style="height: 52px; border-radius: 12px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 700; font-size: 16px; cursor: pointer">Buy with SOL</button>
+<div style="display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: #B4BAB2">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 18px; margin-top: 2px"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+<span>Payment sits in escrow for 48h. If the file doesn't match its report, open a dispute and get refunded from the creator's bond.</span>
+</div>
+<div style="font-size: 12px; color: #6E756D">License: one wallet, personal use. Download is watermarked to your wallet.</div>
+</div>
+
+<div style="background: #121412; border: 1px solid #262A26; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; gap: 12px; align-items: center">
+<span style="width: 44px; height: 44px; border-radius: 50%; background: #C6F432"></span>
+<div style="display: flex; flex-direction: column">
+<span style="font-weight: 600">@dev_degen</span>
+<span style="font-size: 12px; color: #9BA19A">Creator since [DATE] · 11 listings</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-family: 'Geist Mono', monospace; font-size: 12px">
+<div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Bond staked</div><div style="font-size: 15px">50 SOL</div></div>
+<div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Disputes lost</div><div style="font-size: 15px">0</div></div>
+<div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Identity</div><div style="font-size: 15px; color: #C6F432">X + wallet</div></div>
+<div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Holder tier</div><div style="font-size: 15px">OG</div></div>
+</div>
+<a href="#" style="font-size: 13px">Report this listing</a>
+</div>
+</aside>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2050}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tab: 'Security report', tier: 'Trencher' }; }
+  renderVals() {
+    const tabNames = ['Security report', 'Overview', 'Reviews', 'Changelog'];
+    const tabs = tabNames.map((n) => {
+      const on = this.state.tab === n;
+      return { name: n, sel: on ? 'true' : 'false', pick: () => this.setState({ tab: n }),
+        style: 'height: 44px; padding: 0 16px; background: transparent; border: 0; border-bottom: 2px solid ' + (on ? '#C6F432' : 'transparent') + '; color: ' + (on ? '#EDEFEA' : '#9BA19A') + '; font-size: 14px; font-weight: 500; cursor: pointer' };
+    });
+    const tierDefs = [
+      { name: 'None', off: 0 }, { name: 'Scout', off: 0.25 }, { name: 'Trencher', off: 0.6 }, { name: 'OG', off: 1 }
+    ];
+    const tiers = tierDefs.map((t) => {
+      const on = this.state.tier === t.name;
+      return { name: t.name, sel: on ? 'true' : 'false', pick: () => this.setState({ tier: t.name }),
+        style: 'height: 36px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid ' + (on ? '#C6F432' : '#262A26') + '; background: ' + (on ? '#141A08' : 'transparent') + '; color: ' + (on ? '#C6F432' : '#9BA19A') };
+    });
+    const cur = tierDefs.find((t) => t.name === this.state.tier);
+    const fee = 0.075, reb = fee * cur.off;
+    const total = 1.5 + fee - reb;
+    const ok = { icon: '✓', bg: '#C6F432', fg: '#0A0B0A' };
+    const checks = [
+      { t: 'No private-key or seed access', d: 'No reads of wallet adapters, localStorage keys or clipboard.', ...ok },
+      { t: 'No transaction signing', d: 'Never calls signTransaction or injects into wallet popups.', ...ok },
+      { t: 'No outbound network', d: '@connect none. Sandbox saw zero requests off-domain.', ...ok },
+      { t: 'No obfuscation', d: 'Readable source, no eval, no remote code loading.', ...ok },
+      { t: 'Scoped to declared sites', d: 'Runs only on the @match domains listed below.', ...ok },
+      { t: 'Hash pinned', d: 'The file you download matches the reviewed sha256.', ...ok },
+      { t: 'Dependency check', d: 'No third-party libraries pulled at runtime.', ...ok },
+      { t: 'Human review', d: 'Reviewed by a staked verifier, signature on-chain.', ...ok },
+      { t: 'Creator bonded', d: 'Creator bond covers refunds if this turns out malicious.', ...ok }
+    ];
+    const rail = [
+      { k: 'Dev holding', v: '< 4%' }, { k: 'Top 10', v: '< 28%' }, { k: 'Bundlers', v: 'flag' },
+      { k: 'Migrated only', v: 'on' }, { k: 'Min liquidity', v: '[X] SOL' }
+    ];
+    const pairs = [
+      { n: 'SAMPLE-A', age: '42s', flag: 'pass', fc: '#C6F432', c: '#7CC4FF' },
+      { n: 'SAMPLE-B', age: '1m', flag: 'bundled', fc: '#FF8A7A', c: '#C9A2FF' },
+      { n: 'SAMPLE-C', age: '2m', flag: 'pass', fc: '#C6F432', c: '#F5A524' },
+      { n: 'SAMPLE-D', age: '3m', flag: 'dev 9%', fc: '#FF8A7A', c: '#6EE7C8' },
+      { n: 'SAMPLE-E', age: '4m', flag: 'pass', fc: '#C6F432', c: '#C6F432' }
+    ];
+    const tab = this.state.tab;
+    return { tabs, tiers, checks, rail, pairs,
+      price: total.toFixed(3) + ' SOL', rebate: reb > 0 ? '−' + reb.toFixed(3) + ' SOL' : '—',
+      showSec: tab === 'Security report', showOverview: tab === 'Overview', showReviews: tab === 'Reviews', showLog: tab === 'Changelog' };
+  }
+}
+</script>
+</body>
+</html>
