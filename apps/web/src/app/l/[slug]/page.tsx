@@ -438,6 +438,13 @@ export default function ListingPage() {
               </span>
               Download once payment is confirmed in escrow. Watermarked to your wallet.
             </li>
+            <li data-testid="devnet-hint" className="flex list-none gap-2">
+              <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
+                ◎
+              </span>
+              Devnet only. Switch your wallet to Solana Devnet before paying (Phantom: Settings →
+              Developer Settings → Testnet Mode).
+            </li>
           </ul>
           <p className="m-0 border-t border-line-soft pt-3 text-xs text-muted">
             License: {listing.license} · creator bond {solText(listing.creator.bondLamports)}

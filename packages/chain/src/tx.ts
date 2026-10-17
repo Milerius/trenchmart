@@ -3,6 +3,7 @@ import nacl from 'tweetnacl';
 
 export const SYSTEM_PROGRAM = '11111111111111111111111111111111';
 export const MEMO_PROGRAM = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+export const COMPUTE_BUDGET_PROGRAM = 'ComputeBudget111111111111111111111111111111';
 
 export type CompiledTransfer = {
   source: string;
@@ -105,21 +106,42 @@ export function compileUnsignedTransferMemo(input: {
   lamports: bigint;
   memo: string;
   recentBlockhash: string;
+  /** Compute unit limit, CU price (micro-lamports) and loaded account data limit. */
+  budget?: { units: number; microLamportsPerUnit: bigint; loadedAccountsDataBytes: number };
 }): Uint8Array {
   const keys: Uint8Array[] = [];
   const from = pushKey(keys, input.from);
   const to = pushKey(keys, input.to);
   const system = pushKey(keys, SYSTEM_PROGRAM);
   const memoProgram = pushKey(keys, MEMO_PROGRAM);
+  const budget = input.budget ? pushKey(keys, COMPUTE_BUDGET_PROGRAM) : -1;
   const blockhash = bs58.decode(input.recentBlockhash);
   if (blockhash.length !== 32) throw new Error('recentBlockhash must be 32 bytes');
+  const u32 = (tag: number, value: number) => {
+    const data = new Uint8Array(5);
+    data[0] = tag;
+    new DataView(data.buffer).setUint32(1, value, true);
+    return data;
+  };
+  const budgetIxs: Ix[] = [];
+  if (input.budget) {
+    const price = new Uint8Array(9);
+    price[0] = 3;
+    new DataView(price.buffer).setBigUint64(1, input.budget.microLamportsPerUnit, true);
+    budgetIxs.push(
+      { programIdIndex: budget, accounts: [], data: u32(2, input.budget.units) },
+      { programIdIndex: budget, accounts: [], data: price },
+      { programIdIndex: budget, accounts: [], data: u32(4, input.budget.loadedAccountsDataBytes) },
+    );
+  }
   const message = encodeMessage({
     signers: 1,
     readonlySigned: 0,
-    readonlyUnsigned: 2,
+    readonlyUnsigned: input.budget ? 3 : 2,
     keys,
     blockhash,
     ixs: [
+      ...budgetIxs,
       { programIdIndex: system, accounts: [from, to], data: transferData(input.lamports) },
       { programIdIndex: memoProgram, accounts: [from], data: new TextEncoder().encode(input.memo) },
     ],

@@ -11,6 +11,52 @@ import { sha256 } from '@noble/hashes/sha2';
 
 export const SYSTEM_PROGRAM_ID = '11111111111111111111111111111111';
 export const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+export const COMPUTE_BUDGET_PROGRAM_ID = 'ComputeBudget111111111111111111111111111111';
+
+/**
+ * Explicit resource limits. Phantom asks dApps to set the compute unit and loaded account
+ * data limits so its simulation can predict the transaction, and a tight CU limit keeps the
+ * priority fee tiny. https://docs.phantom.com/developer-powertools/domain-and-transaction-warnings
+ */
+export type ComputeBudget = {
+  units: number;
+  microLamportsPerUnit: bigint;
+  loadedAccountsDataBytes: number;
+};
+
+export function computeBudgetIxs(budget: ComputeBudget): Instruction[] {
+  const u32 = (tag: number, value: number) => {
+    const data = new Uint8Array(5);
+    data[0] = tag;
+    new DataView(data.buffer).setUint32(1, value, true);
+    return data;
+  };
+  const price = new Uint8Array(9);
+  price[0] = 3;
+  new DataView(price.buffer).setBigUint64(1, budget.microLamportsPerUnit, true);
+  return [
+    { programId: COMPUTE_BUDGET_PROGRAM_ID, keys: [], data: u32(2, budget.units) },
+    { programId: COMPUTE_BUDGET_PROGRAM_ID, keys: [], data: price },
+    {
+      programId: COMPUTE_BUDGET_PROGRAM_ID,
+      keys: [],
+      data: u32(4, budget.loadedAccountsDataBytes),
+    },
+  ];
+}
+
+/** checkout uses ~37k CU and loads ~260 KB (escrow program + memo program); dispute far less. */
+export const ESCROW_BUDGET: ComputeBudget = {
+  units: 80_000,
+  microLamportsPerUnit: 1_000n,
+  loadedAccountsDataBytes: 512 * 1024,
+};
+/** A system transfer plus a memo: ~20k CU, ~75 KB (the memo program). */
+export const TRANSFER_BUDGET: ComputeBudget = {
+  units: 40_000,
+  microLamportsPerUnit: 1_000n,
+  loadedAccountsDataBytes: 256 * 1024,
+};
 
 export type EscrowStatusName =
   'pending' | 'paid' | 'released' | 'refunded' | 'disputed' | 'expired';

@@ -132,6 +132,30 @@ export async function sendRaw(url: string, tx: Uint8Array): Promise<string> {
   return signature;
 }
 
+export type Simulation = { err: unknown; logs: string[]; unitsConsumed: number | null };
+
+/**
+ * Simulates an unsigned transaction the way a wallet will (no signature check, the
+ * transaction's own blockhash). Run before asking a wallet to sign: a transaction that would
+ * fail on chain is exactly what makes Phantom warn that a dApp "could be malicious".
+ */
+export async function simulateUnsigned(url: string, tx: Uint8Array): Promise<Simulation> {
+  const result = (await rpc(url, 'simulateTransaction', [
+    toBase64(tx),
+    {
+      encoding: 'base64',
+      sigVerify: false,
+      replaceRecentBlockhash: false,
+      commitment: 'confirmed',
+    },
+  ])) as { value?: { err?: unknown; logs?: string[] | null; unitsConsumed?: number } };
+  return {
+    err: result?.value?.err ?? null,
+    logs: result?.value?.logs ?? [],
+    unitsConsumed: result?.value?.unitsConsumed ?? null,
+  };
+}
+
 export async function requestAirdrop(
   url: string,
   pubkey: string,

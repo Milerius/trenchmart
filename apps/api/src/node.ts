@@ -1,6 +1,12 @@
 import { serve } from '@hono/node-server';
 import { createSql } from '@trenchmart/db';
-import { accountData, fetchTransaction, latestBlockhash, sendAndConfirm } from '@trenchmart/chain';
+import {
+  accountData,
+  fetchTransaction,
+  latestBlockhash,
+  simulateUnsigned,
+  sendAndConfirm,
+} from '@trenchmart/chain';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
@@ -18,6 +24,7 @@ const app = createApp({
   now: () => new Date(),
   getTx: (signature) => fetchTransaction(env.rpcUrl, signature),
   blockhash: () => latestBlockhash(env.rpcUrl),
+  simulate: (tx) => simulateUnsigned(env.rpcUrl, tx),
   escrowChain: {
     account: (address) => accountData(env.rpcUrl, address),
     sendAndConfirm: (tx) => sendAndConfirm(env.rpcUrl, tx),
