@@ -6,9 +6,13 @@
     "studio": "remotion studio src/index.ts",
     "typecheck": "tsc",
     "render:square": "remotion render src/index.ts Promo-1x1 out/trenchmart-promo-1080x1080.mp4",
+    "render:square:music-sfx": "remotion render src/index.ts Promo-1x1-music-sfx out/trenchmart-promo-1080x1080-music-sfx.mp4",
     "render:wide": "remotion render src/index.ts Promo-16x9 out/trenchmart-promo-1920x1080.mp4",
-    "render": "npm run render:square && npm run render:wide",
-    "stills": "node scripts/stills.mjs"
+    "render:wide:music-sfx": "remotion render src/index.ts Promo-16x9-music-sfx out/trenchmart-promo-1920x1080-music-sfx.mp4",
+    "render": "npm run render:square && npm run render:square:music-sfx && npm run render:wide && npm run render:wide:music-sfx",
+    "stills": "tsx scripts/stills.ts",
+    "tts": "audio/.venv/bin/python audio/tts.py",
+    "audio": "tsx audio/build.ts"
   },
   "dependencies": {
     "@remotion/cli": "4.0.536",
@@ -20,8 +24,10 @@
   "devDependencies": {
     "@remotion/bundler": "4.0.536",
     "@remotion/renderer": "4.0.536",
+    "@types/node": "22.20.5",
     "@types/react": "19.3.0",
     "geist": "1.8.1",
+    "tsx": "4.23.15",
     "typescript": "5.9.3"
   }
 }

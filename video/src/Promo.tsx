@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Sequence, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Html5Audio, Sequence, staticFile, useCurrentFrame } from 'remotion';
 import { lin } from './anim';
 import { Background, Hud, Ticker } from './ui/layout';
 import { Hook } from './scenes/Hook';
@@ -12,7 +12,15 @@ import { BEATS } from './timeline';
 
 const STEP_STARTS = [BEATS.list.from, BEATS.scan.from, BEATS.escrow.from, BEATS.unlock.from];
 
-export const Promo: React.FC = () => {
+export type PromoMix = 'full' | 'music-sfx';
+export type PromoProps = { mix: PromoMix };
+
+const MIX_FILES: Record<PromoMix, string> = {
+  full: 'audio/promo-full.flac',
+  'music-sfx': 'audio/promo-music-sfx.flac',
+};
+
+export const Promo: React.FC<PromoProps> = ({ mix }) => {
   const frame = useCurrentFrame();
   const hudOpacity = Math.min(
     lin(frame, BEATS.list.from + 4, BEATS.list.from + 16),
@@ -34,6 +42,7 @@ export const Promo: React.FC = () => {
       })}
       <Hud step={Math.max(0, step)} opacity={hudOpacity} />
       <Ticker />
+      <Html5Audio src={staticFile(MIX_FILES[mix])} />
     </AbsoluteFill>
   );
 };
