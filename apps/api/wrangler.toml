@@ -1,0 +1,15 @@
+name = "trenchmart-api"
+main = "src/worker.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "trenchmart-files"
+
+[[queues.producers]]
+binding = "SCAN_QUEUE"
+queue = "scan-static"

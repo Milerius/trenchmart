@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { quote, splitFee, sumSplit } from './fee';
+import { quote, quoteFromConfig, splitFee, sumSplit } from './fee';
 import { solToLamports } from './money';
 
 const SPLIT = { buyback: 4000, ai_verification: 2500, ops: 2000, safety: 1500 };
@@ -30,6 +30,12 @@ describe('quote', () => {
     expect(quote(1n, 500, 0).fee).toBe(0n);
     expect(quote(10_001n, 500, 0).fee).toBe(500n);
   });
+
+  it('rejects negative basis points and accepts string prices', () => {
+    expect(() => quote(1n, -1, 0)).toThrow(/bps/);
+    expect(() => quote(1n, 0, -1)).toThrow(/bps/);
+    expect(quoteFromConfig('10000', 500, 0).fee).toBe(500n);
+  });
 });
 
 describe('splitFee', () => {
@@ -50,5 +56,13 @@ describe('splitFee', () => {
 
   it('zero net fee splits to zero', () => {
     expect(sumSplit(splitFee(0n, SPLIT))).toBe(0n);
+  });
+
+  it('creates an ops line for dust when the split omits ops', () => {
+    const parts = splitFee(3n, { buyback: 5000 });
+    expect(parts.buyback).toBe(1n);
+    expect(parts.ops).toBe(2n);
+    expect(sumSplit(parts)).toBe(3n);
+    expect(sumSplit({})).toBe(0n);
   });
 });

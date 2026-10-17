@@ -1,3 +1,5 @@
+import { arrayBufferOf } from './money';
+
 function b64url(bytes: Uint8Array): string {
   let s = '';
   for (const b of bytes) s += String.fromCharCode(b);
@@ -17,7 +19,7 @@ function fromB64url(s: string): Uint8Array {
   return out;
 }
 
-async function hmacKey(secret: string, usages: KeyUsage[]): Promise<CryptoKey> {
+async function hmacKey(secret: string, usages: ('sign' | 'verify')[]): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -38,6 +40,7 @@ export async function signJwt(payload: Record<string, unknown>, secret: string):
 export async function verifyJwt<T extends Record<string, unknown>>(
   token: string,
   secret: string,
+  nowMs: number = Date.now(),
 ): Promise<T | null> {
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -46,13 +49,13 @@ export async function verifyJwt<T extends Record<string, unknown>>(
   const ok = await crypto.subtle.verify(
     'HMAC',
     key,
-    fromB64url(sig),
+    arrayBufferOf(fromB64url(sig)),
     new TextEncoder().encode(`${header}.${body}`),
   );
   if (!ok) return null;
   try {
     const json = JSON.parse(new TextDecoder().decode(fromB64url(body))) as T & { exp?: number };
-    if (typeof json.exp === 'number' && json.exp * 1000 < Date.now()) return null;
+    if (typeof json.exp === 'number' && json.exp * 1000 < nowMs) return null;
     return json;
   } catch {
     return null;

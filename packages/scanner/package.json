@@ -13,14 +13,14 @@
   },
   "dependencies": {
     "@trenchmart/shared": "workspace:*",
-    "acorn": "^8.14.0",
-    "acorn-walk": "^8.3.4",
-    "bs58": "^6.0.0",
-    "fflate": "^0.8.2"
+    "acorn": "8.19.0",
+    "acorn-walk": "8.3.5",
+    "bs58": "6.0.0",
+    "fflate": "0.8.3"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
   }
 }

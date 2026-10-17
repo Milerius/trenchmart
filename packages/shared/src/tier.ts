@@ -91,7 +91,6 @@ export function minBalanceInWindow(rows: BalanceRow[], now: Date, windowHours: n
   }
 
   for (const row of inside) amounts.push(row.amount);
-  if (amounts.length === 0) return 0n;
   return amounts.reduce((m, a) => (a < m ? a : m));
 }
 

@@ -16,3 +16,9 @@ test-results
 .DS_Store
 tsconfig.tsbuildinfo
 apps/web/next-env.d.ts
+.data/
+target/
+.anchor/
+**/*-keypair.json
+e2e-keys.json
+playwright/.auth/

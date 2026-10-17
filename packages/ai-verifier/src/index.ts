@@ -106,10 +106,15 @@ export async function signAttestation(message: string, secret: string): Promise<
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function verifyAttestation(message: string, signature: string, secret: string): Promise<boolean> {
+export async function verifyAttestation(
+  message: string,
+  signature: string,
+  secret: string,
+): Promise<boolean> {
   const expected = await signAttestation(message, secret);
   if (expected.length !== signature.length) return false;
   let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
+  for (let i = 0; i < expected.length; i++)
+    diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
   return diff === 0;
 }

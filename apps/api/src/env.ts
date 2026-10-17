@@ -1,0 +1,88 @@
+import { assertSafeRpc, assertTestCluster, defaultRpc, type TestCluster } from '@trenchmart/shared';
+
+export type Env = {
+  appUrl: string;
+  apiUrl: string;
+  siwsDomain: string;
+  siwsUri: string;
+  sessionSecret: string;
+  internalToken: string;
+  cluster: TestCluster;
+  rpcUrl: string;
+  webhookSecret: string;
+  vaultAddress: string;
+  trenchMint: string;
+  buckets: {
+    buyback: string;
+    ai_verification: string;
+    ops: string;
+    safety: string;
+  };
+  aiAgentId: string;
+  aiVerifierUrl: string;
+  aiAttestSecret: string;
+  blobDir: string;
+  escrowHoursOverride: string;
+  rateLimitPerMin: number;
+  sandboxMode: 'inline' | 'external';
+  landingStats: 'auto' | 'mock' | 'real';
+  solUsdOverride: string;
+  r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
+};
+
+function blank(value: string | undefined): string {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed || trimmed.includes('${')) return '';
+  return trimmed;
+}
+
+export function readEnv(source: Record<string, string | undefined> = process.env): Env {
+  const cluster = assertTestCluster(source.SOLANA_CLUSTER || 'devnet');
+  const helius = blank(source.HELIUS_RPC_URL);
+  const explicit = blank(source.SOLANA_RPC_URL);
+  const rpcUrl = explicit || defaultRpc(cluster, helius || undefined);
+  assertSafeRpc(rpcUrl);
+  const accountId = blank(source.CF_ACCOUNT_ID);
+  const accessKeyId = blank(source.R2_ACCESS_KEY_ID);
+  const secretAccessKey = blank(source.R2_SECRET_ACCESS_KEY);
+  return {
+    appUrl: blank(source.APP_URL) || 'http://localhost:3000',
+    apiUrl: blank(source.API_URL) || 'http://localhost:8787',
+    siwsDomain: blank(source.SIWS_DOMAIN) || 'localhost:3000',
+    siwsUri: blank(source.APP_URL) || 'http://localhost:3000',
+    sessionSecret: source.SESSION_SECRET || 'change-me-32-bytes-min',
+    internalToken: source.INTERNAL_TOKEN || 'change-me',
+    cluster,
+    rpcUrl,
+    webhookSecret: source.HELIUS_WEBHOOK_SECRET || 'change-me',
+    vaultAddress: blank(source.VAULT_ADDRESS),
+    trenchMint: blank(source.TRENCH_MINT),
+    buckets: {
+      buyback: blank(source.BUCKET_WALLET_BUYBACK),
+      ai_verification: blank(source.BUCKET_WALLET_AI_VERIFICATION),
+      ops: blank(source.BUCKET_WALLET_OPS),
+      safety: blank(source.BUCKET_WALLET_SAFETY),
+    },
+    aiAgentId: blank(source.AI_AGENT_ID) || 'trenchmart-ai-v1',
+    aiVerifierUrl: blank(source.AI_VERIFIER_URL),
+    aiAttestSecret: source.AI_ATTEST_SECRET || 'change-me',
+    blobDir: blank(source.BLOB_DIR) || '.data/blobs',
+    escrowHoursOverride: source.ESCROW_HOURS_OVERRIDE ?? '',
+    rateLimitPerMin: Number(source.RATE_LIMIT_PER_MIN || 120),
+    sandboxMode: source.SANDBOX_MODE === 'external' ? 'external' : 'inline',
+    landingStats:
+      source.LANDING_STATS === 'mock' || source.LANDING_STATS === 'real'
+        ? source.LANDING_STATS
+        : 'auto',
+    solUsdOverride: blank(source.SOL_USD_OVERRIDE),
+    r2:
+      accountId && accessKeyId && secretAccessKey
+        ? {
+            accountId,
+            bucket: blank(source.R2_BUCKET) || 'trenchmart-files',
+            accessKeyId,
+            secretAccessKey,
+          }
+        : null,
+  };
+}

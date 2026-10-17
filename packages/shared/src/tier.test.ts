@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { minBalanceInWindow, parseThreshold, tierFor, type BalanceRow } from './tier';
+import {
+  minBalanceInWindow,
+  nextTierNeed,
+  parseThreshold,
+  parseThresholds,
+  requiredBondLamports,
+  tierAtLeast,
+  tierFor,
+  type BalanceRow,
+} from './tier';
 
 const thresholds = {
   scout: 100n,
@@ -23,7 +32,34 @@ describe('tierFor', () => {
     expect(parseThreshold('[X]')).toBeUndefined();
     expect(parseThreshold('[Y]')).toBeUndefined();
     expect(parseThreshold('[Z]')).toBeUndefined();
+    expect(parseThreshold(10n)).toBe(10n);
+    expect(parseThreshold(-1n)).toBeUndefined();
+    expect(parseThreshold(25)).toBe(25n);
+    expect(parseThreshold(-2)).toBeUndefined();
+    expect(parseThreshold(1.5)).toBeUndefined();
+    expect(parseThreshold({})).toBeUndefined();
+    expect(parseThreshold('')).toBeUndefined();
     expect(tierFor(1_000_000_000n, { scout: parseThreshold('[X]') })).toBe('none');
+    expect(tierFor(10n, {})).toBe('none');
+    expect(tierFor(10n, { scout: 5n })).toBe('scout');
+    expect(tierFor(10n, { trencher: 5n })).toBe('trencher');
+    expect(parseThresholds({ scout: '5', trencher: '[Y]', og: 9 })).toEqual({
+      scout: 5n,
+      trencher: undefined,
+      og: 9n,
+    });
+  });
+
+  it('reports the next threshold and bond requirements', () => {
+    expect(tierAtLeast('og', 'trencher')).toBe(true);
+    expect(tierAtLeast('scout', 'trencher')).toBe(false);
+    expect(nextTierNeed(0n, thresholds)).toEqual({ nextTier: 'scout', needed: 100n });
+    expect(nextTierNeed(100n, thresholds).nextTier).toBe('trencher');
+    expect(nextTierNeed(10_000n, thresholds)).toEqual({ nextTier: null, needed: 0n });
+    expect(nextTierNeed(0n, {})).toEqual({ nextTier: null, needed: 0n });
+    expect(requiredBondLamports(['filter', 'missing'], { filter: 100n }, 'none', 5000)).toBe(100n);
+    expect(requiredBondLamports(['userscript'], { userscript: 100n }, 'og', 5000)).toBe(50n);
+    expect(requiredBondLamports([], {}, 'none', 5000)).toBe(0n);
   });
 });
 
@@ -47,9 +83,15 @@ describe('minBalanceInWindow', () => {
     expect(minBalanceInWindow(rows, now, 72)).toBe(0n);
   });
 
-  it('trusts a first snapshot inside the window', () => {
+  it('trusts a first snapshot or reconcile inside the window', () => {
     const rows = [row(1_000n, 1, 'snapshot')];
     expect(minBalanceInWindow(rows, now, 72)).toBe(1_000n);
+    expect(minBalanceInWindow([row(800n, 2, 'reconcile'), row(50n, 1, 'webhook')], now, 72)).toBe(
+      50n,
+    );
+    expect(minBalanceInWindow([row(50n, 3, 'snapshot'), row(800n, 1, 'webhook')], now, 72)).toBe(
+      50n,
+    );
     expect(tierFor(1_000n, thresholds)).toBe('trencher');
   });
 

@@ -2,8 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { runAiVerifier, signAttestation, verifyAttestation, attestationMessage } from './index';
 
 const pass = { ruleId: 'no-eval', result: 'pass' as const, title: 'No eval', detail: 'clean' };
-const fail = { ruleId: 'no-sign-transaction', result: 'fail' as const, title: 'No signing', detail: 'calls signTransaction' };
-const warn = { ruleId: 'network-declared', result: 'warn' as const, title: 'Network', detail: 'undeclared host' };
+const fail = {
+  ruleId: 'no-sign-transaction',
+  result: 'fail' as const,
+  title: 'No signing',
+  detail: 'calls signTransaction',
+};
+const warn = {
+  ruleId: 'network-declared',
+  result: 'warn' as const,
+  title: 'Network',
+  detail: 'undeclared host',
+};
 
 describe('runAiVerifier', () => {
   it('approves a clean file', () => {

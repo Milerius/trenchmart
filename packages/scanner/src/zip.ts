@@ -20,7 +20,8 @@ export function unsafeZipPath(name: string): boolean {
 function findEocd(buf: Uint8Array): number {
   const min = Math.max(0, buf.length - 22 - 65535);
   for (let i = buf.length - 22; i >= min; i--) {
-    if (buf[i] === 0x50 && buf[i + 1] === 0x4b && buf[i + 2] === 0x05 && buf[i + 3] === 0x06) return i;
+    if (buf[i] === 0x50 && buf[i + 1] === 0x4b && buf[i + 2] === 0x05 && buf[i + 3] === 0x06)
+      return i;
   }
   return -1;
 }

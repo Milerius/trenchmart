@@ -1,13 +1,9 @@
 import { z } from 'zod';
 import { CATEGORY_CODES } from './config';
 
-export const walletSchema = z
-  .string()
-  .regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'invalid wallet');
+export const walletSchema = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'invalid wallet');
 
-export const txSigSchema = z
-  .string()
-  .regex(/^[1-9A-HJ-NP-Za-km-z]{64,100}$/, 'invalid signature');
+export const txSigSchema = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{64,100}$/, 'invalid signature');
 
 export const nonceBody = z.object({ wallet: walletSchema });
 export const verifyBody = z.object({
@@ -38,7 +34,12 @@ export const listingBody = z.object({
   priceLamports: z.string().regex(/^\d+$/),
   license: z.enum(['single', 'multi3', 'subscription']).default('single'),
   subPeriodDays: z.number().int().positive().max(3650).optional(),
-  holderOnlyHours: z.number().int().min(0).max(24 * 14).default(0),
+  holderOnlyHours: z
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 14)
+    .default(0),
   holderOnly: z.boolean().default(false),
 });
 

@@ -10,9 +10,7 @@ export function assertTestCluster(cluster: string): TestCluster {
     );
   }
   if (c === 'devnet' || c === 'testnet' || c === 'localnet') return c;
-  throw new Error(
-    `Unknown Solana cluster "${cluster}". Use devnet, testnet, or localnet.`,
-  );
+  throw new Error(`Unknown Solana cluster "${cluster}". Use devnet, testnet, or localnet.`);
 }
 
 export function assertSafeRpc(url: string): void {

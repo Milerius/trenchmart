@@ -79,7 +79,10 @@ function big(v: unknown, fallback: bigint): bigint {
   }
 }
 
-export function parseAppConfig(rows: Record<string, unknown>, escrowHoursOverride?: string): AppConfig {
+export function parseAppConfig(
+  rows: Record<string, unknown>,
+  escrowHoursOverride?: string,
+): AppConfig {
   const d = DEFAULT_CONFIG_JSON;
   const rebate = {
     ...d.tier_rebate_bps,
@@ -115,7 +118,8 @@ export function parseAppConfig(rows: Record<string, unknown>, escrowHoursOverrid
   }
 
   const free = String(rows.verification_fee_free_from_tier ?? d.verification_fee_free_from_tier);
-  const freeTier: Tier = free === 'scout' || free === 'trencher' || free === 'og' || free === 'none' ? free : 'trencher';
+  const freeTier: Tier =
+    free === 'scout' || free === 'trencher' || free === 'og' || free === 'none' ? free : 'trencher';
 
   return {
     fee_bps: num(rows.fee_bps, d.fee_bps),
@@ -144,7 +148,10 @@ export function parseAppConfig(rows: Record<string, unknown>, escrowHoursOverrid
     },
     escrow_hours: escrow,
     order_ttl_minutes: num(rows.order_ttl_minutes, d.order_ttl_minutes),
-    verification_fee_lamports: big(rows.verification_fee_lamports, BigInt(d.verification_fee_lamports)),
+    verification_fee_lamports: big(
+      rows.verification_fee_lamports,
+      BigInt(d.verification_fee_lamports),
+    ),
     verification_fee_free_from_tier: freeTier,
     bond_lamports_by_category: bonds,
     og_bond_discount_bps: num(rows.og_bond_discount_bps, d.og_bond_discount_bps),

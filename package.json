@@ -1,26 +1,28 @@
 {
   "name": "trenchmart",
   "private": true,
-  "packageManager": "pnpm@10.33.4",
+  "packageManager": "pnpm@12.14.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "lint": "eslint .",
+    "lint": "eslint . && prettier --check .",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "db:migrate": "pnpm --filter @trenchmart/db migrate",
     "db:seed": "pnpm --filter @trenchmart/db seed",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "verify:escrow": "tsx scripts/verify-escrow.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^9.16.0",
-    "eslint": "^9.16.0",
-    "prettier": "^3.4.2",
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.18.0"
+    "@eslint/js": "10.0.1",
+    "eslint": "10.13.0",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "turbo": "2.11.9",
+    "typescript": "7.0.2",
+    "typescript-eslint": "8.71.2"
   }
 }

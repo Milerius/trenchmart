@@ -1,5 +1,12 @@
 export const LAMPORTS_PER_SOL = 1_000_000_000n;
 
+/** Copy into a fresh ArrayBuffer so WebCrypto accepts it under TypeScript 7. */
+export function arrayBufferOf(bytes: Uint8Array): ArrayBuffer {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  return copy;
+}
+
 export function asBigint(value: bigint | string | number): bigint {
   if (typeof value === 'bigint') return value;
   if (typeof value === 'number') {
@@ -14,7 +21,9 @@ export function asBigint(value: bigint | string | number): bigint {
 export function solToLamports(sol: string): bigint {
   const s = sol.trim();
   if (!/^\d+(\.\d+)?$/.test(s)) throw new Error('invalid SOL amount');
-  const [whole, frac = ''] = s.split('.');
+  const parts = s.split('.');
+  const whole = parts[0] ?? '0';
+  const frac = parts[1] ?? '';
   if (frac.length > 9) throw new Error('SOL supports at most 9 decimal places');
   const fracPadded = (frac + '000000000').slice(0, 9);
   return BigInt(whole) * LAMPORTS_PER_SOL + BigInt(fracPadded);

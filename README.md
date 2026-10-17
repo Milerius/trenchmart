@@ -6,22 +6,22 @@ Verified marketplace for Solana "trench" tooling: Tampermonkey userscripts for t
 
 ## Read in this order
 
-| # | File | What it covers |
-|---|------|----------------|
-| 0 | `AGENT_PROMPT.md` | Paste this to the building agent as its brief |
-| 1 | `docs/01-product.md` | Users, categories, features, scope (POC vs later) |
-| 2 | `docs/02-architecture.md` | Stack, repo layout, diagrams, environments |
-| 3 | `docs/03-data-model.md` | Full Postgres schema (SQL) + state machines |
-| 4 | `docs/04-api.md` | Every endpoint, auth, request/response shapes |
-| 5 | `docs/05-security-pipeline.md` | Upload → hash → static scan → sandbox → human review |
-| 6 | `docs/06-payments-escrow.md` | Checkout, escrow, payouts, disputes, fee math |
-| 7 | `docs/07-token-tiers.md` | $TRENCH holder tiers, 72h min-balance rule, Helius |
-| 8 | `docs/08-design-system.md` | Colors, type, spacing, components |
-| 9 | `docs/09-screens.md` | Screen-by-screen spec of the 4 designed pages + extras |
-| 10 | `docs/10-build-plan.md` | Milestones, tasks, acceptance criteria, test plan |
-| 11 | `docs/11-costs.md` | Hosting cost estimate by stage |
-| — | `design/` | Design sources (`*.dc.html`) + `tokens.json` |
-| — | `.env.example` | Every env var the system needs |
+| #   | File                           | What it covers                                         |
+| --- | ------------------------------ | ------------------------------------------------------ |
+| 0   | `AGENT_PROMPT.md`              | Paste this to the building agent as its brief          |
+| 1   | `docs/01-product.md`           | Users, categories, features, scope (POC vs later)      |
+| 2   | `docs/02-architecture.md`      | Stack, repo layout, diagrams, environments             |
+| 3   | `docs/03-data-model.md`        | Full Postgres schema (SQL) + state machines            |
+| 4   | `docs/04-api.md`               | Every endpoint, auth, request/response shapes          |
+| 5   | `docs/05-security-pipeline.md` | Upload → hash → static scan → sandbox → human review   |
+| 6   | `docs/06-payments-escrow.md`   | Checkout, escrow, payouts, disputes, fee math          |
+| 7   | `docs/07-token-tiers.md`       | $TRENCH holder tiers, 72h min-balance rule, Helius     |
+| 8   | `docs/08-design-system.md`     | Colors, type, spacing, components                      |
+| 9   | `docs/09-screens.md`           | Screen-by-screen spec of the 4 designed pages + extras |
+| 10  | `docs/10-build-plan.md`        | Milestones, tasks, acceptance criteria, test plan      |
+| 11  | `docs/11-costs.md`             | Hosting cost estimate by stage                         |
+| —   | `design/`                      | Design sources (`*.dc.html`) + `tokens.json`           |
+| —   | `.env.example`                 | Every env var the system needs                         |
 
 ## Design reference
 

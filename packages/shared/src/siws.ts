@@ -28,7 +28,11 @@ export function buildSiwsMessage(input: SiwsInput): string {
   ].join('\n');
 }
 
-export function verifySiwsSignature(message: string, signatureB58: string, wallet: string): boolean {
+export function verifySiwsSignature(
+  message: string,
+  signatureB58: string,
+  wallet: string,
+): boolean {
   try {
     const sig = bs58.decode(signatureB58);
     const pub = bs58.decode(wallet);
@@ -48,7 +52,11 @@ export function attestationMessage(input: {
   return `trenchmart-attest:v1:${input.versionId}:${input.sha256}:${input.decision}:${input.issuedAt}`;
 }
 
-export function verifyWalletSignature(message: string, signatureB58: string, wallet: string): boolean {
+export function verifyWalletSignature(
+  message: string,
+  signatureB58: string,
+  wallet: string,
+): boolean {
   return verifySiwsSignature(message, signatureB58, wallet);
 }
 

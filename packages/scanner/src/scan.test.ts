@@ -23,7 +23,11 @@ async function result(name: string, source: string, category: string, opts = {})
 
 describe('userscript rules', () => {
   it('passes a clean script', async () => {
-    const { out, byId } = await result('clean.user.js', script('const filters = { devHolding: "< 4%" };'), 'userscript');
+    const { out, byId } = await result(
+      'clean.user.js',
+      script('const filters = { devHolding: "< 4%" };'),
+      'userscript',
+    );
     expect(out.summary).toBe('pass');
     expect(byId['header-valid']).toBe('pass');
     expect(byId['no-eval']).toBe('pass');
@@ -62,7 +66,11 @@ describe('userscript rules', () => {
   });
 
   it('no-remote-code fails off-allowlist @require and passes with SRI on an allowlisted host', async () => {
-    const bad = await result('x.user.js', script('const x = 1;', '// @require https://evil.example/a.js\n'), 'userscript');
+    const bad = await result(
+      'x.user.js',
+      script('const x = 1;', '// @require https://evil.example/a.js\n'),
+      'userscript',
+    );
     expect(bad.byId['no-remote-code']).toBe('fail');
     const missingSri = await result(
       'x.user.js',
@@ -79,25 +87,41 @@ describe('userscript rules', () => {
   });
 
   it('no-obfuscation fails a very long line', async () => {
-    const { byId } = await result('x.user.js', script(`const blob = '${'a'.repeat(5100)}';`), 'userscript');
+    const { byId } = await result(
+      'x.user.js',
+      script(`const blob = '${'a'.repeat(5100)}';`),
+      'userscript',
+    );
     expect(byId['no-obfuscation']).toBe('fail');
   });
 
   it('no-sign-transaction fails a drainer call', async () => {
-    const { byId, out } = await result('drain.user.js', script('window.solana.signTransaction({ tx: 1 });'), 'userscript');
+    const { byId, out } = await result(
+      'drain.user.js',
+      script('window.solana.signTransaction({ tx: 1 });'),
+      'userscript',
+    );
     expect(byId['no-sign-transaction']).toBe('fail');
     expect(out.summary).toBe('fail');
   });
 
   it('no-key-access fails a seed storage read', async () => {
-    const { byId } = await result('x.user.js', script("localStorage.getItem('seedPhrase');"), 'userscript');
+    const { byId } = await result(
+      'x.user.js',
+      script("localStorage.getItem('seedPhrase');"),
+      'userscript',
+    );
     expect(byId['no-key-access']).toBe('fail');
   });
 
   it('clipboard read fails and clipboard write warns', async () => {
     const read = await result('x.user.js', script('navigator.clipboard.readText();'), 'userscript');
     expect(read.byId['no-clipboard-read']).toBe('fail');
-    const write = await result('x.user.js', script("navigator.clipboard.writeText('addr');"), 'userscript');
+    const write = await result(
+      'x.user.js',
+      script("navigator.clipboard.writeText('addr');"),
+      'userscript',
+    );
     expect(write.byId['no-clipboard-write-address']).toBe('warn');
   });
 
@@ -112,12 +136,19 @@ describe('userscript rules', () => {
   });
 
   it('no-dom-wallet-tamper warns on address selectors', async () => {
-    const { byId } = await result('x.user.js', script("document.querySelector('input.address');"), 'userscript');
+    const { byId } = await result(
+      'x.user.js',
+      script("document.querySelector('input.address');"),
+      'userscript',
+    );
     expect(byId['no-dom-wallet-tamper']).toBe('warn');
   });
 
   it('grant-minimal warns on unsafeWindow and deps warns when @require is present', async () => {
-    const src = script('const x = 1;', '// @grant unsafeWindow\n// @require https://cdn.jsdelivr.net/npm/x#sha384-abc\n');
+    const src = script(
+      'const x = 1;',
+      '// @grant unsafeWindow\n// @require https://cdn.jsdelivr.net/npm/x#sha384-abc\n',
+    );
     const { byId } = await result('x.user.js', src, 'userscript');
     expect(byId['grant-minimal']).toBe('warn');
     expect(byId['deps']).toBe('warn');
@@ -126,10 +157,13 @@ describe('userscript rules', () => {
 
 describe('data files', () => {
   it('wallet list passes valid pubkeys and fails junk', async () => {
-    const { Keypair } = await import('@solana/web3.js').catch(() => ({ Keypair: null }));
-    const addr = Keypair ? Keypair.generate().publicKey.toBase58() : 'So11111111111111111111111111111111111111112';
+    const { default: bs58 } = await import('bs58');
+    const addr = bs58.encode(Uint8Array.from({ length: 32 }, (_, i) => i + 1));
     expect(isPubkey(addr)).toBe(true);
-    const good = await scan({ name: 'w.json', bytes: enc(JSON.stringify([addr, addr])) }, 'wallet_list');
+    const good = await scan(
+      { name: 'w.json', bytes: enc(JSON.stringify([addr, addr])) },
+      'wallet_list',
+    );
     expect(good.checks.find((c) => c.ruleId === 'wl-schema')?.result).toBe('pass');
     expect(good.checks.find((c) => c.ruleId === 'wl-schema')?.detail).toMatch(/duplicate/i);
     const bad = await scan({ name: 'w.json', bytes: enc('["not-a-key"]') }, 'wallet_list');
@@ -158,9 +192,15 @@ describe('data files', () => {
   });
 
   it('links warns on http and passes https', async () => {
-    const bad = await scan({ name: 'a.md', bytes: enc('See http://example.com/phish') }, 'strategy');
+    const bad = await scan(
+      { name: 'a.md', bytes: enc('See http://example.com/phish') },
+      'strategy',
+    );
     expect(bad.checks.find((c) => c.ruleId === 'links')?.result).toBe('warn');
-    const good = await scan({ name: 'a.md', bytes: enc('See https://example.com/docs') }, 'strategy');
+    const good = await scan(
+      { name: 'a.md', bytes: enc('See https://example.com/docs') },
+      'strategy',
+    );
     expect(good.checks.find((c) => c.ruleId === 'links')?.result).toBe('pass');
     expect(good.checks.find((c) => c.ruleId === 'doc-safe')?.result).toBe('pass');
   });

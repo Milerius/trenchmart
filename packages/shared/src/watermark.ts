@@ -5,17 +5,28 @@ export function licenseLine(orderId: string, wallet: string, sha256: string): st
   return `// trenchmart-license: ${orderId} ${wallet} ${sha256}`;
 }
 
-export function watermarkUserJs(source: string, orderId: string, wallet: string, sha256: string): string {
+export function watermarkUserJs(
+  source: string,
+  orderId: string,
+  wallet: string,
+  sha256: string,
+): string {
   const line = licenseLine(orderId, wallet, sha256);
   const marker = '// ==/UserScript==';
   const at = source.indexOf(marker);
   if (at === -1) return `${line}\n${source}`;
   const insertAt = at + marker.length;
-  const nl = source[insertAt] === '\r' ? '' : '\n';
-  return source.slice(0, insertAt) + '\n' + line + nl + source.slice(insertAt);
+  const next = source[insertAt];
+  const separator = next === '\n' || next === '\r' ? '' : '\n';
+  return source.slice(0, insertAt) + '\n' + line + separator + source.slice(insertAt);
 }
 
-export function watermarkJsonObject(source: string, orderId: string, wallet: string, sha256: string): string {
+export function watermarkJsonObject(
+  source: string,
+  orderId: string,
+  wallet: string,
+  sha256: string,
+): string {
   const trimmed = source.trimStart();
   const lead = source.slice(0, source.length - trimmed.length);
   if (!trimmed.startsWith('{')) {
@@ -25,7 +36,13 @@ export function watermarkJsonObject(source: string, orderId: string, wallet: str
   return lead + '{' + field + trimmed.slice(1);
 }
 
-export function watermarkText(source: string, orderId: string, wallet: string, sha256: string, fileName: string): string {
+export function watermarkText(
+  source: string,
+  orderId: string,
+  wallet: string,
+  sha256: string,
+  fileName: string,
+): string {
   const lower = fileName.toLowerCase();
   if (lower.endsWith('.user.js') || lower.endsWith('.js')) {
     return watermarkUserJs(source, orderId, wallet, sha256);

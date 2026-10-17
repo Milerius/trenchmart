@@ -1,0 +1,12 @@
+design
+node_modules
+pnpm-lock.yaml
+coverage
+.next
+dist
+target
+programs
+.open-next
+.wrangler
+evidence
+.data

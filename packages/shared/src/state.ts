@@ -1,4 +1,11 @@
-export const ORDER_STATUSES = ['pending', 'paid', 'released', 'refunded', 'disputed', 'expired'] as const;
+export const ORDER_STATUSES = [
+  'pending',
+  'paid',
+  'released',
+  'refunded',
+  'disputed',
+  'expired',
+] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const VERSION_STATUSES = [
