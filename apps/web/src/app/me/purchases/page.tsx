@@ -401,21 +401,25 @@ function ClosedRow({ order }: { order: Order }) {
       >
         {order.title}
       </Link>
-      <StatusTag status={order.status} />
+      <span className="w-28">
+        <StatusTag status={order.status} />
+      </span>
       <span className="tabular w-28 text-right font-mono text-[13px] text-ink-2">
         {solText(order.amount.lamports)}
       </span>
       <span className="w-36 text-right font-mono text-xs text-muted">{when ? utc(when) : '—'}</span>
-      {order.refund_sig ? (
-        <a
-          href={explorerTx(order.refund_sig)}
-          target="_blank"
-          rel="noreferrer"
-          className="text-[13px] text-ink-2 underline-offset-4 hover:underline"
-        >
-          Refund tx ↗
-        </a>
-      ) : null}
+      <span className="w-20 text-right">
+        {order.refund_sig ? (
+          <a
+            href={explorerTx(order.refund_sig)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[13px] text-ink-2 underline-offset-4 hover:underline"
+          >
+            Refund tx ↗
+          </a>
+        ) : null}
+      </span>
     </li>
   );
 }
