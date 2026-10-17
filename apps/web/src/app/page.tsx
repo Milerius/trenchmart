@@ -70,7 +70,7 @@ export default function HomePage() {
             style={{ animationDelay: '40ms' }}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
-            Solana marketplace · AI-verified · escrowed
+            Solana devnet marketplace · reviewed · escrowed
           </p>
           <h1
             className="rise mt-4 text-[42px] font-semibold leading-[1.04] tracking-[-0.035em] sm:text-[58px]"
@@ -83,8 +83,8 @@ export default function HomePage() {
             style={{ animationDelay: '150ms' }}
           >
             Buy and sell trading scripts, terminal filters and wallet lists. Every version is
-            scanned, run in a sandbox and checked by AI verification in seconds. Your SOL waits in
-            escrow until the trade is done.
+            scanned, scripts also run in a sandbox, and a rules engine decides in seconds. Your SOL
+            waits in escrow until the trade is done.
           </p>
           <div className="rise mt-8 flex flex-wrap gap-3" style={{ animationDelay: '210ms' }}>
             <ButtonLink href="#market" size="lg">
@@ -129,7 +129,7 @@ export default function HomePage() {
             {[
               [
                 'Pick a verified tool',
-                'Every listing shows its AI verification result, the checks it passed and the file hash.',
+                'Every listing shows its review result, the checks it passed, the file hash and a signed scan report.',
               ],
               [
                 'See your exact price',
@@ -260,8 +260,8 @@ export default function HomePage() {
                 'Each order is a program account on Solana. Only the program moves the SOL: to the creator after the window, or back to you on an upheld dispute.',
               ],
               [
-                'Sandboxed AI review',
-                'Each file is statically scanned, run in an isolated sandbox with logged network calls, then reviewed by AI.',
+                'Sandboxed automated review',
+                'Each file is statically scanned; scripts also run in an isolated sandbox with logged network calls. A rules engine then decides.',
               ],
             ].map(([title, body]) => (
               <div
@@ -315,7 +315,7 @@ export default function HomePage() {
               Have an edge? Sell it.
             </h2>
             <p className="mt-2 max-w-lg text-ink-2">
-              Upload a file and watch AI verification run live. 0% commission, payouts in SOL.
+              Upload a file and watch the automated review run live. 0% commission, payouts in SOL.
             </p>
           </div>
           <ButtonLink href="/sell" size="lg">
@@ -350,12 +350,12 @@ function ReviewReceipt() {
   const steps: [string, string, string][] = [
     ['Static scan', '14 rules · 0 findings', '0.4s'],
     ['Sandbox run', '3 requests · allowlisted hosts', '1.9s'],
-    ['AI verdict', 'Behaviour matches description', '2.6s'],
+    ['Verdict', 'Rules engine: approve', '2.6s'],
   ];
   return (
     <figure className="m-0 overflow-hidden rounded-panel border border-line bg-surface shadow-[0_30px_80px_-40px_rgba(198,244,50,0.25)]">
       <div className="flex items-center justify-between border-b border-line-soft bg-inset px-5 py-3">
-        <span className="font-mono text-xs text-muted">ai-review · axiom-pulse-filter.user.js</span>
+        <span className="font-mono text-xs text-muted">review · axiom-pulse-filter.user.js</span>
         <Tag tone="ok">
           <span aria-hidden="true">✓</span> PASSED · 4.9s
         </Tag>
@@ -388,7 +388,7 @@ function ReviewReceipt() {
         </div>
       </div>
       <figcaption className="border-t border-line-soft px-5 py-2.5 text-xs text-muted">
-        Example AI review receipt
+        Example review receipt (illustration)
       </figcaption>
     </figure>
   );
@@ -398,7 +398,7 @@ function LandingStats({ stats, failed }: { stats: Stats | null; failed: boolean 
   const tiles: [string, ReactNode][] = stats
     ? [
         ['Live listings', stats ? <CountUp key="listings" value={stats.listings} /> : null],
-        ['Verified creators', stats ? <CountUp key="creators" value={stats.creators} /> : null],
+        ['Creators', stats ? <CountUp key="creators" value={stats.creators} /> : null],
         ['Orders paid', stats ? <CountUp key="orders" value={stats.orders} /> : null],
         [
           'Volume traded',

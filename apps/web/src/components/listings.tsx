@@ -58,7 +58,7 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
           {meta.tag}
         </span>
         <Tag tone="ok">
-          <span aria-hidden="true">✓</span> AI-VERIFIED
+          <span aria-hidden="true">✓</span> REVIEWED
         </Tag>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
@@ -151,7 +151,7 @@ export function ListingGrid({
   tier,
   loading = false,
   emptyTitle = 'No live listings yet',
-  emptyBody = 'Every listing passes AI verification before it shows here. Check back soon, or be the first to sell.',
+  emptyBody = 'Every listing passes automated review before it shows here. Check back soon, or be the first to sell.',
 }: {
   listings: Listing[];
   centsPerSol: string | null;

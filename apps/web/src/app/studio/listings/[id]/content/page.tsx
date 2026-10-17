@@ -229,7 +229,7 @@ export default function ContentEditorPage() {
             ) : (
               'Loading…'
             )}{' '}
-            · images, README and install guide. Buyers see it once AI review approves it.
+            · images, README and install guide. Buyers see it once the automated review approves it.
           </p>
         </div>
 
@@ -462,7 +462,7 @@ export default function ContentEditorPage() {
             {[
               ['Links and phishing', 'schemes, lookalike domains, shorteners, seed-phrase asks'],
               ['Images', 'real PNG/JPEG/WebP, size, EXIF stripped, yours only'],
-              ['AI verdict', 'signed decision; warnings need your explanation'],
+              ['Verdict', 'signed decision; warnings need your explanation'],
             ].map(([title, detail], index) => {
               const done = content?.status === 'live';
               return (

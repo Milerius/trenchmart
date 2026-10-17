@@ -13,8 +13,8 @@ const SPLIT: Record<string, [string, string]> = {
     'Buys $TRENCH on a published schedule, with the transactions posted.',
   ],
   ai_verification: [
-    'AI verification',
-    'Pays for automated review: static checks, sandbox runs and AI verdicts.',
+    'Verification',
+    'Pays for automated review: static checks, sandbox runs and the review verdict.',
   ],
   ops: ['Operations', 'Running the marketplace.'],
   safety: [
@@ -128,8 +128,8 @@ export default function TokenPage() {
       <section>
         <h2 className="m-0 text-[24px] font-semibold tracking-[-0.02em]">Where every fee goes</h2>
         <p className="mt-2 max-w-2xl text-ink-2">
-          The net fee, after your tier discount, is split four ways. The AI verification bucket
-          funds automated review, not people.
+          The net fee, after your tier discount, is split four ways. The verification bucket funds
+          automated review, not people.
         </p>
         <ul className="m-0 mt-6 grid gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
           {Object.entries(fees.feeSplitBps).map(([bucket, bps]) => (

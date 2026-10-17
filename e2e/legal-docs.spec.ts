@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import {
+  CONTACT_LABEL,
   DOCS_NAV,
   ESCROW_PROGRAM_ID,
   bonds,
@@ -44,7 +45,8 @@ test('footer and wallet picker link to the terms and privacy pages', async ({ pa
 test('terms and privacy name the product, the data, and the contact address', async ({ page }) => {
   await page.goto('/terms');
   await expect(page.getByRole('heading', { name: 'Terms of Service' })).toBeVisible();
-  await expect(page.getByText(protocol.contactEmail).first()).toBeVisible();
+  await expect(page.getByText(CONTACT_LABEL).first()).toBeVisible();
+  await expect(page.locator(`a[href="${protocol.contactUrl}"]`).first()).toBeVisible();
   await expect(page.getByText(/non-custodial/i).first()).toBeVisible();
   await expect(page.getByText(/malware, drainers/i)).toBeVisible();
   await expect(page.getByText(ESCROW_PROGRAM_ID)).toBeVisible();

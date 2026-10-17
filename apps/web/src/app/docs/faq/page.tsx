@@ -1,17 +1,17 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
-import { CONTACT_EMAIL, protocol } from '@/lib/protocol-facts';
+import { CONTACT_LABEL, CONTACT_URL, protocol } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'FAQ · TrenchMart docs' };
 
 const QA: [string, string][] = [
   [
     'When can I download?',
-    `After the order status is released. A paid order is still inside the ${protocol.escrowHours}-hour escrow window.`,
+    `As soon as your payment is confirmed in the escrow account. Downloads pause while a dispute is open. The seller is paid only after the ${protocol.escrowHours}-hour window.`,
   ],
   [
     'Who holds the SOL?',
-    'A Squads multisig vault. The API has no key that can move it. The Anchor program on devnet is a separate, tested path and is not the live checkout.',
+    `Your order's own escrow account, a PDA of the trench_escrow program on ${protocol.cluster}. After the ${protocol.escrowHours}-hour window the program pays the seller and the fee buckets; during a dispute the resolver can refund you. Bonds and verification fees sit in a Squads multisig vault. Every address is on /verify.`,
   ],
   [
     'What does the seller receive?',
@@ -25,8 +25,14 @@ const QA: [string, string][] = [
     'How long do I have to dispute?',
     `Until the ${protocol.escrowHours}-hour window ends, or ${protocol.maliciousDisputeDays} days from payment if the reason is malicious.`,
   ],
-  ['Who reviews listings?', `${protocol.aiAgentId} does. There is no human verifier role.`],
-  ['Where do I write about an order?', CONTACT_EMAIL],
+  [
+    'Who reviews listings?',
+    `An automated reviewer, ${protocol.aiAgentId}: static checks, a sandboxed run and a rules engine. No language model is configured yet, and each listing's signed scan report names the engine that reviewed it. There is no human verifier role.`,
+  ],
+  [
+    'Where do I write about an order?',
+    `${CONTACT_LABEL}. For anything private, a private GitHub advisory.`,
+  ],
 ];
 
 export default function FaqDocsPage() {
@@ -48,8 +54,8 @@ export default function FaqDocsPage() {
       <DocSection id="more" title="Still stuck">
         <p>
           Mail{' '}
-          <a className="text-ink underline" href={`mailto:${CONTACT_EMAIL}`}>
-            {CONTACT_EMAIL}
+          <a className="text-ink underline" href={CONTACT_URL}>
+            {CONTACT_LABEL}
           </a>{' '}
           with the order id and the transaction signature.
         </p>

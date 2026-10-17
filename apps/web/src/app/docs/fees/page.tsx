@@ -34,7 +34,7 @@ export default function FeesDocsPage() {
           The fee is floor-divided in lamports. The tier rebate is floor-divided from that fee. The
           remainder is the net fee. Each bucket takes its basis points of the net fee, and any
           rounding dust is added to ops so the parts sum to the net fee. The verification fee is not
-          split: it is paid in full to AI verification.
+          split: it is paid in full to the verification bucket.
         </p>
         <ul className="m-0 grid gap-2 p-0 sm:grid-cols-2">
           {feeSplit.map((row) => (

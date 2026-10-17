@@ -10,19 +10,22 @@ export default function TreasuryDocsPage() {
       <DocHeader
         kicker="Treasury"
         title="Squads multisig vault"
-        lede="Escrowed SOL sits in a Squads multisig vault. The API never holds a key that can move it."
+        lede="Bonds and verification fees sit in a Squads multisig vault. Order payments do not: each order is held by the escrow program. The API never holds a key that can move the vault."
       />
       <DocSection id="vault" title="Custody">
         <p>
-          Checkout builds a system transfer from the buyer to the vault address, plus the order
-          memo. Bond and verification-fee transfers use the same vault. The database ledger records
-          which part of that balance belongs to a creator, a buyer refund, or a fee bucket. The
-          on-chain vault balance is expected to cover the vault ledger.
+          Bond and verification-fee payments are a system transfer from your wallet to the vault
+          address, with a memo. The database ledger records which part of that balance belongs to
+          whom. Order payments go to a per-order escrow account of the program instead (see Escrow
+          program).
         </p>
         <p>
-          Signer keys and the approval threshold are configured in Squads. This repository does not
-          store the signer set or a threshold, so a policy such as 2-of-3 is an operational Squads
-          setting rather than a constant in the program or the API.
+          Signer keys and the approval threshold are configured in Squads, not in this code. They
+          are public on chain:{' '}
+          <a className="text-ink underline" href="/verify#proof">
+            /verify
+          </a>{' '}
+          reads the multisig account live and shows its threshold and members.
         </p>
       </DocSection>
       <DocSection id="payouts" title="Payouts">
@@ -36,9 +39,9 @@ export default function TreasuryDocsPage() {
       <DocSection id="program" title="The on-chain program">
         <p>
           <span className="font-mono text-ink">{protocol.programId}</span> on {protocol.cluster} can
-          hold a deposit inside its own PDA and pay it out with the same split. That program is
-          tested on every pull request. Live orders do not call it. Custody for the running
-          marketplace is the Squads vault.
+          holds each order&apos;s deposit inside its own PDA and pays it out with the fee split.
+          Every live order uses it, and it is tested on every pull request. Its IDL is published on
+          chain and it embeds a security.txt.
         </p>
       </DocSection>
     </article>

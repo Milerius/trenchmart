@@ -34,7 +34,7 @@ function Results() {
         </h1>
         {listings ? (
           <p className="m-0 mt-1 text-sm text-muted">
-            {listings.length} AI-verified listing{listings.length === 1 ? '' : 's'}
+            {listings.length} reviewed listing{listings.length === 1 ? '' : 's'}
           </p>
         ) : null}
       </div>

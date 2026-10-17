@@ -112,7 +112,7 @@ export default function StudioPage() {
         <h1 className="text-[28px] font-semibold tracking-[-0.025em]">Creator studio</h1>
         <p className="mt-3 text-ink-2">Connect a wallet to open the studio.</p>
         <p className="mt-1 text-sm text-muted">
-          List tooling with 0% commission. Every upload is AI-verified live, in seconds.
+          List tooling with 0% commission. Every upload is reviewed live by automated checks.
         </p>
         <Button className="mt-6" onClick={() => void wallet.connect()} disabled={wallet.busy}>
           {wallet.busy ? 'Check your wallet…' : 'Connect wallet'}
@@ -193,7 +193,7 @@ export default function StudioPage() {
               <div className="p-5">
                 <EmptyState
                   title="No listings yet"
-                  body="Upload a file and AI verification runs live: static scan, sandbox run and verdict, in seconds."
+                  body="Upload a file and automated review runs live: static scan, sandbox run and verdict."
                   action={
                     <ButtonLink href="/studio/listings/new">Create your first listing</ButtonLink>
                   }
@@ -379,7 +379,7 @@ export default function StudioPage() {
                     </Button>
                   </form>
                 </Requirement>
-                <Requirement ok title="AI verification fee">
+                <Requirement ok title="Verification fee">
                   <span className="mt-1 block text-[13px] text-ink-2">
                     {requirements.verificationFee === '0' ? (
                       'Free right now'
@@ -402,8 +402,8 @@ export default function StudioPage() {
             )}
           </div>
           <Panel tone="info" className="p-4 text-[13px] text-ink-2">
-            Uploads are reviewed live: static scan, sandbox run, AI verdict. Most finish in seconds,
-            and you watch every step.
+            Uploads are reviewed live: static scan, sandbox run, rules verdict. Most finish in
+            seconds, and you watch every step.
           </Panel>
           {message ? (
             <p role="status" className="m-0 text-sm text-ink-2">

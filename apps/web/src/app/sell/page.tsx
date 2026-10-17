@@ -8,7 +8,7 @@ const STEPS: [string, string][] = [
   ],
   [
     'Upload and watch the review',
-    'Static checks and an isolated sandbox run at once, then AI verification approves, rejects or asks for a note. Seconds, not days.',
+    'Static checks (and, for scripts, an isolated sandbox) run at once, then a rules engine approves, rejects or asks for a note. Seconds, not days.',
   ],
   ['Get paid in SOL', 'You keep 100% of your price. Each sale pays out after its escrow releases.'],
 ];
@@ -22,8 +22,8 @@ export default function SellPage() {
           Sell your tooling. Keep 100% of the price.
         </h1>
         <p className="m-0 mt-3 text-[17px] text-ink-2">
-          0% creator commission. Buyers pay the fee, and every version you upload is AI-verified
-          live, so buyers trust it on sight.
+          0% creator commission. Buyers pay the fee, and every version you upload goes through
+          automated review live, so buyers trust it on sight.
         </p>
         <ButtonLink href="/studio" size="lg" className="mt-6">
           Open creator studio

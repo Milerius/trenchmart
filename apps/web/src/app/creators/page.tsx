@@ -36,7 +36,7 @@ export default function CreatorsPage() {
       ) : creators.length === 0 ? (
         <EmptyState
           title="No creators with live listings yet."
-          body="Creators appear here once a listing passes AI verification."
+          body="Creators appear here once a listing passes automated review."
         />
       ) : (
         <ol className="m-0 space-y-2 p-0">
