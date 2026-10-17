@@ -54,7 +54,7 @@ jobs:
       # Coverage gates live in packages/shared (fee/tier 100, escrow state 90, payouts 85).
       # The API integration file needs Postgres and runs in the integration job.
       # A Workers vitest pool is not used: the API imports postgres.js.
-      - run: pnpm --filter @trenchmart/shared --filter @trenchmart/scanner --filter @trenchmart/chain --filter @trenchmart/ai-verifier --filter @trenchmart/db test
+      - run: pnpm --filter @trenchmart/shared --filter @trenchmart/scanner --filter @trenchmart/chain --filter @trenchmart/ai-verifier --filter @trenchmart/db --filter @trenchmart/web test
       - run: pnpm --filter @trenchmart/api exec vitest run src/price.test.ts src/sandbox.test.ts src/dispatch.test.ts
 
   integration:
