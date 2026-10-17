@@ -1,0 +1,172 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>02 · Design directions</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap"><style>:root{
+  --bg:#0A0B0A;--inset:#0E100E;--surface:#121412;--surface-2:#161916;
+  --line:#262A26;--line-soft:#1E221E;--line-strong:#343A34;--line-control:#646C63;
+  --text:#EDEFEA;--text-2:#B4BAB2;--muted:#9BA19A;--faint:#868D86;--decor:#6E756D;
+  --accent:#C6F432;--accent-hover:#DDFF7A;--on-accent:#0A0B0A;--accent-bg:#141A08;--accent-line:#2E3A12;--accent-label:#9FAF86;--accent-body:#C9D0BE;
+  --warn:#F5A524;--warn-bg:#1C160A;--warn-line:#3A2C0E;
+  --danger:#FF8A7A;--danger-bg:#1F1210;--danger-line:#4A2620;
+  --info:#7CC4FF;--info-bg:#0F1620;--info-line:#1E3448;
+  --violet:#C9A2FF;--teal:#6EE7C8;
+  --mono:'Geist Mono',ui-monospace,monospace;--sans:'Geist',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.grow{flex:1;min-width:0}
+.ml{margin-left:auto}
+.muted{color:var(--muted)}.t2{color:var(--text-2)}.faint{color:var(--faint)}.acc{color:var(--accent)}.warn{color:var(--warn)}.danger{color:var(--danger)}.info{color:var(--info)}
+.lbl{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.inset{background:var(--inset);border:1px solid var(--line-soft);border-radius:10px}
+.pad{padding:20px}.pad-s{padding:14px}
+.acc-panel{background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:16px}
+.warn-panel{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:14px}
+.danger-panel{background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:14px}
+.info-panel{background:var(--info-bg);border:1px solid var(--info-line);border-radius:14px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:10px;font:600 14px var(--sans);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.secondary{background:transparent;color:var(--text);border-color:var(--line-control)}
+.btn.ghost{background:transparent;color:var(--text-2)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger-line)}
+.btn.xl{height:52px;font-size:16px;border-radius:12px;font-weight:700}
+.btn.lg{height:48px}.btn.sm{height:36px;padding:0 12px;font-size:13px}
+.btn.block{width:100%}
+.btn[disabled],.btn.is-disabled{background:var(--surface-2);color:var(--faint);border-color:var(--line);cursor:not-allowed}
+.focus{outline:2px solid var(--accent);outline-offset:2px}
+/* tags + badges */
+.tag{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--mono);padding:3px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--text-2);white-space:nowrap}
+.tag.ok{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent)}
+.tag.wait{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tag.bad{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.tag.inf{background:var(--info-bg);border-color:var(--info-line);color:var(--info)}
+.tag.dark{background:var(--bg);border-color:transparent}
+.pill{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;font-size:13px;border:1px solid var(--line-control);background:var(--surface);color:var(--text-2)}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2)}
+.input{height:44px;background:var(--inset);border:1px solid var(--line-control);border-radius:10px;color:var(--text);padding:0 12px;font-size:14px;display:flex;align-items:center}
+.input.err{border-color:var(--danger)}
+.help{font-size:12px;color:var(--muted)}.help.err{color:var(--danger)}
+/* rows */
+.kv{display:flex;justify-content:space-between;gap:12px;font:13px var(--mono)}
+.kv .k{color:var(--muted);font-family:var(--sans)}
+.hr{height:1px;background:var(--line-soft)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.sq{flex:0 0 22px;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:700 12px var(--sans);color:var(--on-accent)}
+.sq.ok{background:var(--accent)}.sq.w{background:var(--warn)}.sq.x{background:var(--danger)}.sq.i{background:var(--info)}.sq.n{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-control)}
+/* skeleton */
+.sk{background:linear-gradient(90deg,#161916 0%,#1E221E 50%,#161916 100%);border-radius:6px}
+/* chrome */
+.netbar{background:#1C160A;border-bottom:1px solid var(--warn-line);color:var(--warn);font:12px var(--mono);text-align:center;padding:6px 16px}
+.ticker{border-bottom:1px solid var(--line-soft);background:var(--inset);font:12px var(--mono);color:var(--muted)}
+.ticker .wrap{padding:8px 24px;display:flex;flex-wrap:wrap;gap:8px 28px;align-items:center}
+.nav{border-bottom:1px solid var(--line-soft)}
+.nav .wrap{padding:14px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.logo{display:flex;gap:10px;align-items:center;color:var(--text);font-weight:700;font-size:18px;letter-spacing:-.02em}
+.logo i{width:32px;height:32px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.navlinks{display:flex;gap:4px}
+.navlinks a{padding:10px 12px;border-radius:8px;color:var(--muted);font-size:14px}
+.navlinks a.on{color:var(--text);background:var(--surface-2)}
+.search{flex:1 1 240px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line-control);border-radius:10px;padding:0 14px;height:44px;color:var(--muted);font-size:14px}
+.kbd{font:11px var(--mono);border:1px solid var(--line-control);border-radius:4px;padding:1px 6px;color:var(--muted)}
+.tierchip{display:flex;gap:6px;align-items:center;height:44px;padding:0 12px;border:1px solid var(--accent-line);background:var(--accent-bg);border-radius:10px;font:12px var(--mono);color:var(--accent)}
+.h-hero{font-size:clamp(40px,6vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:700}
+.h1{font-size:40px;line-height:1.05;letter-spacing:-.03em;font-weight:700}
+.h2{font-size:28px;letter-spacing:-.02em;font-weight:700}
+.h3{font-size:20px;letter-spacing:-.01em;font-weight:600}
+.lead{font-size:17px;color:var(--text-2)}
+.meta{font-size:13px;color:var(--muted)}
+.grid{display:grid;gap:16px}
+.g-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+/* artboards for exploration sheets */
+.sheet{padding:40px;display:flex;flex-direction:column;gap:28px}
+.sheet-h{display:flex;gap:16px;align-items:baseline;border-bottom:1px solid var(--line-soft);padding-bottom:16px}
+.sheet-h h1{font-size:28px;letter-spacing:-.02em}
+.board{display:flex;flex-direction:column;gap:10px}
+.board>.cap{font:12px var(--mono);color:var(--muted)}
+.frame{border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--bg)}
+.phone{width:390px;border:1px solid var(--line-strong);border-radius:28px;overflow:hidden;background:var(--bg)}
+.note{font-size:13px;color:var(--text-2);border-left:2px solid var(--accent);padding:2px 0 2px 12px}
+.q{font-size:13px;color:var(--warn);border-left:2px solid var(--warn);padding:2px 0 2px 12px}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+</style>
+<style>
+.dir{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.opt{display:flex;flex-direction:column;gap:14px}
+.opt h2{font-size:20px}
+.lc{display:flex;flex-direction:column;overflow:hidden}
+.lc .hd{height:110px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;border-bottom:1px solid var(--line-soft)}
+.lc .bd{padding:14px;display:flex;flex-direction:column;gap:8px}
+.receipt{background:#0E100E;border:1px dashed var(--line-strong);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.pros{font-size:13px;color:var(--text-2);display:flex;flex-direction:column;gap:4px}
+.pros span::before{content:'+ ';color:var(--accent)}
+.pros span.c::before{content:'− ';color:var(--danger)}
+</style></head><body><div class="sheet">
+<div class="sheet-h"><span class="lbl acc">02 · exploration</span><h1>Three directions for card + buy box</h1><span class="ml meta">Same data: Sniper Filter Pack v2 · 1.50 SOL · Trencher tier</span></div>
+
+<div class="dir">
+<!-- A -->
+<div class="opt">
+  <div class="row"><span class="tag">A</span><h2>Terminal (handover, as is)</h2></div>
+  <div class="card lc">
+    <div class="hd" style="background:#141A10"><div class="row"><span class="tag dark acc">USERSCRIPT</span><span class="tag dark acc ml">✓ VERIFIED</span></div><span class="mono t2" style="font-size:12px">Axiom · GMGN</span></div>
+    <div class="bd"><b>Sniper Filter Pack v2</b><span class="meta">by @dev_degen · ★ 4.9 · 412 sold</span><div class="row"><span class="mono" style="font-size:17px;font-weight:600">1.50 SOL</span><span class="mono acc" style="font-size:12px">holders 1.20</span></div></div>
+  </div>
+  <div class="panel pad col">
+    <div class="row"><span class="mono" style="font-size:30px;font-weight:600">1.530 SOL</span><span class="mono meta">total at your tier</span></div>
+    <div class="kv"><span class="k">List price</span><span>1.50 SOL</span></div>
+    <div class="kv"><span class="k">Platform fee (5%)</span><span>0.075 SOL</span></div>
+    <div class="kv"><span class="k">Holder rebate</span><span class="acc">−0.045 SOL</span></div>
+    <button class="btn primary xl">Buy with SOL</button>
+  </div>
+  <div class="pros"><span>Dense, on-brand for traders</span><span>Already designed and specced</span><span class="c">"holders 1.20" is wrong: tiers only cut the 5% fee, so the floor is 1.50</span><span class="c">Rebate shown without saying which tier or what % off</span><span class="c">No network fee, no destination, no escrow state</span></div>
+</div>
+<!-- B -->
+<div class="opt">
+  <div class="row"><span class="tag ok">B</span><h2>Terminal + Receipt (recommended)</h2></div>
+  <div class="card lc">
+    <div class="hd" style="background:#141A10"><div class="row"><span class="tag dark acc">USERSCRIPT</span><span class="tag ok ml">✓ AI-VERIFIED · 9/9</span></div><span class="mono t2" style="font-size:12px">Axiom · GMGN · sha 9f3a…c21e</span></div>
+    <div class="bd"><b>Sniper Filter Pack v2</b><span class="meta">@dev_degen · bond 5 SOL · 412 sold · ★ 4.9</span><div class="row"><span class="mono" style="font-size:17px;font-weight:600">1.50 SOL</span><span class="mono meta" style="font-size:12px">+ fee from 0%</span></div></div>
+  </div>
+  <div class="panel pad col">
+    <div class="row"><span class="lbl">You pay · Trencher</span><span class="tag ok ml">60% off fee</span></div>
+    <span class="mono" style="font-size:34px;font-weight:600;line-height:1">1.53 SOL</span>
+    <div class="receipt">
+      <div class="kv"><span class="k">List price · 100% to creator</span><span>1.50</span></div>
+      <div class="kv"><span class="k">Marketplace fee 5%</span><span>0.075</span></div>
+      <div class="kv"><span class="k">Trencher discount −60% of fee</span><span class="acc">−0.045</span></div>
+      <div class="hr"></div>
+      <div class="kv"><span>Total to escrow</span><span style="font-weight:700">1.53 SOL</span></div>
+      <div class="kv"><span class="k">Network fee (est.)</span><span class="muted">~0.000005</span></div>
+    </div>
+    <button class="btn primary xl">Review &amp; buy</button>
+    <span class="meta row" style="gap:8px"><svg class="i acc" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Held in escrow 48h · dispute for a refund</span>
+  </div>
+  <div class="pros"><span>Keeps the brand; the fee becomes a printed receipt</span><span>Says the tier name and % in plain words</span><span>Card shows the true range: "+ fee from 0%"</span><span>Trust facts on the card: bond, check count, hash</span><span class="c">Slightly taller buy box</span></div>
+</div>
+<!-- C -->
+<div class="opt">
+  <div class="row"><span class="tag">C</span><h2>Signal (pump.fun energy)</h2></div>
+  <div class="card lc" style="border-color:var(--accent)">
+    <div class="hd" style="background:linear-gradient(135deg,#2E3A12,#0A0B0A)"><div class="row"><span class="tag dark acc">🔥 TRENDING</span><span class="tag dark acc ml">✓</span></div><span class="mono acc" style="font-size:22px;font-weight:700">+412 sold</span></div>
+    <div class="bd"><b style="font-size:18px">Sniper Filter Pack v2</b><div class="row"><span class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">1.50 SOL</span></div></div>
+  </div>
+  <div class="panel pad col" style="border-color:var(--accent)">
+    <span class="mono acc" style="font-size:44px;font-weight:700;line-height:1">1.53</span>
+    <span class="meta">SOL · you save 0.045 holding $TRENCH</span>
+    <button class="btn primary xl" style="font-size:18px">APE IN ⚡</button>
+  </div>
+  <div class="pros"><span>High energy, strong on mobile</span><span class="c">Hype over trust; "ape in" fights the safety story</span><span class="c">Hides the breakdown; fails "show fees exactly"</span><span class="c">Glow and gradients hurt density</span><span class="c">Emoji icons go against the system rule</span></div>
+</div>
+</div>
+
+<p class="note">Recommendation: <b>B</b>. Keep the dark terminal look and add a receipt-style breakdown wherever money moves (card, buy box, checkout sheet, order page). The primary CTA becomes "Review &amp; buy", which opens a checkout sheet that shows the receipt again next to the wallet hand-off, so nothing is signed from the listing page by surprise.</p>
+<p class="q">Owner question: list cards can't know the visitor's tier before they connect. I show "1.50 SOL + fee from 0%" (0% at OG) logged out, and the exact "you pay" once connected. Or would you rather show the no-tier total (1.575) on cards?</p>
+</div></body></html>
