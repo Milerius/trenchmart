@@ -229,6 +229,9 @@ importers:
       '@hono/node-server':
         specifier: 2.1.5
         version: 2.1.5(hono@4.13.13)
+      '@jitl/quickjs-wasmfile-release-sync':
+        specifier: 0.32.0
+        version: 0.32.0
       '@trenchmart/ai-verifier':
         specifier: workspace:*
         version: link:../../packages/ai-verifier

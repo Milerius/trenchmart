@@ -96,6 +96,18 @@ describe('QuickJS sandbox', () => {
     expect(run.verdict).toBe('warn');
   });
 
+  it('stops a tight loop on the CPU tick budget even when the clock does not move', async () => {
+    // Workers freeze Date.now() during pure compute; the tick budget must still stop it.
+    const frozen = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const run = await runIsolatedSandbox('for (;;) {}', 0, { maxTicks: 50 });
+      expect(run.verdict).toBe('fail');
+      expect(run.errors.join(' ')).toMatch(/CPU budget/);
+    } finally {
+      frozen.mockRestore();
+    }
+  });
+
   it('kills a tight loop and a memory bomb inside the budget', async () => {
     const hung = await runIsolatedSandbox('while (true) {}', 0, { timeoutMs: 200 });
     expect(hung.verdict).toBe('fail');

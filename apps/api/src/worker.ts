@@ -1,4 +1,8 @@
 import { createSql } from '@trenchmart/db';
+import { configureSandboxWasm } from '@trenchmart/scanner';
+// workerd cannot fetch the QuickJS engine at runtime; wrangler bundles it as a compiled module.
+// The package's exports map hides the .wasm path, and wrangler's CompiledWasm rule needs it.
+import quickjsWasm from '../node_modules/@jitl/quickjs-wasmfile-release-sync/dist/emscripten-module.wasm';
 import { accountData, fetchTransaction, latestBlockhash, sendAndConfirm } from '@trenchmart/chain';
 import { createApp, type PriceCacheBox } from './app';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
@@ -23,6 +27,7 @@ type Ctx = { waitUntil: (p: Promise<unknown>) => void };
 // another in workerd ("Cannot perform I/O on behalf of a different request"), so every
 // fetch and scheduled invocation opens its own postgres.js client and closes it afterwards.
 const priceCache: PriceCacheBox = { value: null };
+configureSandboxWasm(quickjsWasm);
 
 export function databaseUrl(env: Binding): string | undefined {
   return env.HYPERDRIVE?.connectionString || env.DATABASE_URL || undefined;

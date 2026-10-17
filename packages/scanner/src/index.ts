@@ -2,10 +2,12 @@ export { ENGINE_VER, scan, isPubkey, KNOWN_PROGRAM_IDS, markSymlink } from './sc
 export {
   runIsolatedSandbox,
   sandboxPage,
+  configureSandboxWasm,
   SandboxInfraError,
   SANDBOX_BUDGET_MS,
   SANDBOX_MEMORY_MB,
   SANDBOX_VIRTUAL_MS,
+  SANDBOX_MAX_TICKS,
 } from './isolate';
 export type { IsolatedSandboxResult } from './isolate';
 export type { ScanCheck, ScanOutput, ScanOptions, Declared, CheckResult } from './scan';

@@ -1,5 +1,6 @@
 import {
   newQuickJSWASMModuleFromVariant,
+  newVariant,
   shouldInterruptAfterDeadline,
   type QuickJSContext,
   type QuickJSHandle,
@@ -13,6 +14,13 @@ export const SANDBOX_BUDGET_MS = 15_000;
 export const SANDBOX_MEMORY_MB = 128;
 /** Virtual time the timer loop may advance: timers due later never run. */
 export const SANDBOX_VIRTUAL_MS = 60_000;
+/**
+ * Interrupt ticks (~10k QuickJS bytecode steps each) a run may use: about 20M steps, roughly
+ * 60 ms of CPU, so a hostile loop ends with a verdict well inside the Worker CPU limit
+ * (a 20k budget hit error 1102 on the current plan). The Trojan Trenches Intel script,
+ * including 60 s of virtual timers, uses 2 ticks.
+ */
+export const SANDBOX_MAX_TICKS = 2_000;
 const MAX_TIMER_RUNS = 2_000;
 const MAX_SOURCE_BYTES = 1_500_000;
 
@@ -41,9 +49,25 @@ export class SandboxInfraError extends Error {
 }
 
 let engine: Promise<QuickJSWASMModule> | null = null;
+// A compiled WebAssembly.Module; typed loosely because the package builds without DOM libs.
+let wasmModule: object | null = null;
+
+/**
+ * Workers cannot fetch the engine's .wasm at runtime; the Worker imports it as a compiled
+ * module (`@jitl/quickjs-wasmfile-release-sync/wasm`) and hands it over here. Node loads the
+ * file from disk by itself.
+ */
+export function configureSandboxWasm(module: object): void {
+  if (wasmModule === module) return;
+  wasmModule = module;
+  engine = null;
+}
 
 function loadEngine(): Promise<QuickJSWASMModule> {
-  engine ??= newQuickJSWASMModuleFromVariant(RELEASE_SYNC).catch((err: unknown) => {
+  const variant = wasmModule
+    ? newVariant(RELEASE_SYNC, { wasmModule: wasmModule as never })
+    : RELEASE_SYNC;
+  engine ??= newQuickJSWASMModuleFromVariant(variant).catch((err: unknown) => {
     engine = null;
     throw new SandboxInfraError(
       `sandbox engine failed to load: ${err instanceof Error ? err.message : String(err)}`,
@@ -100,9 +124,10 @@ function errorText(ctx: QuickJSContext, handle: QuickJSHandle): string {
 export async function runIsolatedSandbox(
   source: string,
   startedAt: number,
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number; maxTicks?: number },
 ): Promise<IsolatedSandboxResult> {
   const timeoutMs = clampTimeout(options?.timeoutMs);
+  const maxTicks = Math.max(1, Math.floor(options?.maxTicks ?? SANDBOX_MAX_TICKS));
   const limits = { timeoutMs, memoryMb: SANDBOX_MEMORY_MB };
   const walletCalls: string[] = [];
   const requestMap = new Map<string, { host: string; method: string; count: number }>();
@@ -138,10 +163,18 @@ export async function runIsolatedSandbox(
   let outOfMemory = false;
   let timerRuns = 0;
   const deadline = Date.now() + timeoutMs;
+  // Workers freeze Date.now() while code runs without I/O, so a wall-clock deadline alone
+  // never fires inside a tight loop. QuickJS calls the handler every ~10k bytecode steps;
+  // the tick budget bounds CPU no matter what the clock says.
+  const pastDeadline = shouldInterruptAfterDeadline(deadline);
+  let ticks = 0;
   try {
     runtime.setMemoryLimit(SANDBOX_MEMORY_MB * 1024 * 1024);
     runtime.setMaxStackSize(1024 * 1024);
-    runtime.setInterruptHandler(shouldInterruptAfterDeadline(deadline));
+    runtime.setInterruptHandler((rt) => {
+      ticks += 1;
+      return ticks > maxTicks || pastDeadline(rt);
+    });
     const ctx = runtime.newContext();
     try {
       const record = ctx.newFunction('record', (kindHandle, valueHandle) => {
@@ -227,7 +260,7 @@ export async function runIsolatedSandbox(
         drain();
         const horizon = ctx.newNumber(SANDBOX_VIRTUAL_MS);
         const maxRuns = ctx.newNumber(MAX_TIMER_RUNS);
-        while (!timedOut && !outOfMemory && Date.now() < deadline) {
+        while (!timedOut && !outOfMemory && Date.now() < deadline && ticks <= maxTicks) {
           const more = call('step', horizon, maxRuns);
           drain();
           if (more !== true) break;
@@ -254,7 +287,14 @@ export async function runIsolatedSandbox(
     }
   }
 
-  if (timedOut) errors.push(`Script execution timed out after ${timeoutMs}ms`);
+  const cpuCapped = ticks > maxTicks;
+  if (cpuCapped) timedOut = true;
+  if (timedOut)
+    errors.push(
+      cpuCapped
+        ? `Script execution timed out: it used the whole sandbox CPU budget`
+        : `Script execution timed out after ${timeoutMs}ms`,
+    );
   if (outOfMemory) errors.push(`Script exceeded the ${SANDBOX_MEMORY_MB}MB memory limit`);
   const requests = [...requestMap.values()];
   const signing = walletCalls.length > 0;
@@ -273,7 +313,7 @@ export async function runIsolatedSandbox(
         : errors.length > 0
           ? 'The script threw while running in the sandbox, so part of it was not exercised. The creator must explain or fix it.'
           : 'Sandbox ran the script in a QuickJS isolate with a browser-like page. Network egress is blocked.';
-  log.push(`timers run ${timerRuns}`);
+  log.push(`timers run ${timerRuns}`, `interrupt ticks ${ticks}`);
   return {
     ...base,
     durationMs: Math.max(0, Date.now() - (startedAt > 0 ? Math.min(startedAt, started) : started)),
