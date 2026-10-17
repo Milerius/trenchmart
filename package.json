@@ -16,7 +16,8 @@
     "db:seed": "pnpm --filter @trenchmart/db seed",
     "format": "prettier --write .",
     "verify:escrow": "tsx scripts/verify-escrow.ts",
-    "screenshots": "tsx scripts/screenshots.ts"
+    "screenshots": "tsx scripts/screenshots.ts",
+    "brand": "tsx scripts/brand.ts"
   },
   "devDependencies": {
     "@anchor-lang/core": "1.2.1",

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/01-landing.webp" alt="TrenchMart landing page: the verified edge, for sale" width="100%" />
+<img src="brand/logo-mark.svg" alt="TrenchMart logo" width="96" height="96" />
 
 # TrenchMart
 
@@ -15,6 +15,10 @@ Every file is AI-verified in seconds. Every order is escrowed. Creators keep 100
 ![Creator commission: 0%](https://img.shields.io/badge/creator%20commission-0%25-C6F432?labelColor=0A0B0A)
 
 [How buying works](#how-buying-works) · [Fees and tiers](#fees-and-tiers) · [Trust and security](#trust-and-security) · [For creators](#for-creators) · [Quickstart](#quickstart) · [Docs](#documentation)
+
+<br />
+
+<img src="docs/screenshots/01-landing.webp" alt="TrenchMart landing page: the verified edge, for sale" width="100%" />
 
 </div>
 
@@ -165,6 +169,7 @@ Every other setting has a working local default. See [`.env.example`](.env.examp
 | `pnpm lint`                 | ESLint and Prettier                                                 |
 | `pnpm test`                 | Unit tests, including fee and tier maths at 100% coverage           |
 | `pnpm exec playwright test` | End-to-end and axe accessibility checks (starts the web app itself) |
+| `pnpm brand`                | Re-renders the brand PNGs and app icons from the SVGs in `brand/`   |
 | `pnpm screenshots`          | Regenerates the screenshots in this README from the running app     |
 
 `pnpm screenshots` ([`scripts/screenshots.ts`](scripts/screenshots.ts)) needs the API and web app running against a seeded database. It adds demo escrow orders, payouts and a Trencher-tier balance, signs in with the app's test wallet hook, uploads a file through the live AI review, and saves WebP captures to `docs/screenshots/`. Run `pnpm db:seed` afterwards to reset.
@@ -180,6 +185,7 @@ Every other setting has a working local default. See [`.env.example`](.env.examp
 | Payments and escrow    | [`docs/06-payments-escrow.md`](docs/06-payments-escrow.md)                                                                       |
 | $TRENCH tiers          | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                               |
 | Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/)       |
+| Brand assets           | [`brand/`](brand/): logo mark, wordmark (dark and light), X avatar and header, favicon. `pnpm brand` re-renders the PNGs         |
 | Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                                    |
 | Costs and budget       | [`docs/11-costs.md`](docs/11-costs.md) · [`docs/12-budget.md`](docs/12-budget.md) · [`DEPLOYMENT_COSTS.md`](DEPLOYMENT_COSTS.md) |
 | Brief for build agents | [`AGENT_PROMPT.md`](AGENT_PROMPT.md)                                                                                             |
