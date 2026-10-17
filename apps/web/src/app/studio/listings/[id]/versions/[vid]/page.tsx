@@ -228,7 +228,7 @@ export default function VersionPage() {
           </div>
           <div className="text-right" aria-live="off">
             <Label>{running ? 'Elapsed' : 'Review time'}</Label>
-            <p className="tabular m-0 font-mono text-2xl font-semibold">
+            <p className="tabular glow m-0 font-display text-[28px] leading-tight font-bold text-accent">
               {startedAt ? seconds(elapsed) : '—'}
             </p>
           </div>
@@ -296,7 +296,7 @@ export default function VersionPage() {
               data-testid="review-step"
               data-step={step}
               data-status={event.status}
-              className={`grid list-none grid-cols-[auto_1fr_auto] items-center gap-3 rounded-card border px-4 py-3 ${
+              className={`crt grid list-none grid-cols-[auto_1fr_auto] items-center gap-3 rounded-card border px-4 py-3 ${
                 isRunning ? 'border-info-line bg-info-bg' : 'border-line bg-surface'
               }`}
             >
@@ -318,8 +318,13 @@ export default function VersionPage() {
       </ol>
 
       {sandbox?.log ? (
-        <div className="overflow-hidden rounded-card border border-line bg-inset">
+        <div className="crt overflow-hidden rounded-card border border-line bg-inset">
           <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-4 py-2">
+            <span aria-hidden="true" className="flex gap-1.5">
+              <span className="h-2.5 w-2.5 bg-sol-purple" />
+              <span className="h-2.5 w-2.5 bg-sol-green" />
+              <span className="h-2.5 w-2.5 bg-accent" />
+            </span>
             <Label>Sandbox log</Label>
             <Tag tone={sandbox.log.egress === 'blocked' ? 'warn' : 'neutral'}>
               EGRESS {String(sandbox.log.egress ?? 'logged').toUpperCase()}
