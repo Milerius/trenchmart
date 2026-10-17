@@ -169,6 +169,7 @@ type Check = { tone: Tone; label: string };
 const LIVE: Check = { tone: 'ok', label: 'LIVE' };
 const VERIFIED: Check = { tone: 'ok', label: 'VERIFIED' };
 const NOT_YET: Check = { tone: 'neutral', label: 'NOT YET' };
+const MULTISIG: Check = { tone: 'ok', label: 'MULTISIG' };
 
 function Chip({ check }: { check: Check }) {
   const symbol = check.tone === 'ok' ? '✓' : check.tone === 'warn' ? '!' : '○';
@@ -295,16 +296,15 @@ function SectionHead({ title, children }: { title: string; children?: ReactNode 
 function ProofSection() {
   const { facts, error } = useFacts();
   const program = facts?.program;
+  // Squads v4 executes upgrades as the vault PDA, so the authority must equal the vault address.
+  const vaultAddress = facts?.accounts.find((account) => /vault/i.test(account.role))?.address;
   const authorityIsMultisig =
-    !!program?.upgradeAuthority &&
-    (program.upgradeAuthority === facts?.multisig.address ||
-      facts?.accounts.some(
-        (account) => account.address === program.upgradeAuthority && /vault/i.test(account.role),
-      ));
+    !!program?.upgradeAuthority && program.upgradeAuthority === vaultAddress;
   const checks: { name: string; check: Check }[] = facts
     ? [
         { name: 'Escrow program', check: program?.exists ? LIVE : NOT_YET },
         { name: 'Program bytes', check: program?.sha256 ? LIVE : NOT_YET },
+        { name: 'Upgrade authority', check: authorityIsMultisig ? MULTISIG : NOT_YET },
         {
           name: 'security.txt',
           check: program?.securityTxt ? VERIFIED : NOT_YET,
@@ -368,16 +368,19 @@ function ProofSection() {
                 }
               />
               <ProofItem
+                testId="upgrade-authority"
                 title="Who can upgrade it"
                 proves={
                   authorityIsMultisig
-                    ? 'Only the treasury multisig can change the program code.'
-                    : 'One key can change the program code today. It is not yet the multisig; this is devnet.'
+                    ? `Only the treasury multisig can change the program code: its vault holds the upgrade authority, so every upgrade needs ${facts.multisig.threshold ?? 'the threshold of'} of ${facts.multisig.members.length} signers.`
+                    : program?.upgradeAuthority
+                      ? 'One key can change the program code today. It is not yet the multisig; this is devnet.'
+                      : 'Nobody can change the program code: the upgrade authority was removed.'
                 }
                 check={
                   program?.upgradeAuthority
                     ? authorityIsMultisig
-                      ? VERIFIED
+                      ? MULTISIG
                       : { tone: 'warn', label: 'SINGLE KEY' }
                     : { tone: 'ok', label: 'IMMUTABLE' }
                 }
