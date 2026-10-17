@@ -155,24 +155,25 @@ button,input{font-family:inherit}
 <span style="font-family: 'Geist Mono', monospace; font-size: 34px; font-weight: 600">{{price}}</span>
 <span style="font-family: 'Geist Mono', monospace; font-size: 13px; color: #9BA19A">you pay · {{tierLabel}}</span>
 </div>
+<div style="margin-top: -10px; font-family: 'Geist Mono', monospace; font-size: 13px; color: #B4BAB2">{{priceUsd}} <span style="color: #868D86">· USD at $180.00/SOL · estimate</span></div>
 <div role="group" aria-label="Preview the price at each holder tier" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
 <sc-for list="{{tiers}}" as="t" hint-placeholder-count="4">
 <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.sel}}" style="{{t.style}}">{{t.name}}<span style="display: block; font-family: 'Geist Mono', monospace; font-size: 10px; color: #9BA19A">{{t.hint}}</span></button>
 </sc-for>
 </div>
 <div data-testid="fee-breakdown" style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-family: 'Geist Mono', monospace; background: #0E100E; border: 1px dashed #343A34; border-radius: 12px; padding: 14px">
-<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">List price · 100% to creator</span><span>1.50 SOL</span></div>
-<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">Marketplace fee · 5%</span><span>0.075 SOL</span></div>
-<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">{{discountLabel}}</span><span style="color: #C6F432">{{rebate}}</span></div>
-<div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #1E221E; padding-top: 8px; font-size: 14px"><span>Total to escrow</span><span style="font-weight: 600">{{price}}</span></div>
-<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">Solana network fee · to validators</span><span style="color: #9BA19A">≈ 0.000005 SOL</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">List price · 100% to creator</span><span>1.50 SOL <span style="color: #9BA19A">≈ $270.00</span></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">Marketplace fee · 5%</span><span>0.075 SOL <span style="color: #9BA19A">≈ $13.50</span></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">{{discountLabel}}</span><span style="color: #C6F432">{{rebate}} <span style="color: #9BA19A">{{rebateUsd}}</span></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #1E221E; padding-top: 8px; font-size: 14px"><span>Total to escrow</span><span style="font-weight: 600">{{price}} <span style="color: #9BA19A; font-weight: 400">{{priceUsd}}</span></span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px"><span style="color: #9BA19A; font-family: 'Geist', system-ui, sans-serif">Solana network fee · to validators</span><span style="color: #9BA19A">≈ 0.000005 SOL · &lt; $0.01</span></div>
 </div>
 <button type="button" style="height: 52px; border-radius: 12px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 700; font-size: 16px; cursor: pointer">Review &amp; buy</button>
 <div style="display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: #B4BAB2">
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 18px; margin-top: 2px"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
-<span>Your SOL is held in escrow for 48h. You can download right away. If the file doesn't match this report, open a dispute and you're refunded.</span>
+<span>Your SOL is held in escrow for 48h. The download unlocks once escrow releases to the creator. Before that, if the listing changes or isn't as described, open a dispute and you're refunded.</span>
 </div>
-<div style="font-size: 12px; color: #868D86">License: one wallet, personal use. Download is watermarked to your wallet and order.</div>
+<div style="font-size: 12px; color: #868D86">License: one wallet, personal use. After release, the download is watermarked to your wallet and order.</div>
 </div>
 
 <div style="background: #121412; border: 1px solid #262A26; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
@@ -184,7 +185,7 @@ button,input{font-family:inherit}
 </div>
 </div>
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-family: 'Geist Mono', monospace; font-size: 12px">
-<div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Bond staked</div><div style="font-size: 15px">5 SOL</div></div>
+<div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Bond staked</div><div style="font-size: 15px">5 SOL <span style="font-size: 12px; color: #9BA19A">≈ $900</span></div></div>
 <div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Disputes lost</div><div style="font-size: 15px">0</div></div>
 <div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Identity</div><div style="font-size: 15px; color: #C6F432">X + wallet</div></div>
 <div style="padding: 10px; border: 1px solid #262A26; border-radius: 10px"><div style="color: #9BA19A">Holder tier</div><div style="font-size: 15px">OG</div></div>
@@ -219,6 +220,7 @@ class Component extends DCLogic {
     const sol = (l) => { const s = l.toString().padStart(10, '0'); let f = s.slice(-9).replace(/0+$/, ''); if (f.length < 2) f = f.padEnd(2, '0'); return s.slice(0, -9).replace(/^0+(?=\d)/, '') + '.' + f; };
     const price = 1500000000n, fee = (price * 500n) / 10000n, reb = (fee * cur.bps) / 10000n;
     const total = price + fee - reb;
+    const usd = (l) => { const c = (l * 18000n) / 1000000000n; if (c < 1n) return '< $0.01'; return '≈ $' + (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + (c % 100n).toString().padStart(2, '0'); };
     const ok = { icon: '✓', bg: '#C6F432', fg: '#0A0B0A' };
     const checks = [
       { t: 'No private-key or seed access', d: 'No reads of wallet adapters, localStorage keys or clipboard.', ...ok },
@@ -226,7 +228,7 @@ class Component extends DCLogic {
       { t: 'No outbound network', d: '@connect none. Sandbox saw zero requests off-domain.', ...ok },
       { t: 'No obfuscation', d: 'Readable source, no eval, no remote code loading.', ...ok },
       { t: 'Scoped to declared sites', d: 'Runs only on the @match domains listed below.', ...ok },
-      { t: 'Hash pinned', d: 'The file you download matches the verified sha256.', ...ok },
+      { t: 'Hash pinned', d: 'The file you download after release matches the verified sha256.', ...ok },
       { t: 'Dependency check', d: 'No third-party libraries pulled at runtime.', ...ok },
       { t: 'AI verification', d: 'Automated verifier approved this version; attestation signed.', ...ok },
       { t: 'Creator bonded', d: '5 SOL bond can fund refunds if this is proven malicious.', ...ok }
@@ -244,7 +246,7 @@ class Component extends DCLogic {
     ];
     const tab = this.state.tab;
     return { tabs, tiers, checks, rail, pairs,
-      price: sol(total) + ' SOL', rebate: reb > 0n ? '−' + sol(reb) + ' SOL' : '0.00 SOL',
+      price: sol(total) + ' SOL', priceUsd: usd(total), rebate: reb > 0n ? '−' + sol(reb) + ' SOL' : '0.00 SOL', rebateUsd: reb > 0n ? usd(reb).replace('$', '−$') : '',
       tierLabel: cur.name === yourTier ? cur.name : cur.name + ' (preview)',
       discountLabel: cur.name === 'None' ? 'No holder discount' : cur.name + ' discount · −' + cur.pct + ' of fee',
       showSec: tab === 'Security report', showOverview: tab === 'Overview', showReviews: tab === 'Reviews', showLog: tab === 'Changelog' };
