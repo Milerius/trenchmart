@@ -1,4 +1,4 @@
-# TrenchMart design system (v2)
+# TrenchMart design system (v2.1)
 
 Supersedes the visual parts of `docs/08-design-system.md`. Machine-readable values live in `design/tokens.json`. Copy, flows and states are in `docs/ux-guidelines.md`. Visual references are in `design/*.dc.html` (pixel/copy) and `design/explorations/` (concepts with every state).
 
@@ -9,6 +9,8 @@ Supersedes the visual parts of `docs/08-design-system.md`. Machine-readable valu
 3. **One status, one symbol, one word.** Every state reads as symbol + uppercase word + colour. Never colour alone.
 4. **Testnet honesty.** A devnet bar is always visible. Explorer links carry `?cluster=devnet`.
 5. **Dense, calm, terminal.** Near-black ground, one lime accent, mono for numbers. Thin 1px borders, no shadows, no glow, no emoji.
+6. **Live, not queued.** Anything the machine is doing (AI review, payment confirmation) streams step by step with seconds on the clock. No "come back later".
+7. **Real numbers, or clearly sample.** Dashboards only show API values. The landing page alone may show a labelled sample set.
 
 ## Colour
 
@@ -60,6 +62,8 @@ Category accents are unchanged (see `tokens.json › color.category`). Fee split
 - The shared `formatSol()` truncates to 3 decimals (`1.556`). Don't use it for user-facing amounts. Use a display-only formatter in the web app (`formatSolExact`).
 - Discounts are negative with a real minus sign: `−0.045 SOL`, in `accent`.
 - Never show a "holder price" below list price: tiers only discount the fee.
+- **USD next to SOL** (owner decision 5): `UsdAmount` renders `≈ $275.40` in `muted` mono, right after or under the SOL value. Convert as `lamports × centsPerSol / 1e9`, truncated to the cent (same as `lamportsToUsdCents` in `packages/shared`). Below one cent show `< $0.01`. With no rate show `USD unavailable` in `faint`. API money fields are `{lamports, sol, usdCents}`: format SOL from `lamports` (the `sol` string is 3-digit truncated) and USD from `usdCents`.
+- One `UsdSource` line per page or sheet: "USD at $180.00/SOL · CoinGecko · 1 min ago · estimate".
 
 ## Spacing, shape, layout
 
@@ -84,26 +88,32 @@ Each component lists variants, states and its `data-testid`. Test IDs are stable
 | `Button` | primary · secondary (`border-control`) · ghost · danger · disabled; sm 36 / md 44 / lg 48 / xl 52 | 600 weight; `aria-busy` while working; disabled = surface-2 + faint text, not opacity | — |
 | `Tag` | category · ok · wait · bad · inf · neutral · dark | mono 11px, 3×8 padding, radius 6, 1px border in tone | — |
 | `StatusTag` | every value in `tokens.json › status` | symbol + WORD, tone colours | `status-tag` + `data-status` |
-| `ListingCard` | logged out (`1.50 SOL` + "+ 5% fee · 0% for OG") · connected ("1.53 SOL you pay · Trencher rate") · in review (not buyable) · holder-only lock (countdown) · skeleton | 112px tinted header (category tag, status tag, terminals), body: title, `@creator · bond 5 SOL · 412 sold · ★ 4.9`, price line | `listing-card` |
+| `ListingCard` | logged out (`1.50 SOL` + `≈ $270.00 · list price` + "+ 5% fee · your tier can cut it") · connected ("1.53 SOL you pay · Trencher rate" + USD) · holder-only lock (countdown) · skeleton. Versions in AI review are never public. | 112px tinted header (category tag, status tag, terminals), body: title, `@creator · bond 5 SOL · 412 sold · ★ 4.9`, price line | `listing-card` |
 | `TerminalFilter` | pill group, `aria-pressed` | inactive border `border-control`, active accent fill | `terminal-filter` |
 | `TrustStrip` | 4 cells / phone checklist | Static + sandbox scan · AI verification · Hash-pinned versions · 48h escrow | `trust-strip` |
 | `SecuritySummary` | pass · warn · fail | accent-bg panel, shield, "Passed · 9 of 9 checks", "Attestation signed by trenchmart-ai-v1 on <date>", "View attestation" | `security-summary` |
 | `CheckItem` / `ScanRow` | pass ✓ · warn ! · fail × · n/a – | 22px square + title + detail + mono label | `check-item` |
 | `PermissionsTable` | — | @match, @grant, @connect, sha256 (copy button) | `permissions` |
-| `BuyBox` | logged out · ready · owned/in escrow · holder-locked · in review · loading quote | "You pay · <tier>" + tier tag, total 36px, `TierPreview`, `FeeReceipt`, "Review & buy" xl, escrow note, licence | `buy-box`, `buybox-total`, `buy-button` |
+| `BuyBox` | logged out (compact `PreviewNotice`) · ready · owned in escrow (locked `DownloadButton`) · owned released (Download) · holder-locked · loading quote | "You pay · <tier>" + tier tag, total 36px + USD, `TierPreview`, `FeeReceipt` with USD per row, "Review & buy" xl, escrow note "The download unlocks once escrow releases to the creator", licence | `buy-box`, `buybox-total`, `buy-button` |
 | `TierPreview` | 4 pills; user's tier says "your tier", others "preview" | `role="group"`, `aria-pressed` | `tier-preview` |
 | `FeeReceipt` | compact (card) · full (buy box, checkout, order) | Dashed inset box. Rows: List price · 100% to creator / Marketplace fee · 5% / `<Tier>` discount · −X% of fee / **Total to escrow** / Solana network fee · to validators | `fee-breakdown` |
 | `CheckoutSheet` | review · awaiting-signature · confirming · confirmed · cancelled · insufficient · expired · failed | Modal 480px, bottom sheet under 640. 3-segment progress. `role="dialog"`, focus trap, Esc closes (except while signing). Live region for state changes. | `checkout`, `checkout-state` + `data-state` |
 | `TxProgress` | signed → processed → confirmed → checked by TrenchMart | 4 rows of status squares; explorer link | `tx-progress` |
 | `EscrowTimeline` | paid · licence · in escrow (countdown + bar) · released / disputed / refunded | Vertical list, accent connector for done steps, exact UTC times | `escrow-timeline` |
 | `Countdown` | running · paused · elapsed | mono, `aria-live="off"` (announce only at thresholds), plus a bar | `countdown` |
-| `PurchasesTable` | table ≥ 640 · cards < 640 | item, version, paid, status, escrow, actions | `purchases-table` |
-| `DisputeForm` | — | reason radios, details (min 20 chars), evidence drop zone, window banner | `dispute-form` |
+| `PurchasesTable` | table ≥ 640 · cards < 640 | item, version, paid (SOL + USD), status, escrow, actions (locked download while in escrow) | `purchases-table` |
+| `DownloadButton` | locked (`paid`, `disputed`: disabled, lock icon, "Unlocks in 41h" / "Download unlocks 19 Oct 06:01 UTC") · ready (`released`: primary "Download") · working ("Preparing your copy…") | Disabled uses the disabled tokens, not opacity, and has `aria-describedby` pointing to the unlock time. Hidden for `refunded` / `expired`. | `download-button` + `data-state="locked\|ready\|working"` |
+| `DisputeForm` | — | reason radios ("Listing changed or was delisted after I paid" · "Not as described on the listing page" · "Malicious", open 30 days from release), details (min 20 chars), evidence drop zone, window banner | `dispute-form` |
 | `CreatorCard` | — | avatar, handle, 2×2 stats: bond, disputes lost, identity, tier; report link | `creator-card` |
-| `PipelineStepper` | done · now · next · blocked | 5 steps: Identity & bond · Upload · Automated scan · AI verification · Live | `pipeline` |
-| `PipelineBar` | compact 5-segment bar for tables | segment tones as stepper | — |
-| `FlaggedCode` | — | warn-border panel, highlighted line, explain textarea ("The AI verifier reads this note"), quick fix | `flagged-code` |
-| `StatTile` | — | label, mono value, meta | `stat-tile` |
+| `UploadComposer` | empty (drop zone "Drop a file or click to choose") · uploading (%) · frozen (file chip, sha, FROZEN tag) | Works like a prompt box: dropping a file starts the review. Optional note for the AI, Replace file, Stop review. | `upload-composer` |
+| `LiveReviewStream` | running · paused (needs note) · approved · rejected · slow (> 60s) · crashed | Header with live dot, "AI review running", step N of 5 and elapsed `◑ 00:14`, plus a progress bar. Steps: Received · Static checks · Isolated sandbox · AI verdict · Live, each with its duration. The sandbox step has a mono `role="log"` panel. `aria-live="polite"` + `aria-busy` while running. Fed by the SSE events from `POST /studio/versions/:id/complete?stream=1`. | `live-review` + `data-state` |
+| `PipelineStepper` | done · running · paused · next | Static 5-step summary of the same steps for the upload page header, with durations | `pipeline` |
+| `PipelineBar` | compact 5-segment bar for tables | segment tones as stepper; paired with "AI REVIEW · 00:11" or "verified in 27s" | — |
+| `FlaggedCode` | — | warn-border panel, highlighted line, explain textarea ("The AI reads your note and re-checks right away"), "Send note · re-check", quick fix | `flagged-code` |
+| `StatTile` | loading (skeleton) · value · zero · error | label, mono SOL value, `UsdAmount` under it, meta. Values come from the API only; never a placeholder number. | `stat-tile` |
+| `LandingStats` | `mock` (chip "SAMPLE DATA" + API `note`) · `live` (chip "● LIVE" + updated time) · loading | Renders `GET /stats` as-is: AI-verified tools, creators, trades, volume (SOL + USD). It switches automatically when the API's `source` changes. | `landing-stats` + `data-source="mock\|live"` |
+| `PreviewNotice` | full (above listing grids) · compact (buy box, stacked button) | info panel, "i" square, **Preview prices**, "You're seeing list prices. Connect your wallet to see your exact price with your $TRENCH tier discount (up to 100% off the 5% fee)." + "Connect to see your price". `role="note"`. Only when logged out. | `preview-notice` |
+| `UsdAmount` | value · `< $0.01` · unavailable | `≈ $275.40`, muted mono; `aria-label="about 275 dollars 40 cents"` | `usd-amount` |
 | `FeeTable`, `SplitBar`, `TierCard`, `SavingsCalc` | as handover | split label "AI verification"; SplitBar `role="img"` with a full aria-label | `fee-table`, `split-bar`, `tier-card`, `savings-calc` |
 | `EmptyState` | search · first-run · no purchases · no listings | icon 36px muted, title, one sentence, 1–2 actions | `empty-state` |
 | `ErrorState` | inline · page | danger panel, what failed, what is **not** affected, retry, ref code | `error-state` |

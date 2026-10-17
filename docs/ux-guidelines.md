@@ -1,6 +1,19 @@
 # TrenchMart UX guidelines
 
-How the product behaves and talks. Visual tokens and components are in `docs/design-system.md`. Every state below has a mockup in `design/explorations/` (01–08).
+How the product behaves and talks. Visual tokens and components are in `docs/design-system.md`. Every state below has a mockup in `design/explorations/` (01–09; the `-v2` files include the owner decisions).
+
+## 0 · Owner decisions (final)
+
+These override anything else in this file or in the handover docs.
+
+| # | Decision | What it means in the UI |
+|---|---|---|
+| 1 | AI verification fully replaces human review | No human-review fallback anywhere: no "appeal to a person", no "reviewed by our team", no "a human will check". A rejection gives the exact reason and a fix path (upload a new version). |
+| 2 | Logged-out visitors see a preview | `PreviewNotice` above listings and in the buy box: "Preview prices: you're seeing list prices. Connect your wallet to see your exact price with your $TRENCH tier discount." Cards show the list price plus "+ 5% fee · your tier can cut it". |
+| 3 | Landing stats look good before real data exists | `LandingStats` renders `GET /stats`. While `source` is `mock` it shows the chip "SAMPLE DATA". Once a live listing exists the API switches to `live` and so does the component, with the same layout. Sample numbers only ever appear on the landing page. |
+| 4 | AI review feels near-instant | Upload works like sending a prompt. The review starts on drop and streams live steps with seconds-level timings and a sandbox log. No "in review, come back later" queue. |
+| 5 | Dashboards show real values, with USD | The studio and purchases pages show values computed from API data only (skeleton while loading, real 0.00 when empty). Every SOL amount that matters gets a USD estimate next to it. |
+| 6 | Download only after release | No download while funds are in escrow or disputed. The download unlocks when the order is `released`. |
 
 ## 1 · Research summary
 
@@ -23,7 +36,11 @@ Plain, short, specific. Say what happened, what it means for the user's money, a
 
 | Say | Don't say | Why |
 |---|---|---|
-| **AI verification**, **AI-verified**, "the AI verifier", "trenchmart-ai-v1" | human review, reviewers, verifiers, staked verifier, "reviewed by humans" | Verification is automated (`packages/ai-verifier`). The `ai_verification` fee bucket funds it. No human verifiers are paid. |
+| **AI verification**, **AI-verified**, "the AI verifier", "trenchmart-ai-v1" | human review, reviewers, verifiers, staked verifier, "reviewed by humans", "appeal to our team", "a person will check" | Verification is automated (`packages/ai-verifier`) and final (owner decision 1). The `ai_verification` fee bucket funds it. No human verifiers are paid. |
+| **AI review · 00:14** (live elapsed), **Running in an isolated sandbox** | in queue, pending review, "come back later", "usually within 24h" | The review streams while you watch (decision 4) |
+| **Download unlocks 19 Oct 06:01 UTC** / **Unlocks in 41h** | "Download now" during escrow | Downloads open only after release (decision 6) |
+| **≈ $275.40** next to `1.53 SOL` | "$275.40" without ≈, USD instead of SOL | USD is an estimate; SOL is what moves |
+| **Preview prices** | "Sign up to see prices" | Prices are visible logged out; only the tier discount needs a wallet |
 | **Marketplace fee · 5%** | platform fee, commission, rebate | One fee, paid by the buyer |
 | **`<Tier>` discount · −60% of fee** | holder rebate, cashback | Tiers discount the fee, not the price |
 | **You pay** / **Total to escrow** | total at your tier | The total is what goes into escrow |
@@ -42,7 +59,16 @@ Plain, short, specific. Say what happened, what it means for the user's money, a
 - Worked example for a 1.50 SOL listing: None **1.575** · Scout **1.55625** · Trencher **1.53** · OG **1.50** SOL. The creator receives 1.50 in every case.
 - Amounts are exact, with no rounding (see design-system › Money formatting). If a value doesn't fit, wrap it. Don't shorten it.
 - All percentages come from config at runtime (`fee_bps`, `tier_rebate_bps`, `fee_split_bps`). The copy above is the current default; render the live values.
-- Logged-out cards show `1.50 SOL` with "+ 5% fee · 0% for OG". Connected cards show the exact "you pay" at the user's tier.
+- Logged-out cards show `1.50 SOL` and `≈ $270.00 · list price`, plus "+ 5% fee · your tier can cut it", under a `PreviewNotice`. Connected cards show the exact "you pay" at the user's tier ("1.53 SOL · you pay · Trencher rate").
+
+### USD next to SOL
+
+- SOL is the primary amount and is always exact. USD sits next to it or under it in `muted`, prefixed with "≈": `1.53 SOL · ≈ $275.40`.
+- Show USD on every money amount a person decides on or checks: card prices, buy box rows, checkout totals, receipts, escrow and refund amounts, dashboard tiles and table cells, payouts, bonds and the verification fee. Skip it on network fees below a cent ("< $0.01") and inside code or logs.
+- Convert in lamports × integer cents (no floats) and truncate to the cent. Below one cent show "< $0.01".
+- The page or sheet shows the source once: "USD at $180.00/SOL · CoinGecko · 1 min ago · estimate".
+- If the price feed fails or is older than 10 minutes, keep the SOL amount and show "USD unavailable" in `faint`. Never block a flow on the USD rate.
+- On devnet, USD is still shown (owner decision 5), and the devnet banner already says nothing has real value.
 
 ## 3 · Flows
 
@@ -57,28 +83,34 @@ Plain, short, specific. Say what happened, what it means for the user's money, a
 2. Review shows the item, version and sha, the full `FeeReceipt`, "Sent to: Escrow vault 9WzD…Tm4q", the memo `tm:<id8>`, release terms, the balance check, and a quote timer ("Quote held for 19:42"). The tier is re-checked (72h minimum balance).
 3. **Approve 1.53 SOL in wallet** moves to Awaiting signature: "Check Phantom. Your wallet should show a transfer of 1.53 SOL to 9WzD…Tm4q with memo tm:8c1d2e0a. If it shows anything else, reject it."
 4. Confirming: signed ✓ → processed ✓ → confirmed ◑ → checked by TrenchMart ○, with a Solscan (devnet) link. "You can close this. The order keeps confirming and shows up in Purchases."
-5. Confirmed: "Payment confirmed" + `● PAID · IN ESCROW · 48h` + Download + receipt + "Open a dispute within 48h".
+5. Confirmed: "Payment confirmed · 1.53 SOL (≈ $275.40) is in escrow" + `● PAID · IN ESCROW` + a disabled `download-button` "Download unlocks 19 Oct 06:01 UTC" + receipt + "Open a dispute before release" + a link to Purchases.
+6. Released (after 48h with no dispute, or a rejected dispute): the order becomes `RELEASED`, the download button turns primary ("Download"), and a toast/notification says "Trade finished. Your download is ready."
 
 ### Escrow and disputes
 - Order states map 1:1 to `ORDER_STATUSES`: `pending` AWAITING PAYMENT · `paid` PAID · IN ESCROW · `disputed` DISPUTED · `released` RELEASED · `refunded` REFUNDED · `expired` EXPIRED.
-- The current step always has: what is happening, who acts next, and an exact UTC time plus a countdown bar.
-- Disputed shows both outcomes before the decision ("If upheld: 0.612 SOL refunded to you · If rejected: released to creator").
-- Dispute form: reason (doesn't match report / doesn't work / malicious, which is open for 30 days), details (min 20 characters), and evidence. "Release is paused as soon as you submit."
+- The timeline is Paid → In escrow → Released to @creator → Download unlocks. The current step always says what is happening, who acts next, and an exact UTC time plus a countdown bar.
+- Download state by order status: `paid` and `disputed` show it locked ("Unlocks in 41h" / "Download stays locked during the dispute"); `released` shows it enabled; `refunded` and `expired` don't show it.
+- Disputed shows both outcomes before the decision ("If upheld: 0.612 SOL (≈ $110.16) back to you · If rejected: released to creator"). Disputes are resolved by the TrenchMart admin multisig (the escrow `resolve` instruction). This is about payments, not listing review, so it doesn't conflict with decision 1.
+- Dispute form reasons, written for a buyer who doesn't have the file yet: "Listing changed or was delisted after I paid" · "Not as described on the listing page" · "Malicious" (after download; open for 30 days from release). Details need at least 20 characters, plus optional evidence. "Release is paused as soon as you submit."
 
-### Creator upload
-- Stepper: Identity & bond · Upload · Automated scan · **AI verification** · Live, driven by `version.status`.
-- A warning sets `needs_creator`. The dashboard banner reads "1 version needs your explanation" with **Fix now**. Explain-field help: "The AI verifier reads this note. Say what the call does, which host it reaches and what data it sends. One-word notes like 'ok' are sent back."
-- Rejected: show the failing rule in plain words ("sandbox: signTransaction call") and the fix path ("upload a new version").
+### Creator upload (live AI review)
+- Upload works like sending a prompt. Dropping a file hashes and freezes it, then starts the review right away. The details form (title, category, price, licence) fills in in parallel and autosaves. Publishing waits only for the verdict.
+- Live steps, driven by `version.status` plus streamed step events: **Received** (`uploading`, about 0.5s) → **Static checks** (`scanning`, about 2s, with each rule ticking) → **Isolated sandbox** (`scanning`, fresh browser, a fake wallet that logs every call and never signs, a live log line per event) → **AI verdict** (`in_review`, seconds) → **Live** (`live`). Each finished step shows its duration ("2.1s"), and the header shows total elapsed ("◑ 00:14").
+- Copy: "Usually done in under a minute. You can leave: we'll notify you the moment there's a verdict." If a step runs past 60s: "Taking longer than usual · still on step 3". Never "in queue" or "check back later".
+- Request changes (`needs_creator`) pauses the run at that step with the exact finding ("The sandbox saw POST api.telegram.org, which isn't in your @connect"). Help text: "At least 20 characters. 'ok' or 'lgtm' gets sent back." **Send note · re-check** resumes from that step. It doesn't restart or wait in line.
+- Rejected: name the failing call and where it happened ("called signTransaction during the sandbox run, gmgn.ai, 00:16.2"), and give one path forward: **Fix and upload a new version**. There is no appeal (decision 1).
+- Approved: "Approved · live" with total time ("00:27 total"), the verifier's one-line summary, and the attestation signature.
 
 ## 4 · States per screen
 
 | Screen | Loading | Empty | Error | Other |
 |---|---|---|---|---|
-| Home / Explore | Card skeletons at final size, `aria-busy` | "No listings for "<q>" on <terminal>" + Clear filters | "Couldn't load listings. Your wallet and open orders aren't affected." + Try again + ref | Holder-only lock, in-review (not buyable) |
-| Listing | Skeleton header + buy box with "Getting your price…" | 404: "This listing doesn't exist or was delisted" + Explore | Quote failed: "Couldn't get a price. Try again." Buy disabled | Owned, holder-locked, delisted ("Delisted on <date>. Your download still works.") |
-| Checkout | "Preparing your transaction…" | — | Insufficient SOL (blocked before signing, shows the shortfall + devnet faucet link) · Quote expired · Tx failed (says what was and wasn't charged) | Cancelled = neutral |
-| Purchases | Row skeletons | "No purchases yet. Everything you buy shows up here with its escrow timer." + Browse | Inline error + retry | Disputed, refunded |
-| Studio | Tile + row skeletons | First run: 3-step checklist (wallet ✓, link X, stake bond) | Upload failed: "Upload stopped at 62%. Nothing was published." + Retry | needs_creator banner, rejected reason |
+| Landing | `LandingStats` skeleton tiles | No real stats yet: sample set with "SAMPLE DATA" chip (`data-source="mock"`) | Stats API failed: keep the sample set, never an error on the landing page | Live: "● LIVE · updated 2 min ago" (`data-source="live"`) |
+| Home / Explore | Card skeletons at final size, `aria-busy` | "No listings for "<q>" on <terminal>" + Clear filters | "Couldn't load listings. Your wallet and open orders aren't affected." + Try again + ref | Logged out: `PreviewNotice` + list prices. Holder-only lock. Versions in AI review aren't public; buyers only see live listings. |
+| Listing | Skeleton header + buy box with "Getting your price…" | 404: "This listing doesn't exist or was delisted" + Explore | Quote failed: "Couldn't get a price. Try again." Buy disabled | Logged out: preview notice in the buy box. Owned in escrow: "You own this · download unlocks in 41h". Owned and released: Download. Holder-locked. Delisted ("Delisted on <date>. Released orders can still download.") |
+| Checkout | "Preparing your transaction…" | — | Insufficient SOL (blocked before signing, shows the shortfall + devnet faucet link) · Quote expired · Tx failed (says what was and wasn't charged) | Cancelled = neutral. Success = "in escrow" with the download locked. |
+| Purchases | Row skeletons | "No purchases yet. Everything you buy shows up here with its escrow timer." + Browse | Inline error + retry | Download locked for `paid` / `disputed`, enabled for `released` |
+| Studio | Tile + row skeletons (never placeholder numbers) | First run: 3-step checklist (wallet ✓, link X, stake bond). No sales yet: real `0.00 SOL · ≈ $0.00` | "Couldn't load your numbers." + Retry. Upload failed: "Upload stopped at 62%. Nothing was published." + Retry | Live AI review card, needs_creator banner, rejected reason with fix path. Price feed down: SOL stays, "USD unavailable". |
 | $TRENCH | Static | Tier thresholds not set: "Thresholds are set after launch" | — | — |
 
 ### Error copy
@@ -94,6 +126,10 @@ Plain, short, specific. Say what happened, what it means for the user's money, a
 | Wrong network | Wrong network | Switch your wallet to Devnet. | — | warn |
 | API down | Couldn't load … | What failed. What is not affected. | Try again · ref | danger |
 | Rate limited (429) | Slow down a little | Try again in a few seconds. | auto-retry | neutral |
+| Download requested before release | Download unlocks after release | Your 1.53 SOL is in escrow until 19 Oct 06:01 UTC. The file unlocks when it's released to the creator. | View order | info |
+| AI review step slow (> 60s) | Taking longer than usual | Still on step 3 · isolated sandbox. You can leave; we'll notify you. | — | info |
+| AI review crashed (infra, not a verdict) | The review stopped | Something broke on our side, not in your file. Nothing was published. | Run again | danger |
+| USD price unavailable | — | Show the SOL amount and "USD unavailable" in `faint`. No banner. | — | neutral |
 
 Never show raw errors, hex or stack traces. Put a short ref code (`ref 7f2c`) in fine print.
 
@@ -127,12 +163,31 @@ Never show raw errors, hex or stack traces. Put a short ref code (`ref 7f2c`) in
 - Fee assertions compare against `packages/shared` `quote()` output formatted with the exact formatter. Never hard-code rounded strings.
 - Playwright runs `@axe-core/playwright` on key pages and fails on serious or critical violations.
 
-## 8 · Open questions for the owner
+## 8 · Decisions log
 
-1. Should creators be able to appeal an AI rejection to a person? Today the flow is AI-only.
-2. Logged-out cards show "1.50 SOL + 5% fee · 0% for OG". Would you prefer the no-tier total (1.575)?
-3. Should "In AI review" listings be visible to buyers (not buyable), or hidden until live?
-4. Should downloads during escrow stay as specified (download-then-dispute risk), or wait for confirmation + 1h?
-5. Should "Disputes lost: 0 of 1,204" show total sales, or a rate?
-6. Fiat estimate (≈ $) on mainnet only?
-7. Live landing stats (verified listings, SOL in escrow, refunds) once real data exists?
+| Question | Resolution |
+|---|---|
+| Appeal an AI rejection to a person? | No. AI verification is final (owner decision 1). Rejections give the reason and a fix path. |
+| Logged-out card price | List price + USD + "+ 5% fee · your tier can cut it", under a `PreviewNotice` (decision 2) |
+| Show "In AI review" listings to buyers? | No. Reviews take seconds now (decision 4), so only live versions are public. |
+| Download during escrow? | No. It unlocks on `released` only (decision 6). |
+| Fiat estimate | USD next to every relevant SOL amount, on devnet too (decision 5) |
+| Live landing stats | Sample set until real data exists, then live automatically (decision 3) |
+| "Disputes lost" format | Still open: `0 lost` today. A rate needs more volume to mean anything. |
+
+## 9 · API contract the UI binds to
+
+The build branch (`cursor/trenchmart-poc-a7ef`, `apps/api`) already implements the owner decisions. The UI uses these exact shapes:
+
+| Decision | API | UI binding |
+|---|---|---|
+| 6 · Download after release | `POST /orders/:id/download` → 403 `ESCROW_LOCKED` unless `status === 'released'` | `download-button` is disabled (`data-state="locked"`) for `paid` / `disputed`, with "Download unlocks <escrow_until UTC>". If the API still returns `ESCROW_LOCKED`, show the "Download unlocks after release" info toast. |
+| 4 · Live AI review | `POST /studio/versions/:id/complete?stream=1` (SSE). Events are named `static`, `sandbox`, `ai` and `done`, with data `{step, status: running\|done, summary?, verdict?, decision?, versionStatus?}` | `LiveReviewStream` steps: Received (client upload progress) → Static checks → Isolated sandbox (`verdict: 'na'` shows "Not needed for this file type") → AI verdict → Live / Needs your note / Rejected (from `versionStatus`). The client times each step from the event timestamps. Details come from `GET /studio/versions/:id` (checks, review notes). |
+| 5 · USD | Money fields are `moneyView` = `{lamports, sol, usdCents}` plus `solUsd: {centsPerSol, source}`. `GET /prices/sol` adds `fetchedAt`. | Format SOL from `lamports` with the exact formatter. The API `sol` field is 3-digit truncated, so don't print it. Format USD from `usdCents`. If `usdCents` is null or `source === 'unavailable'`, show "USD unavailable". |
+| 3 · Landing stats | `GET /stats` → `{source: 'mock'\|'live', listings, creators, orders, volume, note}`. Mock until a live listing exists. | `LandingStats` renders the payload as-is, with `data-source` set to `source`. `mock` shows the "SAMPLE DATA" chip and `note`; `live` shows "● LIVE". |
+| 1 · No human review | `ai_reviews` table, agent `trenchmart-ai-v1`. `/internal/sandbox/next` reports no queue. | No reviewer UI, queue or appeal surfaces. |
+
+Small asks, all optional, for the build agent:
+- `docs/04-api.md` still says download "requires status paid/released/disputed", but the code only allows `released`. Worth syncing.
+- Sandbox log lines in the `sandbox` event (for example `lines: string[]`) would let the live log in `09-upload-live-ai-review` stream for real. Until then the UI shows the summary when the step finishes.
+- `MOCK_LANDING_STATS` (8 listings, 4 creators, 128 trades, 11.5 SOL) could be bolder for decision 3. The UI shows whatever the API sends.

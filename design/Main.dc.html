@@ -105,7 +105,7 @@ button,input{font-family:inherit}
 </a>
 </section>
 
-<!-- LandingStats: sample until GET /stats returns real data, then live. Same layout either way. -->
+<!-- LandingStats: renders GET /stats as-is. source=mock until a live listing exists, then live. Same layout either way. -->
 <section data-testid="landing-stats" data-source="{{statsSource}}" aria-label="Marketplace stats" style="margin-bottom: 24px; background: #121412; border: 1px solid #262A26; border-radius: 14px; padding: 4px">
 <div style="display: flex; gap: 8px; align-items: center; padding: 10px 14px 0; font-family: 'Geist Mono', monospace; font-size: 11px">
 <span style="padding: 3px 8px; border-radius: 6px; border: 1px solid {{statsChipBorder}}; color: {{statsChipColor}}">{{statsChip}}</span>
@@ -301,12 +301,15 @@ class Component extends DCLogic {
     const listings = (term === 'All' ? all : all.filter((l) => l.t.indexOf(term) >= 0)).map(priced);
     // Real stats replace the sample set automatically once the API has any (see docs/design-system.md · LandingStats).
     const liveStats = null;
-    const sampleStats = [
-      { k: 'Tools AI-verified', v: '1,284', d: '+86 this week' }, { k: 'Median AI review', v: '38 s', d: 'upload → verdict' },
-      { k: 'Settled through escrow', v: '2,940 SOL', d: usd(2940000000000n) }, { k: 'Drainers blocked', v: '312', d: '0 shipped to buyers' },
-      { k: 'Traders', v: '4,120', d: '30-day active wallets' }
+    // Shape of GET /stats: { source: 'mock' | 'live', listings, creators, orders, volume: { lamports, sol, usdCents } }.
+    const stats = liveStats || { source: 'mock', listings: 8, creators: 4, orders: 128, volumeLamports: 11500000000n };
+    const isLive = stats.source === 'live';
+    const tiles = [
+      { k: 'AI-verified tools', v: String(stats.listings), d: 'live listings' },
+      { k: 'Creators', v: String(stats.creators), d: 'bonded and X-linked' },
+      { k: 'Trades', v: String(stats.orders), d: 'paid through escrow' },
+      { k: 'Volume', v: sol(stats.volumeLamports) + ' SOL', d: usd(stats.volumeLamports) }
     ];
-    const isLive = !!liveStats;
     const creators = [
       { rank: '01', name: '@dev_degen', meta: 'Userscripts · bond 5 SOL', vol: '618.00', usd: usd(618000000000n), av: '#C6F432' },
       { rank: '02', name: '@rugradar', meta: 'Userscripts · bond 5 SOL', vol: '639.60', usd: usd(639600000000n), av: '#7CC4FF' },
@@ -315,7 +318,7 @@ class Component extends DCLogic {
     ];
     return { categories, terminals, listings, creators, connected, loggedOut: !connected,
       connect: () => this.setState({ connected: true }), disconnect: () => this.setState({ connected: false }),
-      stats: isLive ? liveStats : sampleStats, statsSource: isLive ? 'live' : 'sample',
+      stats: tiles, statsSource: stats.source,
       statsChip: isLive ? '● LIVE' : 'SAMPLE DATA', statsChipColor: isLive ? '#C6F432' : '#B4BAB2', statsChipBorder: isLive ? '#2E3A12' : '#646C63',
       statsNote: isLive ? 'Devnet · updated just now' : 'Illustrative numbers until the first real trades. Switches to live automatically.' };
   }
