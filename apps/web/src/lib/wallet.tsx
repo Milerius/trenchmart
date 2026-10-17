@@ -5,7 +5,7 @@ import { fromBase64, signLegacyTransaction, toBase64 } from '@trenchmart/chain';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api } from './api';
+import { api, ApiError } from './api';
 import {
   DISCOVERY_TIMEOUT_MS,
   discoverWallet,
@@ -16,6 +16,9 @@ import {
   readInjectedProvider,
   signerFromLegacyProvider,
   signerFromStandardWallet,
+  signSignInMessage,
+  walletErrorMessage,
+  withTimeout,
   type Signer,
   type WalletList,
 } from './wallet-detect';
@@ -33,6 +36,10 @@ type WalletContextValue = {
   signAndSend: (txBase64: string) => Promise<string>;
   refresh: () => Promise<void>;
 };
+
+/** Long enough to read and approve in the wallet; short enough that a dead extension does not spin forever. */
+const WALLET_TIMEOUT_MS = 120_000;
+const WALLET_TIMEOUT_MESSAGE = 'The wallet did not respond. Reload the page and try again.';
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
@@ -139,20 +146,31 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   async function connect() {
     setBusy(true);
     setError('');
+    let walletName: string | undefined;
     try {
-      const signer = await obtainSigner(false);
+      const signer = await withTimeout(
+        obtainSigner(false),
+        WALLET_TIMEOUT_MS,
+        WALLET_TIMEOUT_MESSAGE,
+      );
+      walletName = signer.name;
       const nonce = await api<{ message: string }>('/auth/nonce', {
         method: 'POST',
         body: JSON.stringify({ wallet: signer.address }),
       });
-      const signature = await signer.signMessage(new TextEncoder().encode(nonce.message));
+      const signature = await withTimeout(
+        signSignInMessage(signer, nonce.message),
+        WALLET_TIMEOUT_MS,
+        WALLET_TIMEOUT_MESSAGE,
+      );
       await api('/auth/verify', {
         method: 'POST',
         body: JSON.stringify({ wallet: signer.address, signature: bs58.encode(signature) }),
       });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'sign-in failed');
+      console.error('[trenchmart] sign-in failed', err);
+      setError(err instanceof ApiError ? err.message : walletErrorMessage(err, walletName));
     } finally {
       setBusy(false);
     }

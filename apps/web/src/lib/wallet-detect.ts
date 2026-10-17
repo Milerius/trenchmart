@@ -44,10 +44,27 @@ export type InjectedScope = {
   removeEventListener?: (type: string, listener: () => void) => void;
 };
 
+/** Sign In With Solana input, as accepted by the Wallet Standard `solana:signIn` feature. */
+export type SignInInput = {
+  domain: string;
+  address: string;
+  statement?: string;
+  uri?: string;
+  nonce?: string;
+  issuedAt?: string;
+  expirationTime?: string;
+};
+
+export type SignInResult = { address: string; signedMessage: Uint8Array; signature: Uint8Array };
+
 export type Signer = {
   address: string;
+  /** Wallet name, used to label wallet errors. */
+  name?: string;
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
   signTransaction: (transaction: Uint8Array) => Promise<Uint8Array>;
+  /** Present when the wallet implements `solana:signIn`. */
+  signIn?: (input: SignInInput) => Promise<SignInResult>;
 };
 
 export type WalletDiscovery =
@@ -63,6 +80,14 @@ type SignMessageMethod = (
 type SignTransactionMethod = (
   ...inputs: readonly { account: StandardAccount; transaction: Uint8Array; chain?: string }[]
 ) => Promise<readonly { signedTransaction: Uint8Array }[]>;
+
+type SignInMethod = (...inputs: readonly SignInInput[]) => Promise<
+  readonly {
+    account: StandardAccount;
+    signedMessage: Uint8Array;
+    signature: Uint8Array;
+  }[]
+>;
 
 type ConnectMethod = (input?: {
   silent?: boolean;
@@ -166,17 +191,38 @@ export async function signerFromStandardWallet(
   }
   const account = pickAccount(accounts);
   if (!account) throw new Error(`${wallet.name} did not return an account`);
+  const signIn = featureMethod<SignInMethod>(wallet.features['solana:signIn'], 'signIn');
+  // Phantom checks the account by identity against its current account object, so pass
+  // the wallet's own instance when it still lists this address.
+  const current = () =>
+    wallet.accounts.find((candidate) => candidate.address === account.address) ?? account;
 
   return {
     address: account.address,
+    name: wallet.name,
+    ...(signIn
+      ? {
+          async signIn(input: SignInInput) {
+            const [out] = await signIn(input);
+            if (!out?.signature || !out.signedMessage) {
+              throw new Error(`${wallet.name} returned no sign-in signature`);
+            }
+            return {
+              address: out.account?.address ?? account.address,
+              signedMessage: out.signedMessage,
+              signature: out.signature,
+            };
+          },
+        }
+      : {}),
     async signMessage(message: Uint8Array) {
-      const [out] = await signMessage({ account, message });
+      const [out] = await signMessage({ account: current(), message });
       if (!out?.signature) throw new Error(`${wallet.name} returned no signature`);
       return out.signature;
     },
     async signTransaction(transaction: Uint8Array) {
       const [out] = await signTransaction({
-        account,
+        account: current(),
         transaction,
         chain: DEVNET_CHAIN,
       });
@@ -253,5 +299,93 @@ export function discoverWallet(input: {
       else if (input.mobile) finish({ kind: 'deeplink', url: phantomBrowseUrl(input.pageUrl) });
       else finish({ kind: 'none' });
     }, input.timeoutMs);
+  });
+}
+
+const SIWS_HEADER = ' wants you to sign in with your Solana account:';
+
+/**
+ * Read the fields of a Sign In With Solana message, so the wallet's own `solana:signIn`
+ * flow can rebuild exactly the same text. Returns null when the text is not SIWS.
+ */
+export function siwsInputFromMessage(message: string): SignInInput | null {
+  const lines = message.split('\n');
+  const header = lines[0] ?? '';
+  if (!header.endsWith(SIWS_HEADER)) return null;
+  const domain = header.slice(0, -SIWS_HEADER.length);
+  const address = lines[1]?.trim();
+  if (!domain || !address) return null;
+  const input: SignInInput = { domain, address };
+  let rest = lines.slice(2);
+  if (rest[0] === '' && rest[1] !== undefined && !/^[A-Z][A-Za-z ]+: /.test(rest[1])) {
+    input.statement = rest[1];
+    rest = rest.slice(2);
+  }
+  if (rest[0] === '') rest = rest.slice(1);
+  const keys: Record<string, keyof SignInInput> = {
+    URI: 'uri',
+    Nonce: 'nonce',
+    'Issued At': 'issuedAt',
+    'Expiration Time': 'expirationTime',
+  };
+  for (const line of rest) {
+    const at = line.indexOf(': ');
+    const key = at > 0 ? keys[line.slice(0, at)] : undefined;
+    // Any field the wallet would not rebuild (Version, Chain ID, Resources) means the
+    // signIn text would differ, so use plain signMessage for this message instead.
+    if (!key) return null;
+    input[key] = line.slice(at + 2);
+  }
+  return input;
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/**
+ * Sign the server's sign-in message. Prefers the wallet's `solana:signIn` (Phantom's
+ * dedicated SIWS flow) and only accepts its result when the signed bytes are exactly the
+ * server's message for the same account. Otherwise falls back to `signMessage`.
+ */
+export async function signSignInMessage(signer: Signer, message: string): Promise<Uint8Array> {
+  const bytes = new TextEncoder().encode(message);
+  const input = signer.signIn ? siwsInputFromMessage(message) : null;
+  if (signer.signIn && input && input.address === signer.address) {
+    const out = await signer.signIn(input);
+    if (out.address === signer.address && sameBytes(out.signedMessage, bytes)) {
+      return out.signature;
+    }
+  }
+  return signer.signMessage(bytes);
+}
+
+/** Show the wallet's real error, with its code, instead of a bare generic line. */
+export function walletErrorMessage(err: unknown, walletName?: string): string {
+  if (!(err instanceof Error) && (!err || typeof err !== 'object')) return 'sign-in failed';
+  const { message, code } = err as { message?: unknown; code?: unknown };
+  const text = typeof message === 'string' && message.trim() ? message.trim() : 'sign-in failed';
+  const suffix = typeof code === 'number' || typeof code === 'string' ? ` (code ${code})` : '';
+  return walletName && !text.startsWith(walletName)
+    ? `${walletName}: ${text}${suffix}`
+    : `${text}${suffix}`;
+}
+
+/** Reject when a wallet call never settles, e.g. after the extension was updated. */
+export function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
   });
 }

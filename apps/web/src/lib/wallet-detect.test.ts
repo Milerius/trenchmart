@@ -8,6 +8,11 @@ import {
   pickSolanaWallet,
   readInjectedProvider,
   signerFromStandardWallet,
+  signSignInMessage,
+  siwsInputFromMessage,
+  walletErrorMessage,
+  withTimeout,
+  type Signer,
   type InjectedScope,
   type StandardAccount,
   type StandardWallet,
@@ -283,5 +288,158 @@ describe('signerFromStandardWallet', () => {
     expect(signer.address).toContain('Prompted');
     expect(phantom.connect).toHaveBeenNthCalledWith(1, { silent: true });
     expect(phantom.connect).toHaveBeenNthCalledWith(2);
+  });
+});
+
+// The exact text /api/v1/auth/nonce returns (packages/shared buildSiwsMessage).
+const ADDRESS = '9Ww4nhGfPEE3WTzirx1hNYBtU2u7VFP6Zj3rC5QvkYsH';
+const SIWS = [
+  `trenchmart.fun wants you to sign in with your Solana account:`,
+  ADDRESS,
+  '',
+  'Sign in to Trenchmart. This does not send a transaction.',
+  '',
+  'URI: https://trenchmart.fun',
+  'Nonce: 413a72880d86e9918cee20a9b0100d66',
+  'Issued At: 2026-10-17T09:14:06.766Z',
+  'Expiration Time: 2026-10-17T09:24:06.766Z',
+].join('\n');
+
+/** Phantom 26.33's formatSolanaSignInMessage, copied from the extension's service worker. */
+function phantomFormat(e: Record<string, string | undefined>): string {
+  let text = `${e.domain} wants you to sign in with your Solana account:\n${e.address}`;
+  if (e.statement) text += `\n\n${e.statement}`;
+  const fields: string[] = [];
+  if (e.uri) fields.push(`URI: ${e.uri}`);
+  if (e.version) fields.push(`Version: ${e.version}`);
+  if (e.chainId) fields.push(`Chain ID: ${e.chainId}`);
+  if (e.nonce) fields.push(`Nonce: ${e.nonce}`);
+  if (e.issuedAt) fields.push(`Issued At: ${e.issuedAt}`);
+  if (e.expirationTime) fields.push(`Expiration Time: ${e.expirationTime}`);
+  if (fields.length) text += `\n\n${fields.join('\n')}`;
+  return text;
+}
+
+describe('siwsInputFromMessage', () => {
+  it('reads every field so the wallet rebuilds the identical text', () => {
+    const input = siwsInputFromMessage(SIWS);
+    expect(input).toEqual({
+      domain: 'trenchmart.fun',
+      address: ADDRESS,
+      statement: 'Sign in to Trenchmart. This does not send a transaction.',
+      uri: 'https://trenchmart.fun',
+      nonce: '413a72880d86e9918cee20a9b0100d66',
+      issuedAt: '2026-10-17T09:14:06.766Z',
+      expirationTime: '2026-10-17T09:24:06.766Z',
+    });
+    expect(phantomFormat(input!)).toBe(SIWS);
+  });
+
+  it('declines text it cannot round-trip', () => {
+    expect(siwsInputFromMessage('hello')).toBeNull();
+    expect(siwsInputFromMessage(`${SIWS}\nResources:\n- https://x`)).toBeNull();
+    expect(siwsInputFromMessage(`d wants you to sign in with your Solana account:\n`)).toBeNull();
+  });
+});
+
+function signerWith(overrides: Partial<Signer>): Signer & {
+  signMessage: ReturnType<typeof vi.fn>;
+} {
+  return {
+    address: ADDRESS,
+    name: 'Phantom',
+    signTransaction: async (tx) => tx,
+    ...overrides,
+    signMessage: vi.fn(async () => new Uint8Array(64).fill(7)),
+  } as Signer & { signMessage: ReturnType<typeof vi.fn> };
+}
+
+describe('signSignInMessage', () => {
+  it('uses solana:signIn and returns its signature when the bytes match the server message', async () => {
+    // Regression: plain signMessage of the SIWS text failed in Phantom with "Unexpected error"
+    // before /auth/verify was ever called.
+    const signIn = vi.fn(async (input) => ({
+      address: input.address,
+      signedMessage: new TextEncoder().encode(phantomFormat(input)),
+      signature: new Uint8Array(64).fill(9),
+    }));
+    const signer = signerWith({ signIn });
+    const signature = await signSignInMessage(signer, SIWS);
+    expect(Array.from(signature)).toEqual(new Array(64).fill(9));
+    expect(signer.signMessage).not.toHaveBeenCalled();
+  });
+
+  it('falls back to signMessage when the wallet signed different text or another account', async () => {
+    const changed = signerWith({
+      signIn: async (input) => ({
+        address: input.address,
+        signedMessage: new TextEncoder().encode(`${phantomFormat(input)}\nVersion: 1`),
+        signature: new Uint8Array(64).fill(9),
+      }),
+    });
+    expect(Array.from(await signSignInMessage(changed, SIWS))[0]).toBe(7);
+    expect(changed.signMessage).toHaveBeenCalledWith(new TextEncoder().encode(SIWS));
+
+    const other = signerWith({
+      signIn: async (input) => ({
+        address: 'Other1111111111111111111111111111111111111',
+        signedMessage: new TextEncoder().encode(phantomFormat(input)),
+        signature: new Uint8Array(64).fill(9),
+      }),
+    });
+    expect(Array.from(await signSignInMessage(other, SIWS))[0]).toBe(7);
+  });
+
+  it('uses signMessage when the wallet has no signIn feature', async () => {
+    const signer = signerWith({});
+    await signSignInMessage(signer, SIWS);
+    expect(signer.signMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('standard wallet signIn and account identity', () => {
+  it("exposes solana:signIn and passes the wallet's own account instance to signMessage", async () => {
+    const phantom = wallet('Phantom');
+    const own = account(ADDRESS, [DEVNET_CHAIN]);
+    const copy = { ...own };
+    phantom.connect.mockResolvedValue({ accounts: [copy] });
+    (phantom as unknown as { accounts: readonly StandardAccount[] }).accounts = [own];
+    const signIn = vi.fn(async () => [
+      { account: own, signedMessage: new Uint8Array([1]), signature: new Uint8Array(64) },
+    ]);
+    phantom.features['solana:signIn'] = { version: '1.0.0', signIn };
+    const signer = await signerFromStandardWallet(phantom);
+    expect(signer.name).toBe('Phantom');
+    const out = await signer.signIn!({ domain: 'trenchmart.fun', address: ADDRESS });
+    expect(out.address).toBe(ADDRESS);
+    await signer.signMessage(new Uint8Array([1]));
+    expect(phantom.signMessage.mock.calls[0]?.[0].account).toBe(own);
+  });
+});
+
+describe('walletErrorMessage', () => {
+  it('keeps the wallet name and code so the real failure is visible', () => {
+    const err = Object.assign(new Error('Unexpected error'), { code: -32603 });
+    expect(walletErrorMessage(err, 'Phantom')).toBe('Phantom: Unexpected error (code -32603)');
+    expect(walletErrorMessage(new Error('Phantom cannot sign'), 'Phantom')).toBe(
+      'Phantom cannot sign',
+    );
+    expect(walletErrorMessage({ message: 'User rejected the request.', code: 4001 })).toBe(
+      'User rejected the request. (code 4001)',
+    );
+    expect(walletErrorMessage(undefined)).toBe('sign-in failed');
+  });
+});
+
+describe('withTimeout', () => {
+  it('rejects a wallet call that never settles', async () => {
+    vi.useFakeTimers();
+    const pending = withTimeout(new Promise<never>(() => undefined), 1000, 'no answer');
+    const check = expect(pending).rejects.toThrow('no answer');
+    await vi.advanceTimersByTimeAsync(1000);
+    await check;
+    vi.useRealTimers();
+    await expect(withTimeout(Promise.resolve(3), 1000, 'x')).resolves.toBe(3);
+    await expect(withTimeout(Promise.reject(new Error('boom')), 1000, 'x')).rejects.toThrow('boom');
   });
 });
