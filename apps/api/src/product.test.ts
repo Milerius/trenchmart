@@ -22,6 +22,8 @@ import { releaseOrders, resolveDispute } from './logic';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
+import { REPORT_SCHEMA, reportMessage } from '@trenchmart/shared';
+import { resetTransparencyCache } from './transparency';
 import type { Deps } from './logic';
 
 const databaseUrl =
@@ -109,20 +111,21 @@ describe('owner product decisions', () => {
     sql ??= createSql(databaseUrl);
     await migrate(sql);
     await reset();
+    resetTransparencyCache();
   });
 
   afterAll(async () => {
     await sql?.end();
   });
 
-  it('mocks landing stats until a live listing exists, and serves the cached SOL price', async () => {
+  it('shows real landing stats (zero, not samples) before any listing, and serves the cached SOL price', async () => {
     const app = await appFor();
     const stats = (await (await app.request('/api/v1/stats')).json()) as {
       source: string;
       volume: { usdCents: string };
     };
-    expect(stats.source).toBe('mock');
-    expect(stats.volume.usdCents).toBe('115000');
+    expect(stats.source).toBe('live');
+    expect(stats.volume.usdCents).toBe('0');
     const price = (await (await app.request('/api/v1/prices/sol')).json()) as {
       source: string;
       centsPerSol: string;
@@ -351,6 +354,160 @@ describe('owner product decisions', () => {
     expect(again).toContain('"step":"static"');
     expect(again).toContain('"status":"skipped"');
     expect(again).toContain('event: sandbox');
+  });
+
+  it('publishes a signed, verifiable scan report and lets a model only tighten the verdict', async () => {
+    const signer = nacl.sign.keyPair();
+    const reportKey = bs58.encode(signer.secretKey);
+    const calls: string[] = [];
+    let modelDecision = 'request_changes';
+    const llmFetch = (async (url: string, init: RequestInit) => {
+      calls.push(String(url));
+      const sent = JSON.parse(String(init.body)) as {
+        model: string;
+        messages: { content: string }[];
+      };
+      expect(sent.messages[1]?.content).toContain('sniper');
+      return new Response(
+        JSON.stringify({
+          model: sent.model,
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({ decision: modelDecision, notes: 'model says so' }),
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as unknown as typeof fetch;
+    const app = await appFor(
+      {
+        REPORT_SIGNING_KEY: reportKey,
+        LLM_API_KEY: 'test-key',
+        LLM_BASE_URL: 'https://llm.example/v1',
+        LLM_MODEL: 'test-model-1',
+      },
+      { llmFetch },
+    );
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    await sql`
+      update users set roles = roles || '{creator}'::user_role[], x_handle = 'dev_report', x_user_id = 'dev:dev_report'
+      where wallet = ${creator.publicKey}
+    `;
+    const user = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
+    await sql`
+      insert into bonds (user_id, amount, tx_sig, status) values (${user[0]!.id}, ${5_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+    `;
+    await sql`update config set value = '0'::jsonb where key = 'verification_fee_lamports'`;
+    const listing = await app.request('/api/v1/studio/listings', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Report Filter Pack',
+        summary: 'Scoped filters for new pairs.',
+        description: 'No wallet access.',
+        category: 'userscript',
+        priceLamports: '1500000000',
+      }),
+    });
+    const created = (await listing.json()) as { id: string; slug?: string };
+    const upload = async (semver: string) => {
+      const version = await app.request(`/api/v1/studio/listings/${created.id}/versions`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          semver,
+          changelog: 'x',
+          fileName: 'sniper.user.js',
+          fileSize: clean.length,
+        }),
+      });
+      const uploaded = (await version.json()) as { versionId: string; uploadUrl: string };
+      const target = new URL(uploaded.uploadUrl);
+      await app.request(`${target.pathname}${target.search}`, {
+        method: 'PUT',
+        body: new TextEncoder().encode(clean),
+      });
+      const done = await app.request(`/api/v1/studio/versions/${uploaded.versionId}/complete`, {
+        method: 'POST',
+        headers: { cookie },
+      });
+      expect(done.status).toBe(200);
+      return uploaded.versionId;
+    };
+    // The rules approve a clean file; the model asks for changes, so the stricter verdict wins.
+    const first = await upload('1.0.0');
+    const held = await sql<{ status: string }[]>`select status from versions where id = ${first}`;
+    expect(held[0]?.status).toBe('needs_creator');
+    modelDecision = 'approve';
+    const second = await upload('1.0.1');
+    const live = await sql<{ status: string }[]>`select status from versions where id = ${second}`;
+    expect(live[0]?.status).toBe('live');
+    expect(calls.every((url) => url === 'https://llm.example/v1/chat/completions')).toBe(true);
+    const review = await sql<{ engine: string; model: string }[]>`
+      select engine, model from ai_reviews where version_id = ${second}
+    `;
+    expect(review[0]).toEqual({ engine: 'rules@1.0.0+llm', model: 'test-model-1' });
+
+    const slugRow = await sql<
+      { slug: string }[]
+    >`select slug from listings where id = ${created.id}`;
+    const slug = slugRow[0]!.slug;
+    const res = await app.request(`/api/v1/listings/${slug}/report?download=1`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toContain('attachment');
+    const signed = (await res.json()) as {
+      report: {
+        schema: string;
+        version: { sha256: string; id: string };
+        steps: { kind: string; checks: unknown[] }[];
+        reviews: { engine: string; model: string | null; decision: string }[];
+      };
+      signature: { publicKey: string; value: string };
+    };
+    expect(signed.report.schema).toBe(REPORT_SCHEMA);
+    expect(signed.report.version.id).toBe(second);
+    expect(signed.report.steps.map((step) => step.kind).sort()).toEqual(['sandbox', 'static']);
+    expect(signed.report.reviews.at(-1)).toMatchObject({
+      engine: 'rules@1.0.0+llm',
+      model: 'test-model-1',
+      decision: 'approve',
+    });
+    expect(signed.signature.publicKey).toBe(bs58.encode(signer.publicKey));
+    // A third party verifies with only the report, the signature and the public key.
+    const message = reportMessage(signed.report);
+    expect(
+      nacl.sign.detached.verify(
+        message,
+        bs58.decode(signed.signature.value),
+        bs58.decode(signed.signature.publicKey),
+      ),
+    ).toBe(true);
+    const tampered = reportMessage({
+      ...signed.report,
+      version: { ...signed.report.version, sha256: '00' },
+    });
+    expect(
+      nacl.sign.detached.verify(
+        tampered,
+        bs58.decode(signed.signature.value),
+        bs58.decode(signed.signature.publicKey),
+      ),
+    ).toBe(false);
+
+    const facts = (await (await app.request('/api/v1/transparency')).json()) as {
+      reportSigningKey: string;
+      review: { engine: string; model: string };
+      recentEscrows: unknown[];
+    };
+    expect(facts.reportSigningKey).toBe(bs58.encode(signer.publicKey));
+    expect(facts.review).toMatchObject({ engine: 'rules@1.0.0+llm', model: 'test-model-1' });
+    expect(Array.isArray(facts.recentEscrows)).toBe(true);
   });
 
   it('reviews seller pages before they go public and serves only clean, approved images', async () => {

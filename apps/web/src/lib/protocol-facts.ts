@@ -18,9 +18,13 @@ import {
 /** Devnet program id from programs/trench_escrow/src/lib.rs. */
 export const ESCROW_PROGRAM_ID = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
 export const ESCROW_CLUSTER = 'devnet';
-export const CONTACT_EMAIL = 'support@trenchmart.fun';
-export const AI_AGENT_ID = 'trenchmart-ai-v1';
-export const AI_ENGINE = 'ai-verifier@1.0.0';
+/** trenchmart.fun has no mail server yet, so contact goes through GitHub, which is real and public. */
+export const CONTACT_URL = 'https://github.com/Milerius/trenchmart/issues';
+export const CONTACT_LABEL = 'GitHub issues (github.com/Milerius/trenchmart)';
+/** Private reports (security, personal data) go through a private GitHub advisory. */
+export const PRIVATE_CONTACT_URL = 'https://github.com/Milerius/trenchmart/security/advisories/new';
+export const AI_AGENT_ID = 'trenchmart-review-v1';
+export const AI_ENGINE = 'rules@1.0.0';
 export const SCANNER_ENGINE = 'scanner@1.1.0';
 /** Matches the `limit 15` payout batch in apps/api/src/logic.ts. */
 export const PAYOUT_BATCH_LIMIT = 15;
@@ -60,7 +64,7 @@ const TIER_LABEL: Record<Tier, string> = {
 
 const SPLIT_LABEL = {
   buyback: 'Buyback',
-  ai_verification: 'AI verification',
+  ai_verification: 'Verification',
   ops: 'Ops',
   safety: 'Safety',
 } as const;
@@ -129,7 +133,7 @@ export const versionEdges = VERSION_STATUSES.flatMap((from) =>
 );
 
 export const protocol = {
-  contactEmail: CONTACT_EMAIL,
+  contactUrl: CONTACT_URL,
   cluster: ESCROW_CLUSTER,
   programId: ESCROW_PROGRAM_ID,
   pdaSeeds: 'escrow + order id',
@@ -159,3 +163,16 @@ export const protocol = {
 
 export type OrderEdge = { from: OrderStatus; to: OrderStatus };
 export type VersionEdge = { from: VersionStatus; to: VersionStatus };
+
+/** Solana Explorer links, always pinned to devnet. */
+export function explorerAddress(address: string): string {
+  return `https://explorer.solana.com/address/${address}?cluster=${ESCROW_CLUSTER}`;
+}
+
+export function explorerTx(signature: string): string {
+  return `https://explorer.solana.com/tx/${signature}?cluster=${ESCROW_CLUSTER}`;
+}
+
+export function shortKey(value: string, head = 6, tail = 4): string {
+  return value.length > head + tail + 1 ? `${value.slice(0, head)}…${value.slice(-tail)}` : value;
+}

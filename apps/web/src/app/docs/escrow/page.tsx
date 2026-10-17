@@ -36,7 +36,7 @@ export default function EscrowDocsPage() {
       <DocSection id="accounts" title="Accounts">
         <p>
           The escrow account is a PDA seeded with the byte string escrow and the 16-byte order id.
-          It stores the buyer, seller, resolver, and the buyback, AI verification, ops, and safety
+          It stores the buyer, seller, resolver, and the buyback, verification, ops, and safety
           pubkeys, plus status, disputed_from, price, deposit, fee and rebate basis points, the four
           split basis points, expires_at, escrow_until, and the bump.
         </p>
@@ -64,6 +64,43 @@ export default function EscrowDocsPage() {
           ))}
         </ul>
         <EscrowStateDiagram />
+      </DocSection>
+      <DocSection id="check" title="Check it yourself">
+        <ul className="m-0 grid gap-2 p-0">
+          <li className="list-none">
+            Program on Solana Explorer:{' '}
+            <a
+              className="font-mono text-ink underline"
+              href={`https://explorer.solana.com/address/${protocol.programId}?cluster=${protocol.cluster}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {protocol.programId}
+            </a>
+            . The IDL is published on chain (Program Metadata, seed{' '}
+            <span className="font-mono">idl</span>):{' '}
+            <span className="font-mono text-ink">
+              npx @solana-program/program-metadata fetch idl {protocol.programId} --rpc &lt;devnet
+              RPC&gt;
+            </span>
+          </li>
+          <li className="list-none">
+            The binary embeds a security.txt (name, project URL, source, policy). Explorer shows it
+            on the program page.
+          </li>
+          <li className="list-none">
+            Live program hash, upgrade authority, multisig, buckets and the latest escrows are on{' '}
+            <a className="text-ink underline" href="/verify#proof">
+              /verify
+            </a>
+            . Your own order&apos;s escrow account and release time are on your purchases page, read
+            from chain.
+          </li>
+          <li className="list-none">
+            A verified (reproducible) build is not published yet, so compare the deployed hash with
+            your own <span className="font-mono">anchor build</span> of programs/trench_escrow.
+          </li>
+        </ul>
       </DocSection>
       <DocSection id="resolver" title="Resolver">
         <p>

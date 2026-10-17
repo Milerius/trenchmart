@@ -61,7 +61,7 @@ export default function SellersDocsPage() {
         <p>
           Each version quotes {protocol.verificationFee} unless your tier is{' '}
           {protocol.verificationFeeFreeFrom} or higher. The transfer uses memo{' '}
-          <span className="font-mono text-ink">vfee:</span>. The whole fee is paid to the AI
+          <span className="font-mono text-ink">vfee:</span>. The whole fee is paid to the
           verification bucket. A version cannot finish review until that fee is recorded or waived.
         </p>
       </DocSection>

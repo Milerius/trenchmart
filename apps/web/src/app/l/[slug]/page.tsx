@@ -29,6 +29,7 @@ import { ApiError, api } from '@/lib/api';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { solText } from '@/lib/money';
 import { useWallet } from '@/lib/wallet';
+import { ESCROW_PROGRAM_ID, explorerAddress, shortKey } from '@/lib/protocol-facts';
 
 type Listing = {
   id: string;
@@ -275,7 +276,7 @@ export default function ListingPage() {
             <ShieldIcon className={verified ? 'text-accent' : 'text-warn'} />
             <div className="min-w-0 flex-1">
               <p className="m-0 font-semibold">
-                {verified ? 'AI-verified' : 'Verification pending'} · v{security.semver}
+                {verified ? 'Passed automated review' : 'Review pending'} · v{security.semver}
               </p>
               <p className="m-0 text-[13px] text-accent-body">
                 {security.passed ?? security.checks.filter((c) => c.result === 'pass').length} of{' '}
@@ -438,6 +439,23 @@ export default function ListingPage() {
               </span>
               Download once payment is confirmed in escrow. Watermarked to your wallet.
             </li>
+            <li data-testid="escrow-program" className="flex list-none gap-2">
+              <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
+                ⛓
+              </span>
+              <span>
+                Escrow program{' '}
+                <a
+                  href={explorerAddress(ESCROW_PROGRAM_ID)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-ink-2 underline decoration-line-control underline-offset-2 hover:text-ink"
+                >
+                  {shortKey(ESCROW_PROGRAM_ID)} ↗
+                </a>{' '}
+                on devnet. Your receipt shows the escrow account and its on-chain release time.
+              </span>
+            </li>
             <li data-testid="devnet-hint" className="flex list-none gap-2">
               <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
                 ◎
@@ -541,6 +559,7 @@ function SecurityPanel({ listing }: { listing: Listing }) {
           </dl>
         </div>
       ) : null}
+      <ReportBlock slug={listing.slug} />
       {listing.preview ? (
         <div>
           <Label>Preview</Label>
@@ -602,5 +621,77 @@ function CreatorLink({ creator }: { creator: Listing['creator'] }) {
     <Link href={`/u/${handle}`} className="text-ink-2 hover:text-ink">
       @{creator.handle ?? handle.slice(0, 4)}
     </Link>
+  );
+}
+
+type ReportSummary = {
+  report: {
+    version: { sha256: string; semver: string };
+    steps: { kind: string; engine: string; finishedAt: string | null; summary: string | null }[];
+    reviews: { engine: string; model: string | null; decision: string; decidedAt: string }[];
+  };
+  signature: { publicKey: string; value: string } | null;
+};
+
+function ReportBlock({ slug }: { slug: string }) {
+  const [data, setData] = useState<ReportSummary | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    void api<ReportSummary>(`/listings/${slug}/report`)
+      .then(setData)
+      .catch(() => setFailed(true));
+  }, [slug]);
+  const review = data?.report.reviews.at(-1);
+  return (
+    <div data-testid="scan-report">
+      <Label>Signed scan report</Label>
+      {failed ? (
+        <p className="m-0 mt-2 text-sm text-muted">The report is not available right now.</p>
+      ) : !data ? (
+        <p className="m-0 mt-2 text-sm text-muted">Loading the report…</p>
+      ) : (
+        <div className="mt-2 space-y-2 text-sm text-ink-2">
+          <ol className="m-0 space-y-1 p-0 font-mono text-[13px]">
+            {data.report.steps.map((step) => (
+              <li key={step.kind} className="list-none">
+                {step.kind} · {step.engine} · {step.summary ?? 'n/a'}
+                {step.finishedAt ? ` · ${utc(step.finishedAt)}` : ''}
+              </li>
+            ))}
+            {review ? (
+              <li className="list-none">
+                review · {review.engine}
+                {review.model ? ` (${review.model})` : ''} · {review.decision} ·{' '}
+                {utc(review.decidedAt)}
+              </li>
+            ) : null}
+          </ol>
+          <p className="m-0 text-[13px] text-muted">
+            {data.signature ? (
+              <>
+                Ed25519-signed by{' '}
+                <span className="font-mono text-ink-2" title={data.signature.publicKey}>
+                  {shortKey(data.signature.publicKey)}
+                </span>
+                . Check it on{' '}
+                <Link href="/verify#report" className="underline">
+                  /verify
+                </Link>{' '}
+                or with any Ed25519 library.
+              </>
+            ) : (
+              'This report is not signed yet (no report signing key is configured).'
+            )}
+          </p>
+          <a
+            href={`/api/v1/listings/${slug}/report?download=1`}
+            download
+            className="inline-block rounded-ctl border border-line-control px-3 py-1.5 text-[13px] font-medium text-ink hover:border-accent-line"
+          >
+            Download full report (JSON)
+          </a>
+        </div>
+      )}
+    </div>
   );
 }

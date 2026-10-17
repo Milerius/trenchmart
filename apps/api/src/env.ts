@@ -21,6 +21,12 @@ export type Env = {
   aiAgentId: string;
   aiVerifierUrl: string;
   aiAttestSecret: string;
+  /** OpenAI-compatible model for the review step. All three must be set or the rules engine runs alone. */
+  llm: { baseUrl: string; apiKey: string; model: string };
+  /** Ed25519 secret (base58 or JSON array) that signs public scan reports. */
+  reportSigningKey: string;
+  /** Squads multisig config account that controls the treasury vault. */
+  multisigAddress: string;
   blobDir: string;
   escrowHoursOverride: string;
   rateLimitPerMin: number;
@@ -80,9 +86,16 @@ export function readEnv(source: Record<string, string | undefined> = process.env
       ops: blank(source.BUCKET_WALLET_OPS),
       safety: blank(source.BUCKET_WALLET_SAFETY),
     },
-    aiAgentId: blank(source.AI_AGENT_ID) || 'trenchmart-ai-v1',
+    aiAgentId: blank(source.AI_AGENT_ID) || 'trenchmart-review-v1',
     aiVerifierUrl: blank(source.AI_VERIFIER_URL),
     aiAttestSecret: source.AI_ATTEST_SECRET || 'change-me',
+    llm: {
+      baseUrl: blank(source.LLM_BASE_URL) || 'https://api.x.ai/v1',
+      apiKey: blank(source.LLM_API_KEY),
+      model: blank(source.LLM_MODEL),
+    },
+    reportSigningKey: blank(source.REPORT_SIGNING_KEY),
+    multisigAddress: blank(source.MULTISIG_ADDRESS),
     blobDir: blank(source.BLOB_DIR) || '.data/blobs',
     escrowHoursOverride: source.ESCROW_HOURS_OVERRIDE ?? '',
     rateLimitPerMin: Number(source.RATE_LIMIT_PER_MIN || 120),

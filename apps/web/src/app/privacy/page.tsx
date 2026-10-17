@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
-import { CONTACT_EMAIL } from '@/lib/protocol-facts';
+import { CONTACT_LABEL, CONTACT_URL, PRIVATE_CONTACT_URL } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Privacy Policy · TrenchMart' };
 
@@ -17,8 +17,8 @@ export default function PrivacyPage() {
         <p>
           TrenchMart runs the site at trenchmart.fun and the API at api.trenchmart.fun. Privacy
           questions go to{' '}
-          <a className="text-ink underline" href={`mailto:${CONTACT_EMAIL}`}>
-            {CONTACT_EMAIL}
+          <a className="text-ink underline" href={CONTACT_URL}>
+            {CONTACT_LABEL}
           </a>
           .
         </p>
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
         </p>
         <p>
           Uploads. File name, size, sha256, and the bytes of each version you submit, plus the
-          static-scan and sandbox results and the AI attestation.
+          static-scan and sandbox results and the review attestation.
         </p>
         <p>
           Logs. Order, bond, payout, dispute, and audit records; a session cookie named tm_session;
@@ -74,14 +74,15 @@ export default function PrivacyPage() {
         <p>
           Account, listing, order, scan, and ledger rows stay for as long as the marketplace keeps
           that history, including after a ban or a delist, because refunds and audits refer to them.
-          You can ask {CONTACT_EMAIL} what is stored for your wallet address.
+          You can ask what is stored for your wallet address through a private GitHub advisory (
+          {PRIVATE_CONTACT_URL}).
         </p>
       </DocSection>
       <DocSection id="contact" title="Contact">
         <p>
           Email{' '}
-          <a className="text-ink underline" href={`mailto:${CONTACT_EMAIL}`}>
-            {CONTACT_EMAIL}
+          <a className="text-ink underline" href={CONTACT_URL}>
+            {CONTACT_LABEL}
           </a>{' '}
           to ask for a copy of the rows stored for your wallet, or to ask a question about this
           policy.

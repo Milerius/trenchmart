@@ -8,7 +8,7 @@ import {
   disputeBody,
 } from '@trenchmart/shared';
 import {
-  CONTACT_EMAIL,
+  CONTACT_URL,
   DISPUTE_REASONS,
   ESCROW_INSTRUCTIONS,
   ESCROW_PROGRAM_ID,
@@ -101,7 +101,7 @@ describe('protocol facts', () => {
     expect(program).toContain('pub resolver: Signer');
     const logic = readFileSync(new URL('apps/api/src/logic.ts', root), 'utf8');
     expect(logic).toContain(`limit ${PAYOUT_BATCH_LIMIT}`);
-    expect(CONTACT_EMAIL).toBe('support@trenchmart.fun');
+    expect(CONTACT_URL).toBe('https://github.com/Milerius/trenchmart/issues');
     expect(protocol.programId).toBe(ESCROW_PROGRAM_ID);
     expect(protocol.cluster).toBe('devnet');
   });

@@ -122,7 +122,7 @@ export default function NewListingPage() {
           </Link>
           <h1 className="m-0 mt-3 text-[32px] font-semibold tracking-[-0.03em]">New listing</h1>
           <p className="m-0 mt-1 text-ink-2">
-            Describe it, set a price, drop the file. AI verification starts the moment it uploads.
+            Describe it, set a price, drop the file. Automated review starts the moment it uploads.
           </p>
         </div>
 
@@ -152,7 +152,7 @@ export default function NewListingPage() {
           <Field
             label="Description"
             htmlFor="description"
-            hint="AI verification checks the file against this, so say exactly what it does."
+            hint="Buyers compare the file with this, and the review checks its declared permissions, so say exactly what it does."
           >
             <textarea id="description" name="description" required rows={5} className={INPUT} />
           </Field>
@@ -236,7 +236,7 @@ export default function NewListingPage() {
             {[
               ['Static checks', 'eval, remote code, key access, hosts'],
               ['Sandbox run', 'isolated, network and wallet calls logged'],
-              ['AI verdict', 'behaviour vs your description'],
+              ['Verdict', 'rules engine decision on the checks'],
             ].map(([title, detail], index) => (
               <li key={title} className="flex list-none gap-3">
                 <Square>{index + 1}</Square>

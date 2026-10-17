@@ -7,7 +7,7 @@
 ### The verified edge, for sale.
 
 The Solana marketplace for trading scripts, terminal filters and wallet lists.<br />
-Every file is AI-verified in seconds. Every order is escrowed. Creators keep 100% of the price.
+Every file passes automated security review in seconds. Every order is held by an on-chain escrow program (Solana devnet). Creators keep 100% of the price.
 
 [![CI](https://github.com/Milerius/trenchmart/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Milerius/trenchmart/actions/workflows/ci.yml)
 ![Network: Solana devnet](https://img.shields.io/badge/network-Solana%20devnet-C6F432?labelColor=0A0B0A)
@@ -40,9 +40,9 @@ Your SOL is held in escrow for 48 hours before the creator is paid. Open a dispu
 </td>
 <td width="33%" valign="top">
 
-**AI verification in seconds**
+**Automated review in seconds**
 
-Every version is statically scanned, run in an isolated sandbox and judged by AI before it goes live. Creators watch each step happen. There is no review queue.
+Every version is statically scanned (scripts also run in an isolated sandbox) and judged by a rules engine before it goes live. An optional language-model reviewer can be switched on with `LLM_API_KEY`; it can only make a verdict stricter. Creators watch each step happen. There is no review queue.
 
 </td>
 <td width="33%" valign="top">
@@ -58,9 +58,9 @@ Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission.
 ## Highlights
 
 - **Exact price before you sign.** The checkout receipt itemises list price, the 5% fee, your tier discount and the 0% commission, in SOL with USD beside it.
-- **Proof, not stars.** Each listing shows the checks it passed, the declared permissions, the signed AI verdict and the pinned SHA-256 of the file you'll get.
+- **Proof, not stars.** Each listing shows the checks it passed, the declared permissions, the signed review verdict, a downloadable Ed25519-signed scan report and the pinned SHA-256 of the file you'll get.
 - **Downloads after release.** The file unlocks when escrow releases, watermarked to your wallet. Never while your funds are still held.
-- **Live AI review for creators.** Uploading feels like sending a prompt: static checks and the sandbox run at once, then the verdict lands.
+- **Live review for creators.** Uploading feels like sending a prompt: static checks and the sandbox run at once, then the verdict lands.
 - **Real numbers.** Studio and purchases show real totals with USD next to every SOL amount. The landing page shows sample figures until real data exists, then switches on its own.
 - **Built for everyone.** WCAG AA contrast, keyboard and screen-reader support, a mobile-first checkout, and axe checks in CI.
 
@@ -73,7 +73,7 @@ Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/02-listing.webp" alt="Listing page with AI verification checks and the logged-out preview price" /></td>
+<td width="50%"><img src="docs/screenshots/02-listing.webp" alt="Listing page with review checks and the logged-out preview price" /></td>
 <td width="50%"><img src="docs/screenshots/03-checkout-fee-breakdown.webp" alt="Checkout with the exact fee breakdown for a Trencher-tier holder" /></td>
 </tr>
 <tr>
@@ -103,19 +103,21 @@ Buyers pay a 5% fee on top of the listing price. Holding $TRENCH cuts it. Creato
 
 Your tier is based on your lowest $TRENCH balance over the last 72 hours, so it can't be gamed by borrowing tokens for one purchase. Balance thresholds are set by the owner and live in config.
 
-**Where the fee goes.** The net fee, after your discount, is split four ways: 40% $TRENCH buyback, 25% AI verification (automated review: static checks, sandbox runs and AI verdicts), 20% operations, 15% safety fund.
+**Where the fee goes.** The net fee, after your discount, is split four ways: 40% $TRENCH buyback, 25% verification (automated review: static checks, sandbox runs and the review verdict), 20% operations, 15% safety fund.
 
 ## Trust and security
 
 **Escrow on every order.** Payment goes to escrow, not to the creator. The creator is paid only after 48 hours with no dispute. A dispute pauses release until it is settled: upheld means a refund, rejected means the order returns to payout.
 
-**Squads multisig vault.** Escrowed SOL sits in a [Squads](https://squads.so) multisig vault backed by an off-chain ledger. The API holds no key that can move vault funds, and payouts are proposed to multisig signers. The repo also has an on-chain Anchor escrow program, [`trench_escrow`](programs/trench_escrow), that handles fund, release, dispute and refund with the same fee maths. CI builds and tests it on every pull request, but it is not the launch custody path. Custody stays on Squads until the program is audited.
+**On-chain escrow program.** Every order is held by [`trench_escrow`](programs/trench_escrow) on devnet (`Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw`): the buyer signs one transaction that creates the order's escrow PDA and funds it; the program releases to the creator and fee buckets after `escrow_until`, or the resolver refunds during a dispute. The program embeds a security.txt and its IDL is published on chain. It is not audited, and no reproducible (solana-verify) build is published yet. [/verify](https://trenchmart.fun/verify#proof) reads the program hash, upgrade authority, multisig and recent escrows live from devnet.
 
-**Sandboxed AI review.** Every version passes three stages before it can be sold:
+**Squads multisig vault.** Bonds and verification fees go to a [Squads](https://squads.so) v4 vault (2-of-3, readable on chain). The API holds no key that can move vault funds.
+
+**Sandboxed automated review.** Every version passes these stages before it can be sold:
 
 1. **Static scan** for `eval`, remote code, key and seed access, transaction signing, obfuscation, clipboard use and undeclared hosts.
-2. **Isolated sandbox run** with network egress blocked and every request and wallet call logged.
-3. **AI verdict** comparing what the file does with what the listing says, saved as a signed attestation.
+2. **Isolated sandbox run** (userscripts and JavaScript alerts) with network egress blocked and every request and wallet call logged.
+3. **Rules-engine verdict** on the checks and the creator's note, saved as a signed attestation. With `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_MODEL` set, an OpenAI-compatible model also compares the code with the listing; it can only tighten the verdict. The full report is Ed25519-signed and downloadable per listing.
 
 Approved files are pinned by SHA-256. Buyers only ever receive that exact file, watermarked to their wallet.
 
@@ -125,11 +127,11 @@ Approved files are pinned by SHA-256. Buyers only ever receive that exact file, 
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/06-live-ai-review.webp" alt="Live AI review streaming static checks, sandbox and AI verdict" /></td>
+<td width="50%"><img src="docs/screenshots/06-live-ai-review.webp" alt="Live review streaming static checks, sandbox and verdict" /></td>
 <td width="50%"><img src="docs/screenshots/05-creator-dashboard.webp" alt="Creator studio with payouts in SOL and USD" /></td>
 </tr>
 <tr>
-<td align="center"><sub><b>Live AI review.</b> Upload, then watch each step land. Approved files go live at once.</sub></td>
+<td align="center"><sub><b>Live review.</b> Upload, then watch each step land. Approved files go live at once.</sub></td>
 <td align="center"><sub><b>Creator studio.</b> Real payouts, queued and sent, in SOL with USD.</sub></td>
 </tr>
 </table>

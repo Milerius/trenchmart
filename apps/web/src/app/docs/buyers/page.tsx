@@ -54,20 +54,23 @@ export default function BuyersDocsPage() {
       </DocSection>
       <DocSection id="pay" title="Pay">
         <p>
-          Checkout creates a pending order and an unsigned transfer of the total to the Squads
-          vault, with memo <span className="font-mono text-ink">tm:</span> plus the first eight
-          characters of the order id. The order expires after {protocol.orderTtlMinutes} minutes. A
-          matching transfer can still settle for {protocol.paymentGraceMinutes} minutes after that.
-          The amount, memo, source, and vault must match. Overpayment and underpayment do not
-          settle.
+          Checkout creates a pending order and one transaction for your wallet to sign: compute
+          budget limits, then the escrow program&apos;s initialize and fund, which create this
+          order&apos;s escrow account and move the total into it, and a memo{' '}
+          <span className="font-mono text-ink">tm:</span> plus the first eight characters of the
+          order id. You are the only signer and pay the network fee. We simulate it on devnet before
+          your wallet sees it. The order expires after {protocol.orderTtlMinutes} minutes. Before
+          marking it paid, the API reads the escrow account on chain and checks the buyer, seller,
+          amounts and fee fields.
         </p>
       </DocSection>
       <DocSection id="window" title="Escrow window">
         <p>
-          A settled order is paid. Release waits until {protocol.escrowHours} hours after payment,
-          and only when the payment transaction is finalized and no dispute is open. The seller
-          receives the list price. The net fee is split across buyback, AI verification, ops, and
-          safety.
+          A settled order is paid. Release waits until escrow_until, which the escrow account stores
+          ({protocol.escrowHours} hours after payment); the program rejects an earlier release, and
+          none happens while a dispute is open. Your purchases page reads escrow_until from the
+          account. The seller receives the list price. The net fee is split across buyback,
+          verification, ops, and safety.
         </p>
       </DocSection>
       <DocSection id="disputes" title="Refunds and disputes">
@@ -88,12 +91,12 @@ export default function BuyersDocsPage() {
       </DocSection>
       <DocSection id="download" title="Download integrity">
         <p>
-          The download route accepts the order only when its status is released and a license exists
-          for your wallet. The file is watermarked with the order id, your wallet, and the version
-          sha256, then stored and handed out through a signed URL that lasts{' '}
-          {protocol.downloadUrlSeconds} seconds. The version hash is checked on upload, and the same
-          bytes cannot be listed by a different creator. The public verify page matches a file you
-          already have against that hash.
+          The download route accepts the order only when its payment is confirmed in escrow (paid)
+          or released, no dispute is open, and a license exists for your wallet. The file is
+          watermarked with the order id, your wallet, and the version sha256, then stored and handed
+          out through a signed URL that lasts {protocol.downloadUrlSeconds} seconds. The version
+          hash is checked on upload, and the same bytes cannot be listed by a different creator. The
+          public verify page matches a file you already have against that hash.
         </p>
       </DocSection>
       <PurchaseDiagram />

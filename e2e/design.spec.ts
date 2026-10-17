@@ -117,7 +117,7 @@ test('listing shows the exact fee breakdown before connecting', async ({ page })
   await expectNoSeriousAxe(page);
 });
 
-test('connected Trencher sees 60% off the fee and the AI verification split', async ({ page }) => {
+test('connected Trencher sees 60% off the fee and the verification split', async ({ page }) => {
   await stubApi(page, {
     '/me': SESSION('trencher'),
     '/listings/bundle-detector-overlay': LISTING,
@@ -132,7 +132,7 @@ test('connected Trencher sees 60% off the fee and the AI verification split', as
   await expect(fees).toContainText('1.224 SOL');
   await expect(page.getByTestId('preview-notice')).toHaveCount(0);
   await fees.getByText('Where the fee goes').click();
-  await expect(fees).toContainText('AI verification · 25%');
+  await expect(fees).toContainText('Verification · 25%');
   await expect(fees).not.toContainText(/verifiers/i);
   await expect(page.getByTestId('buy')).toHaveText('Pay into escrow');
 });
@@ -216,7 +216,7 @@ test('landing marks sample stats and switches to live data', async ({ page }) =>
   await expect(page.getByTestId('dashboard')).not.toContainText('SAMPLE DATA');
 });
 
-test('live AI review streams each step to an outcome', async ({ page }) => {
+test('live review streams each step to an outcome', async ({ page }) => {
   const events = [
     { step: 'static', status: 'running' },
     { step: 'sandbox', status: 'running' },

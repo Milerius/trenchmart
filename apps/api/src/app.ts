@@ -93,6 +93,7 @@ import {
   watermarked,
   type Deps,
 } from './logic';
+import { orderEscrow, recentEscrows, scanReport, transparency } from './transparency';
 
 type Vars = { user: Record<string, any> | null };
 type App = Hono<{ Variables: Vars }>;
@@ -492,6 +493,27 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     });
     if (!result.ok) throw new HttpError(400, result.code, result.message);
     return c.json({ ok: true });
+  });
+
+  api.get('/transparency', async (c) => {
+    const [state, escrows] = await Promise.all([transparency(deps), recentEscrows(deps)]);
+    return c.json(jsonSafe({ ...(state as object), recentEscrows: escrows }));
+  });
+
+  api.get('/listings/:slug/report', async (c) => {
+    const signed = await scanReport(deps, c.req.param('slug'));
+    if (c.req.query('download') === '1') {
+      c.header(
+        'content-disposition',
+        `attachment; filename="trenchmart-report-${c.req.param('slug')}-${signed.report.version.semver}.json"`,
+      );
+    }
+    return c.json(jsonSafe(signed));
+  });
+
+  api.get('/orders/:id/escrow', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await orderEscrow(deps, c.req.param('id'), user.id as string)));
   });
 
   api.get('/orders/:id', async (c) => {

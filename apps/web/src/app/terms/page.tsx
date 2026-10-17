@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
-import { CONTACT_EMAIL, bonds, protocol } from '@/lib/protocol-facts';
+import { CONTACT_LABEL, CONTACT_URL, bonds, protocol } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Terms of Service · TrenchMart' };
 
@@ -63,13 +63,14 @@ export default function TermsPage() {
           status it had before. One dispute is kept per order.
         </p>
       </DocSection>
-      <DocSection id="verification" title="AI verification">
+      <DocSection id="verification" title="Automated review">
         <p>
           Every upload is checked by the static scanner and, for userscripts and JavaScript alerts,
-          by a sandbox. {protocol.aiAgentId} then approves the version, rejects it, or asks the
-          creator for a real explanation of a warning. There is no human reviewer. A passing review
-          means the automated checks completed. It does not mean the tool will make money, that it
-          is fit for a particular terminal, or that it will stay safe after you change it.
+          by a sandbox. A rules engine, {protocol.aiAgentId}, then approves the version, rejects it,
+          or asks the creator for a real explanation of a warning. There is no human reviewer. A
+          passing review means the automated checks completed. It does not mean the tool will make
+          money, that it is fit for a particular terminal, or that it will stay safe after you
+          change it.
         </p>
       </DocSection>
       <DocSection id="bonds" title="Creator bonds">
@@ -112,8 +113,8 @@ export default function TermsPage() {
       <DocSection id="contact" title="Contact">
         <p>
           Questions about these terms or an order:{' '}
-          <a className="text-ink underline" href={`mailto:${CONTACT_EMAIL}`}>
-            {CONTACT_EMAIL}
+          <a className="text-ink underline" href={CONTACT_URL}>
+            {CONTACT_LABEL}
           </a>
           . Include the order id and, if you have it, the transaction signature.
         </p>

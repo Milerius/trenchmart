@@ -16,7 +16,7 @@ export const DEFAULT_FEES: FeeConfig = {
 
 const SPLIT_LABEL: Record<string, string> = {
   buyback: '$TRENCH buyback',
-  ai_verification: 'AI verification',
+  ai_verification: 'Verification',
   ops: 'Operations',
   safety: 'Safety fund',
 };

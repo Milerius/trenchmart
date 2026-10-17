@@ -7,6 +7,7 @@ import { NetworkBanner } from '@/components/ui';
 import { api } from '@/lib/api';
 import { tierChip, usePublicConfig } from '@/lib/config';
 import { useWallet, WalletProvider } from '@/lib/wallet';
+import { ESCROW_PROGRAM_ID, explorerAddress, shortKey } from '@/lib/protocol-facts';
 
 /** Same geometry as brand/logo-mark.svg. */
 export function LogoMark({ className }: { className?: string }) {
@@ -34,7 +35,7 @@ const TICKER_FACTS = [
   'Solana devnet · live',
   'Holders: up to 100% off the 5% fee',
   'Creators: 0% commission',
-  'Every version scanned, sandboxed and AI-verified',
+  'Every version scanned; scripts sandboxed; rules-engine review',
 ];
 
 function Ticker() {
@@ -201,13 +202,22 @@ function Footer() {
           trenchmart
         </span>
         <Link href="/verify" className="hover:text-ink">
-          Verify a file
+          Verify &amp; proof
         </Link>
+        <a
+          href={explorerAddress(ESCROW_PROGRAM_ID)}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono hover:text-ink"
+          data-testid="footer-program"
+        >
+          Escrow program {shortKey(ESCROW_PROGRAM_ID)} ↗
+        </a>
         <Link href="/token" className="hover:text-ink">
           Fees &amp; $TRENCH
         </Link>
         <Link href="/sell" className="hover:text-ink">
-          How AI verification works
+          How automated review works
         </Link>
         <Link href="/docs" className="hover:text-ink">
           Docs

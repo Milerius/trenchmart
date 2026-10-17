@@ -58,14 +58,14 @@ type VersionView = {
 const STEP_LABEL: Record<string, string> = {
   static: 'Static checks',
   sandbox: 'Sandbox',
-  ai: 'AI verdict',
+  ai: 'Verdict',
   done: 'Done',
 };
 
 const PIPELINE: [string, string][] = [
   ['static', 'Rules for eval, remote code, key access, obfuscation and declared hosts'],
   ['sandbox', 'Runs in an isolated browser sandbox; every request and wallet call is logged'],
-  ['ai', 'AI compares what the file does with what the listing says'],
+  ['ai', 'The rules engine weighs the checks and your note on any warning'],
 ];
 
 function seconds(durationMs: number | undefined): string {
@@ -238,10 +238,10 @@ export default function VersionPage() {
         </Link>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Live AI review</h1>
+            <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Live review</h1>
             <p className="m-0 mt-1 max-w-2xl text-ink-2">
               Your file is checked the moment it lands. Static checks and the sandbox run together,
-              then AI verification gives its verdict. Most reviews finish in seconds.
+              then the rules engine gives its verdict. Most reviews finish in seconds.
             </p>
           </div>
           <div className="text-right" aria-live="off">
@@ -273,7 +273,7 @@ export default function VersionPage() {
         <Skeleton className="h-12 w-full" />
       )}
 
-      <ol aria-label="Live AI review" aria-live="polite" className="m-0 space-y-2 p-0">
+      <ol aria-label="Live review" aria-live="polite" className="m-0 space-y-2 p-0">
         {PIPELINE.map(([step, description], index) => {
           const event = byStep.get(step);
           const tone = stepTone(event);
@@ -372,7 +372,7 @@ export default function VersionPage() {
           <div className="min-w-0 flex-1">
             <p className="m-0 font-semibold">Approved and live</p>
             <p className="m-0 text-sm text-accent-body">
-              AI-verified{totalMs ? ` in ${seconds(totalMs)}` : ''}. Buyers see the checks and the
+              Reviewed{totalMs ? ` in ${seconds(totalMs)}` : ''}. Buyers see the checks and the
               pinned hash on your listing.
             </p>
           </div>

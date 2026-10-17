@@ -7,9 +7,9 @@ const sans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
 const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 
 export const metadata: Metadata = {
-  title: 'TrenchMart · AI-verified trading tools, escrowed on Solana',
+  title: 'TrenchMart · Reviewed trading tools, escrowed on Solana devnet',
   description:
-    'Buy and sell AI-verified trading scripts, filters and wallet lists. Escrow on every order, 0% creator commission.',
+    'Buy and sell trading scripts, filters and wallet lists that pass automated security review. On-chain escrow on every order, 0% creator commission. Devnet proof of concept.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

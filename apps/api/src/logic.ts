@@ -3,9 +3,13 @@ import { unzipSync, zipSync, strToU8 } from 'fflate';
 import type { Sql } from '@trenchmart/db';
 import { clamAvHttpClient, scan } from '@trenchmart/scanner';
 import {
-  AI_ENGINE_VER,
   attestationMessage,
   runAiVerifier,
+  combineVerdicts,
+  llmConfigured,
+  runLlmReview,
+  RULES_ENGINE,
+  type LlmVerdict,
   signAttestation,
 } from '@trenchmart/ai-verifier';
 import {
@@ -83,6 +87,8 @@ export type Deps = {
   sandboxQueue?: SandboxQueue;
   /** Required when ESCROW_PROGRAM_ID is set. */
   escrowChain?: EscrowChain;
+  /** Fetch used for the optional model review. Defaults to the global fetch. */
+  llmFetch?: typeof fetch;
 };
 
 function chainOf(deps: Deps): EscrowChain {
@@ -92,6 +98,9 @@ function chainOf(deps: Deps): EscrowChain {
 }
 
 type Row = Record<string, any>;
+
+/** Engine label stored on sandbox scans (the isolated runner in packages/scanner). */
+export const SANDBOX_ENGINE = 'sandbox-isolate@1.0.0';
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', arrayBufferOf(bytes));
@@ -1282,7 +1291,7 @@ async function recordSandbox(
   await deps.sql`delete from scans where version_id = ${versionId} and kind = 'sandbox'`;
   const scanRow = await deps.sql<{ id: string }[]>`
     insert into scans (version_id, kind, finished_at, engine_ver, summary, raw)
-    values (${versionId}, 'sandbox', ${deps.now()}, ${AI_ENGINE_VER}, ${verdict}::check_result, ${deps.sql.json(raw as never)})
+    values (${versionId}, 'sandbox', ${deps.now()}, ${SANDBOX_ENGINE}, ${verdict}::check_result, ${deps.sql.json(raw as never)})
     returning id
   `;
   const scanId = scanRow[0]?.id;
@@ -1333,7 +1342,7 @@ export async function storeSandbox(
   await deps.sql`delete from scans where version_id = ${versionId} and kind = 'sandbox'`;
   const scanRow = await deps.sql<{ id: string }[]>`
     insert into scans (version_id, kind, finished_at, engine_ver, summary, raw)
-    values (${versionId}, 'sandbox', ${deps.now()}, ${AI_ENGINE_VER}, ${summary}::check_result, ${deps.sql.json(raw as never)})
+    values (${versionId}, 'sandbox', ${deps.now()}, ${SANDBOX_ENGINE}, ${summary}::check_result, ${deps.sql.json(raw as never)})
     returning id
   `;
   const scanId = scanRow[0]?.id;
@@ -1379,6 +1388,53 @@ export async function storeSandbox(
   );
 }
 
+/**
+ * Optional model review. Runs only when LLM_API_KEY, LLM_BASE_URL and LLM_MODEL are all set and
+ * the rules did not already reject. A model failure keeps the rules verdict and says so.
+ */
+async function modelVerdict(
+  deps: Deps,
+  version: Row,
+  checks: { ruleId: string; result: string; title: string; detail: string }[],
+  rules: { decision: string },
+  sandboxVerdict?: 'pass' | 'warn' | 'fail',
+  sandboxWalletCalls?: string[],
+): Promise<{ verdict: LlmVerdict | null; note: string | null }> {
+  const config = { ...deps.env.llm, fetch: deps.llmFetch };
+  if (!llmConfigured(config) || rules.decision === 'reject') return { verdict: null, note: null };
+  try {
+    const listing = (
+      await deps.sql<
+        Row[]
+      >`select title, description from listings where id = ${version.listing_id}`
+    )[0];
+    const bytes = await deps.blob.get(version.r2_key as string);
+    const excerpt = bytes ? new TextDecoder().decode(bytes.slice(0, 24_000)) : '';
+    const hosts = checks
+      .filter((check) => check.ruleId === 'sandbox-network' && check.result !== 'pass')
+      .map((check) => check.detail);
+    const verdict = await runLlmReview(config, {
+      title: String(listing?.title ?? ''),
+      description: String(listing?.description ?? ''),
+      declared: version.declared,
+      fileName: String(version.file_name),
+      fileExcerpt: excerpt,
+      checks,
+      sandbox: {
+        verdict: sandboxVerdict ?? null,
+        walletCalls: sandboxWalletCalls ?? [],
+        hosts,
+      },
+    });
+    return { verdict, note: null };
+  } catch (err) {
+    return {
+      verdict: null,
+      note: `Model review unavailable (${(err as Error).message.slice(0, 80)}); rules verdict only.`,
+    };
+  }
+}
+
 async function decideWithAgent(
   deps: Deps,
   version: Row,
@@ -1392,13 +1448,23 @@ async function decideWithAgent(
   reason: string;
   resumeStep: 'static' | 'sandbox' | 'ai' | null;
 }> {
-  const decision = runAiVerifier({
+  const rules = runAiVerifier({
     checks,
     creatorNote: version.creator_note as string | null,
     sandboxVerdict: sandboxVerdict ?? null,
     sandboxWalletCalls,
     agentId: deps.env.aiAgentId,
   });
+  const model = await modelVerdict(
+    deps,
+    version,
+    checks,
+    rules,
+    sandboxVerdict,
+    sandboxWalletCalls,
+  );
+  const decision = combineVerdicts(rules, model.verdict);
+  const engine = model.verdict ? `${RULES_ENGINE}+llm` : RULES_ENGINE;
   const issuedAt = deps.now().toISOString();
   const message = attestationMessage({
     versionId: version.id as string,
@@ -1408,9 +1474,9 @@ async function decideWithAgent(
   });
   const signature = await signAttestation(message, deps.env.aiAttestSecret);
   await deps.sql`
-    insert into ai_reviews (version_id, agent_id, decision, notes, attestation, signature, credit_lamports)
+    insert into ai_reviews (version_id, agent_id, decision, notes, attestation, signature, credit_lamports, engine, model)
     values (
-      ${version.id}, ${decision.agentId}, ${decision.decision}, ${decision.notes}, ${message}, ${signature}, 0
+      ${version.id}, ${decision.agentId}, ${decision.decision}, ${model.note ? `${decision.notes} ${model.note}` : decision.notes}, ${message}, ${signature}, 0, ${engine}, ${model.verdict?.model ?? null}
     )
   `;
   if (decision.decision === 'approve' && summary !== 'fail') {
@@ -1508,10 +1574,8 @@ export async function landingStats(deps: Deps) {
       (select coalesce(sum(price), 0)::bigint from orders where status in ('paid', 'released')) as volume
   `;
   const row = rows[0] ?? { listings: 0, creators: 0, orders: 0, volume: 0n };
-  if (
-    deps.env.landingStats === 'mock' ||
-    (deps.env.landingStats === 'auto' && row.listings === 0)
-  ) {
+  // Sample figures only when explicitly asked for (local demos). Production always shows real counts.
+  if (deps.env.landingStats === 'mock') {
     return MOCK_LANDING_STATS;
   }
   return {

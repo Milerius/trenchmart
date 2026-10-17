@@ -18,6 +18,8 @@ import {
 } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { TIER_LABEL } from '@/lib/config';
+import { solText } from '@/lib/money';
+import { explorerAddress, explorerTx, shortKey } from '@/lib/protocol-facts';
 import { useWallet } from '@/lib/wallet';
 
 type Order = {
@@ -31,6 +33,9 @@ type Order = {
   created_at?: string;
   tier_at_purchase?: string;
   tx_sig?: string | null;
+  escrow_address?: string | null;
+  release_sig?: string | null;
+  refund_sig?: string | null;
   amount: { lamports: string; usdCents: string | null };
 };
 
@@ -245,6 +250,7 @@ function OrderRow({
         </div>
       </div>
       <EscrowTimeline order={order} now={now} />
+      {order.escrow_address ? <OnChainReceipt order={order} /> : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <DownloadButton
           status={order.status}
@@ -333,5 +339,121 @@ function EscrowTimeline({ order, now }: { order: Order; now: number }) {
         ))}
       </ol>
     </div>
+  );
+}
+
+type EscrowProof = {
+  programId: string | null;
+  address: string | null;
+  txSig: string | null;
+  releaseSig: string | null;
+  refundSig: string | null;
+  onChain:
+    | { exists: false }
+    | {
+        exists: true;
+        status: string;
+        price: string;
+        deposit: string;
+        escrowUntil: string;
+        seller: string;
+      }
+    | null;
+};
+
+/** Reads the order's escrow account from devnet so the buyer can check the server's claims. */
+function OnChainReceipt({ order }: { order: Order }) {
+  const [proof, setProof] = useState<EscrowProof | null>(null);
+  const [error, setError] = useState('');
+  function load() {
+    if (proof || error) return;
+    void api<EscrowProof>(`/orders/${order.id}/escrow`)
+      .then(setProof)
+      .catch((err: Error) => setError(err.message));
+  }
+  const chain = proof?.onChain;
+  const link = (href: string, text: string) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-mono text-ink-2 underline-offset-4 hover:underline"
+    >
+      {text} ↗
+    </a>
+  );
+  return (
+    <details
+      data-testid="onchain-receipt"
+      className="mt-4 rounded-card border border-line-soft bg-inset p-3 text-[13px]"
+      onToggle={(event) => {
+        if ((event.target as HTMLDetailsElement).open) load();
+      }}
+    >
+      <summary className="cursor-pointer font-medium text-ink">On-chain proof</summary>
+      {error ? <p className="m-0 mt-2 text-danger">{error}</p> : null}
+      {!proof && !error ? <p className="m-0 mt-2 text-muted">Reading devnet…</p> : null}
+      {proof ? (
+        <dl className="m-0 mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
+          <dt className="text-muted">Escrow account</dt>
+          <dd className="m-0">
+            {proof.address
+              ? link(explorerAddress(proof.address), shortKey(proof.address, 8, 6))
+              : '—'}
+          </dd>
+          <dt className="text-muted">Program</dt>
+          <dd className="m-0">
+            {proof.programId
+              ? link(explorerAddress(proof.programId), shortKey(proof.programId, 8, 6))
+              : '—'}
+          </dd>
+          {chain && chain.exists ? (
+            <>
+              <dt className="text-muted">On-chain status</dt>
+              <dd className="m-0 font-mono text-ink-2">{chain.status}</dd>
+              <dt className="text-muted">Locked</dt>
+              <dd className="m-0 font-mono text-ink-2">
+                {solText(chain.deposit)} (price {solText(chain.price)})
+              </dd>
+              <dt className="text-muted">Releasable after</dt>
+              <dd className="m-0 font-mono text-ink-2">
+                {utc(chain.escrowUntil)} · read from the account
+              </dd>
+            </>
+          ) : (
+            <>
+              <dt className="text-muted">On-chain status</dt>
+              <dd className="m-0 text-ink-2">
+                {chain === null
+                  ? 'Not readable right now'
+                  : 'Account closed (settled) or not created'}
+              </dd>
+            </>
+          )}
+          {proof.txSig ? (
+            <>
+              <dt className="text-muted">Payment</dt>
+              <dd className="m-0">{link(explorerTx(proof.txSig), shortKey(proof.txSig, 8, 6))}</dd>
+            </>
+          ) : null}
+          {proof.releaseSig ? (
+            <>
+              <dt className="text-muted">Release</dt>
+              <dd className="m-0">
+                {link(explorerTx(proof.releaseSig), shortKey(proof.releaseSig, 8, 6))}
+              </dd>
+            </>
+          ) : null}
+          {proof.refundSig ? (
+            <>
+              <dt className="text-muted">Refund</dt>
+              <dd className="m-0">
+                {link(explorerTx(proof.refundSig), shortKey(proof.refundSig, 8, 6))}
+              </dd>
+            </>
+          ) : null}
+        </dl>
+      ) : null}
+    </details>
   );
 }

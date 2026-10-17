@@ -67,7 +67,7 @@ export default function CreatorPage() {
             <Money lamports={profile.bond} centsPerSol={cents} strong stacked />
           </div>
           <Tag tone="ok" className="mt-2">
-            {profile.listings.length} AI-VERIFIED LISTING{profile.listings.length === 1 ? '' : 'S'}
+            {profile.listings.length} REVIEWED LISTING{profile.listings.length === 1 ? '' : 'S'}
           </Tag>
         </div>
       </div>
