@@ -136,20 +136,30 @@ function Nav() {
               {tierChip(wallet.session.tier, config)}
             </span>
           ) : null}
-          <button
-            data-testid="connect"
-            type="button"
-            className="h-11 rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover disabled:opacity-100"
-            onClick={() => void (wallet.session ? wallet.logout() : wallet.connect())}
-            disabled={wallet.busy}
-            aria-busy={wallet.busy || undefined}
-          >
-            {wallet.session
-              ? `${wallet.session.wallet.slice(0, 4)}…${wallet.session.wallet.slice(-4)}`
-              : wallet.busy
-                ? 'Check your wallet…'
-                : 'Connect wallet'}
-          </button>
+          {wallet.phantomHref && !wallet.session ? (
+            <a
+              data-testid="connect"
+              href={wallet.phantomHref}
+              className="inline-flex h-11 items-center rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover"
+            >
+              Open in Phantom
+            </a>
+          ) : (
+            <button
+              data-testid="connect"
+              type="button"
+              className="h-11 rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover disabled:opacity-100"
+              onClick={() => void (wallet.session ? wallet.logout() : wallet.connect())}
+              disabled={wallet.busy}
+              aria-busy={wallet.busy || undefined}
+            >
+              {wallet.session
+                ? `${wallet.session.wallet.slice(0, 4)}…${wallet.session.wallet.slice(-4)}`
+                : wallet.busy
+                  ? 'Check your wallet…'
+                  : 'Connect wallet'}
+            </button>
+          )}
         </div>
       </div>
       {wallet.error ? (
