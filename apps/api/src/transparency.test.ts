@@ -38,6 +38,43 @@ describe('model review', () => {
     expect(combineVerdicts(rules, null)).toEqual(rules);
   });
 
+  it('sends reasoning_effort without temperature for reasoning models, and caps output', async () => {
+    let sent: Record<string, unknown> = {};
+    const ok = (async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return new Response(
+        JSON.stringify({
+          model: 'm-1',
+          choices: [{ message: { content: '{"decision":"approve","notes":"fine"}' } }],
+        }),
+      );
+    }) as unknown as typeof fetch;
+    const input = {
+      title: 't',
+      description: 'd',
+      declared: {},
+      fileName: 'f',
+      fileExcerpt: 'x'.repeat(60_000),
+      checks: [],
+      sandbox: { verdict: null, walletCalls: [], hosts: [] },
+    };
+    const verdict = await runLlmReview(
+      { baseUrl: 'https://x/v1', apiKey: 'k', model: 'm', reasoningEffort: 'medium', fetch: ok },
+      input,
+    );
+    expect(sent.reasoning_effort).toBe('medium');
+    expect(sent).not.toHaveProperty('temperature');
+    expect(sent.max_completion_tokens).toBe(4000);
+    const user = (sent.messages as { content: string }[])[1]!.content;
+    expect(user.length).toBeLessThan(41_500);
+    expect(user).toContain('"truncated":true');
+    expect(verdict).toMatchObject({ decision: 'approve', model: 'm-1', reasoningEffort: 'medium' });
+    expect(combineVerdicts(rules, verdict).notes).toContain('Model review (m-1, reasoning medium)');
+    await runLlmReview({ baseUrl: 'https://x/v1', apiKey: 'k', model: 'm', fetch: ok }, input);
+    expect(sent.temperature).toBe(0);
+    expect(sent).not.toHaveProperty('reasoning_effort');
+  });
+
   it('needs the full config and rejects malformed answers', async () => {
     expect(llmConfigured({ baseUrl: 'x', apiKey: '', model: 'm' })).toBe(false);
     const bad = (async () =>

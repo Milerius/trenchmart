@@ -66,8 +66,9 @@ export default function TermsPage() {
       <DocSection id="verification" title="Automated review">
         <p>
           Every upload is checked by the static scanner and, for userscripts and JavaScript alerts,
-          by a sandbox. A rules engine, {protocol.aiAgentId}, then approves the version, rejects it,
-          or asks the creator for a real explanation of a warning. There is no human reviewer. A
+          by a sandbox. The automated reviewer, {protocol.aiAgentId} (a rules engine plus a language
+          model that can only make the verdict stricter), then approves the version, rejects it, or
+          asks the creator for a real explanation of a warning. There is no human reviewer. A
           passing review means the automated checks completed. It does not mean the tool will make
           money, that it is fit for a particular terminal, or that it will stay safe after you
           change it.

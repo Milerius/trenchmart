@@ -22,7 +22,7 @@ export type Env = {
   aiVerifierUrl: string;
   aiAttestSecret: string;
   /** OpenAI-compatible model for the review step. All three must be set or the rules engine runs alone. */
-  llm: { baseUrl: string; apiKey: string; model: string };
+  llm: { baseUrl: string; apiKey: string; model: string; reasoningEffort: string };
   /** Ed25519 secret (base58 or JSON array) that signs public scan reports. */
   reportSigningKey: string;
   /** Squads multisig config account that controls the treasury vault. */
@@ -93,6 +93,7 @@ export function readEnv(source: Record<string, string | undefined> = process.env
       baseUrl: blank(source.LLM_BASE_URL) || 'https://api.x.ai/v1',
       apiKey: blank(source.LLM_API_KEY),
       model: blank(source.LLM_MODEL),
+      reasoningEffort: blank(source.LLM_REASONING_EFFORT),
     },
     reportSigningKey: blank(source.REPORT_SIGNING_KEY),
     multisigAddress: blank(source.MULTISIG_ADDRESS),

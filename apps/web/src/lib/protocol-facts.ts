@@ -24,7 +24,15 @@ export const CONTACT_LABEL = 'GitHub issues (github.com/Milerius/trenchmart)';
 /** Private reports (security, personal data) go through a private GitHub advisory. */
 export const PRIVATE_CONTACT_URL = 'https://github.com/Milerius/trenchmart/security/advisories/new';
 export const AI_AGENT_ID = 'trenchmart-review-v1';
-export const AI_ENGINE = 'rules@1.0.0';
+export const AI_ENGINE = 'rules@1.0.0+llm';
+export const RULES_ENGINE = 'rules@1.0.0';
+/**
+ * Intended production model settings (LLM_MODEL, LLM_REASONING_EFFORT), used in copy only.
+ * The live values are at /api/v1/transparency and on /verify; a given report may show a
+ * rules-only review (model skipped or unavailable) or a different model.
+ */
+export const AI_MODEL = 'gpt-5.6-luna';
+export const AI_REASONING_EFFORT = 'medium';
 export const SCANNER_ENGINE = 'scanner@1.1.0';
 /** Matches the `limit 15` payout batch in apps/api/src/logic.ts. */
 export const PAYOUT_BATCH_LIMIT = 15;
@@ -158,6 +166,9 @@ export const protocol = {
   downloadUrlSeconds: DOWNLOAD_URL_SECONDS,
   aiAgentId: AI_AGENT_ID,
   aiEngine: AI_ENGINE,
+  rulesEngine: RULES_ENGINE,
+  aiModel: AI_MODEL,
+  aiReasoningEffort: AI_REASONING_EFFORT,
   scannerEngine: SCANNER_ENGINE,
 };
 

@@ -46,9 +46,15 @@ export default function SecurityDocsPage() {
           report in your browser.
         </p>
         <p>
-          The review step is a rules engine ({protocol.aiEngine}). An optional language-model
-          reviewer can be switched on; it can only make a verdict stricter, and each report names
-          the engine and model that reviewed the version.
+          The review step is an AI review ({protocol.aiEngine}): a rules engine (
+          {protocol.rulesEngine}) and an LLM ({protocol.aiModel}, reasoning effort{' '}
+          {protocol.aiReasoningEffort}). The model sees the listing text buyers read (summary,
+          README, install guide), the first 40,000 characters of the file, your note and the check
+          results, all as untrusted data. The stricter verdict wins, so the model can only make a
+          verdict stricter. Each signed report names the engine and model that reviewed the version.
+          The model is skipped when the rules already reject, and if it is unavailable the rules
+          verdict stands; either way the report shows the rules engine alone. Live settings are on
+          /verify.
         </p>
       </DocSection>
       <DocSection id="downloads" title="Downloads and sessions">

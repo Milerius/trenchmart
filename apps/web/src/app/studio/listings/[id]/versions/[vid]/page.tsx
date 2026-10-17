@@ -65,7 +65,10 @@ const STEP_LABEL: Record<string, string> = {
 const PIPELINE: [string, string][] = [
   ['static', 'Rules for eval, remote code, key access, obfuscation and declared hosts'],
   ['sandbox', 'Runs in an isolated browser sandbox; every request and wallet call is logged'],
-  ['ai', 'The rules engine weighs the checks and your note on any warning'],
+  [
+    'ai',
+    'The rules engine and an LLM weigh the code, the checks and your note; the stricter verdict wins',
+  ],
 ];
 
 function seconds(durationMs: number | undefined): string {
@@ -241,7 +244,8 @@ export default function VersionPage() {
             <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Live review</h1>
             <p className="m-0 mt-1 max-w-2xl text-ink-2">
               Your file is checked the moment it lands. Static checks and the sandbox run together,
-              then the rules engine gives its verdict. Most reviews finish in seconds.
+              then the rules engine and an LLM give their verdict. Most reviews finish in about a
+              minute.
             </p>
           </div>
           <div className="text-right" aria-live="off">

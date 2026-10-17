@@ -32,7 +32,8 @@ export default function DocsOverviewPage() {
           Buyers browse a live listing, pay the price plus a fee, and download only after escrow
           releases. Sellers bond the category, pay a verification fee unless their tier waives it,
           and upload a file. Static checks, a sandbox, and the automated reviewer{' '}
-          {protocol.aiAgentId} (a rules engine) decide whether the version goes live.
+          {protocol.aiAgentId} (a rules engine plus an LLM that can only make the verdict stricter)
+          decide whether the version goes live.
         </p>
         <p>
           Questions about an order go to{' '}

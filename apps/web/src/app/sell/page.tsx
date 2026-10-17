@@ -8,7 +8,7 @@ const STEPS: [string, string][] = [
   ],
   [
     'Upload and watch the review',
-    'Static checks (and, for scripts, an isolated sandbox) run at once, then a rules engine approves, rejects or asks for a note. Seconds, not days.',
+    'Static checks (and, for scripts, an isolated sandbox) run at once, then a rules engine and an LLM review the code against your listing and approve, reject or ask for a note. About a minute, not days.',
   ],
   ['Get paid in SOL', 'You keep 100% of your price. Each sale pays out after its escrow releases.'],
 ];

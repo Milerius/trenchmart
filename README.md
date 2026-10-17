@@ -40,9 +40,9 @@ Your SOL is held in escrow for 48 hours before the creator is paid. Open a dispu
 </td>
 <td width="33%" valign="top">
 
-**Automated review in seconds**
+**AI review in under a minute**
 
-Every version is statically scanned (scripts also run in an isolated sandbox) and judged by a rules engine before it goes live. An optional language-model reviewer can be switched on with `LLM_API_KEY`; it can only make a verdict stricter. Creators watch each step happen. There is no review queue.
+Every version is statically scanned (scripts also run in an isolated sandbox) and judged by an AI review before it goes live: a rules engine plus an LLM (production: `gpt-5.6-luna`, reasoning effort medium) that reads the code against the listing. The stricter verdict wins, so the model can only make a verdict stricter. Creators watch each step happen. There is no review queue.
 
 </td>
 <td width="33%" valign="top">
@@ -117,7 +117,7 @@ Your tier is based on your lowest $TRENCH balance over the last 72 hours, so it 
 
 1. **Static scan** for `eval`, remote code, key and seed access, transaction signing, obfuscation, clipboard use and undeclared hosts.
 2. **Isolated sandbox run** (userscripts and JavaScript alerts) with network egress blocked and every request and wallet call logged.
-3. **Rules-engine verdict** on the checks and the creator's note, saved as a signed attestation. With `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_MODEL` set, an OpenAI-compatible model also compares the code with the listing; it can only tighten the verdict. The full report is Ed25519-signed and downloadable per listing.
+3. **Rules-engine verdict** on the checks and the creator's note, saved as a signed attestation. With `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_MODEL` set (optionally `LLM_REASONING_EFFORT`), an OpenAI-compatible model also compares the code with the listing; it can only tighten the verdict, and the signed report records the model. The full report is Ed25519-signed and downloadable per listing.
 
 Approved files are pinned by SHA-256. Buyers only ever receive that exact file, watermarked to their wallet.
 

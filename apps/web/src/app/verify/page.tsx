@@ -104,7 +104,13 @@ type Facts = {
     owner: string | null;
     lamports: string | null;
   }[];
-  review: { engine: string; model: string | null; sandboxEngine: string; note: string };
+  review: {
+    engine: string;
+    model: string | null;
+    reasoningEffort?: string | null;
+    sandboxEngine: string;
+    note: string;
+  };
   reportSigningKey: string | null;
   recentEscrows: {
     escrow: string;
@@ -246,8 +252,9 @@ function ProofSection() {
             <Label>Review engine</Label>
             <p className="m-0 mt-2 text-[13px] text-ink-2">
               {facts.review.engine}
-              {facts.review.model ? ` · model ${facts.review.model}` : ''} · sandbox{' '}
-              {facts.review.sandboxEngine}. {facts.review.note}
+              {facts.review.model ? ` · model ${facts.review.model}` : ''}
+              {facts.review.reasoningEffort ? ` (reasoning ${facts.review.reasoningEffort})` : ''} ·
+              sandbox {facts.review.sandboxEngine}. {facts.review.note}
             </p>
             <p className="m-0 mt-1 text-[13px] text-ink-2">
               Scan reports are signed with Ed25519 key{' '}

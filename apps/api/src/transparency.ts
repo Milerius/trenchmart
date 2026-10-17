@@ -189,10 +189,11 @@ export async function transparency(deps: Deps) {
     review: {
       engine: env.llm.apiKey && env.llm.model ? `${RULES_ENGINE}+llm` : RULES_ENGINE,
       model: env.llm.apiKey && env.llm.model ? env.llm.model : null,
+      reasoningEffort: env.llm.apiKey && env.llm.model ? env.llm.reasoningEffort || null : null,
       sandboxEngine: SANDBOX_ENGINE,
       note:
         env.llm.apiKey && env.llm.model
-          ? 'Rules engine plus a language model. The model can only make a verdict stricter.'
+          ? 'Rules engine plus a language model (LLM). The model reviews a version unless the rules already rejected it or the model was unavailable; when both give a verdict, the stricter one wins, so the model can only make a verdict stricter. Each review records whether a model ran and which one.'
           : 'Rules engine only (no language model is configured). Reports say which engine reviewed each version.',
     },
     reportSigningKey: reportPublicKey(deps),
