@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   // No CSP. A script-src policy that omits the extension origin blocks Phantom from
   // registering a Wallet Standard wallet, which is what made Connect look dead.
+  // Sign-in messages name the apex domain (SIWS_DOMAIN / APP_URL). Phantom refuses to show a sign-in
+  // request whose domain differs from the page origin, so wallet connect fails on www. Send www to the apex.
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.trenchmart.fun' }],
+        destination: 'https://trenchmart.fun/:path*',
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [{ source: '/api/v1/:path*', destination: `${apiUrl}/api/v1/:path*` }];
   },
