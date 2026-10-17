@@ -184,12 +184,21 @@ importers:
       '@solana/web3.js':
         specifier: 1.99.0
         version: 1.99.0(bufferutil@4.1.0)(typescript@7.0.2)
+      '@trenchmart/db':
+        specifier: workspace:*
+        version: link:packages/db
+      '@trenchmart/shared':
+        specifier: workspace:*
+        version: link:packages/shared
       '@typescript/typescript6':
         specifier: 6.0.2
         version: 6.0.2
       bn.js:
         specifier: 5.2.5
         version: 5.2.5
+      bs58:
+        specifier: 6.0.0
+        version: 6.0.0
       eslint:
         specifier: 10.13.0
         version: 10.13.0(jiti@2.7.0)(supports-color@10.2.2)
@@ -205,6 +214,9 @@ importers:
       turbo:
         specifier: 2.11.9
         version: 2.11.9
+      tweetnacl:
+        specifier: 1.0.3
+        version: 1.0.3
       typescript:
         specifier: 7.0.2
         version: 7.0.2
