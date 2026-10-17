@@ -152,6 +152,22 @@ test('opens the wallet picker and keeps every wallet when none is installed', as
   for (const id of order) {
     await expect(modal.locator(`[data-wallet=${id}]`)).toHaveAttribute('data-installed', 'false');
   }
+  await expect(modal.locator('[data-logo=generic]')).toHaveCount(0);
+  const logos = new Map<string, string>();
+  for (const id of order) {
+    const logo = modal.locator(`[data-wallet=${id}] img[data-logo=bundled]`);
+    await expect(logo).toHaveCount(1);
+    const src = (await logo.getAttribute('src')) ?? '';
+    expect(src).toMatch(/^data:image\/(svg\+xml|png);base64,/);
+    expect(
+      await logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+    ).toBe(true);
+    logos.set(id, src);
+  }
+  expect(
+    new Set(order.filter((id) => !id.startsWith('open-')).map((id) => logos.get(id))).size,
+  ).toBe(7);
+  expect(logos.get('open-trust')).toBe(logos.get('trust'));
   const phantom = modal.getByTestId('wallet-option-phantom');
   await expect(phantom).toContainText('Popular');
   await expect(phantom).toHaveAttribute('href', 'https://phantom.com/download');
@@ -292,6 +308,10 @@ test('does not auto-pick when more than one wallet is installed', async ({ page 
   const rows = page.getByTestId('connect-modal').locator('[data-wallet]');
   await expect(rows.nth(0)).toHaveAttribute('data-wallet', 'solflare');
   await expect(rows.nth(1)).toHaveAttribute('data-wallet', 'phantom');
+  const installedLogo = page.locator('[data-wallet=solflare] img');
+  await expect(installedLogo).toHaveAttribute('data-logo', 'wallet');
+  await expect(installedLogo).toHaveAttribute('src', /^data:image\/svg\+xml,<svg/);
+  await expect(page.locator('[data-wallet=glow] img')).toHaveAttribute('data-logo', 'bundled');
   await page.getByTestId('wallet-option-solflare').click();
   await expect(page.getByTestId('connect')).toHaveText('So1f…1111');
 });
