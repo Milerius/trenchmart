@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { moneyText, solText, usdFor } from '@/lib/money';
+import { moneyText, solText } from '@/lib/money';
 import { useWallet } from '@/lib/wallet';
 
 type Listing = {

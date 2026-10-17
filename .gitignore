@@ -21,3 +21,4 @@ target/
 **/*-keypair.json
 e2e-keys.json
 playwright/.auth/
+apps/web/AGENTS.md

@@ -1,0 +1,268 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Coverage gates live in packages/shared (fee/tier 100, escrow state 90, payouts 85).
+      # The API integration file needs Postgres and runs in the integration job.
+      # A Workers vitest pool is not used: the API imports postgres.js.
+      - run: pnpm --filter @trenchmart/shared --filter @trenchmart/scanner --filter @trenchmart/chain --filter @trenchmart/ai-verifier --filter @trenchmart/db test
+      - run: pnpm --filter @trenchmart/api exec vitest run src/price.test.ts src/sandbox.test.ts src/dispatch.test.ts
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trenchmart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trenchmart"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/trenchmart
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @trenchmart/api exec vitest run src/product.test.ts
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm exec playwright test
+
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: '8.30.1'
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+
+  anchor-build:
+    name: anchor build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: anchor build
+        run: |
+          set -euo pipefail
+          if [ ! -f programs/trench_escrow/Cargo.toml ]; then
+            echo "programs/trench_escrow is not present; skipping anchor build."
+            exit 0
+          fi
+          bash .github/scripts/anchor-toolchain.sh
+          export PATH="$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.local/bin:$PATH"
+          anchor build
+
+  anchor-test:
+    name: anchor test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: anchor test
+        run: |
+          set -euo pipefail
+          if [ ! -f programs/trench_escrow/Cargo.toml ]; then
+            echo "programs/trench_escrow is not present; skipping anchor test."
+            exit 0
+          fi
+          bash .github/scripts/anchor-toolchain.sh
+          export PATH="$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$HOME/.local/bin:$PATH"
+          mkdir -p target/deploy
+          solana-keygen new --no-bip39-passphrase --force -o target/deploy/trench_escrow-keypair.json
+          anchor keys sync
+          anchor test
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: cargo clippy
+        run: |
+          set -euo pipefail
+          if [ ! -f programs/trench_escrow/Cargo.toml ]; then
+            echo "programs/trench_escrow is not present; skipping clippy."
+            exit 0
+          fi
+          bash .github/scripts/anchor-toolchain.sh
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo clippy --manifest-path programs/trench_escrow/Cargo.toml --all-targets -- -D warnings
+
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: cargo fmt
+        run: |
+          set -euo pipefail
+          if [ ! -f programs/trench_escrow/Cargo.toml ]; then
+            echo "programs/trench_escrow is not present; skipping cargo fmt."
+            exit 0
+          fi
+          bash .github/scripts/anchor-toolchain.sh
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo fmt --manifest-path programs/trench_escrow/Cargo.toml -- --check
+
+  cargo-audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: cargo audit
+        run: |
+          set -euo pipefail
+          if [ ! -f programs/trench_escrow/Cargo.toml ]; then
+            echo "programs/trench_escrow is not present; skipping cargo audit."
+            exit 0
+          fi
+          curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.99.1 --profile minimal
+          source "$HOME/.cargo/env"
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo audit --manifest-path programs/trench_escrow/Cargo.toml
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs:
+      - typecheck
+      - lint
+      - unit
+      - integration
+      - e2e
+      - audit
+      - gitleaks
+      - anchor-build
+      - anchor-test
+      - clippy
+      - fmt
+      - cargo-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job
+        env:
+          TYPECHECK: ${{ needs.typecheck.result }}
+          LINT: ${{ needs.lint.result }}
+          UNIT: ${{ needs.unit.result }}
+          INTEGRATION: ${{ needs.integration.result }}
+          E2E: ${{ needs.e2e.result }}
+          AUDIT: ${{ needs.audit.result }}
+          GITLEAKS: ${{ needs.gitleaks.result }}
+          ANCHOR_BUILD: ${{ needs.anchor-build.result }}
+          ANCHOR_TEST: ${{ needs.anchor-test.result }}
+          CLIPPY: ${{ needs.clippy.result }}
+          FMT: ${{ needs.fmt.result }}
+          CARGO_AUDIT: ${{ needs.cargo-audit.result }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          results = {
+              "typecheck": os.environ["TYPECHECK"],
+              "lint": os.environ["LINT"],
+              "unit": os.environ["UNIT"],
+              "integration": os.environ["INTEGRATION"],
+              "e2e": os.environ["E2E"],
+              "audit": os.environ["AUDIT"],
+              "gitleaks": os.environ["GITLEAKS"],
+              "anchor-build": os.environ["ANCHOR_BUILD"],
+              "anchor-test": os.environ["ANCHOR_TEST"],
+              "clippy": os.environ["CLIPPY"],
+              "fmt": os.environ["FMT"],
+              "cargo-audit": os.environ["CARGO_AUDIT"],
+          }
+          print(results)
+          bad = {name: result for name, result in results.items() if result not in ("success", "skipped")}
+          if bad:
+              print("not green:", bad)
+              sys.exit(1)
+          PY

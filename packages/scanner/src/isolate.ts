@@ -59,7 +59,7 @@ function recordRequest(
   url: unknown,
   method: string,
 ): void {
-  let host = 'dynamic';
+  let host: string;
   try {
     host = new URL(String(url)).host || 'dynamic';
   } catch {

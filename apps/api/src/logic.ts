@@ -763,7 +763,7 @@ export async function* reviewVersion(deps: Deps, versionId: string): AsyncGenera
 
   const [staticTimed, sandboxTimed] = await Promise.all([staticWork, sandboxWork]);
   const finishedAt = deps.now().toISOString();
-  let checks: CheckRow[] = [];
+  let checks: CheckRow[];
   let summary = 'pass';
   if (staticTimed) {
     checks = staticTimed.value.checks;
