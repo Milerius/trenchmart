@@ -115,7 +115,7 @@ test('the proof page shows live program, multisig and escrows, and checks a sign
   const proof = page.getByTestId('proof');
   await expect(proof).toContainText('177112 bytes');
   await expect(proof).toContainText('cd'.repeat(32));
-  await expect(proof).toContainText('fund, initialize');
+  await expect(proof.getByRole('list', { name: 'Instructions' })).toContainText('initialize');
   await expect(page.getByTestId('multisig')).toContainText('2 of 3 signers');
   await expect(page.getByTestId('recent-escrows')).toContainText('Proof Pack');
   await expect(
