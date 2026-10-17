@@ -7,24 +7,23 @@ import { NetworkBanner } from '@/components/ui';
 import { tierChip, usePublicConfig } from '@/lib/config';
 import { useWallet, WalletProvider } from '@/lib/wallet';
 
+/** Same geometry as brand/logo-mark.svg. */
+export function LogoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#C6F432" />
+      <g fill="none" stroke="#0A0B0A" strokeWidth="6" strokeLinecap="square" strokeLinejoin="miter">
+        <path d="M17 15 27 23 17 31" />
+        <path d="M11 43H23V51H41V43H53" />
+      </g>
+    </svg>
+  );
+}
+
 export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5" aria-label="TrenchMart home">
-      <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent">
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#0A0B0A"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M4 18 L9 8 L13 14 L16 9 L20 18" />
-        </svg>
-      </span>
+      <LogoMark className="h-8 w-8" />
       <span className="text-lg font-bold tracking-[-0.02em]">trenchmart</span>
     </Link>
   );
@@ -166,7 +165,10 @@ function Footer() {
   return (
     <footer className="mt-20 border-t border-line-soft">
       <div className="mx-auto flex max-w-7xl flex-wrap gap-x-7 gap-y-3 px-6 py-7 text-[13px] text-muted">
-        <span className="font-bold text-ink">trenchmart</span>
+        <span className="flex items-center gap-2 font-bold text-ink">
+          <LogoMark className="h-5 w-5" />
+          trenchmart
+        </span>
         <Link href="/verify" className="hover:text-ink">
           Verify a file
         </Link>
