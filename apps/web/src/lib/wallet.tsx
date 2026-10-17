@@ -352,7 +352,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       signer = await signerFor(last, true);
       signerRef.current = signer;
     }
-    const signed = await signer.signTransaction(fromBase64(txBase64));
+    let signed: Uint8Array;
+    try {
+      signed = await signer.signTransaction(fromBase64(txBase64));
+    } catch (err) {
+      throw new Error(walletRejectionMessage(err), { cause: err });
+    }
     const sent = await api<{ signature: string }>('/tx/send', {
       method: 'POST',
       body: JSON.stringify({ txBase64: toBase64(signed) }),
@@ -395,4 +400,20 @@ export function useWallet(): WalletContextValue {
   const value = useContext(WalletContext);
   if (!value) throw new Error('WalletProvider missing');
   return value;
+}
+
+/**
+ * A wallet that simulates on mainnet cannot predict a devnet transaction and flags it
+ * ("This dApp could be malicious"). Most "rejections" on devnet are that, so say how to fix it.
+ */
+export const DEVNET_WALLET_HINT =
+  'TrenchMart runs on Solana devnet. Switch your wallet to devnet first (Phantom: Settings → Developer Settings → Testnet Mode → Solana Devnet), then try again.';
+
+export function walletRejectionMessage(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err ?? '');
+  const code = (err as { code?: unknown } | null)?.code;
+  if (code === 4001 || /reject|denied|declin|cancel/i.test(text)) {
+    return `You declined in the wallet. ${DEVNET_WALLET_HINT}`;
+  }
+  return text || 'The wallet could not sign this transaction.';
 }

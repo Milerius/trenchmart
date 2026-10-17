@@ -9,6 +9,19 @@ use state::Status;
 
 declare_id!("Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw");
 
+// Lets wallets, explorers and security tools (Phantom, Blowfish, Solscan) identify the
+// program and its owner. https://github.com/neodyme-labs/solana-security-txt
+#[cfg(not(feature = "no-entrypoint"))]
+solana_security_txt::security_txt! {
+    name: "TrenchMart Escrow",
+    project_url: "https://trenchmart.fun",
+    contacts: "link:https://github.com/Milerius/trenchmart/security/advisories/new",
+    policy: "https://github.com/Milerius/trenchmart/security/policy",
+    preferred_languages: "en",
+    source_code: "https://github.com/Milerius/trenchmart",
+    auditors: "None"
+}
+
 #[program]
 pub mod trench_escrow {
     use super::*;

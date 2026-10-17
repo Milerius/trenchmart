@@ -37,8 +37,11 @@ import {
 import {
   compilePayoutBatch,
   compileUnsignedTransferMemo,
+  fromBase64,
   toBase64,
+  TRANSFER_BUDGET,
   type ChainTx,
+  type Simulation,
 } from '@trenchmart/chain';
 import { dispatchSandbox, type SandboxQueue } from './dispatch';
 import {
@@ -75,6 +78,8 @@ export type Deps = {
   now: () => Date;
   getTx: (signature: string) => Promise<ChainTx | null>;
   blockhash: () => Promise<{ blockhash: string; lastValidBlockHeight: number }>;
+  /** Simulates an unsigned transaction (sigVerify off). Optional: skipped when absent. */
+  simulate?: (tx: Uint8Array) => Promise<Simulation>;
   sandboxQueue?: SandboxQueue;
   /** Required when ESCROW_PROGRAM_ID is set. */
   escrowChain?: EscrowChain;
@@ -162,7 +167,47 @@ function unsignedTx(input: {
   memo: string;
   recentBlockhash: string;
 }): string {
-  return toBase64(compileUnsignedTransferMemo(input));
+  return toBase64(compileUnsignedTransferMemo({ ...input, budget: TRANSFER_BUDGET }));
+}
+
+/**
+ * Simulates a transaction before a wallet is asked to sign it. Phantom blocks or warns
+ * ("This dApp could be malicious") when its own simulation fails, so a transaction that
+ * would fail is refused here with the real reason instead. An unreachable RPC does not
+ * block: the wallet and the broadcast preflight still check it.
+ */
+export async function preflightTx(deps: Deps, txBase64: string): Promise<void> {
+  if (!deps.simulate) return;
+  let result: Simulation;
+  try {
+    result = await deps.simulate(fromBase64(txBase64));
+  } catch {
+    return;
+  }
+  if (result.err === null || result.err === undefined) return;
+  const logs = result.logs.join('\n');
+  if (
+    /insufficient (lamports|funds)/i.test(logs) ||
+    JSON.stringify(result.err).includes('InsufficientFunds')
+  ) {
+    throw new HttpError(
+      400,
+      'INSUFFICIENT_SOL',
+      'Not enough devnet SOL in this wallet for the payment and network fee.',
+    );
+  }
+  if (JSON.stringify(result.err).includes('AccountNotFound')) {
+    throw new HttpError(
+      400,
+      'INSUFFICIENT_SOL',
+      'This wallet has no devnet SOL yet. Fund it on devnet, then try again.',
+    );
+  }
+  throw new HttpError(
+    400,
+    'TX_WOULD_FAIL',
+    `This transaction would fail on devnet (${JSON.stringify(result.err).slice(0, 120)}). Nothing was sent.`,
+  );
 }
 
 export async function buildVaultTx(
@@ -174,14 +219,16 @@ export async function buildVaultTx(
   if (!deps.env.vaultAddress)
     throw new HttpError(503, 'VAULT_UNCONFIGURED', 'VAULT_ADDRESS is not set');
   const latest = await deps.blockhash();
+  const txBase64 = unsignedTx({
+    from,
+    to: deps.env.vaultAddress,
+    lamports,
+    memo,
+    recentBlockhash: latest.blockhash,
+  });
+  await preflightTx(deps, txBase64);
   return {
-    txBase64: unsignedTx({
-      from,
-      to: deps.env.vaultAddress,
-      lamports,
-      memo,
-      recentBlockhash: latest.blockhash,
-    }),
+    txBase64,
     blockhash: latest.blockhash,
     lastValidBlockHeight: latest.lastValidBlockHeight,
   };
@@ -284,6 +331,7 @@ export async function createOrder(deps: Deps, userId: string, listingId: string)
       args,
       recentBlockhash: latest.blockhash,
     });
+    await preflightTx(deps, built.txBase64);
     await deps.sql`
       insert into orders (
         id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total,

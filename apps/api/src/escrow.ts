@@ -1,5 +1,7 @@
 import {
   compileLegacyTx,
+  computeBudgetIxs,
+  ESCROW_BUDGET,
   decodeEscrow,
   ESCROW_ACCOUNT_DISCRIMINATOR,
   escrowAddress,
@@ -105,6 +107,7 @@ export function checkoutTx(input: {
 }): { txBase64: string; escrow: string } {
   const escrow = escrowAddress(input.orderId, input.programId);
   const instructions: Instruction[] = [
+    ...computeBudgetIxs(ESCROW_BUDGET),
     initializeIx({
       programId: input.programId,
       buyer: input.buyer,
@@ -131,7 +134,7 @@ export function openDisputeTx(input: {
   return toBase64(
     compileLegacyTx({
       feePayer: input.buyer,
-      instructions: [openDisputeIx(input)],
+      instructions: [...computeBudgetIxs(ESCROW_BUDGET), openDisputeIx(input)],
       recentBlockhash: input.recentBlockhash,
     }),
   );
