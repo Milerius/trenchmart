@@ -580,7 +580,7 @@ function ChangelogPanel({ versions }: { versions: VersionNote[] }) {
               <span className="font-mono text-[11px] text-muted">{utc(version.created_at)}</span>
             </p>
             {version.changelog ? (
-              <Markdown source={version.changelog} className="mt-2 text-sm" />
+              <Markdown source={version.changelog} links={false} className="mt-2 text-sm" />
             ) : null}
           </div>
         </li>

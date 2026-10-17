@@ -8,8 +8,20 @@ import { safeMarkdown, type SafeBlock, type SafeInline } from '@trenchmart/share
  * React element: no innerHTML, raw HTML shows as text, unsafe links lose their href and
  * images only load from our media route.
  */
-export function Markdown({ source, className = '' }: { source: string; className?: string }) {
-  const tree = useMemo(() => safeMarkdown(source), [source]);
+export function Markdown({
+  source,
+  className = '',
+  links = true,
+}: {
+  source: string;
+  className?: string;
+  /** False for text that skipped the content review (version changelogs): links show as plain text. */
+  links?: boolean;
+}) {
+  const tree = useMemo(() => {
+    const parsed = safeMarkdown(source);
+    return links ? parsed : parsed.map(unlinkBlock);
+  }, [source, links]);
   return (
     <div data-testid="markdown" className={`md max-w-none space-y-4 text-ink-2 ${className}`}>
       {tree.map((block, index) => (
@@ -17,6 +29,37 @@ export function Markdown({ source, className = '' }: { source: string; className
       ))}
     </div>
   );
+}
+
+function unlinkInline(node: SafeInline): SafeInline[] {
+  if (node.t === 'link') return node.c.flatMap(unlinkInline);
+  if (node.t === 'strong' || node.t === 'em' || node.t === 'del') {
+    return [{ ...node, c: node.c.flatMap(unlinkInline) }];
+  }
+  return [node];
+}
+
+function unlinkBlock(block: SafeBlock): SafeBlock {
+  switch (block.t) {
+    case 'h':
+    case 'p':
+      return { ...block, c: block.c.flatMap(unlinkInline) };
+    case 'quote':
+      return { ...block, c: block.c.map(unlinkBlock) };
+    case 'list':
+      return {
+        ...block,
+        items: block.items.map((item) => ({ ...item, c: item.c.map(unlinkBlock) })),
+      };
+    case 'table':
+      return {
+        ...block,
+        head: block.head.map((cell) => cell.flatMap(unlinkInline)),
+        rows: block.rows.map((row) => row.map((cell) => cell.flatMap(unlinkInline))),
+      };
+    default:
+      return block;
+  }
 }
 
 const HEADING = [
@@ -65,7 +108,10 @@ function Block({ block }: { block: SafeBlock }): ReactNode {
         </li>
       ));
       return block.ordered ? (
-        <ol start={block.start} className="list-decimal space-y-1.5 pl-6 marker:font-mono marker:text-muted">
+        <ol
+          start={block.start}
+          className="list-decimal space-y-1.5 pl-6 marker:font-mono marker:text-muted"
+        >
           {items}
         </ol>
       ) : (
@@ -100,7 +146,12 @@ function Block({ block }: { block: SafeBlock }): ReactNode {
             <thead>
               <tr className="bg-inset text-left font-mono text-[11px] uppercase tracking-wide text-muted">
                 {block.head.map((cell, index) => (
-                  <th key={index} scope="col" className="px-3 py-2 font-medium" style={{ textAlign: block.align[index] ?? undefined }}>
+                  <th
+                    key={index}
+                    scope="col"
+                    className="px-3 py-2 font-medium"
+                    style={{ textAlign: block.align[index] ?? undefined }}
+                  >
                     <Inlines nodes={cell} />
                   </th>
                 ))}
@@ -110,7 +161,11 @@ function Block({ block }: { block: SafeBlock }): ReactNode {
               {block.rows.map((row, rowIndex) => (
                 <tr key={rowIndex} className="border-t border-line-soft">
                   {row.map((cell, index) => (
-                    <td key={index} className="px-3 py-2" style={{ textAlign: block.align[index] ?? undefined }}>
+                    <td
+                      key={index}
+                      className="px-3 py-2"
+                      style={{ textAlign: block.align[index] ?? undefined }}
+                    >
                       <Inlines nodes={cell} />
                     </td>
                   ))}
@@ -170,9 +225,7 @@ function InlineNode({ node }: { node: SafeInline }): ReactNode {
         <a
           href={node.href}
           className="text-accent underline-offset-4 hover:underline"
-          {...(node.external
-            ? { target: '_blank', rel: 'noopener noreferrer nofollow ugc' }
-            : {})}
+          {...(node.external ? { target: '_blank', rel: 'noopener noreferrer nofollow ugc' } : {})}
         >
           <Inlines nodes={node.c} />
           {node.external ? <span aria-hidden="true"> ↗</span> : null}
@@ -181,7 +234,6 @@ function InlineNode({ node }: { node: SafeInline }): ReactNode {
     case 'img':
       return (
         // Only our own media route reaches here (isMediaUrl); seller uploads are re-checked server side.
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={node.src}
           alt={node.alt}

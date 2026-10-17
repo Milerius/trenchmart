@@ -25,14 +25,25 @@ export type SafeInline =
 export type SafeBlock =
   | { t: 'h'; depth: 1 | 2 | 3 | 4 | 5 | 6; c: SafeInline[] }
   | { t: 'p'; c: SafeInline[] }
-  | { t: 'list'; ordered: boolean; start: number; items: { checked: boolean | null; c: SafeBlock[] }[] }
+  | {
+      t: 'list';
+      ordered: boolean;
+      start: number;
+      items: { checked: boolean | null; c: SafeBlock[] }[];
+    }
   | { t: 'pre'; lang: string; v: string }
   | { t: 'quote'; c: SafeBlock[] }
   | { t: 'hr' }
-  | { t: 'table'; align: ('left' | 'right' | 'center' | null)[]; head: SafeInline[][]; rows: SafeInline[][][] };
+  | {
+      t: 'table';
+      align: ('left' | 'right' | 'center' | null)[];
+      head: SafeInline[][];
+      rows: SafeInline[][][];
+    };
 
 const SITE = 'https://trenchmart.fun';
-const MEDIA_PATH = /^\/api\/v1\/media\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MEDIA_PATH =
+  /^\/api\/v1\/media\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MEDIA_HOSTS = new Set(['trenchmart.fun', 'api.trenchmart.fun']);
 
 /** Our media route (seller uploads served from R2), relative or on our own hosts only. */
@@ -189,7 +200,11 @@ function blockOf(node: RootContent, defs: Defs, depth: number): SafeBlock | null
         })),
       };
     case 'code':
-      return { t: 'pre', lang: (node.lang ?? '').replace(/[^\w+-]/g, '').slice(0, 20), v: node.value };
+      return {
+        t: 'pre',
+        lang: (node.lang ?? '').replace(/[^\w+-]/g, '').slice(0, 20),
+        v: node.value,
+      };
     case 'blockquote':
       return { t: 'quote', c: blocks(node.children, defs, depth) };
     case 'thematicBreak':
@@ -264,5 +279,18 @@ export function markdownRefs(md: string): MarkdownRefs {
 
 /** Plain text of the Markdown (for search snippets and phishing heuristics). */
 export function markdownText(md: string): string {
-  return plain(parse(md));
+  const BLOCKS = new Set([
+    'root',
+    'list',
+    'listItem',
+    'blockquote',
+    'table',
+    'tableRow',
+    'footnoteDefinition',
+  ]);
+  const text = (node: Nodes): string =>
+    BLOCKS.has(node.type) && 'children' in node
+      ? (node.children as Nodes[]).map(text).join('\n')
+      : plain(node);
+  return text(parse(md));
 }

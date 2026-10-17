@@ -228,6 +228,12 @@ export default function StudioPage() {
                           >
                             {listing.title}
                           </Link>
+                          <Link
+                            href={`/studio/listings/${listing.id}/content`}
+                            className="mt-0.5 block text-xs text-muted hover:text-ink"
+                          >
+                            Edit page →
+                          </Link>
                         </td>
                         <td className="px-3 py-3">
                           <span className="flex items-center gap-2">

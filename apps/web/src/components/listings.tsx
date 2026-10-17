@@ -117,7 +117,6 @@ function CardCover({
       className="relative aspect-[16/10] overflow-hidden border-b border-line-soft bg-inset"
     >
       {listing.cover ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={listing.cover.url}
           alt={listing.cover.alt}

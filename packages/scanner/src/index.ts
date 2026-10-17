@@ -14,3 +14,16 @@ export type { ScanCheck, ScanOutput, ScanOptions, Declared, CheckResult } from '
 export { listZip, unsafeZipPath, unixModeIsSymlink } from './zip';
 export { signatureScan, clamAvHttpClient, EICAR, BLOCKED_SHA256 } from './av';
 export type { AvFinding, AvServiceResult, AvVerdict, ClamAvClient } from './av';
+export { scanContent, contentMediaIds, lookalikeOf, CONTENT_ENGINE_VER } from './content';
+export type { ContentInput } from './content';
+export {
+  cleanImage,
+  sniffImage,
+  extensionOf,
+  ImageError,
+  IMAGE_MAX_BYTES,
+  IMAGE_MAX_SIDE,
+  IMAGE_MIN_SIDE,
+  IMAGE_MAX_PIXELS,
+} from './image';
+export type { CleanImage, ImageMime } from './image';

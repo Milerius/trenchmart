@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type GalleryImage = { id: string; url: string; alt: string; width?: number; height?: number };
+export type GalleryImage = {
+  id: string;
+  url: string;
+  alt: string;
+  width?: number;
+  height?: number;
+};
 
 /** Hero image + thumbnail strip. Any image opens the lightbox. */
 export function Gallery({ images, title }: { images: GalleryImage[]; title: string }) {
@@ -18,7 +24,6 @@ export function Gallery({ images, title }: { images: GalleryImage[]; title: stri
         onClick={() => setOpen(active)}
         className="motion-press group relative block aspect-[16/9] w-full overflow-hidden rounded-panel border border-line bg-inset"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={current.url}
           alt={current.alt || `${title} image ${active + 1}`}
@@ -46,7 +51,6 @@ export function Gallery({ images, title }: { images: GalleryImage[]; title: stri
                   index === active ? 'border-accent' : 'border-line opacity-70 hover:opacity-100'
                 }`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={image.url} alt="" className="h-full w-full object-cover" loading="lazy" />
               </button>
             </li>
@@ -135,7 +139,6 @@ export function Lightbox({
           if (event.target === event.currentTarget) onClose(index);
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={image.id}
           src={image.url}
@@ -172,10 +175,11 @@ export function Lightbox({
               aria-current={thumbIndex === index || undefined}
               onClick={() => setIndex(thumbIndex)}
               className={`block h-12 w-20 overflow-hidden rounded-tag border-2 ${
-                thumbIndex === index ? 'border-accent' : 'border-transparent opacity-60 hover:opacity-100'
+                thumbIndex === index
+                  ? 'border-accent'
+                  : 'border-transparent opacity-60 hover:opacity-100'
               }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={thumb.url} alt="" className="h-full w-full object-cover" />
             </button>
           </li>

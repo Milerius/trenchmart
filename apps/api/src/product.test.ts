@@ -16,6 +16,7 @@ import {
   type EscrowStatusName,
 } from '@trenchmart/chain';
 import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
 import type { EscrowChain } from './escrow';
 import { releaseOrders, resolveDispute } from './logic';
 import { createApp } from './app';
@@ -43,7 +44,7 @@ async function reset() {
   await sql`
     truncate table
       audit_log, ledger, notifications, downloads, listing_reviews, disputes, licenses, payouts,
-      orders, scan_checks, scans, ai_reviews, sandbox_jobs, listing_media, versions, listings,
+      orders, scan_checks, scans, ai_reviews, sandbox_jobs, listing_content, listing_media, versions, listings,
       bonds, token_balances, auth_nonces, reports, buybacks, rate_buckets, users
     restart identity cascade
   `;
@@ -350,6 +351,183 @@ describe('owner product decisions', () => {
     expect(again).toContain('"step":"static"');
     expect(again).toContain('"status":"skipped"');
     expect(again).toContain('event: sandbox');
+  });
+
+  it('reviews seller pages before they go public and serves only clean, approved images', async () => {
+    const app = await appFor();
+    const seller = keypair();
+    const cookie = await login(app, seller);
+    const sellerId = (
+      await sql<{ id: string }[]>`select id from users where wallet = ${seller.publicKey}`
+    )[0]!.id;
+    const listingId = randomUUID();
+    const versionId = randomUUID();
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price)
+      values (${listingId}, ${sellerId}, 'rich', 'Rich Pack', 'Sum', 'Desc', 'userscript', ${1_000_000_000n})
+    `;
+    await sql`
+      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status)
+      values (${versionId}, ${listingId}, '1.0.0', 'rich.user.js', 5, 'abc', 'blobs/abc', 'live')
+    `;
+    await sql`update listings set live_version_id = ${versionId}, first_live_at = ${now} where id = ${listingId}`;
+    const json = { cookie, 'content-type': 'application/json' };
+    const base = `/api/v1/studio/listings/${listingId}`;
+
+    // A stranger cannot read or edit the page.
+    const stranger = await login(app, keypair());
+    expect((await app.request(`${base}/content`, { headers: { cookie: stranger } })).status).toBe(
+      404,
+    );
+    expect(
+      (await app.request(`/api/v1/studio/listings/not-a-uuid/content`, { headers: { cookie } }))
+        .status,
+    ).toBe(404);
+
+    // Uploads: type comes from the bytes, metadata is stripped, junk is refused.
+    const png = new Uint8Array(
+      readFileSync(new URL('../../../packages/scanner/src/__fixtures__/meta.png', import.meta.url)),
+    );
+    const jpg = new Uint8Array(
+      readFileSync(new URL('../../../packages/scanner/src/__fixtures__/exif.jpg', import.meta.url)),
+    );
+    const upload = (body: Uint8Array, type: string) =>
+      app.request(`${base}/images`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': type },
+        body,
+      });
+    const html = await upload(new TextEncoder().encode('<svg onload=alert(1)></svg>'), 'image/png');
+    expect(html.status).toBe(400);
+    expect(((await html.json()) as { error: { code: string } }).error.code).toBe('IMAGE_TYPE');
+    const big = await upload(new Uint8Array(3 * 1024 * 1024 + 1), 'image/png');
+    expect(big.status).toBe(413);
+    const first = (await (await upload(png, 'image/jpeg')).json()) as {
+      id: string;
+      mime: string;
+      url: string;
+    };
+    expect(first.mime).toBe('image/png');
+    const second = (await (await upload(jpg, 'image/png')).json()) as { id: string; mime: string };
+    expect(second.mime).toBe('image/jpeg');
+
+    // Drafts are private: the owner can preview images, the public cannot.
+    expect((await app.request(first.url)).status).toBe(404);
+    const ownerView = await app.request(first.url, { headers: { cookie } });
+    expect(ownerView.status).toBe(200);
+    expect(ownerView.headers.get('cache-control')).toBe('private, no-store');
+    const ownerJpg = new Uint8Array(
+      await (
+        await app.request(`/api/v1/media/${second.id}`, { headers: { cookie } })
+      ).arrayBuffer(),
+    );
+    expect(Buffer.from(ownerJpg).includes('Exif')).toBe(false);
+    expect(Buffer.from(ownerJpg).includes('LEAK')).toBe(false);
+
+    // Gallery rules.
+    const put = (body: unknown) =>
+      app.request(`${base}/content`, { method: 'PUT', headers: json, body: JSON.stringify(body) });
+    expect((await put({ gallery: [{ imageId: randomUUID(), alt: '' }] })).status).toBe(400);
+    expect((await put({ gallery: [{ imageId: first.id }], coverImageId: second.id })).status).toBe(
+      400,
+    );
+    expect((await put({ gallery: [{ imageId: first.id }, { imageId: first.id }] })).status).toBe(
+      400,
+    );
+
+    // Phishing is rejected and nothing goes public.
+    const phish = await put({
+      readme: 'Claim at [phantom](https://phant0m.app/claim)\n\n<script>alert(1)</script>',
+      gallery: [],
+    });
+    expect(phish.status).toBe(200);
+    const rejected = (await (
+      await app.request(`${base}/content/review`, { method: 'POST', headers: json })
+    ).json()) as {
+      status: string;
+      checks: { ruleId: string; result: string }[];
+    };
+    expect(rejected.status).toBe('rejected');
+    expect(rejected.checks.find((c) => c.ruleId === 'content-phishing')?.result).toBe('fail');
+    expect(rejected.checks.find((c) => c.ruleId === 'content-html')?.result).toBe('fail');
+    const hidden = (await (await app.request('/api/v1/listings/rich')).json()) as {
+      content: unknown;
+    };
+    expect(hidden.content).toBeNull();
+
+    // A warning needs an explanation, then the page goes live.
+    const readme = [
+      '# Rich Pack',
+      `![shot](/api/v1/media/${second.id})`,
+      '<b>inline html shows as text</b>',
+      '[docs](http://example.com/docs)',
+    ].join('\n\n');
+    await put({
+      readme,
+      howto: 'Install Tampermonkey, then open the file.',
+      requirements: 'Chrome',
+      gallery: [
+        { imageId: first.id, alt: 'Overlay' },
+        { imageId: second.id, alt: 'Settings' },
+      ],
+      coverImageId: second.id,
+    });
+    const asks = (await (
+      await app.request(`${base}/content/review`, { method: 'POST', headers: json, body: '{}' })
+    ).json()) as {
+      status: string;
+    };
+    expect(asks.status).toBe('needs_changes');
+    const live = (await (
+      await app.request(`${base}/content/review`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ note: 'The docs site has no TLS; the link is informational only.' }),
+      })
+    ).json()) as { status: string; review: { decision: string } };
+    expect(live).toMatchObject({ status: 'live', review: { decision: 'approve' } });
+    const attested = await sql<{ review: { attestation: string; signature: string } }[]>`
+      select review from listing_content where listing_id = ${listingId}
+    `;
+    expect(attested[0]?.review.attestation).toMatch(
+      new RegExp(`^trenchmart-ai-attest:v1:content-${listingId}:[0-9a-f]{64}:approve:`),
+    );
+
+    const page = (await (await app.request('/api/v1/listings/rich')).json()) as {
+      content: { readme: string; gallery: { id: string; url: string; alt: string }[] };
+    };
+    expect(page.content.readme).toBe(readme); // stored as source; the renderer turns HTML into text
+    expect(page.content.gallery.map((g) => g.id)).toEqual([second.id, first.id]); // cover first
+    const pub = await app.request(`/api/v1/media/${second.id}`);
+    expect(pub.status).toBe(200);
+    expect(pub.headers.get('content-type')).toBe('image/jpeg');
+    expect(pub.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(pub.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+    expect(pub.headers.get('cache-control')).toBe('public, max-age=86400');
+
+    const market = (await (await app.request('/api/v1/listings')).json()) as {
+      slug: string;
+      cover: { url: string } | null;
+      imageCount: number;
+    }[];
+    const card = market.find((item) => item.slug === 'rich');
+    expect(card?.cover?.url).toBe(`/api/v1/media/${second.id}`);
+    expect(card?.imageCount).toBe(2);
+
+    // Editing the draft does not change the live page, and live images cannot be deleted.
+    await put({ readme: 'draft only', gallery: [{ imageId: first.id }] });
+    expect(
+      (
+        (await (await app.request('/api/v1/listings/rich')).json()) as {
+          content: { readme: string };
+        }
+      ).content.readme,
+    ).toBe(readme);
+    const del = await app.request(`${base}/images/${second.id}`, {
+      method: 'DELETE',
+      headers: { cookie },
+    });
+    expect(del.status).toBe(409);
   });
 
   it('lets a new creator list once the category bond is met, and keeps the fee gate', async () => {
