@@ -178,6 +178,15 @@ function Footer() {
         <Link href="/sell" className="hover:text-ink">
           How AI verification works
         </Link>
+        <Link href="/docs" className="hover:text-ink">
+          Docs
+        </Link>
+        <Link href="/terms" className="hover:text-ink">
+          Terms
+        </Link>
+        <Link href="/privacy" className="hover:text-ink">
+          Privacy
+        </Link>
         <span className="sm:ml-auto">
           Devnet POC. Not financial advice. Tools don&apos;t guarantee profits.
         </span>
