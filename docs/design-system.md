@@ -1,4 +1,4 @@
-# TrenchMart design system (v2.1)
+# TrenchMart design system (v3, retro Solana)
 
 Supersedes the visual parts of `docs/08-design-system.md`. Machine-readable values live in `design/tokens.json`. Copy, flows and states are in `docs/ux-guidelines.md`. Visual references are in `design/*.dc.html` (pixel/copy) and `design/explorations/` (concepts with every state).
 
@@ -8,7 +8,7 @@ Supersedes the visual parts of `docs/08-design-system.md`. Machine-readable valu
 2. **Money is a receipt.** Wherever SOL moves, show every line: list price, the 5% fee, the tier discount, the total and the network fee. Use exact amounts.
 3. **One status, one symbol, one word.** Every state reads as symbol + uppercase word + colour. Never colour alone.
 4. **Testnet honesty.** A devnet bar is always visible. Explorer links carry `?cluster=devnet`.
-5. **Dense, calm, terminal.** Near-black ground, one lime accent, mono for numbers. Thin 1px borders, no shadows, no glow, no emoji.
+5. **Retro terminal, Solana colours.** Near-black ground, lime as the one action colour, the Solana purple-to-green gradient as a decorative touch, and Space Mono for display type. CRT scanlines sit on the hero and cards at 3% so body text stays crisp. Hard pixel shadows, never soft blur. No emoji.
 6. **Live, not queued.** Anything the machine is doing (AI review, payment confirmation) streams step by step with seconds on the clock. No "come back later".
 7. **Real numbers, or clearly sample.** Dashboards only show API values. The landing page alone may show a labelled sample set.
 
@@ -37,6 +37,8 @@ All text tokens pass WCAG 2.2 AA (4.5:1) on `bg`, `bg-inset`, `surface` and `sur
 | `danger` (+`-bg` `#1F1210`, `-border` `#4A2620`)        | `#FF8A7A`                         | Fail, disputed, rejected, blocking errors                                | 8.1:1                             |
 | **`info`** (new, +`-bg` `#0F1620`, `-border` `#1E3448`) | `#7CC4FF`                         | On-chain in progress (confirming, in AI review, refunded, holder window) | 9.9:1                             |
 
+**Solana layer (v3).** `sol-purple` `#9945FF` and `sol-green` `#14F195` drive the gradient, the window-bar squares and the primary button's pixel shadow. `sol-purple` is 4.37:1 on `bg`, so it is **decorative only**. Purple text uses **`violet`** `#B98CFF` (7.75:1), with `violet-bg` `#160F22` and `violet-border` `#3A2560` for the `violet` tone (queued payouts, creator rank).
+
 Category accents are unchanged (see `tokens.json › color.category`). Fee split colours: buyback `#C6F432`, **AI verification** `#7CC4FF`, ops `#C9A2FF`, safety `#F5A524`, all with `#0A0B0A` text.
 
 ### Tone map
@@ -47,13 +49,15 @@ Category accents are unchanged (see `tokens.json › color.category`). Fee split
 | `warn`    | warn / warn-bg / warn-border       | You need to act, or check something                    |
 | `info`    | info / info-bg / info-border       | Waiting on the network or the system, no action needed |
 | `danger`  | danger / danger-bg / danger-border | Failed, blocked, disputed                              |
+| `violet`  | violet / violet-bg / violet-border | $TRENCH and creator accents, queued value              |
 | `neutral` | text-2 / surface / border          | Draft, expired, cancelled                              |
 
 ## Type
 
-- **Geist** for UI and **Geist Mono** for prices, hashes, addresses, memos, codes and tags. Every number column uses `font-variant-numeric: tabular-nums`.
-- Scale: hero `clamp(40px,6vw,68px)`/700/−0.035em · H1 44px (30px on phones) · H2 28px · H3 20px · lead 17–18px · body 15px/1.5 · meta 13px · label 11–12px mono uppercase with +0.04em tracking.
-- Prices: mono 600. Buy box total 36px, card 17px, receipt 13px.
+- **Space Mono** (700) is the display face: H1, H2, buttons, headline amounts (buy box price, "You pay", card price) and stat numbers. **Geist** stays for body copy, card titles and forms, so reading is never monospace. **Geist Mono** for tags, labels, hashes, addresses and small amounts. Every number column uses `font-variant-numeric: tabular-nums`.
+- Scale: hero 52px (36px on phones)/1.08/−0.02em · H1 32px · H2 26–30px · H3 17–20px Geist · lead 17px · body 15px/1.5 · meta 13px · label 11–12px mono uppercase with +0.04em tracking.
+- Headline gradient: only the payoff words ("for sale.", "Sell it.") use `sol-text`, at 24px and up. A lime block cursor follows the hero headline.
+- Prices: Space Mono 700. Buy box price 28px, "You pay" 20px, card 15px. USD stays in Geist Mono `muted`.
 
 ## Money formatting
 
@@ -68,8 +72,8 @@ Category accents are unchanged (see `tokens.json › color.category`). Fee split
 ## Spacing, shape, layout
 
 - 4px base. Steps: 4 6 8 10 12 14 16 20 24 28 32 48 64 72.
-- Radius: tag 6 · control 10 · card 14 · panel 16 · bottom sheet 20 (top corners) · pill 999.
-- No shadows. Elevation is surface colour plus border. Modals add a `rgba(0,0,0,.7)` scrim.
+- Radius (v3, squarer): tag 3 · control 6 · card 8 · panel 10 · bottom sheet 14 (top corners) · pill 999.
+- Shadows are hard pixel offsets only: primary buttons `3px 3px 0 #9945FF`, featured panels (hero receipt, buy box) `6–8px 6–8px 0` purple at 35–40%, interactive cards `4px 4px 0 accent-border` on hover. No blurred drop shadows. Modals add a `rgba(0,0,0,.7)` scrim.
 - Max width 1280, gutter 24 (16 on phones). Breakpoints: sm 640 · md 768 · lg 960 · xl 1280.
 - Cards: `repeat(auto-fill, minmax(280px, 1fr))`. Sidebars (buy box, filters, studio aside) wrap under content below 960.
 - Targets: at least 24×24 everywhere (2.5.8), 44 for touch, 48–52 for primary actions on phones.
@@ -120,13 +124,29 @@ Each component lists variants, states and its `data-testid`. Test IDs are stable
 | `Skeleton`                                        | card · row · text                                                                                                                                                                                                                | surface-2 to border-soft shimmer; static under `prefers-reduced-motion`                                                                                                                                                                                                                                                                                                        | `skeleton`                                                |
 | `Toast`                                           | info · ok · warn · danger                                                                                                                                                                                                        | bottom-right desktop, top on phones; `role="status"` (danger uses `role="alert"`); auto-dismiss 6s except danger                                                                                                                                                                                                                                                               | `toast`                                                   |
 
+## Retro layer (v3)
+
+| Piece           | Class / component                   | Where                                                                                                 | Rule                                                                                                                         |
+| --------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| CRT scanlines   | `.crt`                              | Hero, cards, tiles, buy box, order rows                                                               | 1px white lines at 3% every 3px, `pointer-events: none`. Static, so they stay with reduced motion. Hidden in forced colours. |
+| Hero backdrop   | `.crt-hero`                         | Landing hero                                                                                          | Vignette, violet glow top right, green glow bottom left, lime dot grid every 22px.                                           |
+| Scan beam       | `.crt-beam`                         | Landing hero                                                                                          | Soft lime band every 7s, only with `prefers-reduced-motion: no-preference`.                                                  |
+| Block cursor    | `.cursor-block`                     | After the hero headline                                                                               | Blinks 1.1s `steps(1)`; static with reduced motion. `aria-hidden`.                                                           |
+| Solana gradient | `.sol-text` `.sol-bar` `.sol-frame` | Payoff words, header hairline, mobile buy bar edge, hero receipt, buy box, sell banner, Ready to sell | Text only at 24px and up. Frames are decorative; content inside keeps `surface` contrast.                                    |
+| Window bar      | `WindowBar`                         | Hero receipt, checkout, studio Listings                                                               | Three 10px squares (purple, green, lime) and a mono title on `bg-inset`. Section titles stay real `h2`s.                     |
+| Segment meter   | `SegmentBar`                        | Escrow timeline                                                                                       | 24 segments, `role="progressbar"`. Filled lime with glow, disputed red, empty `border-strong`.                               |
+| Pixel shadow    | `.pixel-shadow`                     | Primary buttons, connect                                                                              | 3px purple offset; 4px on hover, 1px pressed. No translate with reduced motion.                                              |
+| Glow            | `.glow`                             | Lime stat numbers                                                                                     | `0 0 18px` lime at 35%. Never on body text.                                                                                  |
+
+Keep it marketing-first. The retro layer frames content, it never replaces it. Body copy stays in Geist at 15px on a plain surface, and every claim and amount reads the same with the overlay switched off.
+
 ## Iconography
 
 Inline stroke SVG, 2px, round caps (lucide-compatible). Sizes 16 / 18 / 22 / 40. Decorative icons get `aria-hidden="true"`. No emoji.
 
 ## Motion
 
-120ms for hover and press, 200ms for sheets and modals, easing `cubic-bezier(.2,0,0,1)`. Under `prefers-reduced-motion: reduce`: no skeleton shimmer, the spinner becomes a static ◑, and sheets appear without sliding.
+120ms for hover and press, 200ms for sheets and modals, easing `cubic-bezier(.2,0,0,1)`. Under `prefers-reduced-motion: reduce`: no skeleton shimmer, the spinner becomes a static ◑, sheets appear without sliding, the CRT scan beam and cursor blink stop, and buttons and cards don't move on hover. An e2e test (`retro hero motion respects prefers-reduced-motion`) guards this.
 
 ## Focus and accessibility rules
 
@@ -149,9 +169,15 @@ theme: { extend: {
     warn: { DEFAULT: '#F5A524', bg: '#1C160A', line: '#3A2C0E' },
     danger: { DEFAULT: '#FF8A7A', bg: '#1F1210', line: '#4A2620' },
     info: { DEFAULT: '#7CC4FF', bg: '#0F1620', line: '#1E3448' },
-    sky: '#7CC4FF', violet: '#C9A2FF', teal: '#6EE7C8',
+    sky: '#7CC4FF', teal: '#6EE7C8',
+    sol: { purple: '#9945FF', green: '#14F195' },
+    violet: { DEFAULT: '#B98CFF', bg: '#160F22', line: '#3A2560' },
   },
-  fontFamily: { sans: ['Geist', 'system-ui'], mono: ['Geist Mono', 'ui-monospace', 'monospace'] },
-  borderRadius: { tag: '6px', ctl: '10px', card: '14px', panel: '16px', sheet: '20px' },
+  fontFamily: {
+    sans: ['Geist', 'system-ui'],
+    mono: ['Geist Mono', 'ui-monospace', 'monospace'],
+    display: ['Space Mono', 'ui-monospace', 'monospace'],
+  },
+  borderRadius: { tag: '3px', ctl: '6px', card: '8px', panel: '10px', sheet: '14px' },
 }}
 ```

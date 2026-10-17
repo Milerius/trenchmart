@@ -8,11 +8,18 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;family=Space+Mono:wght@400;700&amp;display=swap">
 <style>
 body{margin:0;background:#0A0B0A}
 a{color:#C6F432;text-decoration:none}a:hover{color:#DDFF7A}
 button{font-family:inherit}
+/* Retro layer (tokens.json v3): Space Mono display, CRT scanlines, Solana gradient. */
+h1,h2{font-family:'Space Mono',ui-monospace,monospace!important;font-weight:700!important;letter-spacing:-0.02em!important}
+.crt{position:relative;isolation:isolate}
+.crt::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:inherit;background:repeating-linear-gradient(to bottom,rgb(255 255 255/.03) 0 1px,transparent 1px 3px)}
+.crt-hero{border:1px solid #262A26;border-radius:10px;padding-left:40px!important;padding-right:40px!important;margin-top:24px;background:radial-gradient(120% 90% at 50% 0%,transparent 55%,rgb(0 0 0/.55) 100%),radial-gradient(60% 70% at 85% 20%,rgb(153 69 255/.24),transparent 70%),radial-gradient(50% 60% at 10% 90%,rgb(20 241 149/.12),transparent 70%),radial-gradient(rgb(198 244 50/.1) 1px,transparent 1.5px) 0 0/22px 22px,#0A0B0A}
+.sol-text{background:linear-gradient(90deg,#B98CFF 0%,#14F195 60%,#C6F432 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sol-bar{height:1px;background:linear-gradient(90deg,#9945FF 0%,#14F195 60%,#C6F432 100%);opacity:.7}
 </style>
 </helmet>
 <div style="min-height: 100vh; background: #0A0B0A; color: #EDEFEA; font-family: 'Geist', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
@@ -21,15 +28,15 @@ button{font-family:inherit}
 <header style="border-bottom: 1px solid #1E221E">
 <div style="max-width: 1280px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center">
 <a href="Main.dc.html" style="display: flex; gap: 10px; align-items: center; color: #EDEFEA">
-<span style="width: 32px; height: 32px; border-radius: 8px; background: #C6F432; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0B0A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18 L9 8 L13 14 L16 9 L20 18"></path></svg></span>
+<span style="width: 32px; height: 32px; border-radius: 6px; background: #C6F432; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0B0A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18 L9 8 L13 14 L16 9 L20 18"></path></svg></span>
 <span style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em">trenchmart</span>
 </a>
 <nav aria-label="Primary" style="display: flex; flex-wrap: wrap; gap: 4px; margin-left: 12px">
-<a href="Main.dc.html" style="padding: 10px 12px; border-radius: 8px; color: #9BA19A">Explore</a>
-<a href="Upload.dc.html" style="padding: 10px 12px; border-radius: 8px; color: #9BA19A">Sell</a>
-<a href="Economics.dc.html" style="padding: 10px 12px; border-radius: 8px; color: #EDEFEA; background: #161916">$TRENCH</a>
+<a href="Main.dc.html" style="padding: 10px 12px; border-radius: 6px; color: #9BA19A">Explore</a>
+<a href="Upload.dc.html" style="padding: 10px 12px; border-radius: 6px; color: #9BA19A">Sell</a>
+<a href="Economics.dc.html" style="padding: 10px 12px; border-radius: 6px; color: #EDEFEA; background: #161916">$TRENCH</a>
 </nav>
-<button type="button" style="margin-left: auto; height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 600; font-size: 14px">7xKp…a9Fq</button>
+<button type="button" style="margin-left: auto; height: 44px; padding: 0 18px; border-radius: 6px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 600; font-size: 14px">7xKp…a9Fq</button>
 </div>
 </header>
 
@@ -43,9 +50,9 @@ button{font-family:inherit}
 <p style="margin: 0; color: #B4BAB2; font-size: 17px; max-width: 560px">Buyers pay a flat 5% fee on each sale and creators keep 100% of the price. Part of every fee buys back $TRENCH. Holders pay less of the fee (Scout −25%, Trencher −60%, OG −100%), get earlier access and help pick what gets featured.</p>
 </div>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: 'Geist Mono', monospace">
-<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-size: 12px; color: #9BA19A">Platform fee</div><div style="font-size: 26px; font-weight: 600">5%</div></div>
-<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-size: 12px; color: #9BA19A">Creator keeps</div><div style="font-size: 26px; font-weight: 600">100%</div></div>
-<div style="padding: 16px; border-radius: 12px; background: #141A08; border: 1px solid #2E3A12"><div style="font-size: 12px; color: #9FAF86">To buyback</div><div style="font-size: 26px; font-weight: 600; color: #C6F432">40%</div></div>
+<div style="padding: 16px; border-radius: 8px; background: #121412; border: 1px solid #262A26"><div style="font-size: 12px; color: #9BA19A">Platform fee</div><div style="font-size: 26px; font-weight: 600">5%</div></div>
+<div style="padding: 16px; border-radius: 8px; background: #121412; border: 1px solid #262A26"><div style="font-size: 12px; color: #9BA19A">Creator keeps</div><div style="font-size: 26px; font-weight: 600">100%</div></div>
+<div style="padding: 16px; border-radius: 8px; background: #141A08; border: 1px solid #2E3A12"><div style="font-size: 12px; color: #9FAF86">To buyback</div><div style="font-size: 26px; font-weight: 600; color: #C6F432">40%</div></div>
 </div>
 </section>
 
@@ -55,7 +62,7 @@ button{font-family:inherit}
 <h2 style="margin: 0; font-size: 28px; letter-spacing: -0.02em">Fee model</h2>
 <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #F5A524">PROPOSED · tune before launch</span>
 </div>
-<div style="overflow-x: auto; border: 1px solid #262A26; border-radius: 14px">
+<div style="overflow-x: auto; border: 1px solid #262A26; border-radius: 8px">
 <table style="width: 100%; min-width: 720px; border-collapse: collapse; font-size: 14px">
 <thead>
 <tr style="background: #121412; text-align: left; color: #9BA19A; font-size: 12px; font-family: 'Geist Mono', monospace">
@@ -84,7 +91,7 @@ button{font-family:inherit}
 <!-- worked example -->
 <section aria-labelledby="ex-h" style="display: flex; flex-direction: column; gap: 12px">
 <h2 id="ex-h" style="margin: 0; font-size: 20px">Worked example · 1.50 SOL listing</h2>
-<div style="overflow-x: auto; border: 1px solid #262A26; border-radius: 14px">
+<div style="overflow-x: auto; border: 1px solid #262A26; border-radius: 8px">
 <table data-testid="fee-example" style="width: 100%; min-width: 560px; border-collapse: collapse; font-family: 'Geist Mono', monospace; font-size: 13px; font-variant-numeric: tabular-nums">
 <thead><tr style="background: #121412; color: #9BA19A; font-size: 12px; text-align: right"><th scope="col" style="padding: 12px 16px; text-align: left; font-weight: 500">Tier</th><th scope="col" style="padding: 12px 16px; font-weight: 500">List price</th><th scope="col" style="padding: 12px 16px; font-weight: 500">Fee 5%</th><th scope="col" style="padding: 12px 16px; font-weight: 500">Discount</th><th scope="col" style="padding: 12px 16px; font-weight: 500">You pay</th><th scope="col" style="padding: 12px 16px; font-weight: 500">Creator gets</th></tr></thead>
 <tbody style="text-align: right">
@@ -101,17 +108,17 @@ button{font-family:inherit}
 <section style="display: flex; flex-direction: column; gap: 16px">
 <h2 style="margin: 0; font-size: 28px; letter-spacing: -0.02em">Where every fee goes</h2>
 <p style="margin: 0; color: #9BA19A; font-size: 14px">Split of the fee actually collected, after any holder discount. Rounding dust goes to ops.</p>
-<div role="img" aria-label="Fee split: 40% buyback, 25% AI verification, 20% ops, 15% safety" style="display: flex; height: 52px; border-radius: 12px; overflow: hidden; font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 600">
+<div role="img" aria-label="Fee split: 40% buyback, 25% AI verification, 20% ops, 15% safety" style="display: flex; height: 52px; border-radius: 8px; overflow: hidden; font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 600">
 <div style="flex: 40; background: #C6F432; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">40% buyback</div>
 <div style="flex: 25; background: #7CC4FF; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">25% AI verification</div>
 <div style="flex: 20; background: #C9A2FF; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">20% ops</div>
 <div style="flex: 15; background: #F5A524; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">15% safety</div>
 </div>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px">
-<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Buyback &amp; burn / reward pool</div><div style="font-size: 13px; color: #9BA19A">Market-buys $TRENCH on a public schedule. Split between burn and staker rewards is a governance vote.</div></div>
-<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">AI verification</div><div style="font-size: 13px; color: #9BA19A">Funds the automated verification agent: model runs, sandbox time and a signed attestation for every version. No human verifiers are paid from this bucket.</div></div>
-<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Operations</div><div style="font-size: 13px; color: #9BA19A">Scanning infra, sandbox wallets, hosting and development.</div></div>
-<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Safety fund</div><div style="font-size: 13px; color: #9BA19A">Refunds buyers when a creator bond isn't enough to cover a confirmed bad listing.</div></div>
+<div style="padding: 16px; border-radius: 8px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Buyback &amp; burn / reward pool</div><div style="font-size: 13px; color: #9BA19A">Market-buys $TRENCH on a public schedule. Split between burn and staker rewards is a governance vote.</div></div>
+<div style="padding: 16px; border-radius: 8px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">AI verification</div><div style="font-size: 13px; color: #9BA19A">Funds the automated verification agent: model runs, sandbox time and a signed attestation for every version. No human verifiers are paid from this bucket.</div></div>
+<div style="padding: 16px; border-radius: 8px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Operations</div><div style="font-size: 13px; color: #9BA19A">Scanning infra, sandbox wallets, hosting and development.</div></div>
+<div style="padding: 16px; border-radius: 8px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Safety fund</div><div style="font-size: 13px; color: #9BA19A">Refunds buyers when a creator bond isn't enough to cover a confirmed bad listing.</div></div>
 </div>
 </section>
 
@@ -139,7 +146,7 @@ button{font-family:inherit}
 
 <!-- calculator + verification -->
 <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px">
-<div style="background: #141A08; border: 1px solid #2E3A12; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="background: #141A08; border: 1px solid #2E3A12; border-radius: 10px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
 <h2 style="margin: 0; font-size: 20px">What you save at {{tierName}}</h2>
 <div role="group" aria-label="Monthly spend" style="display: flex; flex-wrap: wrap; gap: 6px">
 <sc-for list="{{spends}}" as="s" hint-placeholder-count="4">
@@ -153,7 +160,7 @@ button{font-family:inherit}
 </div>
 <p style="margin: 0; font-size: 12px; color: #9FAF86">Assumes every purchase is at that tier. Illustration only. Holding $TRENCH is a risk; perks can change by governance.</p>
 </div>
-<div style="background: #121412; border: 1px solid #262A26; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px">
+<div style="background: #121412; border: 1px solid #262A26; border-radius: 10px; padding: 24px; display: flex; flex-direction: column; gap: 12px">
 <h2 style="margin: 0; font-size: 20px">How holding is checked</h2>
 <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: #B4BAB2">
 <li>Connect and sign a message. No transaction, no approval.</li>
@@ -186,7 +193,7 @@ class Component extends DCLogic {
     const tiers = defs.map((t) => {
       const on = this.state.tier === t.name;
       return { ...t, sel: on ? 'true' : 'false', tag: on ? '#C6F432' : '#9BA19A', pick: () => this.setState({ tier: t.name }),
-        style: 'text-align: left; color: #EDEFEA; cursor: pointer; padding: 22px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; border: 1px solid ' + (on ? '#C6F432' : '#646C63') + '; background: ' + (on ? '#141A08' : '#121412') };
+        style: 'text-align: left; color: #EDEFEA; cursor: pointer; padding: 22px; border-radius: 10px; display: flex; flex-direction: column; gap: 12px; border: 1px solid ' + (on ? '#C6F432' : '#646C63') + '; background: ' + (on ? '#141A08' : '#121412') };
     });
     const cur = defs.find((t) => t.name === this.state.tier);
     const spends = [5, 20, 50, 150].map((v) => {
