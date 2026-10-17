@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { expect, test, devices, type Page } from '@playwright/test';
-import { NO_WALLET_MESSAGE } from '../apps/web/src/lib/wallet-detect';
+import { LAST_WALLET_KEY } from '../apps/web/src/lib/wallet-catalog';
 
 const require = createRequire(import.meta.url);
 const nacl = require('tweetnacl') as typeof import('tweetnacl');
@@ -10,6 +10,13 @@ const ADDRESS = 'F6rqzj5ZMBcCF1rADveqE4cKRShC4ddzVgaPhCJ5zpD7';
 
 function walletAlert(page: Page) {
   return page.locator('[data-testid=nav] p[role=alert]');
+}
+
+async function chooseInstalled(page: Page, id: string) {
+  await page.getByTestId('connect').click();
+  const row = page.getByTestId(`wallet-option-${id}`);
+  await expect(row).toHaveAttribute('data-installed', 'true');
+  await row.click();
 }
 
 async function mockSignIn(page: Page, address: string) {
@@ -100,7 +107,7 @@ function installStandardWallet(options: { address: string; delayMs: number }) {
   });
 }
 
-test('does not install the test adapter and explains a missing wallet', async ({ page }) => {
+test('opens the wallet picker and keeps every wallet when none is installed', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
   const installed = await page.evaluate(
@@ -110,16 +117,52 @@ test('does not install the test adapter and explains a missing wallet', async ({
   );
   expect(installed).toBeNull();
   await page.getByTestId('connect').click();
-  await expect(walletAlert(page)).toHaveText(NO_WALLET_MESSAGE, { timeout: 5_000 });
+  const modal = page.getByTestId('connect-modal');
+  await expect(modal).toBeVisible();
+  await expect(modal).toHaveAttribute('data-state', 'list');
+  await expect(modal.getByRole('heading', { name: 'Select your wallet' })).toBeVisible();
+  const order = ['phantom', 'walletconnect', 'solflare', 'trust', 'glow', 'coinbase', 'backpack'];
+  const rows = modal.locator('[data-wallet]');
+  await expect(rows).toHaveCount(7);
+  await expect(rows).toHaveText([
+    /Phantom/,
+    /WalletConnect/,
+    /Solflare/,
+    /Trust/,
+    /Glow/,
+    /Coinbase/,
+    /Backpack/,
+  ]);
+  for (const id of order) {
+    await expect(modal.locator(`[data-wallet=${id}]`)).toHaveAttribute('data-installed', 'false');
+  }
+  const phantom = modal.getByTestId('wallet-option-phantom');
+  await expect(phantom).toContainText('Popular');
+  await expect(phantom).toHaveAttribute('href', 'https://phantom.com/download');
+  await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
+  await expect(walletAlert(page)).toHaveCount(0);
+  await modal.getByTestId('wallet-search').fill('glow');
+  await expect(modal.locator('[data-wallet]')).toHaveCount(1);
+  await expect(modal.getByTestId('wallet-option-glow')).toBeVisible();
+  await modal.getByTestId('wallet-search').fill('');
+  await modal.getByTestId('wallet-help').click();
+  await expect(modal).toContainText('nothing moves and nothing is approved');
+  await modal.getByTestId('wallet-back').click();
+  await expect(modal).toHaveAttribute('data-state', 'list');
+  await page.keyboard.press('Escape');
+  await expect(modal).toHaveCount(0);
 });
 
 test('connects a Wallet Standard wallet that registers when the app is ready', async ({ page }) => {
   await page.addInitScript(installStandardWallet, { address: ADDRESS, delayMs: 0 });
   await mockSignIn(page, ADDRESS);
   await page.goto('/');
-  await page.getByTestId('connect').click();
+  await chooseInstalled(page, 'phantom');
   await expect(page.getByTestId('connect')).toHaveText('F6rq…zpD7');
+  await expect(page.getByTestId('connect-modal')).toHaveCount(0);
   await expect(walletAlert(page)).toHaveCount(0);
+  const remembered = await page.evaluate((key) => localStorage.getItem(key), LAST_WALLET_KEY);
+  expect(remembered).toBe('phantom');
 });
 
 test('connects a Wallet Standard wallet that registers after the page loads', async ({ page }) => {
@@ -127,6 +170,9 @@ test('connects a Wallet Standard wallet that registers after the page loads', as
   await mockSignIn(page, ADDRESS);
   await page.goto('/');
   await page.getByTestId('connect').click();
+  const phantom = page.getByTestId('wallet-option-phantom');
+  await expect(phantom).toHaveAttribute('data-installed', 'true');
+  await phantom.click();
   await expect(page.getByTestId('connect')).toHaveText('F6rq…zpD7');
 });
 
@@ -148,7 +194,74 @@ test('connects a legacy Phantom provider that is injected after load', async ({ 
   await mockSignIn(page, ADDRESS);
   await page.goto('/');
   await page.getByTestId('connect').click();
+  const phantom = page.getByTestId('wallet-option-phantom');
+  await expect(phantom).toHaveAttribute('data-installed', 'true');
+  await phantom.click();
   await expect(page.getByTestId('connect')).toHaveText('F6rq…zpD7');
+});
+
+test('does not auto-pick when more than one wallet is installed', async ({ page }) => {
+  const solflare = 'So1flare1111111111111111111111111111111111';
+  await page.addInitScript(
+    ({ phantom, solflareAddress }) => {
+      window.addEventListener('wallet-standard:app-ready', (event) => {
+        const api = (event as CustomEvent<{ register: (wallet: unknown) => void }>).detail;
+        for (const entry of [
+          { name: 'Solflare', address: solflareAddress },
+          { name: 'Phantom', address: phantom },
+        ]) {
+          const account = {
+            address: entry.address,
+            publicKey: new Uint8Array(32),
+            chains: ['solana:devnet'],
+            features: ['solana:signMessage', 'solana:signTransaction'],
+          };
+          const wallet = {
+            version: '1.0.0',
+            name: entry.name,
+            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
+            chains: ['solana:devnet'],
+            accounts: [] as (typeof account)[],
+            features: {
+              'standard:connect': {
+                version: '1.0.0',
+                connect: async () => {
+                  wallet.accounts = [account];
+                  return { accounts: [account] };
+                },
+              },
+              'solana:signMessage': {
+                version: '1.0.0',
+                signMessage: async (...inputs: { message: Uint8Array }[]) =>
+                  inputs.map((input) => ({
+                    signedMessage: input.message,
+                    signature: new Uint8Array(64).fill(3),
+                  })),
+              },
+              'solana:signTransaction': {
+                version: '1.0.0',
+                supportedTransactionVersions: ['legacy'],
+                signTransaction: async (...inputs: { transaction: Uint8Array }[]) =>
+                  inputs.map((input) => ({ signedTransaction: input.transaction })),
+              },
+            },
+          };
+          api.register(wallet);
+        }
+      });
+    },
+    { phantom: ADDRESS, solflareAddress: solflare },
+  );
+  await mockSignIn(page, solflare);
+  await page.addInitScript((key) => localStorage.setItem(key, 'solflare'), LAST_WALLET_KEY);
+  await page.goto('/');
+  await page.getByTestId('connect').click();
+  await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
+  const rows = page.getByTestId('connect-modal').locator('[data-wallet]');
+  await expect(rows.nth(0)).toHaveAttribute('data-wallet', 'solflare');
+  await expect(rows.nth(1)).toHaveAttribute('data-wallet', 'phantom');
+  await page.getByTestId('wallet-option-solflare').click();
+  await expect(page.getByTestId('connect')).toHaveText('So1f…1111');
 });
 
 test('signs in with the explicit test adapter when a test sets it', async ({ page }) => {
@@ -176,12 +289,18 @@ test.describe('mobile', () => {
     hasTouch: iphone.hasTouch,
   });
 
-  test('offers a Phantom deeplink when no wallet is injected', async ({ page }) => {
+  test('offers a Phantom deeplink from WalletConnect when no wallet is injected', async ({
+    page,
+  }) => {
     await page.route('https://phantom.app/**', (route) =>
       route.fulfill({ status: 200, contentType: 'text/html', body: '<p>phantom</p>' }),
     );
     await page.goto('/');
-    const link = page.getByTestId('connect');
+    await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
+    await page.getByTestId('connect').click();
+    await page.getByTestId('wallet-option-walletconnect').click();
+    await expect(page.getByTestId('wallet-qr')).toBeVisible();
+    const link = page.getByTestId('wallet-deeplink');
     await expect(link).toHaveText('Open in Phantom');
     await link.click();
     await expect(page).toHaveURL(/https:\/\/phantom\.app\/ul\/browse\//);
@@ -197,7 +316,8 @@ test.describe('mobile', () => {
     await mockSignIn(page, ADDRESS);
     await page.goto('/');
     await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
-    await page.getByTestId('connect').click();
+    await chooseInstalled(page, 'phantom');
     await expect(page.getByTestId('connect')).toHaveText('F6rq…zpD7');
+    expect(page.url()).not.toContain('phantom.app');
   });
 });

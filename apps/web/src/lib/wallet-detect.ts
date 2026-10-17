@@ -19,6 +19,8 @@ export type StandardAccount = {
 
 export type StandardWallet = {
   name: string;
+  /** Wallet Standard icon, usually a data URI. */
+  icon?: string;
   chains: readonly string[];
   accounts: readonly StandardAccount[];
   features: Record<string, unknown>;
