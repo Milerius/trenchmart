@@ -101,16 +101,19 @@ function requireRole(user: Record<string, any>, role: string): void {
   }
 }
 
-export function createApp(deps: Deps): App {
-  let priceCache: PriceCache = null;
+export type PriceCacheBox = { value: PriceCache };
+
+// The Worker builds one app per request (a postgres.js client cannot be shared across
+// requests in workerd), so it passes a module-level box to keep the SOL price cache warm.
+export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null }): App {
   async function solPrice() {
     const quote = await cachedSolUsd({
       nowMs: deps.now().getTime(),
-      cache: priceCache,
+      cache: priceCache.value,
       override: deps.env.solUsdOverride,
       fetchUsd: deps.env.solUsdOverride ? undefined : fetchCoinGeckoSolUsd,
     });
-    priceCache = quote.cache;
+    priceCache.value = quote.cache;
     return quote;
   }
 

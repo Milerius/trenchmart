@@ -2,9 +2,9 @@ import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-export function createSql(databaseUrl: string) {
+export function createSql(databaseUrl: string, options: { max?: number } = {}) {
   return postgres(databaseUrl, {
-    max: 10,
+    max: options.max ?? 10,
     prepare: false,
     types: { bigint: postgres.BigInt },
     onnotice: () => undefined,
