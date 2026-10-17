@@ -100,6 +100,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm exec playwright test
+        env:
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: 9e9aab84f03d9799c7a3dc4ee77fa93b
 
   audit:
     name: audit

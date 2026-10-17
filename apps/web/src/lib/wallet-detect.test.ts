@@ -4,6 +4,7 @@ import {
   discoverWallet,
   isLikelyMobile,
   isUsableSolanaWallet,
+  mobileBrowseUrl,
   phantomBrowseUrl,
   pickSolanaWallet,
   readInjectedProvider,
@@ -246,6 +247,27 @@ describe('phantomBrowseUrl', () => {
     expect(phantomBrowseUrl('http://127.0.0.1:3000/')).toContain('127.0.0.1');
     expect(() => phantomBrowseUrl('http://evil.example/')).toThrow(/deeplink/);
     expect(() => phantomBrowseUrl('javascript:alert(1)')).toThrow();
+  });
+});
+
+describe('mobileBrowseUrl', () => {
+  const page = 'https://trenchmart.fun/sell?q=1';
+
+  it('builds Solflare, Trust, and Backpack links next to Phantom', () => {
+    expect(mobileBrowseUrl('phantom', page)).toBe(phantomBrowseUrl(page));
+    expect(mobileBrowseUrl('solflare', page)).toBe(
+      'https://solflare.com/ul/v1/browse/https%3A%2F%2Ftrenchmart.fun%2Fsell%3Fq%3D1?ref=https%3A%2F%2Ftrenchmart.fun',
+    );
+    expect(mobileBrowseUrl('backpack', page)).toBe(
+      'https://backpack.app/ul/v1/browse/https%3A%2F%2Ftrenchmart.fun%2Fsell%3Fq%3D1?ref=https%3A%2F%2Ftrenchmart.fun',
+    );
+    expect(mobileBrowseUrl('trust', page)).toBe(
+      'https://link.trustwallet.com/open_url?coin_id=501&url=https%3A%2F%2Ftrenchmart.fun%2Fsell%3Fq%3D1',
+    );
+    for (const wallet of ['phantom', 'solflare', 'trust', 'backpack'] as const) {
+      expect(mobileBrowseUrl(wallet, page)).not.toContain('mainnet');
+    }
+    expect(() => mobileBrowseUrl('solflare', 'http://evil.example/')).toThrow(/deeplink/);
   });
 });
 

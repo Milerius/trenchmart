@@ -4,21 +4,46 @@ import { getWallets } from '@wallet-standard/app';
 import { fromBase64, signLegacyTransaction, toBase64 } from '@trenchmart/chain';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, ApiError } from './api';
 import {
-  DISCOVERY_TIMEOUT_MS,
-  discoverWallet,
-  isLikelyMobile,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { api, ApiError } from './api';
+import { ConnectModal } from '@/components/connect-modal';
+import {
+  detectedIdFor,
+  readLastWallet,
+  safeLocalStorage,
+  safeWalletIcon,
+  writeLastWallet,
+  type DetectedWalletInfo,
+} from './wallet-catalog';
+import { commitAfterSignIn, sessionAfterVerify } from './wallet-session';
+import {
+  createWalletConnectProvider,
+  signWalletConnectMessage,
+  signWalletConnectTransaction,
+  startWalletConnect,
+  walletConnectProjectId,
+  type WalletConnectSession,
+  type WcProviderLike,
+} from './walletconnect';
+import {
+  isUsableSolanaWallet,
+  mobileBrowseUrl,
   NO_WALLET_MESSAGE,
-  phantomBrowseUrl,
-  pickSolanaWallet,
   readInjectedProvider,
   signerFromLegacyProvider,
   signerFromStandardWallet,
   signSignInMessage,
   walletErrorMessage,
   withTimeout,
+  type MobileWalletId,
   type Signer,
   type WalletList,
 } from './wallet-detect';
@@ -29,8 +54,6 @@ type WalletContextValue = {
   session: Session | null;
   busy: boolean;
   error: string;
-  /** Set on a phone when no wallet injected. The header renders this as a real link. */
-  phantomHref: string | null;
   connect: () => Promise<void>;
   logout: () => Promise<void>;
   signAndSend: (txBase64: string) => Promise<string>;
@@ -40,6 +63,7 @@ type WalletContextValue = {
 /** Long enough to read and approve in the wallet; short enough that a dead extension does not spin forever. */
 const WALLET_TIMEOUT_MS = 120_000;
 const WALLET_TIMEOUT_MESSAGE = 'The wallet did not respond. Reload the page and try again.';
+const MOBILE_WALLETS: readonly MobileWalletId[] = ['phantom', 'solflare', 'trust', 'backpack'];
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
@@ -80,7 +104,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [phantomHref, setPhantomHref] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [detected, setDetected] = useState<DetectedWalletInfo[]>([]);
+  const [lastUsedId, setLastUsedId] = useState<string | null>(null);
+  const [deeplinks, setDeeplinks] = useState<Partial<Record<MobileWalletId, string>>>({});
+  const [walletConnectEnabled, setWalletConnectEnabled] = useState(false);
+  const [wcUri, setWcUri] = useState<string | null>(null);
+  const signerRef = useRef<Signer | null>(null);
+  const wcGen = useRef(0);
+  const syncRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     // getWallets() dispatches wallet-standard:app-ready. Extensions that injected
@@ -90,12 +122,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     let stopped = false;
     const sync = () => {
       if (stopped) return;
-      const found = pickSolanaWallet(wallets.get()) ?? readInjectedProvider(window);
-      const secret = e2eSecret();
-      const mobile = isLikelyMobile(navigator.userAgent, navigator.maxTouchPoints);
-      if (!found && !secret && mobile) setPhantomHref(phantomBrowseUrl(window.location.href));
-      else setPhantomHref(null);
+      const found: DetectedWalletInfo[] = [];
+      const seen = new Set<string>();
+      for (const wallet of wallets.get()) {
+        if (!isUsableSolanaWallet(wallet)) continue;
+        const id = detectedIdFor(wallet.name);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        found.push({ id, name: wallet.name, icon: safeWalletIcon(wallet.icon) });
+      }
+      if (!seen.has('phantom') && readInjectedProvider(window)) {
+        found.push({ id: 'phantom', name: 'Phantom', icon: null });
+      }
+      setDetected(found);
+      const links: Partial<Record<MobileWalletId, string>> = {};
+      for (const id of MOBILE_WALLETS) {
+        try {
+          links[id] = mobileBrowseUrl(id, window.location.href);
+        } catch {
+          /* this page is not safe to open in a wallet browser */
+        }
+      }
+      setDeeplinks(links);
     };
+    syncRef.current = sync;
     const offRegister = wallets.on('register', sync);
     const offUnregister = wallets.on('unregister', sync);
     window.addEventListener('phantom#initialized', sync);
@@ -104,6 +154,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const stopPoll = window.setTimeout(() => window.clearInterval(poll), 8_000);
     return () => {
       stopped = true;
+      syncRef.current = () => {};
       offRegister();
       offUnregister();
       window.removeEventListener('phantom#initialized', sync);
@@ -112,62 +163,169 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function refresh() {
+  useEffect(() => {
+    if (!pickerOpen) return;
+    syncRef.current();
+    const poll = window.setInterval(() => syncRef.current(), 250);
+    return () => window.clearInterval(poll);
+  }, [pickerOpen]);
+
+  async function refresh(requireSuccess = false) {
     try {
       const me = await api<{
         user: { id: string; wallet: string; handle: string | null; roles: string[] };
         tier: string;
       }>('/me');
       setSession({ ...me.user, tier: me.tier });
-    } catch {
+    } catch (err) {
       setSession(null);
+      if (requireSuccess) throw err;
     }
   }
 
-  async function obtainSigner(silent: boolean): Promise<Signer> {
-    const secret = e2eSecret();
-    if (secret) return signerFromSecret(secret);
-    const found = await discoverWallet({
-      standard: standardWallets(),
-      injected: window,
-      timeoutMs: DISCOVERY_TIMEOUT_MS,
-      mobile: isLikelyMobile(navigator.userAgent, navigator.maxTouchPoints),
-      pageUrl: window.location.href,
+  async function rollbackSignIn() {
+    signerRef.current = null;
+    setSession(null);
+    await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
+  }
+
+  async function finishSignIn(signer: Signer) {
+    const nonce = await api<{ message: string }>('/auth/nonce', {
+      method: 'POST',
+      body: JSON.stringify({ wallet: signer.address }),
     });
-    if (found.kind === 'deeplink') {
-      window.location.assign(found.url);
-      throw new Error('Open this page in Phantom to approve the transaction.');
+    const signature = await withTimeout(
+      signSignInMessage(signer, nonce.message),
+      WALLET_TIMEOUT_MS,
+      WALLET_TIMEOUT_MESSAGE,
+    );
+    await api('/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ wallet: signer.address, signature: bs58.encode(signature) }),
+    });
+    await sessionAfterVerify({
+      load: () => refresh(true),
+      rollback: rollbackSignIn,
+    });
+  }
+
+  function rememberSigner(signer: Signer, id: string) {
+    signerRef.current = signer;
+    writeLastWallet(safeLocalStorage(window), id);
+    setLastUsedId(id);
+  }
+
+  /** The wallet the person clicked. Never the first one in the list. */
+  async function signerFor(id: string, silent: boolean): Promise<Signer> {
+    for (const wallet of standardWallets().get()) {
+      if (!isUsableSolanaWallet(wallet)) continue;
+      if (detectedIdFor(wallet.name) !== id) continue;
+      return signerFromStandardWallet(wallet, { silent });
     }
-    if (found.kind === 'none') throw new Error(NO_WALLET_MESSAGE);
-    if (found.kind === 'standard') return signerFromStandardWallet(found.wallet, { silent });
-    return signerFromLegacyProvider(found.provider);
+    if (id === 'phantom') {
+      const provider = readInjectedProvider(window);
+      if (provider) {
+        const signer = await signerFromLegacyProvider(provider);
+        return { ...signer, name: 'Phantom' };
+      }
+    }
+    throw new Error(NO_WALLET_MESSAGE);
+  }
+
+  function signerFromWalletConnect(
+    provider: WcProviderLike,
+    session: WalletConnectSession,
+  ): Signer {
+    return {
+      address: session.address,
+      name: 'WalletConnect',
+      signMessage: (message) => signWalletConnectMessage(provider, session, message),
+      signTransaction: (transaction) =>
+        signWalletConnectTransaction(provider, session, transaction),
+    };
+  }
+
+  function cancelWalletConnect() {
+    wcGen.current += 1;
+    setWcUri(null);
+  }
+
+  async function beginWalletConnect() {
+    const projectId = walletConnectProjectId();
+    if (!projectId) return;
+    const generation = ++wcGen.current;
+    setWcUri(null);
+    setError('');
+    try {
+      const provider = await createWalletConnectProvider(projectId);
+      if (generation !== wcGen.current) return;
+      const started = startWalletConnect(provider);
+      const uri = await started.uri;
+      if (generation !== wcGen.current) return;
+      setWcUri(uri);
+      const session = await started.session;
+      if (generation !== wcGen.current) return;
+      const signer = signerFromWalletConnect(provider, session);
+      setBusy(true);
+      await commitAfterSignIn({
+        finish: () => finishSignIn(signer),
+        commit: () => rememberSigner(signer, 'walletconnect'),
+      });
+      setPickerOpen(false);
+    } catch (err) {
+      if (generation !== wcGen.current) return;
+      console.error('[trenchmart] sign-in failed', err);
+      setError(err instanceof ApiError ? err.message : walletErrorMessage(err, 'WalletConnect'));
+    } finally {
+      if (generation === wcGen.current) setBusy(false);
+    }
   }
 
   async function connect() {
+    const secret = e2eSecret();
+    if (!secret) {
+      setError('');
+      setLastUsedId(readLastWallet(safeLocalStorage(window)));
+      setWalletConnectEnabled(Boolean(walletConnectProjectId()));
+      setWcUri(null);
+      wcGen.current += 1;
+      setPickerOpen(true);
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const signer = signerFromSecret(secret);
+      await commitAfterSignIn({
+        finish: () => finishSignIn(signer),
+        commit: () => {
+          signerRef.current = signer;
+        },
+      });
+    } catch (err) {
+      console.error('[trenchmart] sign-in failed', err);
+      setError(err instanceof ApiError ? err.message : walletErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function connectId(id: string) {
     setBusy(true);
     setError('');
     let walletName: string | undefined;
     try {
       const signer = await withTimeout(
-        obtainSigner(false),
+        signerFor(id, false),
         WALLET_TIMEOUT_MS,
         WALLET_TIMEOUT_MESSAGE,
       );
       walletName = signer.name;
-      const nonce = await api<{ message: string }>('/auth/nonce', {
-        method: 'POST',
-        body: JSON.stringify({ wallet: signer.address }),
+      await commitAfterSignIn({
+        finish: () => finishSignIn(signer),
+        commit: () => rememberSigner(signer, id),
       });
-      const signature = await withTimeout(
-        signSignInMessage(signer, nonce.message),
-        WALLET_TIMEOUT_MS,
-        WALLET_TIMEOUT_MESSAGE,
-      );
-      await api('/auth/verify', {
-        method: 'POST',
-        body: JSON.stringify({ wallet: signer.address, signature: bs58.encode(signature) }),
-      });
-      await refresh();
+      setPickerOpen(false);
     } catch (err) {
       console.error('[trenchmart] sign-in failed', err);
       setError(err instanceof ApiError ? err.message : walletErrorMessage(err, walletName));
@@ -178,11 +336,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     await api('/auth/logout', { method: 'POST' });
+    signerRef.current = null;
     setSession(null);
   }
 
   async function signAndSend(txBase64: string): Promise<string> {
-    const signer = await obtainSigner(true);
+    let signer = signerRef.current;
+    if (!signer) {
+      const secret = e2eSecret();
+      if (secret) signer = signerFromSecret(secret);
+    }
+    if (!signer) {
+      const last = readLastWallet(safeLocalStorage(window));
+      if (!last) throw new Error('Connect a wallet first.');
+      signer = await signerFor(last, true);
+      signerRef.current = signer;
+    }
     const signed = await signer.signTransaction(fromBase64(txBase64));
     const sent = await api<{ signature: string }>('/tx/send', {
       method: 'POST',
@@ -192,11 +361,34 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ session, busy, error, phantomHref, connect, logout, signAndSend, refresh }),
-    [session, busy, error, phantomHref],
+    () => ({ session, busy, error, connect, logout, signAndSend, refresh }),
+    [session, busy, error],
   );
 
-  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+  return (
+    <WalletContext.Provider value={value}>
+      {children}
+      <ConnectModal
+        open={pickerOpen}
+        busy={busy}
+        error={error}
+        detected={detected}
+        lastUsedId={lastUsedId}
+        walletConnect={walletConnectEnabled}
+        deeplinks={deeplinks}
+        wcUri={wcUri}
+        onClose={() => {
+          if (!busy) {
+            cancelWalletConnect();
+            setPickerOpen(false);
+          }
+        }}
+        onConnect={(id) => void connectId(id)}
+        onWalletConnect={() => void beginWalletConnect()}
+        onLeaveWalletConnect={cancelWalletConnect}
+      />
+    </WalletContext.Provider>
+  );
 }
 
 export function useWallet(): WalletContextValue {
