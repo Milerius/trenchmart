@@ -748,7 +748,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (declared > IMAGE_MAX_BYTES) {
       throw new HttpError(413, 'IMAGE_TOO_LARGE', 'images are limited to 3 MB');
     }
-    const bytes = new Uint8Array(await c.req.arrayBuffer());
+    // Chunked uploads carry no content-length, so the limit is enforced while reading too.
+    const bytes = await readCapped(c.req.raw.body, IMAGE_MAX_BYTES);
     return c.json(await uploadImage(deps, listing.id as string, user.id as string, bytes));
   });
 
@@ -1261,6 +1262,33 @@ async function ownListing(deps: Deps, id: string, userId: string) {
   const listing = rows[0];
   if (!listing) throw new HttpError(404, 'NOT_FOUND', 'listing not found');
   return listing;
+}
+
+async function readCapped(
+  body: ReadableStream<Uint8Array> | null,
+  max: number,
+): Promise<Uint8Array> {
+  if (!body) return new Uint8Array(0);
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > max) {
+      await reader.cancel().catch(() => undefined);
+      throw new HttpError(413, 'IMAGE_TOO_LARGE', 'images are limited to 3 MB');
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
 }
 
 async function ownListingParam(deps: Deps, id: string, userId: string) {

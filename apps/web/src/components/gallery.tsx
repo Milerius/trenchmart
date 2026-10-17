@@ -89,10 +89,18 @@ export function Lightbox({
     (delta: number) => setIndex((value) => (value + delta + images.length) % images.length),
     [images.length],
   );
+  // Keep the latest index and close handler in refs so the key listener is installed once
+  // and focus moves to Close only when the dialog opens, not on every image change.
+  const indexRef = useRef(index);
+  indexRef.current = index;
+  const closeHandler = useRef(onClose);
+  closeHandler.current = onClose;
   useEffect(() => {
     closeRef.current?.focus();
+  }, []);
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose(index);
+      if (event.key === 'Escape') closeHandler.current(indexRef.current);
       if (event.key === 'ArrowRight') go(1);
       if (event.key === 'ArrowLeft') go(-1);
     };
@@ -103,7 +111,7 @@ export function Lightbox({
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = overflow;
     };
-  }, [go, index, onClose]);
+  }, [go]);
   const image = images[index]!;
   return (
     <div

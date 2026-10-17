@@ -18,6 +18,19 @@ export function resolveApiUrl(env: Record<string, string | undefined>, phase: st
     if (url.protocol !== 'https:' && url.protocol !== 'http:') {
       throw new Error(`API_URL must be http(s): ${value}`);
     }
+    // The rewrite appends /api/v1/... to this string, so anything after the path would swallow it.
+    if (
+      url.search ||
+      url.hash ||
+      url.username ||
+      url.password ||
+      value.includes('?') ||
+      value.includes('#')
+    ) {
+      throw new Error(
+        `API_URL must be a plain origin or path, without credentials, query or fragment: ${value}`,
+      );
+    }
     return value.replace(/\/+$/, '');
   }
   if (phase === 'phase-production-build' && env.ALLOW_LOCAL_API !== '1') {

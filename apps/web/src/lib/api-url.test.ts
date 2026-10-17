@@ -23,5 +23,15 @@ describe('API_URL build guard', () => {
       resolveApiUrl({ API_URL: 'api.trenchmart.fun' }, 'phase-production-build'),
     ).toThrow(/not a URL/);
     expect(() => resolveApiUrl({ API_URL: 'ftp://x' }, 'phase-production-build')).toThrow(/http/);
+    for (const bad of [
+      'https://api.example.com/?token=x',
+      'https://api.example.com/#x',
+      'https://u:p@api.example.com',
+      'https://api.example.com?',
+    ]) {
+      expect(() => resolveApiUrl({ API_URL: bad }, 'phase-production-build')).toThrow(
+        /plain origin/,
+      );
+    }
   });
 });

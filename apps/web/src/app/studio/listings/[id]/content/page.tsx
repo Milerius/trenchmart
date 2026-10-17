@@ -7,7 +7,7 @@ import { MARKDOWN_MAX_CHARS } from '@trenchmart/shared';
 import { ListingCard, type Listing } from '@/components/listings';
 import { Markdown } from '@/components/markdown';
 import { Button, Label, Panel, Square, StatusTag, Tag } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 
 type StudioImage = {
@@ -64,27 +64,40 @@ export default function ContentEditorPage() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
   const [note, setNote] = useState('');
+  const [loadError, setLoadError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void api<Content>(`/studio/listings/${params.id}/content`).then((loaded) => {
-      setContent(loaded);
-      const byId = new Map(loaded.images.map((image) => [image.id, image]));
-      setImages(
-        loaded.draft.gallery
-          .map((entry) => {
-            const image = byId.get(entry.imageId);
-            return image ? { ...image, alt: entry.alt } : null;
-          })
-          .filter((image): image is StudioImage => image !== null),
-      );
-      setCover(loaded.draft.coverImageId);
-      setText({
-        readme: loaded.draft.readme,
-        howto: loaded.draft.howto,
-        requirements: loaded.draft.requirements,
+    void api<Content>(`/studio/listings/${params.id}/content`)
+      .then((loaded) => {
+        setContent(loaded);
+        const byId = new Map(loaded.images.map((image) => [image.id, image]));
+        setImages(
+          loaded.draft.gallery
+            .map((entry) => {
+              const image = byId.get(entry.imageId);
+              return image ? { ...image, alt: entry.alt } : null;
+            })
+            .filter((image): image is StudioImage => image !== null),
+        );
+        setCover(loaded.draft.coverImageId);
+        setText({
+          readme: loaded.draft.readme,
+          howto: loaded.draft.howto,
+          requirements: loaded.draft.requirements,
+        });
+      })
+      .catch((err: unknown) => {
+        setLoadError(
+          err instanceof ApiError && err.status === 404
+            ? 'Listing not found, or it is not yours.'
+            : err instanceof ApiError && err.status === 401
+              ? 'Sign in to edit this page.'
+              : err instanceof Error
+                ? err.message
+                : 'Could not load this page.',
+        );
       });
-    });
   }, [params.id]);
 
   async function upload(files: FileList | File[]) {
@@ -122,6 +135,19 @@ export default function ContentEditorPage() {
       } catch (err) {
         setImages((list) => list.filter((image) => image.id !== temp));
         setMessage(err instanceof Error ? err.message : 'upload failed');
+      }
+    }
+  }
+
+  async function remove(id: string) {
+    setImages((list) => list.filter((item) => item.id !== id));
+    setMessage('');
+    try {
+      // Frees the upload slot. An image on the live page stays until a new page is approved.
+      await api(`/studio/listings/${params.id}/images/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      if (!(err instanceof ApiError && err.code === 'IMAGE_LIVE')) {
+        setMessage(err instanceof Error ? err.message : 'remove failed');
       }
     }
   }
@@ -194,8 +220,16 @@ export default function ContentEditorPage() {
           </Link>
           <h1 className="m-0 mt-3 text-[32px] font-semibold tracking-[-0.03em]">Listing page</h1>
           <p className="m-0 mt-1 text-ink-2">
-            {content ? <span className="text-ink">{content.listing.title}</span> : 'Loading…'} ·
-            images, README and install guide. Buyers see it once AI review approves it.
+            {content ? (
+              <span className="text-ink">{content.listing.title}</span>
+            ) : loadError ? (
+              <span role="alert" className="text-danger">
+                {loadError}
+              </span>
+            ) : (
+              'Loading…'
+            )}{' '}
+            · images, README and install guide. Buyers see it once AI review approves it.
           </p>
         </div>
 
@@ -329,9 +363,7 @@ export default function ContentEditorPage() {
                         variant="ghost"
                         className="!h-8 !px-2 text-danger"
                         aria-label={`Remove image ${index + 1}`}
-                        onClick={() =>
-                          setImages((list) => list.filter((item) => item.id !== image.id))
-                        }
+                        onClick={() => void remove(image.id)}
                       >
                         ×
                       </Button>
@@ -371,7 +403,7 @@ export default function ContentEditorPage() {
             </div>
             <span className="pb-2 font-mono text-[11px] text-muted">
               {text[field].length.toLocaleString('en-US')} /{' '}
-              {MARKDOWN_MAX_CHARS.toLocaleString('en-US')}
+              {MAX_CHARS[field].toLocaleString('en-US')}
             </span>
           </div>
           <p className="m-0 px-5 pt-3 text-xs text-muted">

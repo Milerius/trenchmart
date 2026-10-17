@@ -155,7 +155,7 @@ Seller-written pages are untrusted input and go through their own review before 
 is ever returned by the public API. Saving a draft never changes the live page, so a page stays
 up while a new draft is reviewed.
 
-**Images** (`apps/api/src/image.ts`, max 12 in the gallery, 3 MB each, 40 uploads per listing):
+**Images** (`packages/scanner/src/image.ts`, called from `apps/api/src/content.ts`; max 12 in the gallery, 3 MB each, 40 uploads per listing):
 
 - The type comes from the file's magic bytes (PNG, JPEG, WebP). The client's Content-Type is ignored;
   SVG, GIF, HTML and polyglots are refused.

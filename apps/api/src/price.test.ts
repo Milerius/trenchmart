@@ -86,4 +86,16 @@ describe('SOL/USD sources', () => {
     const none = fake({ coingecko: 'throw', coinbase: 'throw', kraken: 'throw', jupiter: 'throw' });
     expect(await fetchSolUsd(none.impl)).toBeNull();
   });
+
+  it('stops trying sources once the shared time budget is spent', async () => {
+    let clock = 0;
+    const tried: string[] = [];
+    const slow = (async (url: string) => {
+      tried.push(url);
+      clock += 2600; // each source stalls until its own timeout
+      throw new Error('timeout');
+    }) as unknown as typeof fetch;
+    expect(await fetchSolUsd(slow, () => clock)).toBeNull();
+    expect(tried).toHaveLength(2);
+  });
 });

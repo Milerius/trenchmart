@@ -402,6 +402,18 @@ describe('owner product decisions', () => {
     expect(((await html.json()) as { error: { code: string } }).error.code).toBe('IMAGE_TYPE');
     const big = await upload(new Uint8Array(3 * 1024 * 1024 + 1), 'image/png');
     expect(big.status).toBe(413);
+    // No content-length (chunked): the limit still holds while streaming.
+    const chunked = await app.request(`${base}/images`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'image/png' },
+      body: new ReadableStream({
+        pull(controller) {
+          controller.enqueue(new Uint8Array(1024 * 1024));
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit);
+    expect(chunked.status).toBe(413);
     const first = (await (await upload(png, 'image/jpeg')).json()) as {
       id: string;
       mime: string;

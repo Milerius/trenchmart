@@ -101,12 +101,22 @@ function priceOf(value: unknown): number | null {
 }
 
 /** First public source that answers with a sane SOL/USD price, or null if none do. */
-export async function fetchSolUsd(fetchImpl: Fetch = fetch): Promise<number | null> {
+export const SOL_USD_SOURCE_TIMEOUT_MS = 3000;
+/** The whole fallback chain shares this budget, so a stalled run costs one request at most 5 s. */
+export const SOL_USD_TOTAL_BUDGET_MS = 5000;
+
+export async function fetchSolUsd(
+  fetchImpl: Fetch = fetch,
+  now: () => number = Date.now,
+): Promise<number | null> {
+  const deadline = now() + SOL_USD_TOTAL_BUDGET_MS;
   for (const source of SOL_USD_SOURCES) {
+    const left = deadline - now();
+    if (left <= 0) break;
     try {
       const response = await fetchImpl(source.url, {
         headers: { accept: 'application/json', 'user-agent': USER_AGENT },
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(Math.min(SOL_USD_SOURCE_TIMEOUT_MS, left)),
       });
       if (!response.ok) continue;
       const usd = priceOf(source.read(await response.json()));
