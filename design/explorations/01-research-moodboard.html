@@ -1,0 +1,163 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>01 · Research findings &amp; moodboard</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap"><style>:root{
+  --bg:#0A0B0A;--inset:#0E100E;--surface:#121412;--surface-2:#161916;
+  --line:#262A26;--line-soft:#1E221E;--line-strong:#343A34;--line-control:#646C63;
+  --text:#EDEFEA;--text-2:#B4BAB2;--muted:#9BA19A;--faint:#868D86;--decor:#6E756D;
+  --accent:#C6F432;--accent-hover:#DDFF7A;--on-accent:#0A0B0A;--accent-bg:#141A08;--accent-line:#2E3A12;--accent-label:#9FAF86;--accent-body:#C9D0BE;
+  --warn:#F5A524;--warn-bg:#1C160A;--warn-line:#3A2C0E;
+  --danger:#FF8A7A;--danger-bg:#1F1210;--danger-line:#4A2620;
+  --info:#7CC4FF;--info-bg:#0F1620;--info-line:#1E3448;
+  --violet:#C9A2FF;--teal:#6EE7C8;
+  --mono:'Geist Mono',ui-monospace,monospace;--sans:'Geist',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.grow{flex:1;min-width:0}
+.ml{margin-left:auto}
+.muted{color:var(--muted)}.t2{color:var(--text-2)}.faint{color:var(--faint)}.acc{color:var(--accent)}.warn{color:var(--warn)}.danger{color:var(--danger)}.info{color:var(--info)}
+.lbl{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.inset{background:var(--inset);border:1px solid var(--line-soft);border-radius:10px}
+.pad{padding:20px}.pad-s{padding:14px}
+.acc-panel{background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:16px}
+.warn-panel{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:14px}
+.danger-panel{background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:14px}
+.info-panel{background:var(--info-bg);border:1px solid var(--info-line);border-radius:14px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:10px;font:600 14px var(--sans);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.secondary{background:transparent;color:var(--text);border-color:var(--line-control)}
+.btn.ghost{background:transparent;color:var(--text-2)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger-line)}
+.btn.xl{height:52px;font-size:16px;border-radius:12px;font-weight:700}
+.btn.lg{height:48px}.btn.sm{height:36px;padding:0 12px;font-size:13px}
+.btn.block{width:100%}
+.btn[disabled],.btn.is-disabled{background:var(--surface-2);color:var(--faint);border-color:var(--line);cursor:not-allowed}
+.focus{outline:2px solid var(--accent);outline-offset:2px}
+/* tags + badges */
+.tag{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--mono);padding:3px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--text-2);white-space:nowrap}
+.tag.ok{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent)}
+.tag.wait{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tag.bad{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.tag.inf{background:var(--info-bg);border-color:var(--info-line);color:var(--info)}
+.tag.dark{background:var(--bg);border-color:transparent}
+.pill{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;font-size:13px;border:1px solid var(--line-control);background:var(--surface);color:var(--text-2)}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2)}
+.input{height:44px;background:var(--inset);border:1px solid var(--line-control);border-radius:10px;color:var(--text);padding:0 12px;font-size:14px;display:flex;align-items:center}
+.input.err{border-color:var(--danger)}
+.help{font-size:12px;color:var(--muted)}.help.err{color:var(--danger)}
+/* rows */
+.kv{display:flex;justify-content:space-between;gap:12px;font:13px var(--mono)}
+.kv .k{color:var(--muted);font-family:var(--sans)}
+.hr{height:1px;background:var(--line-soft)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.sq{flex:0 0 22px;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:700 12px var(--sans);color:var(--on-accent)}
+.sq.ok{background:var(--accent)}.sq.w{background:var(--warn)}.sq.x{background:var(--danger)}.sq.i{background:var(--info)}.sq.n{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-control)}
+/* skeleton */
+.sk{background:linear-gradient(90deg,#161916 0%,#1E221E 50%,#161916 100%);border-radius:6px}
+/* chrome */
+.netbar{background:#1C160A;border-bottom:1px solid var(--warn-line);color:var(--warn);font:12px var(--mono);text-align:center;padding:6px 16px}
+.ticker{border-bottom:1px solid var(--line-soft);background:var(--inset);font:12px var(--mono);color:var(--muted)}
+.ticker .wrap{padding:8px 24px;display:flex;flex-wrap:wrap;gap:8px 28px;align-items:center}
+.nav{border-bottom:1px solid var(--line-soft)}
+.nav .wrap{padding:14px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.logo{display:flex;gap:10px;align-items:center;color:var(--text);font-weight:700;font-size:18px;letter-spacing:-.02em}
+.logo i{width:32px;height:32px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.navlinks{display:flex;gap:4px}
+.navlinks a{padding:10px 12px;border-radius:8px;color:var(--muted);font-size:14px}
+.navlinks a.on{color:var(--text);background:var(--surface-2)}
+.search{flex:1 1 240px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line-control);border-radius:10px;padding:0 14px;height:44px;color:var(--muted);font-size:14px}
+.kbd{font:11px var(--mono);border:1px solid var(--line-control);border-radius:4px;padding:1px 6px;color:var(--muted)}
+.tierchip{display:flex;gap:6px;align-items:center;height:44px;padding:0 12px;border:1px solid var(--accent-line);background:var(--accent-bg);border-radius:10px;font:12px var(--mono);color:var(--accent)}
+.h-hero{font-size:clamp(40px,6vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:700}
+.h1{font-size:40px;line-height:1.05;letter-spacing:-.03em;font-weight:700}
+.h2{font-size:28px;letter-spacing:-.02em;font-weight:700}
+.h3{font-size:20px;letter-spacing:-.01em;font-weight:600}
+.lead{font-size:17px;color:var(--text-2)}
+.meta{font-size:13px;color:var(--muted)}
+.grid{display:grid;gap:16px}
+.g-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+/* artboards for exploration sheets */
+.sheet{padding:40px;display:flex;flex-direction:column;gap:28px}
+.sheet-h{display:flex;gap:16px;align-items:baseline;border-bottom:1px solid var(--line-soft);padding-bottom:16px}
+.sheet-h h1{font-size:28px;letter-spacing:-.02em}
+.board{display:flex;flex-direction:column;gap:10px}
+.board>.cap{font:12px var(--mono);color:var(--muted)}
+.frame{border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--bg)}
+.phone{width:390px;border:1px solid var(--line-strong);border-radius:28px;overflow:hidden;background:var(--bg)}
+.note{font-size:13px;color:var(--text-2);border-left:2px solid var(--accent);padding:2px 0 2px 12px}
+.q{font-size:13px;color:var(--warn);border-left:2px solid var(--warn);padding:2px 0 2px 12px}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+</style>
+<style>
+.f{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.fc{padding:18px;display:flex;flex-direction:column;gap:8px}
+.fc b{font-size:15px}
+.fc .src{font:11px var(--mono);color:var(--faint)}
+.sw{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
+.sw div{border-radius:10px;border:1px solid var(--line);overflow:hidden;font:11px var(--mono)}
+.sw span{display:block;height:56px}
+.sw p{padding:8px;color:var(--text-2)}
+.lane{display:flex;gap:6px;flex-wrap:wrap}
+</style></head><body><div class="sheet">
+<div class="sheet-h"><span class="lbl acc">01 · research</span><h1>What good crypto-marketplace UX looks like in 2026</h1><span class="ml meta">TrenchMart design · phase 1</span></div>
+
+<div class="f">
+  <div class="card fc"><span class="lbl acc">Wallet connect</span><b>One action: connect + sign in</b><span class="t2" style="font-size:13px">Use Wallet Standard discovery and <span class="mono">solana:signIn</span> (SIWS) so connect and sign happen in one click, with <span class="mono">signMessage</span> as fallback. On Android, MWA blocks a programmatic second popup. Show discovery as a loading state, not "no wallets". Say plainly that it is a message, not a transaction.</span><span class="src">solana.com/docs/frontend/messages-and-auth · docs.solanamobile.com ux-guidelines</span></div>
+  <div class="card fc"><span class="lbl acc">Before signing</span><b>Show the exact money movement</b><span class="t2" style="font-size:13px">List every line before the wallet opens: price, fee, discount, total, destination (escrow vault), plus a network-fee estimate. Wallets simulate too, so our numbers must match theirs to the lamport. Re-quote if a quote is stale and show its age.</span><span class="src">MetaMask simulations · Tenderly tx preview · ScamSniffer spoofing report</span></div>
+  <div class="card fc"><span class="lbl acc">Tx status</span><b>4 states, not a spinner</b><span class="t2" style="font-size:13px">idle → awaiting signature ("Approve in your wallet") → pending (sig + explorer link) → confirmed / failed. On Solana, "confirmed" (~0.6s) is the success state; "finalized" (~13s) runs in the background before payout. A wallet rejection is a cancel, not an error: no red.</span><span class="src">Solana cookbook confirmation · Helius commitment levels · cryptoskills frontend-ux</span></div>
+  <div class="card fc"><span class="lbl acc">Escrow</span><b>A visible timeline with an owner</b><span class="t2" style="font-size:13px">Paid → in escrow (countdown) → released or disputed → refunded. Every step shows who acts next and when. Put protection copy right next to the pay button, not in an FAQ. "Processing" with no time frame causes anxiety.</span><span class="src">martech.zone trust-by-design · anoda marketplace UX · u1core patterns</span></div>
+  <div class="card fc"><span class="lbl acc">Trust signals</span><b>Specific over generic</b><span class="t2" style="font-size:13px">Stars from everyone sit at 4.7–4.9 and mean little. Lead with checkable facts: which checks passed, the pinned sha256, bond staked, disputes lost, verified-buyer reviews, sales count. Every security claim must match a check that actually ran.</span><span class="src">u1core · anoda · TrenchMart docs/01 principles</span></div>
+  <div class="card fc"><span class="lbl acc">Errors &amp; empty</span><b>Human copy, a next action</b><span class="t2" style="font-size:13px">Map wallet and RPC errors to plain text: "Not enough SOL: you need 1.53 + ~0.000005 network fee, you have 0.9". Blockhash expired means "Quote expired, get a new one". Empty states offer a next step. Skeletons match the final layout so nothing jumps.</span><span class="src">MLH 100 days of Solana · OnchainKit error-handling · MiniPay best practices</span></div>
+</div>
+
+<div class="row" style="align-items:stretch;gap:12px">
+  <div class="card pad grow col"><span class="lbl acc">WCAG 2.2 AA · what changes for us</span>
+    <div class="kv"><span class="k">1.4.3 text contrast ≥ 4.5:1</span><span class="danger">faint #6E756D = 3.9:1 ✗ → #868D86 = 5.4:1 ✓</span></div>
+    <div class="kv"><span class="k">1.4.11 control borders ≥ 3:1</span><span class="danger">input border #262A26 = 1.4:1 ✗ → #646C63 = 3.4:1 ✓</span></div>
+    <div class="kv"><span class="k">2.5.8 target size ≥ 24px</span><span class="acc">we use 36–52px ✓ (tier pills 36px)</span></div>
+    <div class="kv"><span class="k">2.4.11 focus not obscured</span><span class="warn">sticky mobile buy bar needs scroll-padding</span></div>
+    <div class="kv"><span class="k">4.1.3 status messages</span><span class="warn">tx + escrow states need aria-live="polite"</span></div>
+    <div class="kv"><span class="k">1.4.1 use of colour</span><span class="acc">every status = symbol + word ✓ (keep)</span></div>
+  </div>
+  <div class="card pad col" style="flex:0 0 420px"><span class="lbl acc">Mobile-first</span>
+    <span class="t2" style="font-size:13px">• 390px baseline, single column, no horizontal scroll.<br>• Sticky bottom buy bar on the listing page (total + Buy) above the safe-area inset.<br>• Checkout becomes a bottom sheet with the wallet hand-off on top.<br>• Tables turn into stacked cards under 640px.<br>• Thumb zone: primary action at the bottom, at least 48px tall.</span>
+    <span class="lbl acc" style="margin-top:6px">Testnet honesty</span>
+    <span class="t2" style="font-size:13px">A persistent amber bar: "DEVNET · test SOL only · nothing here has real value". The explorer link always carries <span class="mono">?cluster=devnet</span>.</span>
+  </div>
+</div>
+
+<div class="col"><span class="lbl">Palette · checked against bg #0A0B0A / surface #121412</span>
+<div class="sw">
+  <div><span style="background:#0A0B0A"></span><p>bg<br>#0A0B0A</p></div>
+  <div><span style="background:#121412"></span><p>surface<br>#121412</p></div>
+  <div><span style="background:#C6F432"></span><p>accent · ok<br>14.4:1</p></div>
+  <div><span style="background:#F5A524"></span><p>warn · pending<br>8.8:1</p></div>
+  <div><span style="background:#7CC4FF"></span><p>info · on-chain<br>9.9:1 · NEW</p></div>
+  <div><span style="background:#FF8A7A"></span><p>danger · dispute<br>8.1:1</p></div>
+  <div><span style="background:#868D86"></span><p>faint (fixed)<br>5.4:1</p></div>
+  <div><span style="background:#646C63"></span><p>line-control · NEW<br>3.4:1</p></div>
+</div></div>
+
+<div class="row" style="align-items:stretch;gap:12px">
+<div class="card pad col grow"><span class="lbl">Status vocabulary (symbol + word + colour)</span>
+  <div class="lane"><span class="tag ok">✓ AI-VERIFIED</span><span class="tag wait">◷ IN AI REVIEW</span><span class="tag bad">× REJECTED</span><span class="tag">— DRAFT</span></div>
+  <div class="lane"><span class="tag">○ QUOTE</span><span class="tag wait">◔ APPROVE IN WALLET</span><span class="tag inf">◑ CONFIRMING</span><span class="tag ok">● PAID · IN ESCROW</span><span class="tag ok">✓ RELEASED</span><span class="tag bad">! DISPUTED</span><span class="tag inf">↺ REFUNDED</span><span class="tag">⌛ EXPIRED</span></div>
+</div>
+<div class="card pad col" style="flex:0 0 520px"><span class="lbl">Type</span>
+  <span style="font-size:44px;font-weight:700;letter-spacing:-.035em;line-height:1">The verified edge.</span>
+  <span class="mono" style="font-size:28px;font-weight:600">1.53 SOL <span class="faint" style="font-size:14px">= 1.50 + 0.075 − 0.045</span></span>
+  <span class="meta">Geist 400–700 for UI · Geist Mono for prices, hashes, codes · tabular numbers in every money column</span>
+</div>
+</div>
+
+<p class="q">Owner question: the handover still says "human-reviewed" and "Become a verifier". The build branch now uses an automated AI verifier and has no human verifiers. I've rewritten that copy as "AI verification" everywhere. Is that OK, or should human review stay as a fallback for flagged versions?</p>
+</div></body></html>
