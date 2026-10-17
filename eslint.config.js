@@ -16,6 +16,7 @@ export default tseslint.config(
       'test-results/**',
       'apps/web/AGENTS.md',
       'target/**',
+      'packages/scanner/src/__fixtures__/**',
       '.anchor/**',
     ],
   },

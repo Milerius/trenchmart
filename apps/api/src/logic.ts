@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { unzipSync, zipSync, strToU8 } from 'fflate';
 import type { Sql } from '@trenchmart/db';
-import { scan } from '@trenchmart/scanner';
+import { clamAvHttpClient, scan } from '@trenchmart/scanner';
 import {
   AI_ENGINE_VER,
   attestationMessage,
@@ -41,6 +41,19 @@ import {
   type ChainTx,
 } from '@trenchmart/chain';
 import { dispatchSandbox, type SandboxQueue } from './dispatch';
+import {
+  checkoutTx,
+  escrowEnabled,
+  escrowMismatch,
+  EscrowError,
+  openDisputeTx,
+  orderEscrowArgs,
+  readEscrow,
+  refundTx,
+  rejectDisputeTx,
+  releaseTx,
+  type EscrowChain,
+} from './escrow';
 import type { IsolatedSandboxResult } from './sandbox';
 import type { BlobStore } from './blob';
 import type { Env } from './env';
@@ -63,7 +76,15 @@ export type Deps = {
   getTx: (signature: string) => Promise<ChainTx | null>;
   blockhash: () => Promise<{ blockhash: string; lastValidBlockHeight: number }>;
   sandboxQueue?: SandboxQueue;
+  /** Required when ESCROW_PROGRAM_ID is set. */
+  escrowChain?: EscrowChain;
 };
+
+function chainOf(deps: Deps): EscrowChain {
+  if (!deps.escrowChain)
+    throw new EscrowError(503, 'ESCROW_MISCONFIGURED', 'escrow chain access is not wired');
+  return deps.escrowChain;
+}
 
 type Row = Record<string, any>;
 
@@ -239,6 +260,53 @@ export async function createOrder(deps: Deps, userId: string, listingId: string)
   const id = randomUUID();
   const memo = orderMemo(id);
   const expires = new Date(deps.now().getTime() + quoted.config.order_ttl_minutes * 60_000);
+  if (escrowEnabled(deps.env)) {
+    // The buyer funds a per-order escrow PDA. The window is fixed when the escrow is
+    // created, so it runs from the order's payment deadline, not from the block time.
+    const seller = await userById(deps.sql, listing.creator_id as string);
+    const escrowUntil = escrowUntilFrom(expires, quoted.config.escrow_hours);
+    const args = orderEscrowArgs({
+      env: deps.env,
+      config: quoted.config,
+      seller: seller.wallet as string,
+      price: quoted.price,
+      feeBps: quoted.feeBps,
+      rebateBps: quoted.rebateBps,
+      expiresAt: expires,
+      escrowUntil,
+    });
+    const latest = await deps.blockhash();
+    const built = checkoutTx({
+      programId: deps.env.escrowProgramId,
+      buyer: quoted.buyer.wallet as string,
+      orderId: id,
+      memo,
+      args,
+      recentBlockhash: latest.blockhash,
+    });
+    await deps.sql`
+      insert into orders (
+        id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total,
+        tier_at_purchase, memo, status, expires_at, escrow_until, escrow_address
+      ) values (
+        ${id}, ${userId}, ${listingId}, ${listing.live_version_id}, ${quoted.price}, ${quoted.feeBps},
+        ${quoted.rebateBps}, ${quoted.fee}, ${quoted.rebate}, ${quoted.total}, ${quoted.tier}::tier,
+        ${memo}, 'pending', ${expires}, ${escrowUntil}, ${built.escrow}
+      )
+    `;
+    return {
+      orderId: id,
+      total: quoted.total,
+      memo,
+      escrow: built.escrow,
+      escrowProgram: deps.env.escrowProgramId,
+      escrowUntil: escrowUntil.toISOString(),
+      txBase64: built.txBase64,
+      blockhash: latest.blockhash,
+      lastValidBlockHeight: latest.lastValidBlockHeight,
+    };
+  }
+  const tx = await buildVaultTx(deps, quoted.buyer.wallet as string, quoted.total, memo);
   await deps.sql`
     insert into orders (
       id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total,
@@ -249,7 +317,6 @@ export async function createOrder(deps: Deps, userId: string, listingId: string)
       ${memo}, 'pending', ${expires}
     )
   `;
-  const tx = await buildVaultTx(deps, quoted.buyer.wallet as string, quoted.total, memo);
   return { orderId: id, total: quoted.total, memo, vault: deps.env.vaultAddress, ...tx };
 }
 
@@ -270,28 +337,38 @@ async function settleOrder(deps: Deps, orderId: string, txSig: string, tx: Chain
   if (!order) return { ok: false, code: 'NOT_FOUND', message: 'order not found' };
   if (order.status === 'paid' && order.tx_sig === txSig) return { ok: true as const };
   const buyer = await userById(deps.sql, order.buyer_id as string);
-  const assessment = assessPayment({
-    status: order.status as OrderStatus,
-    expectedLamports: order.total as bigint,
-    expectedMemo: order.memo as string,
-    expectedSource: buyer.wallet as string,
-    expectedDestination: deps.env.vaultAddress,
-    transfers: tx.transfers,
-    memos: tx.memos,
-    expiresAt: order.expires_at as Date,
-    blockTimeMs: tx.blockTime === null ? null : tx.blockTime * 1000,
-    txErr: tx.err != null,
-    now: deps.now(),
-  });
-  if (!assessment.ok) {
-    if (assessment.code === 'WRONG_AMOUNT' || assessment.code === 'WRONG_MEMO') {
-      await audit(deps.sql, buyer.id as string, 'order', orderId, 'payment_mismatch', assessment);
-    }
-    return assessment;
-  }
   const config = await loadConfig(deps);
   const paidAt = new Date((tx.blockTime ?? Math.floor(deps.now().getTime() / 1000)) * 1000);
-  const escrowUntil = escrowUntilFrom(paidAt, config.escrow_hours);
+  let escrowUntil: Date;
+  if (order.escrow_address) {
+    const verdict = await verifyEscrowFunding(deps, order, buyer, tx, config);
+    if (!verdict.ok) {
+      await audit(deps.sql, buyer.id as string, 'order', orderId, 'payment_mismatch', verdict);
+      return verdict;
+    }
+    escrowUntil = order.escrow_until as Date;
+  } else {
+    const assessment = assessPayment({
+      status: order.status as OrderStatus,
+      expectedLamports: order.total as bigint,
+      expectedMemo: order.memo as string,
+      expectedSource: buyer.wallet as string,
+      expectedDestination: deps.env.vaultAddress,
+      transfers: tx.transfers,
+      memos: tx.memos,
+      expiresAt: order.expires_at as Date,
+      blockTimeMs: tx.blockTime === null ? null : tx.blockTime * 1000,
+      txErr: tx.err != null,
+      now: deps.now(),
+    });
+    if (!assessment.ok) {
+      if (assessment.code === 'WRONG_AMOUNT' || assessment.code === 'WRONG_MEMO') {
+        await audit(deps.sql, buyer.id as string, 'order', orderId, 'payment_mismatch', assessment);
+      }
+      return assessment;
+    }
+    escrowUntil = escrowUntilFrom(paidAt, config.escrow_hours);
+  }
   const duplicate =
     await deps.sql`select id from orders where tx_sig = ${txSig} and id <> ${orderId}`;
   if (duplicate.length > 0)
@@ -310,14 +387,73 @@ async function settleOrder(deps: Deps, orderId: string, txSig: string, tx: Chain
     listingRows[0]?.license === 'subscription' ? listingRows[0]?.sub_period_days : null;
   const validUntil = period ? new Date(paidAt.getTime() + period * 86_400_000) : null;
   await deps.sql`insert into licenses (order_id, wallet, valid_until) values (${orderId}, ${buyer.wallet}, ${validUntil})`;
+  const holding = order.escrow_address ? 'escrow' : 'vault';
   await deps.sql`
-    insert into ledger (account, delta, ref_type, ref_id) values ('vault', ${order.total}, 'order', ${orderId})
+    insert into ledger (account, delta, ref_type, ref_id) values (${holding}, ${order.total}, 'order', ${orderId})
   `;
   await deps.sql`
     update listings set sales_7d = sales_7d + 1 where id = ${order.listing_id}
   `;
   await audit(deps.sql, buyer.id as string, 'order', orderId, 'paid', { txSig });
   return { ok: true as const };
+}
+
+/**
+ * A funded escrow is proven by the account itself, not by the transfer list: it must be
+ * owned by the program, be Paid, hold the full total, and carry exactly the terms the server
+ * asked the buyer to sign. The signature must be this order's successful checkout tx.
+ */
+async function verifyEscrowFunding(
+  deps: Deps,
+  order: Row,
+  buyer: Row,
+  tx: ChainTx,
+  config: AppConfig,
+): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  if (order.status !== 'pending')
+    return { ok: false, code: 'NOT_PENDING', message: 'order is not pending' };
+  if (tx.err != null) return { ok: false, code: 'TX_FAILED', message: 'transaction failed' };
+  if (!tx.memos.some((memo) => memo.includes(order.memo as string)))
+    return { ok: false, code: 'WRONG_MEMO', message: 'transaction is not this order checkout' };
+  const blockMs = tx.blockTime === null ? null : tx.blockTime * 1000;
+  if (blockMs !== null && blockMs > (order.expires_at as Date).getTime())
+    return { ok: false, code: 'EXPIRED', message: 'paid after the order expired' };
+  if (!deps.env.escrowProgramId)
+    return { ok: false, code: 'ESCROW_MISCONFIGURED', message: 'ESCROW_PROGRAM_ID is not set' };
+  const account = await readEscrow(
+    chainOf(deps),
+    deps.env.escrowProgramId,
+    order.escrow_address as string,
+  );
+  if (!account) return { ok: false, code: 'ESCROW_MISSING', message: 'escrow account not found' };
+  if (account.status !== 'paid')
+    return { ok: false, code: 'ESCROW_NOT_PAID', message: `escrow is ${account.status}` };
+  const seller = await deps.sql<{ wallet: string }[]>`
+    select u.wallet from listings l join users u on u.id = l.creator_id where l.id = ${order.listing_id}
+  `;
+  const expected = orderEscrowArgs({
+    env: deps.env,
+    config,
+    seller: seller[0]?.wallet ?? '',
+    price: order.price as bigint,
+    feeBps: order.fee_bps as number,
+    rebateBps: order.rebate_bps as number,
+    expiresAt: order.expires_at as Date,
+    escrowUntil: order.escrow_until as Date,
+  });
+  const wrong = escrowMismatch(account, {
+    ...expected,
+    buyer: buyer.wallet as string,
+    orderId: order.id as string,
+    total: order.total as bigint,
+  });
+  if (wrong)
+    return {
+      ok: false,
+      code: 'ESCROW_MISMATCH',
+      message: `escrow ${wrong} does not match the order`,
+    };
+  return { ok: true };
 }
 
 /** Idempotent. A wallet becomes a creator once it meets the bond for a listing. */
@@ -420,15 +556,25 @@ export async function releaseOrders(deps: Deps): Promise<string[]> {
   `;
   const released: string[] = [];
   for (const order of rows) {
-    const tx = order.tx_sig ? await deps.getTx(order.tx_sig as string) : null;
-    const due = releaseDue({
-      status: 'paid',
-      escrowUntil: order.escrow_until as Date,
-      now: deps.now(),
-      openDispute: false,
-      finalized: tx?.confirmationStatus === 'finalized' && tx.err == null,
-    });
-    if (!due) continue;
+    let releaseSig: string | null = null;
+    if (order.escrow_address) {
+      const outcome = await releaseEscrow(deps, order).catch((err: unknown) => {
+        console.error('escrow release failed', order.id, (err as Error).message);
+        return null;
+      });
+      if (!outcome) continue;
+      releaseSig = outcome.sig;
+    } else {
+      const tx = order.tx_sig ? await deps.getTx(order.tx_sig as string) : null;
+      const due = releaseDue({
+        status: 'paid',
+        escrowUntil: order.escrow_until as Date,
+        now: deps.now(),
+        openDispute: false,
+        finalized: tx?.confirmationStatus === 'finalized' && tx.err == null,
+      });
+      if (!due) continue;
+    }
     const lines = releasePayouts({
       price: order.price as bigint,
       netFee: (order.fee as bigint) - (order.rebate as bigint),
@@ -437,10 +583,12 @@ export async function releaseOrders(deps: Deps): Promise<string[]> {
       buckets: deps.env.buckets,
     });
     await deps.sql`
-      update orders set status = 'released', released_at = ${deps.now()} where id = ${order.id} and status = 'paid'
+      update orders set status = 'released', released_at = ${deps.now()}, release_sig = ${releaseSig}
+      where id = ${order.id} and status = 'paid'
     `;
+    const holding = order.escrow_address ? 'escrow' : 'vault';
     await deps.sql`
-      insert into ledger (account, delta, ref_type, ref_id) values ('vault', ${-(order.total as bigint)}, 'order', ${order.id})
+      insert into ledger (account, delta, ref_type, ref_id) values (${holding}, ${-(order.total as bigint)}, 'order', ${order.id})
     `;
     await deps.sql`
       insert into ledger (account, delta, ref_type, ref_id)
@@ -453,15 +601,45 @@ export async function releaseOrders(deps: Deps): Promise<string[]> {
           values (${'bucket:' + line.bucket}, ${line.amount}, 'payout', ${order.id})
         `;
       }
-      await deps.sql`
-        insert into payouts (order_id, recipient, bucket, amount) values (${order.id}, ${line.recipient}, ${line.bucket}, ${line.amount})
-      `;
+      // The escrow program pays every line in the release tx; vault orders queue a batch.
+      if (order.escrow_address) {
+        await deps.sql`
+          insert into payouts (order_id, recipient, bucket, amount, status, tx_sig)
+          values (${order.id}, ${line.recipient}, ${line.bucket}, ${line.amount}, 'sent', ${releaseSig})
+        `;
+      } else {
+        await deps.sql`
+          insert into payouts (order_id, recipient, bucket, amount) values (${order.id}, ${line.recipient}, ${line.bucket}, ${line.amount})
+        `;
+      }
     }
     await notify(deps.sql, order.creator_user as string, 'released', { orderId: order.id });
     await notify(deps.sql, order.buyer_id as string, 'released', { orderId: order.id });
     released.push(order.id as string);
   }
   return released;
+}
+
+/**
+ * Sends `release` for a due escrow, signed by the resolver as fee payer. The program pays
+ * the seller and the four buckets itself. Returns null when the escrow is not releasable
+ * (still in window, disputed on chain, or not funded).
+ */
+async function releaseEscrow(deps: Deps, order: Row): Promise<{ sig: string | null } | null> {
+  const programId = deps.env.escrowProgramId;
+  if (!programId) return null;
+  const chain = chainOf(deps);
+  const address = order.escrow_address as string;
+  const account = await readEscrow(chain, programId, address);
+  if (!account) return null;
+  // Release is permissionless on chain; someone may already have cranked it.
+  if (account.status === 'released') return { sig: null };
+  if (account.status !== 'paid') return null;
+  if (BigInt(Math.floor(deps.now().getTime() / 1000)) < account.escrowUntil) return null;
+  const latest = await deps.blockhash();
+  const sig = await chain.sendAndConfirm(releaseTx(deps.env, address, account, latest.blockhash));
+  await audit(deps.sql, null, 'order', order.id as string, 'escrow_released', { sig });
+  return { sig };
 }
 
 export async function proposePayouts(
@@ -567,7 +745,7 @@ export async function resolveDispute(
   body: { status: 'upheld' | 'rejected'; resolution: string; slashLamports?: bigint },
 ): Promise<void> {
   const rows = await deps.sql<Row[]>`
-    select d.*, o.buyer_id, o.total, o.price, o.status as order_status, o.disputed_from, o.listing_id, o.version_id, l.creator_id
+    select d.*, o.buyer_id, o.total, o.price, o.status as order_status, o.disputed_from, o.listing_id, o.version_id, o.escrow_address, l.creator_id
     from disputes d
     join orders o on o.id = d.order_id
     join listings l on l.id = o.listing_id
@@ -577,8 +755,38 @@ export async function resolveDispute(
   if (!dispute || dispute.status !== 'open')
     throw new HttpError(404, 'NOT_FOUND', 'open dispute not found');
   const now = deps.now();
+  // Funds still in an on-chain escrow move only through the program, signed by the resolver.
+  const onChain = dispute.escrow_address && dispute.disputed_from !== 'released';
+  let settleSig: string | null = null;
+  let fundsAlreadyReleased = false;
+  if (onChain) {
+    const programId = deps.env.escrowProgramId;
+    if (!programId)
+      throw new HttpError(503, 'ESCROW_MISCONFIGURED', 'ESCROW_PROGRAM_ID is not set');
+    const chain = chainOf(deps);
+    const address = dispute.escrow_address as string;
+    const account = await readEscrow(chain, programId, address);
+    if (!account) throw new HttpError(409, 'ESCROW_MISSING', 'escrow account not found');
+    if (account.status === 'disputed') {
+      const latest = await deps.blockhash();
+      const tx =
+        body.status === 'upheld'
+          ? refundTx(deps.env, address, account, latest.blockhash)
+          : rejectDisputeTx(deps.env, address, latest.blockhash);
+      settleSig = await chain.sendAndConfirm(tx);
+    } else if (account.status === 'released') {
+      // The window lapsed and release was cranked before the dispute reached the chain.
+      fundsAlreadyReleased = true;
+    } else if (body.status === 'upheld') {
+      throw new HttpError(
+        409,
+        'DISPUTE_NOT_ONCHAIN',
+        'the buyer has not signed the on-chain dispute yet, so the escrow cannot be refunded',
+      );
+    }
+  }
   if (body.status === 'rejected') {
-    const next = dispute.disputed_from === 'released' ? 'released' : 'paid';
+    const next = dispute.disputed_from === 'released' || fundsAlreadyReleased ? 'released' : 'paid';
     await deps.sql`update orders set status = ${next}::order_status where id = ${dispute.order_id}`;
     await deps.sql`
       update disputes set status = 'rejected', resolution = ${body.resolution}, resolved_by = ${adminId}, resolved_at = ${now}
@@ -586,11 +794,25 @@ export async function resolveDispute(
     `;
     await audit(deps.sql, adminId, 'dispute', disputeId, 'rejected', {
       resolution: body.resolution,
+      sig: settleSig,
     });
     return;
   }
   const buyer = await userById(deps.sql, dispute.buyer_id as string);
-  if (dispute.disputed_from === 'released') {
+  if (onChain && !fundsAlreadyReleased) {
+    // Refunded by the program in settleSig: the deposit already went back to the buyer.
+    await deps.sql`
+      insert into ledger (account, delta, ref_type, ref_id)
+      values ('escrow', ${-(dispute.total as bigint)}, 'order', ${dispute.order_id})
+    `;
+    for (const line of refundPayout(dispute.total as bigint, buyer.wallet as string)) {
+      await deps.sql`
+        insert into payouts (order_id, recipient, bucket, amount, status, tx_sig)
+        values (${dispute.order_id}, ${line.recipient}, ${line.bucket}, ${line.amount}, 'sent', ${settleSig})
+      `;
+    }
+    await deps.sql`update orders set refund_sig = ${settleSig} where id = ${dispute.order_id}`;
+  } else if (dispute.disputed_from === 'released' || fundsAlreadyReleased) {
     const slashed = await slash(
       deps,
       dispute.creator_id as string,
@@ -610,11 +832,13 @@ export async function resolveDispute(
       values ('vault', ${-(dispute.total as bigint)}, 'order', ${dispute.order_id})
     `;
   }
-  for (const line of refundPayout(dispute.total as bigint, buyer.wallet as string)) {
-    await deps.sql`
-      insert into payouts (order_id, recipient, bucket, amount)
-      values (${dispute.order_id}, ${line.recipient}, ${line.bucket}, ${line.amount})
-    `;
+  if (!onChain || fundsAlreadyReleased) {
+    for (const line of refundPayout(dispute.total as bigint, buyer.wallet as string)) {
+      await deps.sql`
+        insert into payouts (order_id, recipient, bucket, amount)
+        values (${dispute.order_id}, ${line.recipient}, ${line.bucket}, ${line.amount})
+      `;
+    }
   }
   await deps.sql`update orders set status = 'refunded' where id = ${dispute.order_id}`;
   if (body.slashLamports && body.slashLamports > 0n) {
@@ -667,7 +891,43 @@ export async function openDispute(
     update orders set disputed_from = status, status = 'disputed' where id = ${orderId}
   `;
   await audit(deps.sql, userId, 'order', orderId, 'disputed', { reason });
-  return inserted[0]?.id;
+  // A dispute inside the window must also reach the chain, or release stays permissionless.
+  let txBase64: string | null = null;
+  if (order.escrow_address && order.status === 'paid' && deps.env.escrowProgramId) {
+    const buyer = await userById(deps.sql, userId);
+    const latest = await deps.blockhash();
+    txBase64 = openDisputeTx({
+      programId: deps.env.escrowProgramId,
+      buyer: buyer.wallet as string,
+      escrow: order.escrow_address as string,
+      recentBlockhash: latest.blockhash,
+    });
+  }
+  return { id: inserted[0]?.id, txBase64 };
+}
+
+/** Fresh open_dispute tx for an open dispute whose escrow is still Paid on chain. */
+export async function disputeTx(deps: Deps, orderId: string, userId: string) {
+  const rows = await deps.sql<Row[]>`select * from orders where id = ${orderId}`;
+  const order = rows[0];
+  if (!order || order.buyer_id !== userId) throw new HttpError(404, 'NOT_FOUND', 'order not found');
+  if (order.status !== 'disputed' || order.disputed_from !== 'paid' || !order.escrow_address)
+    throw new HttpError(400, 'NO_ONCHAIN_DISPUTE', 'this order has no escrow dispute to sign');
+  const programId = deps.env.escrowProgramId;
+  if (!programId) throw new HttpError(503, 'ESCROW_MISCONFIGURED', 'ESCROW_PROGRAM_ID is not set');
+  const account = await readEscrow(chainOf(deps), programId, order.escrow_address as string);
+  if (account?.status === 'disputed') return { onChain: true, txBase64: null };
+  const buyer = await userById(deps.sql, userId);
+  const latest = await deps.blockhash();
+  return {
+    onChain: false,
+    txBase64: openDisputeTx({
+      programId,
+      buyer: buyer.wallet as string,
+      escrow: order.escrow_address as string,
+      recentBlockhash: latest.blockhash,
+    }),
+  };
 }
 
 function needsSandbox(category: string, fileName: string): boolean {
@@ -762,7 +1022,11 @@ export async function* reviewVersion(deps: Deps, versionId: string): AsyncGenera
             timeoutMs: deps.env.sandboxBudgetMs,
             nowMs: deps.now().getTime(),
             queue: deps.sandboxQueue,
-          }).catch((err: unknown) => failedSandbox(err, deps.env.sandboxBudgetMs)),
+          }).then(
+            (result) => ({ ok: true as const, result }),
+            // The engine or the runner failed, not the script. Nothing is decided.
+            (err: unknown) => ({ ok: false as const, message: sandboxInfraMessage(err) }),
+          ),
         )
       : Promise.resolve(null);
 
@@ -797,18 +1061,48 @@ export async function* reviewVersion(deps: Deps, versionId: string): AsyncGenera
 
   let sandboxVerdict: 'pass' | 'warn' | 'fail' | undefined;
   let sandboxWalletCalls: string[] | undefined;
-  if (sandboxTimed) {
-    await recordSandbox(deps, versionId, sandboxTimed.value);
-    sandboxVerdict = sandboxTimed.value.verdict;
-    sandboxWalletCalls = sandboxTimed.value.walletCalls;
+  if (sandboxTimed && !sandboxTimed.value.ok) {
+    // Retryable: no AI verdict, no sandbox scan row, the creator can rerun the review.
+    const reason = `The sandbox could not run (${sandboxTimed.value.message}). Nothing was decided; retry the review.`;
+    await deps.sql`delete from scans where version_id = ${versionId} and kind = 'sandbox'`;
+    await deps.sql`
+      update versions set status = 'needs_creator', resume_step = 'sandbox' where id = ${versionId}
+    `;
     yield {
       step: 'sandbox',
       status: 'done',
       startedAt,
       finishedAt,
-      durationMs: sandboxTimed.value.durationMs || sandboxTimed.durationMs,
+      durationMs: sandboxTimed.durationMs,
+      verdict: 'error',
+      reason,
+    };
+    yield {
+      step: 'done',
+      status: 'done',
+      startedAt,
+      finishedAt,
+      durationMs: 0,
+      decision: 'retry',
+      versionStatus: 'needs_creator',
+      reason,
+      resumeStep: 'sandbox',
+    };
+    return;
+  }
+  if (sandboxTimed && sandboxTimed.value.ok) {
+    const run = sandboxTimed.value.result;
+    await recordSandbox(deps, versionId, run);
+    sandboxVerdict = run.verdict;
+    sandboxWalletCalls = run.walletCalls;
+    yield {
+      step: 'sandbox',
+      status: 'done',
+      startedAt,
+      finishedAt,
+      durationMs: run.durationMs || sandboxTimed.durationMs,
       verdict: sandboxVerdict,
-      log: sandboxTimed.value,
+      log: run,
     };
   } else if (skipSandbox) {
     sandboxVerdict = (priorSandbox[0]?.summary as 'pass' | 'warn' | 'fail') ?? 'pass';
@@ -849,21 +1143,21 @@ function resumeOf(value: unknown): 'static' | 'sandbox' | 'ai' {
   return value === 'sandbox' || value === 'ai' ? value : 'static';
 }
 
-function failedSandbox(err: unknown, timeoutMs: number): IsolatedSandboxResult {
+function sandboxInfraMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : 'sandbox dispatch failed';
+  return message.slice(0, 300);
+}
+
+/** Script errors never pass: a timeout or OOM fails, an exception warns. */
+function runtimeCheck(errors: string[], verdict: string) {
+  const fatal = errors.some((item) => /timed out|out of memory|memory limit/i.test(item));
   return {
-    mode: 'vm-isolate',
-    durationMs: 0,
-    requests: [],
-    walletCalls: [],
-    clipboard: [],
-    storageReads: [],
-    errors: [message],
-    verdict: 'fail',
-    notes: message,
-    egress: 'blocked',
-    limits: { timeoutMs, memoryMb: 128 },
-    log: [message],
+    ruleId: 'sandbox-runtime',
+    result: errors.length === 0 ? 'pass' : fatal || verdict === 'fail' ? 'fail' : 'warn',
+    title: 'Sandbox runtime',
+    detail: errors.length
+      ? `Script errors: ${errors.slice(0, 5).join('; ').slice(0, 900)}`
+      : 'Ran without errors.',
   };
 }
 
@@ -880,6 +1174,9 @@ async function storeStaticScan(
     {
       blocklistHosts: config.blocklist_hosts,
       requireAllowHosts: config.require_allow_hosts,
+      antivirus: deps.env.clamavUrl
+        ? clamAvHttpClient(deps.env.clamavUrl, { token: deps.env.clamavToken || undefined })
+        : undefined,
     },
   );
   await deps.sql`delete from scans where version_id = ${versionId} and kind = 'static'`;
@@ -933,6 +1230,7 @@ async function recordSandbox(
         ? `Hosts: ${requests.map((item) => item.host).join(', ')}`
         : 'No outbound hosts.',
     },
+    runtimeCheck(raw.errors ?? [], verdict),
   ];
   await deps.sql`delete from scans where version_id = ${versionId} and kind = 'sandbox'`;
   const scanRow = await deps.sql<{ id: string }[]>`
@@ -957,10 +1255,12 @@ export async function storeSandbox(
 ): Promise<void> {
   const walletCalls = Array.isArray(raw.walletCalls) ? (raw.walletCalls as string[]) : [];
   const requests = Array.isArray(raw.requests) ? (raw.requests as { host?: string }[]) : [];
+  const errors = Array.isArray(raw.errors) ? raw.errors.map(String) : [];
+  const runtime = runtimeCheck(errors, String(raw.verdict));
   const verdict =
-    raw.verdict === 'fail' || walletCalls.length > 0
+    raw.verdict === 'fail' || walletCalls.length > 0 || runtime.result === 'fail'
       ? 'fail'
-      : raw.verdict === 'warn'
+      : raw.verdict === 'warn' || runtime.result === 'warn' || requests.length > 0
         ? 'warn'
         : 'pass';
   const checks = [
@@ -980,6 +1280,7 @@ export async function storeSandbox(
         : 'No outbound hosts.',
       locations: [],
     },
+    { ...runtime, locations: [] },
   ];
   const summary = verdict;
   await deps.sql`delete from scans where version_id = ${versionId} and kind = 'sandbox'`;

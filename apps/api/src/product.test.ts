@@ -6,10 +6,22 @@ import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createSql, migrate, type Sql } from '@trenchmart/db';
-import { randomKeypair } from '@trenchmart/chain';
+import {
+  decodeEscrow,
+  encodeEscrowForTest,
+  escrowAddress,
+  fromBase64,
+  orderIdBytes,
+  randomKeypair,
+  type EscrowStatusName,
+} from '@trenchmart/chain';
+import { createServer } from 'node:http';
+import type { EscrowChain } from './escrow';
+import { releaseOrders, resolveDispute } from './logic';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
+import type { Deps } from './logic';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/postgres';
@@ -42,9 +54,14 @@ function keypair() {
   return { publicKey: bs58.encode(pair.publicKey), secretKey: pair.secretKey };
 }
 
-async function appFor() {
-  const dir = await mkdtemp(join(tmpdir(), 'tm-blob-'));
+async function appFor(
+  extraEnv: Record<string, string> = {},
+  extraDeps: Partial<Deps> = {},
+  blobDir?: string,
+) {
+  const dir = blobDir ?? (await mkdtemp(join(tmpdir(), 'tm-blob-')));
   const env = readEnv({
+    ...extraEnv,
     SOLANA_CLUSTER: 'devnet',
     VAULT_ADDRESS: vault.publicKey,
     SESSION_SECRET: 'test-secret-test-secret-test-secret',
@@ -63,6 +80,7 @@ async function appFor() {
     now: () => now,
     getTx: async () => null,
     blockhash: async () => ({ blockhash, lastValidBlockHeight: 1 }),
+    ...extraDeps,
   });
 }
 
@@ -118,7 +136,7 @@ describe('owner product decisions', () => {
     expect(Array.isArray(await top.json())).toBe(true);
   });
 
-  it('issues a signed download only after escrow release', async () => {
+  it('issues a signed download once paid in escrow, never during a dispute', async () => {
     const app = await appFor();
     const buyer = keypair();
     const cookie = await login(app, buyer);
@@ -155,20 +173,30 @@ describe('owner product decisions', () => {
       )
     `;
     await sql`insert into licenses (order_id, wallet) values (${orderId}, ${buyer.publicKey})`;
-    const locked = await app.request(`/api/v1/orders/${orderId}/download`, {
+    const pending = await app.request(`/api/v1/orders/${orderId}/download`, {
       method: 'POST',
       headers: { cookie },
     });
-    expect(locked.status).toBe(403);
-    const lockedBody = (await locked.json()) as { error: { code: string }; url?: string };
-    expect(lockedBody.error.code).toBe('ESCROW_LOCKED');
-    expect(lockedBody.url).toBeUndefined();
-    await sql`update orders set status = 'disputed' where id = ${orderId}`;
+    // Paid with the file missing from this app's blob dir: past the escrow gate, 404 on the file.
+    expect(pending.status).toBe(404);
+    await sql`update orders set status = 'pending' where id = ${orderId}`;
+    const unpaid = await app.request(`/api/v1/orders/${orderId}/download`, {
+      method: 'POST',
+      headers: { cookie },
+    });
+    expect(unpaid.status).toBe(403);
+    const unpaidBody = (await unpaid.json()) as { error: { code: string }; url?: string };
+    expect(unpaidBody.error.code).toBe('ESCROW_LOCKED');
+    expect(unpaidBody.url).toBeUndefined();
+    await sql`update orders set status = 'disputed', disputed_from = 'paid' where id = ${orderId}`;
     const disputed = await app.request(`/api/v1/orders/${orderId}/download`, {
       method: 'POST',
       headers: { cookie },
     });
     expect(disputed.status).toBe(403);
+    expect(((await disputed.json()) as { error: { message: string } }).error.message).toMatch(
+      /dispute/,
+    );
     await sql`update orders set status = 'released', released_at = ${now} where id = ${orderId}`;
     const env = readEnv({
       API_URL: 'http://localhost:8787',
@@ -196,6 +224,17 @@ describe('owner product decisions', () => {
       getTx: async () => null,
       blockhash: async () => ({ blockhash, lastValidBlockHeight: 1 }),
     });
+    await sql`update orders set status = 'paid', released_at = null where id = ${orderId}`;
+    const paidOpen = await releasedApp.request(`/api/v1/orders/${orderId}/download`, {
+      method: 'POST',
+      headers: { cookie },
+    });
+    expect(paidOpen.status).toBe(200);
+    expect(((await paidOpen.json()) as { url: string }).url).toContain('sig=');
+    // Downloading does not move funds: the order is still paid and in its escrow window.
+    const still = await sql<{ status: string }[]>`select status from orders where id = ${orderId}`;
+    expect(still[0]?.status).toBe('paid');
+    await sql`update orders set status = 'released', released_at = ${now} where id = ${orderId}`;
     const open = await releasedApp.request(`/api/v1/orders/${orderId}/download`, {
       method: 'POST',
       headers: { cookie },
@@ -478,5 +517,404 @@ describe('owner product decisions', () => {
       headers: { cookie },
     });
     expect(appeal.status).toBe(404);
+  });
+  it('builds the bond transaction before writing a pending row', async () => {
+    let fail = true;
+    const app = await appFor(
+      {},
+      {
+        blockhash: async () => {
+          if (fail) throw new Error('rpc down');
+          return { blockhash, lastValidBlockHeight: 1 };
+        },
+      },
+    );
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    const json = { cookie, 'content-type': 'application/json' };
+    const broken = await app.request('/api/v1/studio/bond', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ amount: '1000000000' }),
+    });
+    expect(broken.status).toBe(500);
+    expect((await sql`select id from bonds`).length).toBe(0);
+    fail = false;
+    const ok = await app.request('/api/v1/studio/bond', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ amount: '1000000000' }),
+    });
+    expect(ok.status).toBe(200);
+    const body = (await ok.json()) as { bondId: string; memo: string; txBase64: string };
+    const rows = await sql<{ id: string; status: string }[]>`select id, status from bonds`;
+    expect(rows).toEqual([{ id: body.bondId, status: 'pending' }]);
+    expect(body.memo).toBe(`bond:${body.bondId.replace(/-/g, '').slice(0, 8)}`);
+    expect(body.txBase64).toBeTruthy();
+  });
+
+  it('turns a sandbox infrastructure failure into a retryable review, not a verdict', async () => {
+    const runner = createServer((_req, res) => {
+      res.writeHead(502);
+      res.end('bad gateway');
+    });
+    await new Promise<void>((resolve) => runner.listen(0, '127.0.0.1', () => resolve()));
+    const address = runner.address();
+    if (!address || typeof address === 'string') throw new Error('no port');
+    try {
+      const shared = await mkdtemp(join(tmpdir(), 'tm-retry-'));
+      const app = await appFor(
+        { SANDBOX_RUNNER_URL: `http://127.0.0.1:${address.port}` },
+        {},
+        shared,
+      );
+      const creator = keypair();
+      const cookie = await login(app, creator);
+      await sql`
+        update users set roles = roles || '{creator}'::user_role[], x_handle = 'dev_degen', x_user_id = 'dev:dev_degen'
+        where wallet = ${creator.publicKey}
+      `;
+      const user = await sql<
+        { id: string }[]
+      >`select id from users where wallet = ${creator.publicKey}`;
+      await sql`
+        insert into bonds (user_id, amount, tx_sig, status) values (${user[0]!.id}, ${5_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+      `;
+      await sql`update config set value = '0'::jsonb where key = 'verification_fee_lamports'`;
+      const listing = await app.request('/api/v1/studio/listings', {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Retry pack',
+          summary: 'Sandbox infra test.',
+          description: 'No wallet access.',
+          category: 'userscript',
+          priceLamports: '1000000000',
+        }),
+      });
+      const created = (await listing.json()) as { id: string };
+      const version = await app.request(`/api/v1/studio/listings/${created.id}/versions`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          semver: '1.0.0',
+          changelog: 'x',
+          fileName: 'r.user.js',
+          fileSize: clean.length,
+        }),
+      });
+      const uploaded = (await version.json()) as { versionId: string; uploadUrl: string };
+      const target = new URL(uploaded.uploadUrl);
+      await app.request(`${target.pathname}${target.search}`, {
+        method: 'PUT',
+        body: new TextEncoder().encode(clean),
+      });
+      const streamed = await app.request(
+        `/api/v1/studio/versions/${uploaded.versionId}/complete?stream=1`,
+        { method: 'POST', headers: { cookie, accept: 'text/event-stream' } },
+      );
+      const text = await streamed.text();
+      expect(text).toContain('"decision":"retry"');
+      expect(text).toContain('"verdict":"error"');
+      expect(text).not.toContain('event: ai');
+      const row = await sql<{ status: string; resume_step: string }[]>`
+        select status, resume_step from versions where id = ${uploaded.versionId}
+      `;
+      expect(row[0]).toEqual({ status: 'needs_creator', resume_step: 'sandbox' });
+      expect(
+        (await sql`select 1 from ai_reviews where version_id = ${uploaded.versionId}`).length,
+      ).toBe(0);
+      expect(
+        (
+          await sql`select 1 from scans where version_id = ${uploaded.versionId} and kind = 'sandbox'`
+        ).length,
+      ).toBe(0);
+      // Retry once the sandbox is healthy (inline QuickJS): the review completes normally.
+      const healthy = await appFor({}, {}, shared);
+      const retried = await healthy.request(
+        `/api/v1/studio/versions/${uploaded.versionId}/review?stream=1`,
+        { method: 'POST', headers: { cookie, accept: 'text/event-stream' } },
+      );
+      const again = await retried.text();
+      expect(again).toContain('"versionStatus":"live"');
+      const checks = await sql<{ rule_id: string; result: string }[]>`
+        select sc.rule_id, sc.result from scan_checks sc join scans s on s.id = sc.scan_id
+        where s.version_id = ${uploaded.versionId} and s.kind = 'sandbox'
+      `;
+      expect(checks).toContainEqual({ rule_id: 'sandbox-runtime', result: 'pass' });
+    } finally {
+      await new Promise<void>((resolve) => runner.close(() => resolve()));
+    }
+  });
+
+  it('settles orders through the on-chain escrow: verify, release, dispute and refund', async () => {
+    const programId = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
+    const resolver = nacl.sign.keyPair();
+    const resolverPub = bs58.encode(resolver.publicKey);
+    const buckets = [randomKeypair(), randomKeypair(), randomKeypair(), randomKeypair()].map(
+      (k) => k.publicKey,
+    );
+    const accounts = new Map<string, Uint8Array>();
+    const sent: { tx: Uint8Array; effect: EscrowStatusName }[] = [];
+    let effect: EscrowStatusName = 'released';
+    const chain: EscrowChain = {
+      async account(address) {
+        const data = accounts.get(address);
+        return data ? { data, owner: programId, lamports: 1n } : null;
+      },
+      async sendAndConfirm(tx) {
+        // The resolver must sign the message: [1 sig][64 sig bytes][message].
+        expect(tx[0]).toBe(1);
+        const message = tx.subarray(65);
+        expect(nacl.sign.detached.verify(message, tx.subarray(1, 65), resolver.publicKey)).toBe(
+          true,
+        );
+        sent.push({ tx, effect });
+        for (const [address, data] of accounts) {
+          const account = decodeEscrow(data);
+          if (account.status === 'paid' || account.status === 'disputed')
+            accounts.set(address, encodeEscrowForTest({ ...account, status: effect }));
+        }
+        return bs58.encode(nacl.randomBytes(64));
+      },
+    };
+    let clock = now;
+    const txs = new Map<string, { memos: string[]; err: unknown }>();
+    const env = readEnv({
+      SOLANA_CLUSTER: 'devnet',
+      VAULT_ADDRESS: vault.publicKey,
+      SESSION_SECRET: 'test-secret-test-secret-test-secret',
+      AI_ATTEST_SECRET: 'attest-secret',
+      SOL_USD_OVERRIDE: '100',
+      RATE_LIMIT_PER_MIN: '1000',
+      API_URL: 'http://localhost:8787',
+      ESCROW_PROGRAM_ID: programId,
+      ESCROW_RESOLVER: resolverPub,
+      ESCROW_RESOLVER_SECRET: bs58.encode(resolver.secretKey),
+      BUCKET_WALLET_BUYBACK: buckets[0]!,
+      BUCKET_WALLET_AI_VERIFICATION: buckets[1]!,
+      BUCKET_WALLET_OPS: buckets[2]!,
+      BUCKET_WALLET_SAFETY: buckets[3]!,
+    });
+    const blob = filesystemBlob(
+      await mkdtemp(join(tmpdir(), 'tm-esc-')),
+      env.sessionSecret,
+      env.apiUrl,
+    );
+    const deps: Deps = {
+      sql,
+      blob,
+      env,
+      now: () => clock,
+      getTx: async (signature) => {
+        const known = txs.get(signature);
+        return known
+          ? {
+              signature,
+              err: known.err,
+              blockTime: Math.floor(clock.getTime() / 1000),
+              confirmationStatus: 'confirmed',
+              transfers: [],
+              memos: known.memos,
+            }
+          : null;
+      },
+      blockhash: async () => ({ blockhash, lastValidBlockHeight: 1 }),
+      escrowChain: chain,
+    };
+    const app = createApp(deps);
+    const buyer = keypair();
+    const cookie = await login(app, buyer);
+    const seller = randomKeypair();
+    const creatorId = randomUUID();
+    const listingId = randomUUID();
+    const versionId = randomUUID();
+    await sql`insert into users (id, wallet, roles) values (${creatorId}, ${seller.publicKey}, ${sql.array(['creator'])}::user_role[])`;
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price, live_version_id)
+      values (${listingId}, ${creatorId}, 'esc', 'Esc', 'Sum', 'Desc', 'userscript', ${100_000_000n}, null)
+    `;
+    await sql`
+      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status)
+      values (${versionId}, ${listingId}, '1.0.0', 'esc.user.js', ${clean.length}, 'esc', 'blobs/esc', 'live')
+    `;
+    await blob.put('blobs/esc', new TextEncoder().encode(clean));
+    await sql`update listings set live_version_id = ${versionId}, first_live_at = ${now} where id = ${listingId}`;
+
+    const buy = async () => {
+      const res = await app.request('/api/v1/orders', {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ listingId }),
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as {
+        orderId: string;
+        escrow: string;
+        txBase64: string;
+        memo: string;
+        total: string;
+        escrowUntil: string;
+      };
+    };
+    const order = await buy();
+    expect(order.escrow).toBe(escrowAddress(order.orderId, programId));
+    expect(fromBase64(order.txBase64).length).toBeGreaterThan(200);
+    const stored = await sql<
+      Record<string, any>[]
+    >`select * from orders where id = ${order.orderId}`;
+    const row = stored[0]!;
+    const fundedAccount = (overrides: Partial<ReturnType<typeof decodeEscrow>> = {}) => ({
+      buyer: buyer.publicKey,
+      seller: seller.publicKey,
+      resolver: resolverPub,
+      buyback: buckets[0]!,
+      aiVerification: buckets[1]!,
+      ops: buckets[2]!,
+      safety: buckets[3]!,
+      status: 'paid' as EscrowStatusName,
+      disputedFrom: 'pending' as EscrowStatusName,
+      price: row.price as bigint,
+      deposit: row.total as bigint,
+      feeBps: row.fee_bps as number,
+      rebateBps: row.rebate_bps as number,
+      splitBuybackBps: 4000,
+      splitAiBps: 2500,
+      splitOpsBps: 2000,
+      splitSafetyBps: 1500,
+      expiresAt: BigInt(Math.floor((row.expires_at as Date).getTime() / 1000)),
+      escrowUntil: BigInt(Math.floor((row.escrow_until as Date).getTime() / 1000)),
+      bump: 255,
+      orderId: orderIdBytes(order.orderId),
+      ...overrides,
+    });
+    const submit = async (orderId: string, txSig: string) =>
+      app.request(`/api/v1/orders/${orderId}/submitted`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ txSig }),
+      });
+
+    // Forged terms: a different seller in the escrow is refused.
+    const sig1 = bs58.encode(nacl.randomBytes(64));
+    txs.set(sig1, { memos: [order.memo], err: null });
+    accounts.set(order.escrow, encodeEscrowForTest(fundedAccount({ seller: buckets[0]! })));
+    const forged = await submit(order.orderId, sig1);
+    expect(forged.status).toBe(400);
+    expect(((await forged.json()) as { error: { code: string } }).error.code).toBe(
+      'ESCROW_MISMATCH',
+    );
+    // Short deposit is refused.
+    accounts.set(order.escrow, encodeEscrowForTest(fundedAccount({ deposit: 1n })));
+    expect((await submit(order.orderId, sig1)).status).toBe(400);
+    // A tx without this order's memo is not accepted as its checkout.
+    const sig2 = bs58.encode(nacl.randomBytes(64));
+    txs.set(sig2, { memos: ['tm:deadbeef'], err: null });
+    accounts.set(order.escrow, encodeEscrowForTest(fundedAccount()));
+    expect((await submit(order.orderId, sig2)).status).toBe(400);
+    // The real funded escrow settles the order.
+    const ok = await submit(order.orderId, sig1);
+    expect(ok.status).toBe(200);
+    const paid = await sql<Record<string, any>[]>`select * from orders where id = ${order.orderId}`;
+    expect(paid[0]?.status).toBe('paid');
+    expect(paid[0]?.escrow_until.getTime()).toBe(row.escrow_until.getTime());
+    const ledger = await sql<
+      { account: string }[]
+    >`select account from ledger where ref_id = ${order.orderId}`;
+    expect(ledger.map((l) => l.account)).toEqual(['escrow']);
+    // Download opens while the funds stay in escrow.
+    const dl = await app.request(`/api/v1/orders/${order.orderId}/download`, {
+      method: 'POST',
+      headers: { cookie },
+    });
+    expect(dl.status).toBe(200);
+
+    // Not due yet: the cron sends nothing.
+    expect(await releaseOrders(deps)).toEqual([]);
+    expect(sent).toHaveLength(0);
+    clock = new Date(row.escrow_until.getTime() + 1000);
+    effect = 'released';
+    expect(await releaseOrders(deps)).toEqual([order.orderId]);
+    expect(sent).toHaveLength(1);
+    const released = await sql<
+      Record<string, any>[]
+    >`select * from orders where id = ${order.orderId}`;
+    expect(released[0]?.status).toBe('released');
+    expect(released[0]?.release_sig).toBeTruthy();
+    const payouts = await sql<{ status: string; tx_sig: string; bucket: string }[]>`
+      select status, tx_sig, bucket from payouts where order_id = ${order.orderId}
+    `;
+    expect(payouts.length).toBe(5);
+    expect(payouts.every((p) => p.status === 'sent' && p.tx_sig === released[0]?.release_sig)).toBe(
+      true,
+    );
+
+    // Second order: dispute inside the window, refund through the program.
+    clock = now;
+    await sql`delete from licenses`;
+    const second = await buy();
+    const row2 = (
+      await sql<Record<string, any>[]>`select * from orders where id = ${second.orderId}`
+    )[0]!;
+    const sig3 = bs58.encode(nacl.randomBytes(64));
+    txs.set(sig3, { memos: [second.memo], err: null });
+    accounts.set(
+      second.escrow,
+      encodeEscrowForTest(
+        fundedAccount({
+          orderId: orderIdBytes(second.orderId),
+          expiresAt: BigInt(Math.floor((row2.expires_at as Date).getTime() / 1000)),
+          escrowUntil: BigInt(Math.floor((row2.escrow_until as Date).getTime() / 1000)),
+        }),
+      ),
+    );
+    expect((await submit(second.orderId, sig3)).status).toBe(200);
+    const opened = await app.request(`/api/v1/orders/${second.orderId}/dispute`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ reason: 'broken', details: 'It does not load on axiom at all.' }),
+    });
+    expect(opened.status).toBe(200);
+    const dispute = (await opened.json()) as { disputeId: string; txBase64: string | null };
+    expect(dispute.txBase64).toBeTruthy();
+    const admin = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${buyer.publicKey}`;
+    // The buyer has not signed open_dispute yet: no refund, and release still refuses (DB dispute).
+    await expect(
+      resolveDispute(deps, dispute.disputeId, admin[0]!.id, {
+        status: 'upheld',
+        resolution: 'broken file',
+      }),
+    ).rejects.toMatchObject({ code: 'DISPUTE_NOT_ONCHAIN' });
+    const unsigned = await app.request(`/api/v1/orders/${second.orderId}/dispute/tx`, {
+      method: 'POST',
+      headers: { cookie },
+    });
+    expect(((await unsigned.json()) as { onChain: boolean }).onChain).toBe(false);
+    const current = decodeEscrow(accounts.get(second.escrow)!);
+    accounts.set(
+      second.escrow,
+      encodeEscrowForTest({ ...current, status: 'disputed', disputedFrom: 'paid' }),
+    );
+    clock = new Date(row2.escrow_until.getTime() + 1000);
+    expect(await releaseOrders(deps)).toEqual([]);
+    effect = 'refunded';
+    await resolveDispute(deps, dispute.disputeId, admin[0]!.id, {
+      status: 'upheld',
+      resolution: 'broken file',
+    });
+    const refunded = (
+      await sql<Record<string, any>[]>`select * from orders where id = ${second.orderId}`
+    )[0]!;
+    expect(refunded.status).toBe('refunded');
+    expect(refunded.refund_sig).toBeTruthy();
+    expect(decodeEscrow(accounts.get(second.escrow)!).status).toBe('refunded');
+    const refundPayouts = await sql<{ bucket: string; status: string; recipient: string }[]>`
+      select bucket, status, recipient from payouts where order_id = ${second.orderId}
+    `;
+    expect(refundPayouts).toEqual([
+      { bucket: 'refund', status: 'sent', recipient: buyer.publicKey },
+    ]);
   });
 });

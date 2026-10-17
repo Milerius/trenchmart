@@ -136,7 +136,7 @@ export default function ListingPage() {
         body: JSON.stringify({ txSig: signature }),
       });
       setStep('done');
-      setMessage('Payment seen. Download unlocks after escrow releases.');
+      setMessage('Payment confirmed in escrow. Your download is ready in Purchases.');
     } catch (err) {
       setStep('failed');
       setMessage(err instanceof Error ? err.message : 'checkout failed');
@@ -404,7 +404,7 @@ export default function ListingPage() {
               <span className="shrink-0 text-muted">
                 <LockIcon />
               </span>
-              Download unlocks after escrow releases. Watermarked to your wallet.
+              Download once payment is confirmed in escrow. Watermarked to your wallet.
             </li>
           </ul>
           <p className="m-0 border-t border-line-soft pt-3 text-xs text-muted">

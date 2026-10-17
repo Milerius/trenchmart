@@ -11,18 +11,108 @@ export type ChainTx = {
   memos: string[];
 };
 
-type RpcResponse = { result?: unknown; error?: { message?: string } };
+type RpcResponse = { result?: unknown; error?: { code?: number; message?: string } };
 
-async function rpc(url: string, method: string, params: unknown[]): Promise<unknown> {
+export type RpcOptions = {
+  /** Total attempts for 429, 5xx, network errors and the RPC's own rate-limit codes. */
+  attempts?: number;
+  baseDelayMs?: number;
+  fetchImpl?: typeof fetch;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+const RETRYABLE_RPC_CODES = new Set([-32005, -32029, 429]);
+
+export class RpcError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly retryable: boolean,
+  ) {
+    super(message);
+  }
+}
+
+/** Hides keys in `?api-key=` style query strings and path tokens from error text. */
+export function redactRpcUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return 'rpc';
+  }
+}
+
+export async function rpc(
+  url: string,
+  method: string,
+  params: unknown[],
+  options: RpcOptions = {},
+): Promise<unknown> {
   assertSafeRpc(url);
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  const body = (await response.json()) as RpcResponse;
-  if (body.error) throw new Error(body.error.message ?? method);
-  return body.result;
+  const attempts = Math.max(1, options.attempts ?? 4);
+  const base = options.baseDelayMs ?? 250;
+  const doFetch = options.fetchImpl ?? fetch;
+  const sleep = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+  let last: RpcError | null = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) await sleep(base * 2 ** (attempt - 1) + Math.floor(Math.random() * base));
+    let response: Response;
+    try {
+      response = await doFetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      last = new RpcError(
+        `${method}: ${redactRpcUrl(url)} unreachable (${err instanceof Error ? err.message : 'network error'})`,
+        0,
+        true,
+      );
+      continue;
+    }
+    const text = await response.text();
+    let body: RpcResponse | null;
+    try {
+      body = JSON.parse(text) as RpcResponse;
+    } catch {
+      body = null;
+    }
+    const retryable =
+      response.status === 429 ||
+      response.status >= 500 ||
+      (body?.error?.code !== undefined && RETRYABLE_RPC_CODES.has(body.error.code));
+    if (body?.error || !response.ok || !body) {
+      const detail = body?.error?.message ?? `HTTP ${response.status}`;
+      last = new RpcError(
+        `${method}: ${detail} (${redactRpcUrl(url)})`,
+        response.status,
+        retryable,
+      );
+      if (retryable) continue;
+      throw last;
+    }
+    return body.result;
+  }
+  throw last ?? new RpcError(`${method}: no response`, 0, true);
+}
+
+export async function accountData(
+  url: string,
+  pubkey: string,
+): Promise<{ data: Uint8Array; owner: string; lamports: bigint } | null> {
+  const result = (await rpc(url, 'getAccountInfo', [
+    pubkey,
+    { encoding: 'base64', commitment: 'confirmed' },
+  ])) as { value: { data: [string, string]; owner: string; lamports: number } | null };
+  if (!result.value) return null;
+  return {
+    data: fromBase64(result.value.data[0]),
+    owner: result.value.owner,
+    lamports: BigInt(result.value.lamports),
+  };
 }
 
 export async function latestBlockhash(
@@ -86,6 +176,23 @@ export async function confirm(
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   throw new Error(`transaction ${signature} was not ${want}`);
+}
+
+/** Sends and waits for `confirmed`; a transaction that landed with an error throws. */
+export async function sendAndConfirm(url: string, tx: Uint8Array, attempts = 40): Promise<string> {
+  const signature = await sendRaw(url, tx);
+  for (let i = 0; i < attempts; i += 1) {
+    const result = (await rpc(url, 'getSignatureStatuses', [[signature]])) as {
+      value: Array<{ confirmationStatus?: string; err: unknown } | null>;
+    };
+    const status = result.value[0];
+    if (status?.err)
+      throw new Error(`transaction ${signature} failed: ${JSON.stringify(status.err)}`);
+    if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized')
+      return signature;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`transaction ${signature} was not confirmed`);
 }
 
 type ParsedIx = {

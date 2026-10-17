@@ -67,7 +67,7 @@ export default function PurchasesPage() {
     } catch (err) {
       setMessage(
         err instanceof ApiError && err.code === 'ESCROW_LOCKED'
-          ? 'Download unlocks after escrow releases.'
+          ? 'Downloads open once payment is confirmed in escrow, and pause during a dispute.'
           : err instanceof Error
             ? err.message
             : 'Download failed',
@@ -83,7 +83,7 @@ export default function PurchasesPage() {
         <h1 className="text-[28px] font-semibold tracking-[-0.025em]">Purchases</h1>
         <p className="mt-3 text-ink-2">Connect a wallet to see purchases.</p>
         <p className="mt-1 text-sm text-muted">
-          Every order shows its escrow timer here, and its download once escrow releases.
+          Every order shows its escrow timer here, and its download once payment is confirmed.
         </p>
         <Button className="mt-6" onClick={() => void wallet.connect()} disabled={wallet.busy}>
           {wallet.busy ? 'Check your wallet…' : 'Connect wallet'}
@@ -93,7 +93,7 @@ export default function PurchasesPage() {
   }
 
   const inEscrow = (orders ?? []).filter((o) => o.status === 'paid' || o.status === 'disputed');
-  const ready = (orders ?? []).filter((o) => o.status === 'released');
+  const ready = (orders ?? []).filter((o) => o.status === 'released' || o.status === 'paid');
   const escrowTotal = inEscrow.reduce((sum, o) => sum + BigInt(o.amount.lamports), 0n);
   const centsPerSol = escrowCents(inEscrow);
 
@@ -103,8 +103,8 @@ export default function PurchasesPage() {
         <div>
           <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Purchases</h1>
           <p className="mt-2 max-w-2xl text-ink-2">
-            Real totals in SOL with USD beside them. Downloads stay locked while funds are in escrow
-            and unlock when it releases.
+            Real totals in SOL with USD beside them. Download as soon as payment is confirmed in
+            escrow; the creator is paid only when the escrow window ends with no dispute.
           </p>
         </div>
         <ButtonLink href="/search" variant="secondary">

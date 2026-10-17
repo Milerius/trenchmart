@@ -12,11 +12,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
     "@trenchmart/shared": "workspace:*",
     "acorn": "8.19.0",
     "acorn-walk": "8.3.5",
     "bs58": "6.0.0",
-    "fflate": "0.8.3"
+    "fflate": "0.8.3",
+    "quickjs-emscripten-core": "0.32.0"
   },
   "devDependencies": {
     "@types/node": "26.6.5",

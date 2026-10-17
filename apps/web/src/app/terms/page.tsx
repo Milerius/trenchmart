@@ -27,16 +27,15 @@ export default function TermsPage() {
       </DocSection>
       <DocSection id="custody" title="Non-custodial checkout">
         <p>
-          TrenchMart does not take custody of your wallet and does not hold a key that can spend the
-          vault. When you buy, your wallet signs a transfer of the order total to a Squads multisig
-          vault, together with a memo that identifies the order. Bond and verification-fee payments
-          work the same way. Signer keys for that vault are configured in Squads, outside this
-          service.
+          TrenchMart does not take custody of your wallet. When you buy, your wallet signs one
+          transaction that creates an escrow account for the order in the on-chain escrow program (
+          {protocol.programId}) on {protocol.cluster} and deposits the order total into it, with a
+          memo that identifies the order. The program alone moves those funds: to the seller and the
+          fee buckets when the window ends, or back to you when a dispute is upheld.
         </p>
         <p>
-          An on-chain escrow program ({protocol.programId}) exists on {protocol.cluster} and
-          describes the same order states. Orders placed through the site are recorded in the
-          marketplace ledger and paid to the Squads vault.
+          Bond and verification-fee payments are a transfer to a Squads multisig vault with a memo.
+          Signer keys for that vault are configured in Squads, outside this service.
         </p>
       </DocSection>
       <DocSection id="escrow" title="Escrow, release, and refunds">
@@ -47,20 +46,21 @@ export default function TermsPage() {
           minutes, with {protocol.paymentGraceMinutes} minutes of grace for a matching transfer.
         </p>
         <p>
-          After the transfer matches, the order is paid and held for {protocol.escrowHours} hours.
-          If you do not open a dispute, release pays the seller the list price and splits the net
-          fee. You can download the file only after the order is released, and only for a wallet
-          that holds the license. The file is watermarked with the order, the wallet, and the file
-          hash.
+          Once the escrow account holds the full total, the order is paid and held for{' '}
+          {protocol.escrowHours} hours. If you do not open a dispute, release pays the seller the
+          list price and splits the net fee. You can download the file as soon as the order is paid,
+          only for a wallet that holds the license, and not while a dispute is open. The file is
+          watermarked with the order, the wallet, and the file hash.
         </p>
         <p>
           You may open a dispute for not as described, broken or changed, malicious or unsafe, or
           another reason you explain, while the order is paid and the window has not ended. A
           malicious reason can be opened for {protocol.maliciousDisputeDays} days after payment,
-          including after release. Opening a dispute pauses release. If the dispute is upheld, the
-          total you paid is refunded: from the vault ledger when the order was still paid, and from
-          the creator bond and then the safety bucket when it was already released. If the dispute
-          is rejected, the order returns to the status it had before. One dispute is kept per order.
+          including after release. Opening a dispute inside the window freezes the escrow on chain,
+          which you sign. If the dispute is upheld, the total you paid is refunded: by the escrow
+          program when the order was still paid, and from the creator bond and then the safety
+          bucket when it was already released. If the dispute is rejected, the order returns to the
+          status it had before. One dispute is kept per order.
         </p>
       </DocSection>
       <DocSection id="verification" title="AI verification">

@@ -383,7 +383,8 @@ export function DownloadButton({
   className?: string;
   size?: Size;
 }) {
-  if (status === 'released') {
+  // Payment confirmed in escrow unlocks the download; the funds stay locked until release.
+  if (status === 'released' || status === 'paid') {
     return (
       <Button
         data-testid="download-button"
@@ -397,13 +398,8 @@ export function DownloadButton({
       </Button>
     );
   }
-  if (status !== 'paid' && status !== 'disputed') return null;
-  const label =
-    status === 'disputed'
-      ? 'Locked during dispute'
-      : escrowUntil
-        ? `Unlocks in ${remaining(escrowUntil)}`
-        : 'Unlocks after release';
+  if (status !== 'disputed') return null;
+  const label = 'Locked during dispute';
   return (
     <Button
       data-testid="download-button"
@@ -411,7 +407,7 @@ export function DownloadButton({
       size={size}
       disabled
       className={className}
-      title={escrowUntil ? `Download unlocks ${utc(escrowUntil)}` : undefined}
+      title={escrowUntil ? `Escrow window ends ${utc(escrowUntil)}` : undefined}
     >
       <LockIcon /> {label}
     </Button>

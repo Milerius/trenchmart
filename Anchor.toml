@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-trench_escrow = "7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM"
+trench_escrow = "Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw"
 
 [programs.localnet]
-trench_escrow = "7Nmxf7QLPUXKha3WQG81GFfXQPYgyXuc5mLfRyUzNzCM"
+trench_escrow = "Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw"
 
 [provider]
 cluster = "localnet"
