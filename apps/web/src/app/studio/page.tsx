@@ -232,7 +232,7 @@ export default function StudioPage() {
                             href={`/studio/listings/${listing.id}/content`}
                             className="mt-0.5 block text-xs text-muted hover:text-ink"
                           >
-                            Edit page →
+                            Edit page: images, README, install guide →
                           </Link>
                         </td>
                         <td className="px-3 py-3">

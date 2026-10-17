@@ -3,11 +3,20 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent, type ReactNode } from 'react';
+import {
+  ContentTabs,
+  GalleryEditor,
+  imageProblem,
+  MAX_IMAGES,
+  mediaPath,
+  type GalleryItem,
+} from '@/components/content-editor';
 import { CATEGORIES, solToLamports } from '@trenchmart/shared';
 import { Button, Label, Money, Panel, Square } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 import { payVerificationFee, type UnsignedTx } from '@/lib/studio';
+import { templateFor, type ContentField } from '@/lib/listing-templates';
 import { useWallet } from '@/lib/wallet';
 
 const INPUT =
@@ -29,6 +38,92 @@ export default function NewListingPage() {
   const [busy, setBusy] = useState('');
   const [price, setPrice] = useState('');
   const [fileName, setFileName] = useState('');
+  const [category, setCategory] = useState<string>(CATEGORIES[0]!.code);
+  const [text, setText] = useState<Record<ContentField, string>>(() =>
+    templateFor(CATEGORIES[0]!.code),
+  );
+  const [images, setImages] = useState<GalleryItem[]>([]);
+  const [cover, setCover] = useState<string | null>(null);
+  const [imageMessage, setImageMessage] = useState('');
+
+  function changeCategory(next: string) {
+    const before = templateFor(category);
+    const after = templateFor(next);
+    // Untouched sections follow the new category's template; edited ones are kept.
+    setText((current) => {
+      const updated = { ...current };
+      for (const key of Object.keys(updated) as ContentField[]) {
+        if (current[key] === before[key]) updated[key] = after[key];
+      }
+      return updated;
+    });
+    setCategory(next);
+  }
+
+  function addImages(files: File[]) {
+    setImageMessage('');
+    const room = MAX_IMAGES - images.length;
+    const picked: GalleryItem[] = [];
+    for (const file of files.slice(0, room)) {
+      const problem = imageProblem(file);
+      if (problem) {
+        setImageMessage(problem);
+        continue;
+      }
+      // A real UUID, so the Markdown preview accepts it as a media path until the upload swaps it.
+      picked.push({ id: crypto.randomUUID(), url: URL.createObjectURL(file), alt: '', file });
+    }
+    if (files.length > room) setImageMessage(`Up to ${MAX_IMAGES} images.`);
+    setImages((list) => [...list, ...picked]);
+    setCover((value) => value ?? picked[0]?.id ?? null);
+  }
+
+  function removeImage(id: string) {
+    setImages((list) => list.filter((image) => image.id !== id));
+  }
+
+  /** Uploads picked images, swaps their ids in the Markdown, saves the page and submits it. */
+  async function saveContent(listingId: string) {
+    const ids = new Map<string, string>();
+    const gallery: { imageId: string; alt: string }[] = [];
+    for (const [index, image] of images.entries()) {
+      if (!image.file) continue;
+      setBusy(`Uploading image ${index + 1} of ${images.length}…`);
+      const saved = await api<{ id: string }>(`/studio/listings/${listingId}/images`, {
+        method: 'POST',
+        headers: { 'content-type': image.file.type },
+        body: image.file,
+      });
+      ids.set(image.id, saved.id);
+      gallery.push({ imageId: saved.id, alt: image.alt });
+    }
+    const swap = (value: string) =>
+      [...ids].reduce(
+        (out, [temp, real]) => out.split(mediaPath(temp)).join(mediaPath(real)),
+        value,
+      );
+    const page = {
+      readme: swap(text.readme),
+      howto: swap(text.howto),
+      requirements: swap(text.requirements),
+    };
+    if (!gallery.length && !page.readme.trim() && !page.howto.trim() && !page.requirements.trim())
+      return;
+    setBusy('Saving listing page…');
+    await api(`/studio/listings/${listingId}/content`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...page,
+        coverImageId: (cover && ids.get(cover)) ?? gallery[0]?.imageId ?? null,
+        gallery,
+      }),
+    });
+    setBusy('Reviewing listing page…');
+    await api(`/studio/listings/${listingId}/content/review`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,6 +145,7 @@ export default function NewListingPage() {
           .filter(Boolean),
       }),
     });
+    await saveContent(created.id);
     const file = data.get('file');
     if (!(file instanceof File) || file.size === 0) {
       router.push('/studio');
@@ -115,14 +211,15 @@ export default function NewListingPage() {
         })
       }
     >
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <div>
           <Link href="/studio" className="text-sm text-muted hover:text-ink">
             ← Studio
           </Link>
           <h1 className="m-0 mt-3 text-[32px] font-semibold tracking-[-0.03em]">New listing</h1>
           <p className="m-0 mt-1 text-ink-2">
-            Describe it, set a price, drop the file. Automated review starts the moment it uploads.
+            Describe it, add screenshots and an install guide, set a price, drop the file. Automated
+            review starts the moment it uploads.
           </p>
         </div>
 
@@ -158,7 +255,13 @@ export default function NewListingPage() {
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Category" htmlFor="category">
-              <select id="category" name="category" className={INPUT}>
+              <select
+                id="category"
+                name="category"
+                value={category}
+                onChange={(event) => changeCategory(event.target.value)}
+                className={INPUT}
+              >
                 {CATEGORIES.map((cat) => (
                   <option key={cat.code} value={cat.code}>
                     {cat.label}
@@ -187,6 +290,60 @@ export default function NewListingPage() {
             />
           </Field>
         </div>
+
+        <GalleryEditor
+          images={images}
+          setImages={setImages}
+          cover={cover}
+          setCover={setCover}
+          onFiles={addImages}
+          onRemove={removeImage}
+          note={
+            imageMessage ? (
+              <p role="alert" className="m-0 text-sm text-danger">
+                {imageMessage}
+              </p>
+            ) : null
+          }
+        />
+
+        <ContentTabs
+          text={text}
+          setText={setText}
+          gallery={images}
+          previews={Object.fromEntries(images.map((image) => [image.id, image.url]))}
+          intro={
+            <p data-testid="template-note" className="m-0 px-5 pt-3 text-[13px] text-ink-2">
+              Started from the{' '}
+              <span className="text-ink">
+                {CATEGORIES.find((cat) => cat.code === category)?.label}
+              </span>{' '}
+              template. Replace the [bracketed] parts; everything is yours to edit.
+            </p>
+          }
+          actions={(key) => (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={text[key] === templateFor(category)[key]}
+                onClick={() =>
+                  setText((value) => ({ ...value, [key]: templateFor(category)[key] }))
+                }
+              >
+                Reset to template
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!text[key]}
+                onClick={() => setText((value) => ({ ...value, [key]: '' }))}
+              >
+                Start blank
+              </Button>
+            </>
+          )}
+        />
 
         <label
           htmlFor="file"
@@ -241,6 +398,7 @@ export default function NewListingPage() {
               ['Static checks', 'eval, remote code, key access, hosts'],
               ['Sandbox run', 'isolated, network and wallet calls logged'],
               ['AI verdict', 'rules engine plus LLM; the stricter wins'],
+              ['Listing page', 'images and links checked; warnings need a note'],
             ].map(([title, detail], index) => (
               <li key={title} className="flex list-none gap-3">
                 <Square>{index + 1}</Square>
