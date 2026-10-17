@@ -35,7 +35,7 @@ const TICKER_FACTS = [
   'Solana devnet · live',
   'Holders: up to 100% off the 5% fee',
   'Creators: 0% commission',
-  'Every version scanned; scripts sandboxed; rules-engine review',
+  'Every version scanned; scripts sandboxed; AI review: rules engine + LLM',
 ];
 
 function Ticker() {
