@@ -7,6 +7,7 @@ import { accountData, fetchTransaction, latestBlockhash, sendAndConfirm } from '
 import { createApp, type PriceCacheBox } from './app';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
 import { readEnv } from './env';
+import { closeAfterResponse } from './lifetime';
 import { expireOrders, proposePayouts, releaseOrders } from './logic';
 
 type Binding = Record<string, unknown> & {
@@ -78,11 +79,16 @@ export default {
     if (!dbUrl) throw new Error('HYPERDRIVE or DATABASE_URL is required');
     const deps = depsFor(env, dbUrl);
     const app = createApp({ ...deps, sandboxQueue: env.SCAN_QUEUE }, priceCache);
+    const close = () => deps.sql.end({ timeout: 5 });
+    let response: Response;
     try {
-      return await app.fetch(request);
-    } finally {
-      ctx.waitUntil(deps.sql.end({ timeout: 5 }));
+      response = await app.fetch(request);
+    } catch (error) {
+      ctx.waitUntil(close());
+      throw error;
     }
+    // Streamed reviews keep querying after the handler returns: close once the body is sent.
+    return closeAfterResponse(response, close, (p) => ctx.waitUntil(p));
   },
   async scheduled(_event: unknown, env: Binding, ctx: Ctx): Promise<void> {
     const dbUrl = databaseUrl(env);
