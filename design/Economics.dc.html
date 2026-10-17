@@ -16,6 +16,7 @@ button{font-family:inherit}
 </style>
 </helmet>
 <div style="min-height: 100vh; background: #0A0B0A; color: #EDEFEA; font-family: 'Geist', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+<div role="note" style="background: #1C160A; border-bottom: 1px solid #3A2C0E; color: #F5A524; font-family: 'Geist Mono', monospace; font-size: 12px; text-align: center; padding: 6px 16px">DEVNET · test SOL only · nothing here has real value</div>
 
 <header style="border-bottom: 1px solid #1E221E">
 <div style="max-width: 1280px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center">
@@ -39,7 +40,7 @@ button{font-family:inherit}
 <div style="display: flex; flex-direction: column; gap: 16px">
 <span style="align-self: flex-start; font-family: 'Geist Mono', monospace; font-size: 12px; color: #C6F432; border: 1px solid #2E3A12; border-radius: 999px; padding: 6px 12px">$TRENCH · fair launch on pump.fun</span>
 <h1 style="margin: 0; font-size: clamp(38px, 5.4vw, 60px); line-height: 1.03; letter-spacing: -0.035em">Fees fund the token.<br>The token cuts your fees.</h1>
-<p style="margin: 0; color: #B4BAB2; font-size: 17px; max-width: 560px">A flat 5% on each sale. Part of every fee buys back $TRENCH; holders pay less, get earlier access and help pick what gets featured.</p>
+<p style="margin: 0; color: #B4BAB2; font-size: 17px; max-width: 560px">Buyers pay a flat 5% fee on each sale and creators keep 100% of the price. Part of every fee buys back $TRENCH. Holders pay less of the fee (Scout −25%, Trencher −60%, OG −100%), get earlier access and help pick what gets featured.</p>
 </div>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: 'Geist Mono', monospace">
 <div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-size: 12px; color: #9BA19A">Platform fee</div><div style="font-size: 26px; font-weight: 600">5%</div></div>
@@ -80,18 +81,35 @@ button{font-family:inherit}
 </div>
 </section>
 
+<!-- worked example -->
+<section aria-labelledby="ex-h" style="display: flex; flex-direction: column; gap: 12px">
+<h2 id="ex-h" style="margin: 0; font-size: 20px">Worked example · 1.50 SOL listing</h2>
+<div style="overflow-x: auto; border: 1px solid #262A26; border-radius: 14px">
+<table data-testid="fee-example" style="width: 100%; min-width: 560px; border-collapse: collapse; font-family: 'Geist Mono', monospace; font-size: 13px; font-variant-numeric: tabular-nums">
+<thead><tr style="background: #121412; color: #9BA19A; font-size: 12px; text-align: right"><th scope="col" style="padding: 12px 16px; text-align: left; font-weight: 500">Tier</th><th scope="col" style="padding: 12px 16px; font-weight: 500">List price</th><th scope="col" style="padding: 12px 16px; font-weight: 500">Fee 5%</th><th scope="col" style="padding: 12px 16px; font-weight: 500">Discount</th><th scope="col" style="padding: 12px 16px; font-weight: 500">You pay</th><th scope="col" style="padding: 12px 16px; font-weight: 500">Creator gets</th></tr></thead>
+<tbody style="text-align: right">
+<tr style="border-top: 1px solid #1E221E"><th scope="row" style="padding: 12px 16px; text-align: left; font-weight: 500">None</th><td style="padding: 12px 16px">1.50</td><td style="padding: 12px 16px">0.075</td><td style="padding: 12px 16px; color: #9BA19A">0.00</td><td style="padding: 12px 16px; font-weight: 600">1.575 SOL<span style="display: block; font-size: 11px; font-weight: 400; color: #9BA19A">≈ $283.50</span></td><td style="padding: 12px 16px">1.50</td></tr>
+<tr style="border-top: 1px solid #1E221E"><th scope="row" style="padding: 12px 16px; text-align: left; font-weight: 500">Scout</th><td style="padding: 12px 16px">1.50</td><td style="padding: 12px 16px">0.075</td><td style="padding: 12px 16px; color: #C6F432">−0.01875</td><td style="padding: 12px 16px; font-weight: 600">1.55625 SOL<span style="display: block; font-size: 11px; font-weight: 400; color: #9BA19A">≈ $280.12</span></td><td style="padding: 12px 16px">1.50</td></tr>
+<tr style="border-top: 1px solid #1E221E"><th scope="row" style="padding: 12px 16px; text-align: left; font-weight: 500">Trencher</th><td style="padding: 12px 16px">1.50</td><td style="padding: 12px 16px">0.075</td><td style="padding: 12px 16px; color: #C6F432">−0.045</td><td style="padding: 12px 16px; font-weight: 600">1.53 SOL<span style="display: block; font-size: 11px; font-weight: 400; color: #9BA19A">≈ $275.40</span></td><td style="padding: 12px 16px">1.50</td></tr>
+<tr style="border-top: 1px solid #1E221E"><th scope="row" style="padding: 12px 16px; text-align: left; font-weight: 500">OG</th><td style="padding: 12px 16px">1.50</td><td style="padding: 12px 16px">0.075</td><td style="padding: 12px 16px; color: #C6F432">−0.075</td><td style="padding: 12px 16px; font-weight: 600">1.50 SOL<span style="display: block; font-size: 11px; font-weight: 400; color: #9BA19A">≈ $270.00</span></td><td style="padding: 12px 16px">1.50</td></tr>
+</tbody></table>
+</div>
+<p style="margin: 0; font-size: 12px; color: #9BA19A">Plus the Solana network fee (about 0.000005 SOL), which goes to validators, not to TrenchMart. USD at $180.00/SOL, estimate.</p>
+</section>
+
 <!-- revenue flow -->
 <section style="display: flex; flex-direction: column; gap: 16px">
 <h2 style="margin: 0; font-size: 28px; letter-spacing: -0.02em">Where every fee goes</h2>
-<div style="display: flex; height: 52px; border-radius: 12px; overflow: hidden; font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 600">
+<p style="margin: 0; color: #9BA19A; font-size: 14px">Split of the fee actually collected, after any holder discount. Rounding dust goes to ops.</p>
+<div role="img" aria-label="Fee split: 40% buyback, 25% AI verification, 20% ops, 15% safety" style="display: flex; height: 52px; border-radius: 12px; overflow: hidden; font-family: 'Geist Mono', monospace; font-size: 13px; font-weight: 600">
 <div style="flex: 40; background: #C6F432; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">40% buyback</div>
-<div style="flex: 25; background: #7CC4FF; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">25% verifiers</div>
+<div style="flex: 25; background: #7CC4FF; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">25% AI verification</div>
 <div style="flex: 20; background: #C9A2FF; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">20% ops</div>
 <div style="flex: 15; background: #F5A524; color: #0A0B0A; display: flex; align-items: center; padding: 0 14px">15% safety</div>
 </div>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px">
 <div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Buyback &amp; burn / reward pool</div><div style="font-size: 13px; color: #9BA19A">Market-buys $TRENCH on a public schedule. Split between burn and staker rewards is a governance vote.</div></div>
-<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Verifier rewards</div><div style="font-size: 13px; color: #9BA19A">Pays reviewers per signed review. Verifiers stake too and lose stake if they approve something malicious.</div></div>
+<div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">AI verification</div><div style="font-size: 13px; color: #9BA19A">Funds the automated verification agent: model runs, sandbox time and a signed attestation for every version. No human verifiers are paid from this bucket.</div></div>
 <div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Operations</div><div style="font-size: 13px; color: #9BA19A">Scanning infra, sandbox wallets, hosting and development.</div></div>
 <div style="padding: 16px; border-radius: 12px; background: #121412; border: 1px solid #262A26"><div style="font-weight: 600">Safety fund</div><div style="font-size: 13px; color: #9BA19A">Refunds buyers when a creator bond isn't enough to cover a confirmed bad listing.</div></div>
 </div>
@@ -129,17 +147,17 @@ button{font-family:inherit}
 </sc-for>
 </div>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: 'Geist Mono', monospace">
-<div><div style="font-size: 12px; color: #9FAF86">Fees, no tier</div><div style="font-size: 20px">{{base}}</div></div>
-<div><div style="font-size: 12px; color: #9FAF86">Fees at tier</div><div style="font-size: 20px">{{paid}}</div></div>
-<div><div style="font-size: 12px; color: #9FAF86">Saved / month</div><div style="font-size: 20px; color: #C6F432">{{saved}}</div></div>
+<div><div style="font-size: 12px; color: #9FAF86">Fees, no tier</div><div style="font-size: 20px">{{base}}</div><div style="font-size: 12px; color: #9FAF86">{{baseUsd}}</div></div>
+<div><div style="font-size: 12px; color: #9FAF86">Fees at tier</div><div style="font-size: 20px">{{paid}}</div><div style="font-size: 12px; color: #9FAF86">{{paidUsd}}</div></div>
+<div><div style="font-size: 12px; color: #9FAF86">Saved / month</div><div style="font-size: 20px; color: #C6F432">{{saved}}</div><div style="font-size: 12px; color: #9FAF86">{{savedUsd}}</div></div>
 </div>
-<p style="margin: 0; font-size: 12px; color: #9FAF86">Illustration only. Holding $TRENCH is a risk; perks can change by governance.</p>
+<p style="margin: 0; font-size: 12px; color: #9FAF86">Assumes every purchase is at that tier. Illustration only. Holding $TRENCH is a risk; perks can change by governance.</p>
 </div>
 <div style="background: #121412; border: 1px solid #262A26; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px">
 <h2 style="margin: 0; font-size: 20px">How holding is checked</h2>
 <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: #B4BAB2">
 <li>Connect and sign a message. No transaction, no approval.</li>
-<li>We read your $TRENCH balance, including tokens staked on-site.</li>
+<li>We read your $TRENCH balance from Solana (a devnet test mint until launch).</li>
 <li>Tier uses your lowest balance over the last 72h, so flash-buying before a purchase doesn't count.</li>
 <li>Re-checked at checkout; one tier per wallet, linked wallets don't stack.</li>
 </ol>
@@ -153,33 +171,37 @@ class Component extends DCLogic {
   constructor(p) { super(p); this.state = { tier: 'Trencher', spend: 20 }; }
   renderVals() {
     const fees = [
-      { name: 'Marketplace fee', who: 'Buyer, at checkout', amt: '5% of price', disc: '−25% / −60% / −100%', why: 'Main revenue; shown upfront, never hidden.' },
-      { name: 'Creator commission', who: 'Creator', amt: '0%', disc: '—', why: 'Creators keep the full list price to attract supply.' },
-      { name: 'Verification fee', who: 'Creator, per version', amt: '0.25 SOL', disc: 'Free from Trencher', why: 'Pays reviewers; stops spam uploads.' },
-      { name: 'Creator bond', who: 'Creator, refundable', amt: '5–50 SOL by category', disc: '−50% for OG', why: 'Skin in the game; slashed for malicious listings.' },
+      { name: 'Marketplace fee', who: 'Buyer, at checkout', amt: '5% of list price', disc: 'Scout −25% · Trencher −60% · OG −100%', why: 'Main revenue; shown in full before you sign.' },
+      { name: 'Creator commission', who: 'Creator', amt: '0%', disc: '—', why: 'Creators keep 100% of the list price.' },
+      { name: 'Verification fee', who: 'Creator, per version', amt: '0.25 SOL (≈ $45.00)', disc: 'Free from Trencher', why: 'Funds AI verification runs; stops spam uploads.' },
+      { name: 'Creator bond', who: 'Creator, refundable', amt: '1–5 SOL by category (≈ $180–$900)', disc: '−50% for OG', why: 'Skin in the game; slashed for malicious listings.' },
       { name: 'Featured slot', who: 'Creator, optional', amt: '[X] SOL / week', disc: 'Paid in $TRENCH −20%', why: 'Promotion, ranked with holder votes.' },
       { name: 'Subscriptions', who: 'Buyer, recurring', amt: '5% of each renewal', disc: 'Same as marketplace', why: 'For live wallet lists and alert feeds.' }
     ];
     const defs = [
-      { name: 'Scout', req: 'HOLD ≥ [X] $TRENCH', headline: '−25% marketplace fee', off: 0.25, perks: ['Holder price on every listing', 'Holder badge on reviews', 'Weekly drops newsletter'] },
-      { name: 'Trencher', req: 'HOLD ≥ [Y] $TRENCH', headline: '−60% fee · free verification', off: 0.6, perks: ['48h early access to new drops', 'Holder-only listings', 'Free verification for your uploads', 'Vote on featured listings'] },
-      { name: 'OG', req: 'HOLD ≥ [Z] $TRENCH', headline: '0% marketplace fee', off: 1, perks: ['Everything in Trencher', 'Half creator bond', 'Private alpha room', 'Apply to become a verifier'] }
+      { name: 'Scout', req: 'HOLD ≥ [X] $TRENCH', headline: '−25% of the 5% fee', bps: 2500n, perks: ['Holder price on every listing', 'Holder badge on reviews', 'Weekly drops newsletter'] },
+      { name: 'Trencher', req: 'HOLD ≥ [Y] $TRENCH', headline: '−60% of the fee · free verification', bps: 6000n, perks: ['48h early access to new drops', 'Holder-only listings', 'Free verification for your uploads', 'Vote on featured listings'] },
+      { name: 'OG', req: 'HOLD ≥ [Z] $TRENCH', headline: '0% marketplace fee', bps: 10000n, perks: ['Everything in Trencher', 'Half creator bond', 'Private alpha room'] }
     ];
     const tiers = defs.map((t) => {
       const on = this.state.tier === t.name;
       return { ...t, sel: on ? 'true' : 'false', tag: on ? '#C6F432' : '#9BA19A', pick: () => this.setState({ tier: t.name }),
-        style: 'text-align: left; color: #EDEFEA; cursor: pointer; padding: 22px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; border: 1px solid ' + (on ? '#C6F432' : '#262A26') + '; background: ' + (on ? '#141A08' : '#121412') };
+        style: 'text-align: left; color: #EDEFEA; cursor: pointer; padding: 22px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; border: 1px solid ' + (on ? '#C6F432' : '#646C63') + '; background: ' + (on ? '#141A08' : '#121412') };
     });
     const cur = defs.find((t) => t.name === this.state.tier);
     const spends = [5, 20, 50, 150].map((v) => {
       const on = this.state.spend === v;
       return { label: v + ' SOL / mo', sel: on ? 'true' : 'false', pick: () => this.setState({ spend: v }),
-        style: 'height: 40px; padding: 0 14px; border-radius: 999px; font-size: 13px; cursor: pointer; border: 1px solid ' + (on ? '#C6F432' : '#2E3A12') + '; background: ' + (on ? '#C6F432' : 'transparent') + '; color: ' + (on ? '#0A0B0A' : '#C9D0BE') };
+        style: 'height: 40px; padding: 0 14px; border-radius: 999px; font-size: 13px; cursor: pointer; border: 1px solid ' + (on ? '#C6F432' : '#9FAF86') + '; background: ' + (on ? '#C6F432' : 'transparent') + '; color: ' + (on ? '#0A0B0A' : '#C9D0BE') };
     });
-    const base = this.state.spend * 0.05;
-    const paid = base * (1 - cur.off);
-    const f = (n) => n.toFixed(2) + ' SOL';
-    return { fees, tiers, spends, tierName: cur.name, base: f(base), paid: f(paid), saved: f(base - paid) };
+    // Lamports + basis points, same as packages/shared fee.ts. Exact display, never rounded.
+    const sol = (l) => { const s = l.toString().padStart(10, '0'); let fr = s.slice(-9).replace(/0+$/, ''); if (fr.length < 2) fr = fr.padEnd(2, '0'); return s.slice(0, -9).replace(/^0+(?=\d)/, '') + '.' + fr; };
+    const spend = BigInt(this.state.spend) * 1000000000n;
+    const base = (spend * 500n) / 10000n;
+    const paid = base - (base * cur.bps) / 10000n;
+    const f = (n) => sol(n) + ' SOL';
+    const usd = (l) => { const c = (l * 18000n) / 1000000000n; if (c < 1n) return l > 0n ? '< $0.01' : '≈ $0.00'; return '≈ $' + (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + (c % 100n).toString().padStart(2, '0'); };
+    return { fees, tiers, spends, tierName: cur.name, base: f(base), paid: f(paid), saved: f(base - paid), baseUsd: usd(base), paidUsd: usd(paid), savedUsd: usd(base - paid) };
   }
 }
 </script>

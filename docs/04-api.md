@@ -5,16 +5,18 @@ Base: `/api/v1`. JSON. Errors: `{ "error": { "code": "STRING", "message": "..." 
 Legend: 🔓 public · 👤 signed in · 🛠 creator · 🔍 verifier · 🛡 admin · 🤖 internal/webhook
 
 ## Auth
-| Method | Path | Who | Body → Response |
-|---|---|---|---|
-| POST | `/auth/nonce` | 🔓 | `{wallet}` → `{nonce, message}` |
-| POST | `/auth/verify` | 🔓 | `{wallet, signature}` → sets cookie, `{user}` |
-| POST | `/auth/logout` | 👤 | → 204 |
-| GET | `/me` | 👤 | → `{user, roles, tier, tierDetail:{minBalance, windowHours, nextTier, needed}}` |
-| GET | `/auth/x/start` | 👤 | → 302 to X OAuth |
-| GET | `/auth/x/callback` | 👤 | → links X, 302 to studio |
+
+| Method | Path               | Who | Body → Response                                                                 |
+| ------ | ------------------ | --- | ------------------------------------------------------------------------------- |
+| POST   | `/auth/nonce`      | 🔓  | `{wallet}` → `{nonce, message}`                                                 |
+| POST   | `/auth/verify`     | 🔓  | `{wallet, signature}` → sets cookie, `{user}`                                   |
+| POST   | `/auth/logout`     | 👤  | → 204                                                                           |
+| GET    | `/me`              | 👤  | → `{user, roles, tier, tierDetail:{minBalance, windowHours, nextTier, needed}}` |
+| GET    | `/auth/x/start`    | 👤  | → 302 to X OAuth                                                                |
+| GET    | `/auth/x/callback` | 👤  | → links X, 302 to studio                                                        |
 
 SIWS message format:
+
 ```
 trenchmart.xyz wants you to sign in with your Solana account:
 <wallet>
@@ -28,16 +30,18 @@ Expiration Time: <iso +10m>
 ```
 
 ## Browse
-| Method | Path | Who | Notes |
-|---|---|---|---|
-| GET | `/listings` | 🔓 | query: `q, category, terminal, sort=trending\|new\|price_asc\|price_desc\|rating, cursor, limit≤48`. Hides holder-only-window listings from tier `none` (shows them with `lockedUntil`). |
-| GET | `/listings/:slug` | 🔓 | listing + live version + creator card + `security` block |
-| GET | `/listings/:slug/versions` | 🔓 | changelog (live/superseded only) |
-| GET | `/listings/:slug/reviews` | 🔓 | paginated |
-| GET | `/creators/top` | 🔓 | 30d volume |
-| GET | `/categories` | 🔓 | from enum + counts |
+
+| Method | Path                       | Who | Notes                                                                                                                                                                                    |
+| ------ | -------------------------- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/listings`                | 🔓  | query: `q, category, terminal, sort=trending\|new\|price_asc\|price_desc\|rating, cursor, limit≤48`. Hides holder-only-window listings from tier `none` (shows them with `lockedUntil`). |
+| GET    | `/listings/:slug`          | 🔓  | listing + live version + creator card + `security` block                                                                                                                                 |
+| GET    | `/listings/:slug/versions` | 🔓  | changelog (live/superseded only)                                                                                                                                                         |
+| GET    | `/listings/:slug/reviews`  | 🔓  | paginated                                                                                                                                                                                |
+| GET    | `/creators/top`            | 🔓  | 30d volume                                                                                                                                                                               |
+| GET    | `/categories`              | 🔓  | from enum + counts                                                                                                                                                                       |
 
 `security` block shape (drives the Security report tab):
+
 ```ts
 {
   versionId, semver, sha256,
@@ -50,59 +54,65 @@ Expiration Time: <iso +10m>
 ```
 
 ## Checkout & orders
-| Method | Path | Who | Notes |
-|---|---|---|---|
-| POST | `/orders/quote` | 👤 | `{listingId}` → `{price, fee, rebate, total, tier, feeBps, rebateBps}` (no DB write) |
-| POST | `/orders` | 👤 | `{listingId}` → creates PENDING order, returns `{orderId, total, memo, vault, txBase64}` (unsigned transfer + memo instruction, recent blockhash). Rejects: own listing, holder-only lock, already owns live license. |
-| POST | `/orders/:id/submitted` | 👤 | `{txSig}` → stores sig, verifies immediately if confirmed (also done by webhook) |
-| GET | `/orders/:id` | 👤 | status poll |
-| GET | `/me/orders` | 👤 | purchases |
-| POST | `/orders/:id/download` | 👤 | → `{url, expiresAt}` signed R2 URL (5 min) to the watermarked copy. Requires status paid/released/disputed and valid license. |
-| POST | `/orders/:id/review` | 👤 | `{rating, body}` once per order, after paid |
-| POST | `/orders/:id/dispute` | 👤 | `{reason, details}` only while `now < escrow_until` (malicious: allowed up to 30 days, paid from bond/safety fund) |
+
+| Method | Path                    | Who | Notes                                                                                                                                                                                                                 |
+| ------ | ----------------------- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/orders/quote`         | 👤  | `{listingId}` → `{price, fee, rebate, total, tier, feeBps, rebateBps}` (no DB write)                                                                                                                                  |
+| POST   | `/orders`               | 👤  | `{listingId}` → creates PENDING order, returns `{orderId, total, memo, vault, txBase64}` (unsigned transfer + memo instruction, recent blockhash). Rejects: own listing, holder-only lock, already owns live license. |
+| POST   | `/orders/:id/submitted` | 👤  | `{txSig}` → stores sig, verifies immediately if confirmed (also done by webhook)                                                                                                                                      |
+| GET    | `/orders/:id`           | 👤  | status poll                                                                                                                                                                                                           |
+| GET    | `/me/orders`            | 👤  | purchases                                                                                                                                                                                                             |
+| POST   | `/orders/:id/download`  | 👤  | → `{url, expiresAt}` signed R2 URL (5 min) to the watermarked copy. Requires status paid/released/disputed and valid license.                                                                                         |
+| POST   | `/orders/:id/review`    | 👤  | `{rating, body}` once per order, after paid                                                                                                                                                                           |
+| POST   | `/orders/:id/dispute`   | 👤  | `{reason, details}` only while `now < escrow_until` (malicious: allowed up to 30 days, paid from bond/safety fund)                                                                                                    |
 
 ## Creator studio
-| Method | Path | Who | Notes |
-|---|---|---|---|
-| GET | `/studio/requirements` | 👤 | `{walletSigned, xLinked, bondRequired, bondActive, verificationFee, feeWaived}` |
-| POST | `/studio/bond` | 👤 | `{amount}` → unsigned tx to vault with memo `bond:<id>` |
-| POST | `/studio/bond/:id/submitted` | 👤 | `{txSig}` |
-| POST | `/studio/listings` | 🛠 | create draft listing |
-| PATCH | `/studio/listings/:id` | 🛠 | edit metadata (price changes apply to new orders only) |
-| POST | `/studio/listings/:id/versions` | 🛠 | `{semver, changelog, fileName, fileSize}` → `{versionId, uploadUrl}` (presigned R2 PUT to `uploads/<versionId>`) + verification fee tx if not waived |
-| POST | `/studio/versions/:id/complete` | 🛠 | server reads `uploads/<versionId>`, computes sha256, copies to `blobs/<sha256>`, deletes temp, status → scanning, enqueue `scan-static` |
-| GET | `/studio/versions/:id` | 🛠 | pipeline status + checks |
-| POST | `/studio/versions/:id/explain` | 🛠 | `{note}` → needs_creator → in_review |
-| GET | `/studio/payouts` | 🛠 | history |
-| POST | `/studio/listings/:id/delist` | 🛠 | self-delist |
+
+| Method | Path                            | Who | Notes                                                                                                                                                |
+| ------ | ------------------------------- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/studio/requirements`          | 👤  | `{walletSigned, xLinked, bondRequired, bondActive, verificationFee, feeWaived}`                                                                      |
+| POST   | `/studio/bond`                  | 👤  | `{amount}` → unsigned tx to vault with memo `bond:<id>`                                                                                              |
+| POST   | `/studio/bond/:id/submitted`    | 👤  | `{txSig}`                                                                                                                                            |
+| POST   | `/studio/listings`              | 🛠   | create draft listing                                                                                                                                 |
+| PATCH  | `/studio/listings/:id`          | 🛠   | edit metadata (price changes apply to new orders only)                                                                                               |
+| POST   | `/studio/listings/:id/versions` | 🛠   | `{semver, changelog, fileName, fileSize}` → `{versionId, uploadUrl}` (presigned R2 PUT to `uploads/<versionId>`) + verification fee tx if not waived |
+| POST   | `/studio/versions/:id/complete` | 🛠   | server reads `uploads/<versionId>`, computes sha256, copies to `blobs/<sha256>`, deletes temp, status → scanning, enqueue `scan-static`              |
+| GET    | `/studio/versions/:id`          | 🛠   | pipeline status + checks                                                                                                                             |
+| POST   | `/studio/versions/:id/explain`  | 🛠   | `{note}` → needs_creator → in_review                                                                                                                 |
+| GET    | `/studio/payouts`               | 🛠   | history                                                                                                                                              |
+| POST   | `/studio/listings/:id/delist`   | 🛠   | self-delist                                                                                                                                          |
 
 ## Verifier
-| Method | Path | Who | Notes |
-|---|---|---|---|
-| GET | `/review/queue` | 🔍 | versions in_review, oldest first, excludes own listings |
-| GET | `/review/versions/:id` | 🔍 | file contents (text), diff vs previous live version, scans, creator note |
-| POST | `/review/versions/:id/attestation` | 🔍 | `{decision}` → message to sign: `trenchmart-attest:v1:<versionId>:<sha256>:<decision>:<iso>` |
-| POST | `/review/versions/:id/decide` | 🔍 | `{decision, notes, signature}` → verify sig; approve → live (old live → superseded, `listings.live_version_id` updated) |
+
+| Method | Path                               | Who | Notes                                                                                                                   |
+| ------ | ---------------------------------- | --- | ----------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/review/queue`                    | 🔍  | versions in_review, oldest first, excludes own listings                                                                 |
+| GET    | `/review/versions/:id`             | 🔍  | file contents (text), diff vs previous live version, scans, creator note                                                |
+| POST   | `/review/versions/:id/attestation` | 🔍  | `{decision}` → message to sign: `trenchmart-attest:v1:<versionId>:<sha256>:<decision>:<iso>`                            |
+| POST   | `/review/versions/:id/decide`      | 🔍  | `{decision, notes, signature}` → verify sig; approve → live (old live → superseded, `listings.live_version_id` updated) |
 
 ## Admin
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/admin/disputes` | open disputes |
-| POST | `/admin/disputes/:id/resolve` | `{status:'upheld'\|'rejected', resolution, slashLamports?}` |
-| POST | `/admin/listings/:id/delist` | |
-| PUT | `/admin/config/:key` | |
-| GET | `/admin/payouts/batches` | proposed batches for multisig |
-| POST | `/admin/payouts/batches/:id/sent` | `{txSig}` |
-| POST | `/admin/users/:id/roles` | grant verifier etc. |
+
+| Method | Path                              | Notes                                                       |
+| ------ | --------------------------------- | ----------------------------------------------------------- |
+| GET    | `/admin/disputes`                 | open disputes                                               |
+| POST   | `/admin/disputes/:id/resolve`     | `{status:'upheld'\|'rejected', resolution, slashLamports?}` |
+| POST   | `/admin/listings/:id/delist`      |                                                             |
+| PUT    | `/admin/config/:key`              |                                                             |
+| GET    | `/admin/payouts/batches`          | proposed batches for multisig                               |
+| POST   | `/admin/payouts/batches/:id/sent` | `{txSig}`                                                   |
+| POST   | `/admin/users/:id/roles`          | grant verifier etc.                                         |
 
 ## Internal / webhooks
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/hooks/helius` | 🤖 `Authorization: <HELIUS_WEBHOOK_SECRET>`. Handles (a) SOL transfers to vault → match memo → mark order/bond paid; (b) $TRENCH token transfers → insert `token_balances` rows for affected wallets. Idempotent on tx signature. |
-| GET | `/internal/sandbox/next` | 🤖 `INTERNAL_TOKEN`. Returns next sandbox job `{versionId, fileUrl, declared, targetUrls}` or 204 |
-| POST | `/internal/sandbox/:versionId/result` | 🤖 result payload (see 05) |
+
+| Method | Path                                  | Notes                                                                                                                                                                                                                             |
+| ------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/hooks/helius`                       | 🤖 `Authorization: <HELIUS_WEBHOOK_SECRET>`. Handles (a) SOL transfers to vault → match memo → mark order/bond paid; (b) $TRENCH token transfers → insert `token_balances` rows for affected wallets. Idempotent on tx signature. |
+| GET    | `/internal/sandbox/next`              | 🤖 `INTERNAL_TOKEN`. Returns next sandbox job `{versionId, fileUrl, declared, targetUrls}` or 204                                                                                                                                 |
+| POST   | `/internal/sandbox/:versionId/result` | 🤖 result payload (see 05)                                                                                                                                                                                                        |
 
 ## Payment verification (shared by webhook and `/submitted`)
+
 1. Fetch tx via Helius `getTransaction` (commitment `confirmed`, then re-check `finalized` before release).
 2. Assert: a SystemProgram transfer from `buyer.wallet` to `VAULT_ADDRESS` of exactly `order.total` lamports, and a Memo instruction equal to `order.memo`.
 3. Order still `pending` and not expired (allow a 5-min grace after `expires_at` if tx block time is before it).

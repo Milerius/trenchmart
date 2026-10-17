@@ -1,0 +1,41 @@
+{
+  "name": "trenchmart",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "node --import ./scripts/eslint-ts6-register.mjs ./node_modules/eslint/bin/eslint.js . && prettier --check .",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "db:migrate": "pnpm --filter @trenchmart/db migrate",
+    "db:seed": "pnpm --filter @trenchmart/db seed",
+    "format": "prettier --write .",
+    "verify:escrow": "tsx scripts/verify-escrow.ts",
+    "screenshots": "tsx scripts/screenshots.ts"
+  },
+  "devDependencies": {
+    "@anchor-lang/core": "1.2.1",
+    "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
+    "@solana/web3.js": "1.99.0",
+    "@trenchmart/db": "workspace:*",
+    "@trenchmart/shared": "workspace:*",
+    "@typescript/typescript6": "6.0.2",
+    "bn.js": "5.2.5",
+    "bs58": "6.0.0",
+    "eslint": "10.13.0",
+    "playwright": "1.64.1",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "turbo": "2.11.9",
+    "tweetnacl": "1.0.3",
+    "typescript": "7.0.2",
+    "typescript-eslint": "8.71.2"
+  }
+}

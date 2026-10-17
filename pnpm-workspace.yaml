@@ -1,0 +1,21 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+minimumReleaseAge: 0
+minimumReleaseAgeExclude:
+  - '@turbo/darwin-64@2.11.9'
+  - '@turbo/darwin-arm64@2.11.9'
+  - '@turbo/linux-64@2.11.9'
+  - '@turbo/linux-arm64@2.11.9'
+  - '@turbo/windows-64@2.11.9'
+  - '@turbo/windows-arm64@2.11.9'
+  - eslint@10.13.0
+  - turbo@2.11.9
+allowBuilds:
+  esbuild: true
+  workerd: true
+  bufferutil: false
+  utf-8-validate: false
+# glob 10.2–10.4 is GHSA-5j98-mcp5-4vw2 via @node-minify. 10.5.0 is the patched 10.x line.
+overrides:
+  glob@>=10.2.0 <10.5.0: 10.5.0

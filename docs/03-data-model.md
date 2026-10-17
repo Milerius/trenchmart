@@ -269,20 +269,26 @@ create table audit_log (
   "verification_fee_lamports": 250000000,
   "verification_fee_free_from_tier": "trencher",
   "bond_lamports_by_category": {
-    "userscript": 5000000000, "alerts": 5000000000, "setup": 5000000000,
-    "wallet_list": 2000000000, "filter": 1000000000, "strategy": 1000000000
+    "userscript": 5000000000,
+    "alerts": 5000000000,
+    "setup": 5000000000,
+    "wallet_list": 2000000000,
+    "filter": 1000000000,
+    "strategy": 1000000000
   },
   "og_bond_discount_bps": 5000,
   "bond_unlock_days": 30,
-  "terminals": ["Axiom","GMGN","Photon","BullX","Padre","Trojan","Any"],
+  "terminals": ["Axiom", "GMGN", "Photon", "BullX", "Padre", "Trojan", "Any"],
   "max_file_bytes": { "default": 5242880, "setup": 26214400 }
 }
 ```
+
 Tier thresholds are placeholders until the token launches; tier logic must treat a `"[X]"` string as "tier disabled".
 
 ## State machines
 
 **Version**
+
 ```
 uploading ─▶ scanning ─┬─▶ in_review ─┬─▶ live ─▶ superseded (newer version live)
                        │              │        └▶ delisted (admin / dispute upheld)
@@ -293,6 +299,7 @@ uploading ─▶ scanning ─┬─▶ in_review ─┬─▶ live ─▶ supers
 ```
 
 **Order**
+
 ```
 pending ─┬─▶ paid ─┬─▶ released            (escrow passed, no dispute)
          │         └─▶ disputed ─┬─▶ refunded   (upheld)

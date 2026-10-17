@@ -1,0 +1,266 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>10 · Component and state sheet</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap"><style>:root{
+  --bg:#0A0B0A;--inset:#0E100E;--surface:#121412;--surface-2:#161916;
+  --line:#262A26;--line-soft:#1E221E;--line-strong:#343A34;--line-control:#646C63;
+  --text:#EDEFEA;--text-2:#B4BAB2;--muted:#9BA19A;--faint:#868D86;--decor:#6E756D;
+  --accent:#C6F432;--accent-hover:#DDFF7A;--on-accent:#0A0B0A;--accent-bg:#141A08;--accent-line:#2E3A12;--accent-label:#9FAF86;--accent-body:#C9D0BE;
+  --warn:#F5A524;--warn-bg:#1C160A;--warn-line:#3A2C0E;
+  --danger:#FF8A7A;--danger-bg:#1F1210;--danger-line:#4A2620;
+  --info:#7CC4FF;--info-bg:#0F1620;--info-line:#1E3448;
+  --violet:#C9A2FF;--teal:#6EE7C8;
+  --mono:'Geist Mono',ui-monospace,monospace;--sans:'Geist',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--mono)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:12px}
+.grow{flex:1;min-width:0}
+.ml{margin-left:auto}
+.muted{color:var(--muted)}.t2{color:var(--text-2)}.faint{color:var(--faint)}.acc{color:var(--accent)}.warn{color:var(--warn)}.danger{color:var(--danger)}.info{color:var(--info)}
+.lbl{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.inset{background:var(--inset);border:1px solid var(--line-soft);border-radius:10px}
+.pad{padding:20px}.pad-s{padding:14px}
+.acc-panel{background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:16px}
+.warn-panel{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:14px}
+.danger-panel{background:var(--danger-bg);border:1px solid var(--danger-line);border-radius:14px}
+.info-panel{background:var(--info-bg);border:1px solid var(--info-line);border-radius:14px}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:10px;font:600 14px var(--sans);border:1px solid transparent;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--on-accent)}
+.btn.secondary{background:transparent;color:var(--text);border-color:var(--line-control)}
+.btn.ghost{background:transparent;color:var(--text-2)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger-line)}
+.btn.xl{height:52px;font-size:16px;border-radius:12px;font-weight:700}
+.btn.lg{height:48px}.btn.sm{height:36px;padding:0 12px;font-size:13px}
+.btn.block{width:100%}
+.btn[disabled],.btn.is-disabled{background:var(--surface-2);color:var(--faint);border-color:var(--line);cursor:not-allowed}
+.focus{outline:2px solid var(--accent);outline-offset:2px}
+/* tags + badges */
+.tag{display:inline-flex;align-items:center;gap:4px;font:500 11px var(--mono);padding:3px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--text-2);white-space:nowrap}
+.tag.ok{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent)}
+.tag.wait{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.tag.bad{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+.tag.inf{background:var(--info-bg);border-color:var(--info-line);color:var(--info)}
+.tag.dark{background:var(--bg);border-color:transparent}
+.pill{display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:999px;font-size:13px;border:1px solid var(--line-control);background:var(--surface);color:var(--text-2)}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+/* inputs */
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-2)}
+.input{height:44px;background:var(--inset);border:1px solid var(--line-control);border-radius:10px;color:var(--text);padding:0 12px;font-size:14px;display:flex;align-items:center}
+.input.err{border-color:var(--danger)}
+.help{font-size:12px;color:var(--muted)}.help.err{color:var(--danger)}
+/* rows */
+.kv{display:flex;justify-content:space-between;gap:12px;font:13px var(--mono)}
+.kv .k{color:var(--muted);font-family:var(--sans)}
+.hr{height:1px;background:var(--line-soft)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.sq{flex:0 0 22px;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:700 12px var(--sans);color:var(--on-accent)}
+.sq.ok{background:var(--accent)}.sq.w{background:var(--warn)}.sq.x{background:var(--danger)}.sq.i{background:var(--info)}.sq.n{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-control)}
+/* skeleton */
+.sk{background:linear-gradient(90deg,#161916 0%,#1E221E 50%,#161916 100%);border-radius:6px}
+/* chrome */
+.netbar{background:#1C160A;border-bottom:1px solid var(--warn-line);color:var(--warn);font:12px var(--mono);text-align:center;padding:6px 16px}
+.ticker{border-bottom:1px solid var(--line-soft);background:var(--inset);font:12px var(--mono);color:var(--muted)}
+.ticker .wrap{padding:8px 24px;display:flex;flex-wrap:wrap;gap:8px 28px;align-items:center}
+.nav{border-bottom:1px solid var(--line-soft)}
+.nav .wrap{padding:14px 24px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.logo{display:flex;gap:10px;align-items:center;color:var(--text);font-weight:700;font-size:18px;letter-spacing:-.02em}
+.logo i{width:32px;height:32px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.navlinks{display:flex;gap:4px}
+.navlinks a{padding:10px 12px;border-radius:8px;color:var(--muted);font-size:14px}
+.navlinks a.on{color:var(--text);background:var(--surface-2)}
+.search{flex:1 1 240px;display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line-control);border-radius:10px;padding:0 14px;height:44px;color:var(--muted);font-size:14px}
+.kbd{font:11px var(--mono);border:1px solid var(--line-control);border-radius:4px;padding:1px 6px;color:var(--muted)}
+.tierchip{display:flex;gap:6px;align-items:center;height:44px;padding:0 12px;border:1px solid var(--accent-line);background:var(--accent-bg);border-radius:10px;font:12px var(--mono);color:var(--accent)}
+.h-hero{font-size:clamp(40px,6vw,64px);line-height:1.02;letter-spacing:-.035em;font-weight:700}
+.h1{font-size:40px;line-height:1.05;letter-spacing:-.03em;font-weight:700}
+.h2{font-size:28px;letter-spacing:-.02em;font-weight:700}
+.h3{font-size:20px;letter-spacing:-.01em;font-weight:600}
+.lead{font-size:17px;color:var(--text-2)}
+.meta{font-size:13px;color:var(--muted)}
+.grid{display:grid;gap:16px}
+.g-cards{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+/* artboards for exploration sheets */
+.sheet{padding:40px;display:flex;flex-direction:column;gap:28px}
+.sheet-h{display:flex;gap:16px;align-items:baseline;border-bottom:1px solid var(--line-soft);padding-bottom:16px}
+.sheet-h h1{font-size:28px;letter-spacing:-.02em}
+.board{display:flex;flex-direction:column;gap:10px}
+.board>.cap{font:12px var(--mono);color:var(--muted)}
+.frame{border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--bg)}
+.phone{width:390px;border:1px solid var(--line-strong);border-radius:28px;overflow:hidden;background:var(--bg)}
+.note{font-size:13px;color:var(--text-2);border-left:2px solid var(--accent);padding:2px 0 2px 12px}
+.q{font-size:13px;color:var(--warn);border-left:2px solid var(--warn);padding:2px 0 2px 12px}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+</style>
+<style>
+.g{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+.blk{display:flex;flex-direction:column;gap:12px}
+.blk>.cap{font:12px var(--mono);color:var(--muted)}
+.row.wrap{flex-wrap:wrap}
+.tid{font:11px var(--mono);color:var(--muted);margin-left:auto}
+.step{display:grid;grid-template-columns:24px 1fr 52px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line-soft);font-size:13px}
+.step:first-child{border-top:0}.step .tm{font:12px var(--mono);color:var(--t2);text-align:right}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--info);display:inline-block;box-shadow:0 0 0 4px rgba(124,196,255,.15)}
+.ct td,.ct th{padding:6px 10px;font:12px var(--mono);text-align:left;border-top:1px solid var(--line-soft)}
+.ct th{color:var(--muted);font-weight:500}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid var(--line)}
+.toast{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);font-size:13px;width:340px}
+.focus{outline:2px solid var(--accent);outline-offset:2px}
+</style></head><body><div class="sheet">
+<div class="sheet-h"><span class="lbl acc">10 · reference</span><h1>Component and state sheet (design system v2.1)</h1><span class="ml meta">what the real UI must implement · data-testids in mono · USD at $180.00/SOL</span></div>
+
+<div class="g" style="margin-bottom:28px">
+  <div class="card pad blk"><span class="cap">Button · Button.tsx</span>
+    <div class="row wrap" style="gap:8px"><button class="btn primary">Primary</button><button class="btn secondary">Secondary</button><button class="btn ghost">Ghost</button><button class="btn danger">Danger</button></div>
+    <div class="row wrap" style="gap:8px"><button class="btn is-disabled" disabled>Disabled</button><button class="btn primary focus">Focus ring</button><button class="btn primary" aria-busy="true">◑ Working…</button></div>
+    <div class="row wrap" style="gap:8px;align-items:center"><button class="btn primary sm">sm 36</button><button class="btn primary">md 44</button><button class="btn primary lg">lg 48</button><button class="btn primary xl">xl 52</button></div>
+    <span class="help">Disabled uses disabled-bg + faint text (not opacity). Focus ring is lime at 2px with a 2px offset (3:1+).</span></div>
+  <div class="card pad blk"><span class="cap">StatusTag · status-tag[data-status]</span>
+    <span class="lbl">version</span><div class="row wrap" style="gap:6px"><span class="tag">↑ UPLOADING</span><span class="tag inf">◑ AI REVIEW · 00:11</span><span class="tag wait">! NEEDS YOUR NOTE</span><span class="tag ok">✓ AI-VERIFIED</span><span class="tag bad">× REJECTED</span><span class="tag">↷ SUPERSEDED</span><span class="tag bad">⊘ DELISTED</span></div>
+    <span class="lbl">order</span><div class="row wrap" style="gap:6px"><span class="tag">○ AWAITING PAYMENT</span><span class="tag ok">● PAID · IN ESCROW</span><span class="tag bad">! DISPUTED</span><span class="tag ok">✓ RELEASED</span><span class="tag inf">↺ REFUNDED</span><span class="tag">⌛ EXPIRED</span></div>
+    <span class="lbl">check</span><div class="row wrap" style="gap:6px"><span class="tag ok">✓ PASS</span><span class="tag wait">! WARN</span><span class="tag bad">× FAIL</span><span class="tag">– N/A</span></div></div>
+  <div class="card pad blk"><span class="cap">UsdAmount · usd-amount</span>
+    <div class="kv"><span class="k">Card price</span><span class="mono">1.50 SOL <span class="meta">≈ $270.00</span></span></div>
+    <div class="kv"><span class="k">Exact total</span><span class="mono">1.55625 SOL <span class="meta">≈ $280.12</span></span></div>
+    <div class="kv"><span class="k">Discount</span><span class="mono acc">−0.045 SOL <span class="meta">≈ −$8.10</span></span></div>
+    <div class="kv"><span class="k">Network fee</span><span class="mono">0.000005 SOL <span class="meta">&lt; $0.01</span></span></div>
+    <div class="kv"><span class="k">Dashboard tile</span><span class="mono">13.60 SOL <span class="meta">≈ $2,448.00</span></span></div>
+    <div class="kv"><span class="k">Feed down</span><span class="mono">2.40 SOL <span class="faint">USD unavailable</span></span></div>
+    <span class="help">SOL from lamports with the exact formatter; USD from usdCents, truncated. Source line once per page: "USD at $180.00/SOL · CoinGecko · 1 min ago · estimate".</span></div>
+</div>
+
+<div class="g2" style="margin-bottom:28px">
+  <div class="blk"><span class="cap">PreviewNotice · preview-notice · logged out only</span><div data-x="preview"></div><div style="width:390px"><div data-x="preview" data-compact="1"></div></div></div>
+  <div class="blk"><span class="cap">LandingStats · landing-stats[data-source] · renders GET /stats</span><div id="ls-mock"></div><div id="ls-live"></div></div>
+</div>
+
+<div class="g" style="margin-bottom:28px">
+  <div class="card pad blk"><span class="cap">DownloadButton · download-button[data-state]</span>
+    <div class="row" style="gap:8px"><button class="btn is-disabled block" disabled aria-describedby="u1"><svg class="i" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Download unlocks 19 Oct 06:01 UTC</button></div><span id="u1" class="meta" style="margin-top:-6px">locked · paid (in escrow) · releases in 41h 07m</span>
+    <button class="btn is-disabled block" disabled>Download stays locked during the dispute</button><span class="meta" style="margin-top:-6px">locked · disputed</span>
+    <button class="btn primary block">Download</button><span class="meta" style="margin-top:-6px">ready · released · watermarked to your wallet</span>
+    <button class="btn primary block" aria-busy="true">◑ Preparing your copy…</button><span class="meta" style="margin-top:-6px">working · signed URL valid 5 min</span></div>
+  <div class="card pad blk"><span class="cap">LiveReviewStream · live-review[data-state=running]</span>
+    <div class="row" style="gap:8px"><span class="dot"></span><b>AI review running</b><span class="tag inf ml">◑ 00:14</span></div>
+    <div role="list"><div class="step"><span class="sq ok">✓</span>Received and hashed<span class="tm">0.4s</span></div><div class="step"><span class="sq ok">✓</span>Static checks · 14/14<span class="tm">2.1s</span></div><div class="step"><span class="sq i">◑</span><b>Isolated sandbox</b><span class="tm">11.6s</span></div><div class="step"><span class="sq n">4</span><span class="t2">AI verdict</span><span class="tm">—</span></div><div class="step"><span class="sq n">5</span><span class="t2">Live</span><span class="tm">—</span></div></div>
+    <span class="help">Fed by SSE events static · sandbox · ai · done. aria-live polite, aria-busy while running.</span></div>
+  <div class="card pad blk"><span class="cap">LiveReviewStream · end states</span>
+    <div class="row" style="gap:8px;padding:10px;border-radius:10px;background:var(--accent-bg);border:1px solid var(--accent-border)"><span class="sq ok">✓</span><b class="acc">APPROVED · LIVE</b><span class="mono meta ml">00:27</span></div>
+    <div class="row" style="gap:8px;padding:10px;border-radius:10px;background:var(--warn-bg);border:1px solid var(--warn-border)"><span class="sq w">!</span><b style="color:var(--warn)">NEEDS YOUR NOTE</b><span class="mono meta ml">paused · step 3</span></div>
+    <div class="row" style="gap:8px;padding:10px;border-radius:10px;background:var(--danger-bg);border:1px solid var(--danger-border)"><span class="sq x">×</span><b style="color:var(--danger)">REJECTED</b><span class="meta">signTransaction call</span><span class="mono meta ml">00:19</span></div>
+    <div class="row" style="gap:8px;padding:10px;border-radius:10px;background:var(--info-bg);border:1px solid var(--info-border)"><span class="sq i">◑</span><span>Taking longer than usual · still on step 3</span><span class="mono meta ml">01:04</span></div>
+    <div class="row" style="gap:8px;padding:10px;border-radius:10px;background:var(--danger-bg);border:1px solid var(--danger-border)"><span class="sq x">×</span><span>The review stopped on our side. Nothing was published.</span><button class="btn secondary sm ml">Run again</button></div>
+    <span class="help">No "in queue", no appeal. Rejected → "Fix and upload a new version".</span></div>
+</div>
+
+<div class="g" style="margin-bottom:28px">
+  <div class="card pad blk"><span class="cap">Toast · toast</span>
+    <div class="toast" role="status"><span class="sq ok">✓</span><div><b>Trade finished</b><div class="t2">Your download is ready.</div></div></div>
+    <div class="toast" role="status"><span class="sq i">i</span><div><b>Download unlocks after release</b><div class="t2">1.53 SOL is in escrow until 19 Oct 06:01 UTC.</div></div></div>
+    <div class="toast" role="status"><span class="sq n">i</span><div><b>You cancelled in your wallet</b><div class="t2">Nothing was sent.</div></div></div>
+    <div class="toast" role="alert" style="border-color:var(--danger-border)"><span class="sq x">×</span><div><b>Payment didn't go through</b><div class="t2">At most the network fee left your wallet. <span class="faint mono">ref 7f2c</span></div></div></div></div>
+  <div class="card pad blk"><span class="cap">EmptyState · ErrorState · Skeleton</span>
+    <div class="inset pad-s col" style="gap:6px;border-radius:12px"><b>No purchases yet</b><span class="t2" style="font-size:13px">Everything you buy shows up here with its escrow timer.</span><button class="btn secondary sm" style="align-self:flex-start">Browse the market</button></div>
+    <div class="danger-panel pad-s col" style="gap:6px" role="alert"><b>Couldn't load listings</b><span class="t2" style="font-size:13px">Your wallet and open orders aren't affected.</span><div class="row" style="gap:8px"><button class="btn secondary sm">Try again</button><span class="faint mono ml" style="font-size:12px">ref 7f2c</span></div></div>
+    <div class="col" style="gap:8px" aria-busy="true"><span class="sk" style="height:18px;width:60%;display:block"></span><span class="sk" style="height:12px;width:40%;display:block"></span><span class="sk" style="height:36px;width:100%;display:block"></span></div></div>
+  <div class="card pad blk"><span class="cap">Contrast · computed on this page (WCAG 2.2)</span><table class="ct" id="ct" style="border-collapse:collapse;width:100%"></table></div>
+</div>
+<p class="note">One sheet covering every component and state the docs define, with the test IDs Playwright will target. It's the checklist for applying the design to the real Next.js UI. Contrast is computed live in this page from the token hex values: text pairs must reach 4.5:1, control and focus pairs 3:1.</p>
+</div><script>(function () {
+  const lock = '<svg class="i" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+  const shield = '<svg class="i" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>';
+  const logoSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0B0A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 L9 8 L13 14 L16 9 L20 18"/></svg>';
+  window.ICON = { lock, shield };
+  const parts = {
+    net: () => '<div class="netbar">DEVNET · test SOL only · nothing here has real value</div>',
+    ticker: () => '<div class="ticker"><div class="wrap"><span class="row" style="gap:8px"><span class="dot"></span>Solana devnet · live</span><span>$TRENCH <span style="color:var(--text)">[PRICE]</span></span><span>Holders: <span style="color:var(--text)">up to 100% off the 5% fee</span></span><span class="ml">Every version scanned, sandboxed and AI-verified before it goes live</span></div></div>',
+    nav: (el) => {
+      const a = el.dataset.active || '';
+      const st = el.dataset.state || 'connected';
+      const links = ['Explore', 'Sell', '$TRENCH', 'Purchases'].map((n) => `<a class="${n === a ? 'on' : ''}">${n}</a>`).join('');
+      const right = st === 'connected'
+        ? '<span class="tierchip">Trencher · 60% off fees</span><button class="btn primary">7xKp…a9Fq</button>'
+        : '<button class="btn primary">Connect wallet</button>';
+      return `<header class="nav"><div class="wrap"><a class="logo"><i>${logoSvg}</i>trenchmart</a><nav class="navlinks">${links}</nav><label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="grow">Search scripts, wallet lists, filters, creators…</span><span class="kbd">/</span></label>${right}</div></header>`;
+    },
+    mnav: (el) => {
+      const st = el.dataset.state || 'connected';
+      const right = st === 'connected' ? '<button class="btn primary sm">7xKp…a9Fq</button>' : '<button class="btn primary sm">Connect</button>';
+      return `<div class="netbar" style="font-size:11px">DEVNET · test SOL only</div><header class="nav"><div class="wrap" style="padding:12px 16px;gap:10px"><a class="logo" style="font-size:16px"><i style="width:28px;height:28px">${logoSvg}</i>trenchmart</a><span class="ml"></span><button class="btn secondary sm" aria-label="Search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>${right}</div></header>`;
+    },
+    foot: () => '<footer style="margin-top:56px;border-top:1px solid var(--line-soft)"><div class="wrap row" style="padding:24px;gap:16px 28px;font-size:13px;color:var(--muted)"><b style="color:var(--text)">trenchmart</b><a class="muted">Security policy</a><a class="muted">How AI verification works</a><a class="muted">Report a listing</a><a class="muted">Docs</a><span class="ml">Not financial advice. Tools don\'t guarantee profits.</span></div></footer>',
+  };
+  const REBATE = { none: 0n, scout: 2500n, trencher: 6000n, og: 10000n };
+  const sol = (l) => {
+    const s = l.toString().padStart(10, '0');
+    let frac = s.slice(-9).replace(/0+$/, '');
+    if (frac.length < 2) frac = frac.padEnd(2, '0');
+    return `${s.slice(0, -9).replace(/^0+(?=\d)/, '')}.${frac}`;
+  };
+  const quote = (price, tier) => {
+    const fee = (price * 500n) / 10000n;
+    const rebate = (fee * REBATE[tier]) / 10000n;
+    return { price, fee, rebate, total: price + fee - rebate };
+  };
+  const RATE_CENTS = 18000n;
+  const usd = (l) => {
+    const c = (l * RATE_CENTS) / 1000000000n;
+    if (c < 1n) return '< $0.01';
+    const d = (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `≈ ${d}.${(c % 100n).toString().padStart(2, '0')}`;
+  };
+  window.TM = { sol, quote, usd };
+  const CAT = {
+    USERSCRIPT: ['#C6F432', '#141A10'], 'WALLET LIST': ['#7CC4FF', '#0F1620'], FILTER: ['#F5A524', '#1C160A'],
+    SETUP: ['#C9A2FF', '#18121F'], STRATEGY: ['#6EE7C8', '#0E1A17'], ALERTS: ['#FF8A7A', '#1F1210'],
+  };
+  const L = [
+    ['USERSCRIPT', 'Axiom · GMGN', 'Sniper Filter Pack v2', '@dev_degen', '4.9', 412, 1500000000n, 'ok', '5'],
+    ['WALLET LIST', 'GMGN · Photon · Axiom', '120 Early Wallets (Q4)', '@onchainsleuth', '4.7', 268, 2000000000n, 'ok', '2'],
+    ['FILTER', 'Photon', 'Migration Sniper Presets', '@pumpwatch', '4.6', 190, 800000000n, 'ok', '1'],
+    ['SETUP', 'Axiom · BullX', 'Full Trench Desk Setup', '@nightshift', '4.8', 96, 3500000000n, 'ok', '5'],
+    ['USERSCRIPT', 'Axiom', 'Bundle Detector Overlay', '@rugradar', '4.9', 533, 1200000000n, 'ok', '5'],
+    ['STRATEGY', 'Any terminal', 'Copy-Trade Exit Playbook', '@calmape', '4.5', 74, 1000000000n, 'ok', '1'],
+    ['ALERTS', 'Telegram · Padre', 'KOL Buy Alerts Config', '@signalboy', '4.4', 58, 600000000n, 'ok', '5'],
+    ['USERSCRIPT', 'GMGN · BullX', 'Dev Wallet History Tooltip', '@dev_degen', '4.8', 301, 900000000n, 'ok', '5'],
+  ];
+  window.TM.listings = L;
+  const card = (l, tier) => {
+    const [type, compat, title, by, rating, sold, price, st, bond] = l;
+    const [c, bg] = CAT[type];
+    const badge = st === 'ok' ? '<span class="tag ok ml">✓ AI-VERIFIED</span>' : st === 'locked' ? '<span class="tag inf ml">◷ HOLDERS 48H</span>' : '<span class="tag wait ml">◷ IN AI REVIEW</span>';
+    const q = tier ? quote(price, tier) : null;
+    const priceLine = q
+      ? `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(q.total)} SOL</span><span class="mono acc" style="font-size:12px">you pay · ${tier === 'none' ? 'incl. 5% fee' : tier[0].toUpperCase() + tier.slice(1) + ' rate'}</span></div><span class="mono meta" style="font-size:12px;margin-top:-6px">${usd(q.total)}</span>`
+      : `<div class="row" style="gap:8px;align-items:baseline"><span class="mono" style="font-size:17px;font-weight:600">${sol(price)} SOL</span><span class="mono meta" style="font-size:12px">${usd(price)} · list price</span></div><span class="mono faint" style="font-size:12px;margin-top:-6px">+ 5% fee · your tier can cut it</span>`;
+    return `<a class="card" data-testid="listing-card" style="display:flex;flex-direction:column;overflow:hidden;color:var(--text)"><div style="height:112px;background:${bg};padding:14px;display:flex;flex-direction:column;justify-content:space-between;border-bottom:1px solid var(--line-soft)"><div class="row" style="gap:6px"><span class="tag dark" style="color:${c}">${type}</span>${badge}</div><span class="mono t2" style="font-size:12px">${compat}</span></div><div style="padding:14px;display:flex;flex-direction:column;gap:8px"><div class="col" style="gap:2px"><b>${title}</b><span class="meta">${by} · bond ${bond} SOL · ${sold} sold · ★ ${rating}</span></div>${priceLine}</div></a>`;
+  };
+  window.TM.card = card;
+  parts.preview = (el) => el.dataset.compact
+    ? `<div class="info-panel col" data-testid="preview-notice" role="note" style="padding:14px;gap:10px"><div class="row" style="gap:10px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><b style="font-size:14px">Preview prices</b></div><span class="t2" style="font-size:13px">These are list prices. Connect to see your exact price with your $TRENCH tier discount.</span><button class="btn primary block">Connect to see your price</button></div>`
+    : `<div class="info-panel row" data-testid="preview-notice" role="note" style="padding:12px 16px;gap:12px;flex-wrap:nowrap"><span class="sq i" aria-hidden="true">i</span><div class="grow col" style="gap:0"><b style="font-size:14px">Preview prices</b><span class="t2" style="font-size:13px">You're seeing list prices. Connect your wallet to see your exact price with your $TRENCH tier discount (up to 100% off the 5% fee).</span></div><button class="btn primary sm">Connect to see your price</button></div>`;
+  parts.cards = (el) => {
+    const n = Number(el.dataset.n || 8);
+    const tier = el.dataset.tier || '';
+    const cols = el.dataset.cols ? `grid-template-columns:repeat(${el.dataset.cols},1fr)` : '';
+    return `<div class="grid g-cards" style="${cols}">${L.slice(0, n).map((l) => card(l, tier)).join('')}</div>`;
+  };
+  document.querySelectorAll('[data-x]').forEach((el) => { el.outerHTML = parts[el.dataset.x](el); });
+})();
+</script>
+<script>
+const {sol,usd}=window.TM;
+const ls=(src,stats)=>`<div class="card" data-testid="landing-stats" data-source="${src}" style="padding:4px"><div class="row" style="padding:10px 14px 0;gap:8px">${src==='mock'?'<span class="tag">SAMPLE DATA</span><span class="meta" style="font-size:12px">Sample figures until a live listing exists.</span>':'<span class="tag ok">● LIVE</span><span class="meta" style="font-size:12px">Devnet · updated just now</span>'}<span class="tid">data-source="${src}"</span></div><div style="display:grid;grid-template-columns:repeat(4,1fr)">${[['AI-verified tools',stats.listings,'live listings'],['Creators',stats.creators,'bonded and X-linked'],['Trades',stats.orders,'paid through escrow'],['Volume',sol(stats.vol)+' SOL',usd(stats.vol)]].map(([k,v,d])=>`<div style="padding:12px 14px"><div class="lbl">${k}</div><div class="mono" style="font-size:22px;font-weight:600">${v}</div><div class="meta" style="font-size:12px">${d}</div></div>`).join('')}</div></div>`;
+document.getElementById('ls-mock').innerHTML=ls('mock',{listings:8,creators:4,orders:128,vol:11500000000n});
+document.getElementById('ls-live').innerHTML=ls('live',{listings:3,creators:2,orders:5,vol:4560000000n});
+const L=h=>{const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4));return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+const R=(a,b)=>{const x=L(a),y=L(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+const P=[['text','#EDEFEA','surface','#121412',4.5],['text-2','#B4BAB2','surface','#121412',4.5],['muted','#9BA19A','surface','#121412',4.5],['faint','#868D86','surface','#121412',4.5],['faint','#868D86','surface-2','#161916',4.5],['accent','#C6F432','surface','#121412',4.5],['on-accent','#0A0B0A','accent','#C6F432',4.5],['info','#7CC4FF','info-bg','#0F1620',4.5],['warn','#F5A524','warn-bg','#1C160A',4.5],['danger','#FF8A7A','danger-bg','#1F1210',4.5],['border-control','#646C63','surface','#121412',3],['border-control','#646C63','bg','#0A0B0A',3],['focus (accent)','#C6F432','bg','#0A0B0A',3]];
+document.getElementById('ct').innerHTML='<tr><th>fg</th><th>bg</th><th>ratio</th><th>need</th></tr>'+P.map(([a,ah,b,bh,n])=>{const r=R(ah,bh);return `<tr><td><span class="sw" style="background:${ah}"></span>${a}</td><td><span class="sw" style="background:${bh}"></span>${b}</td><td class="${r>=n?'acc':''}" style="${r>=n?'':'color:var(--danger)'}">${r.toFixed(2)}:1 ${r>=n?'✓':'×'}</td><td class="meta">${n}:1</td></tr>`}).join('');
+</script></body></html>

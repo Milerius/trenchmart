@@ -18,13 +18,16 @@ button,input{font-family:inherit}
 </helmet>
 <div style="min-height: 100vh; background: #0A0B0A; color: #EDEFEA; font-family: 'Geist', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
 
+<!-- network banner: always visible on testnets -->
+<div role="note" style="background: #1C160A; border-bottom: 1px solid #3A2C0E; color: #F5A524; font-family: 'Geist Mono', monospace; font-size: 12px; text-align: center; padding: 6px 16px">DEVNET · test SOL only · nothing here has real value</div>
+
 <!-- top ticker -->
 <div style="border-bottom: 1px solid #1E221E; background: #0E100E; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA19A">
 <div style="max-width: 1280px; margin: 0 auto; padding: 8px 24px; display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: center">
-<span style="display: flex; gap: 8px; align-items: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: #C6F432"></span>Solana · live</span>
+<span style="display: flex; gap: 8px; align-items: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: #C6F432"></span>Solana devnet · live</span>
 <span>$TRENCH <span style="color: #EDEFEA">[PRICE]</span></span>
-<span>Holder tier unlocks: <span style="color: #EDEFEA">up to 100% fee rebate</span></span>
-<span style="margin-left: auto">Every listing scanned + human-reviewed before it goes live</span>
+<span>Holders: <span style="color: #EDEFEA">up to 100% off the 5% fee</span></span>
+<span style="margin-left: auto">Every version scanned, sandboxed and AI-verified before it goes live</span>
 </div>
 </div>
 
@@ -43,14 +46,19 @@ button,input{font-family:inherit}
 <a href="Economics.dc.html" style="padding: 10px 12px; border-radius: 8px; color: #9BA19A">$TRENCH</a>
 <a href="#creators" style="padding: 10px 12px; border-radius: 8px; color: #9BA19A">Creators</a>
 </nav>
-<label style="flex: 1 1 260px; display: flex; gap: 10px; align-items: center; background: #121412; border: 1px solid #262A26; border-radius: 10px; padding: 0 14px; height: 44px">
+<label style="flex: 1 1 260px; display: flex; gap: 10px; align-items: center; background: #121412; border: 1px solid #646C63; border-radius: 10px; padding: 0 14px; height: 44px">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9BA19A" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
 <span style="position: absolute; left: -9999px">Search the marketplace</span>
 <input type="search" placeholder="Search scripts, wallet lists, filters, creators…" style="flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: #EDEFEA; font-size: 14px">
 <span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #9BA19A; border: 1px solid #262A26; border-radius: 4px; padding: 1px 6px">/</span>
 </label>
+<sc-if value="{{connected}}" hint-placeholder-val="{{ false }}">
 <span style="display: flex; gap: 6px; align-items: center; height: 44px; padding: 0 12px; border: 1px solid #2E3A12; background: #141A08; border-radius: 10px; font-family: 'Geist Mono', monospace; font-size: 12px; color: #C6F432">Trencher tier · 60% off fees</span>
-<button type="button" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 600; font-size: 14px; cursor: pointer">7xKp…a9Fq</button>
+<button type="button" data-testid="wallet-button" onClick="{{disconnect}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 600; font-size: 14px; cursor: pointer">7xKp…a9Fq</button>
+</sc-if>
+<sc-if value="{{loggedOut}}" hint-placeholder-val="{{ true }}">
+<button type="button" data-testid="wallet-button" onClick="{{connect}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: #C6F432; color: #0A0B0A; font-weight: 600; font-size: 14px; cursor: pointer">Connect wallet</button>
+</sc-if>
 </div>
 </header>
 
@@ -59,12 +67,12 @@ button,input{font-family:inherit}
 <!-- hero -->
 <section style="padding: 72px 0 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 48px; align-items: center">
 <div style="display: flex; flex-direction: column; gap: 24px">
-<span style="align-self: flex-start; font-family: 'Geist Mono', monospace; font-size: 12px; color: #C6F432; border: 1px solid #2E3A12; border-radius: 999px; padding: 6px 12px">Solana first · more chains later</span>
+<span style="align-self: flex-start; font-family: 'Geist Mono', monospace; font-size: 12px; color: #C6F432; border: 1px solid #2E3A12; border-radius: 999px; padding: 6px 12px">Solana devnet POC · more chains later</span>
 <h1 style="margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.02; letter-spacing: -0.035em; font-weight: 700">The verified edge,<br>for sale.</h1>
-<p style="margin: 0; font-size: 18px; color: #B4BAB2; max-width: 520px">Userscripts for your terminal, curated wallet lists, sniper filters, full setups and strategies — built by trenchers, scanned by machines, reviewed by humans, paid out on-chain.</p>
+<p style="margin: 0; font-size: 18px; color: #B4BAB2; max-width: 520px">Userscripts for your terminal, curated wallet lists, sniper filters, full setups and strategies — built by trenchers, scanned and sandboxed, AI-verified, paid through a 48h escrow.</p>
 <div style="display: flex; flex-wrap: wrap; gap: 12px">
 <a href="#trending" style="height: 48px; padding: 0 22px; display: inline-flex; align-items: center; border-radius: 10px; background: #C6F432; color: #0A0B0A; font-weight: 600">Browse the market</a>
-<a href="Upload.dc.html" style="height: 48px; padding: 0 22px; display: inline-flex; align-items: center; border-radius: 10px; border: 1px solid #343A34; color: #EDEFEA; font-weight: 500">Sell your tooling</a>
+<a href="Upload.dc.html" style="height: 48px; padding: 0 22px; display: inline-flex; align-items: center; border-radius: 10px; border: 1px solid #646C63; color: #EDEFEA; font-weight: 500">Sell your tooling</a>
 </div>
 </div>
 <!-- featured terminal card -->
@@ -72,14 +80,14 @@ button,input{font-family:inherit}
 <div style="padding: 14px 16px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid #1E221E; font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA19A">
 <span style="width: 10px; height: 10px; border-radius: 50%; background: #2A2F2A"></span><span style="width: 10px; height: 10px; border-radius: 50%; background: #2A2F2A"></span><span style="width: 10px; height: 10px; border-radius: 50%; background: #2A2F2A"></span>
 <span style="margin-left: 8px">featured · sniper-filter-pack.user.js</span>
-<span style="margin-left: auto; color: #C6F432">VERIFIED</span>
+<span style="margin-left: auto; color: #C6F432">✓ AI-VERIFIED</span>
 </div>
 <pre style="margin: 0; padding: 20px; font-family: 'Geist Mono', monospace; font-size: 13px; line-height: 1.7; color: #B4BAB2; overflow-x: auto; background: #0E100E">
-<span style="color: #6E756D">// ==UserScript==</span>
-<span style="color: #6E756D">// @match    https://axiom.trade/*</span>
-<span style="color: #6E756D">// @grant    none   </span><span style="color: #C6F432">✓ no wallet access</span>
-<span style="color: #6E756D">// @connect  none   </span><span style="color: #C6F432">✓ no outbound calls</span>
-<span style="color: #6E756D">// ==/UserScript==</span>
+<span style="color: #868D86">// ==UserScript==</span>
+<span style="color: #868D86">// @match    https://axiom.trade/*</span>
+<span style="color: #868D86">// @grant    none   </span><span style="color: #C6F432">✓ no wallet access</span>
+<span style="color: #868D86">// @connect  none   </span><span style="color: #C6F432">✓ no outbound calls</span>
+<span style="color: #868D86">// ==/UserScript==</span>
 
 <span style="color: #EDEFEA">filters</span> = {
   devHolding:   <span style="color: #F5A524">"&lt; 4%"</span>,
@@ -92,9 +100,26 @@ button,input{font-family:inherit}
 <span style="font-weight: 600">Sniper Filter Pack v2</span>
 <span style="font-size: 13px; color: #9BA19A">by @dev_degen · Axiom, GMGN</span>
 </div>
-<span style="margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 18px; font-weight: 600">1.5 SOL</span>
+<span style="margin-left: auto; display: flex; flex-direction: column; align-items: flex-end"><span style="font-family: 'Geist Mono', monospace; font-size: 18px; font-weight: 600">1.50 SOL</span><span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #9BA19A">≈ $270.00 · + 5% fee, 0% for OG</span></span>
 </div>
 </a>
+</section>
+
+<!-- LandingStats: renders GET /stats as-is. source=mock until a live listing exists, then live. Same layout either way. -->
+<section data-testid="landing-stats" data-source="{{statsSource}}" aria-label="Marketplace stats" style="margin-bottom: 24px; background: #121412; border: 1px solid #262A26; border-radius: 14px; padding: 4px">
+<div style="display: flex; gap: 8px; align-items: center; padding: 10px 14px 0; font-family: 'Geist Mono', monospace; font-size: 11px">
+<span style="padding: 3px 8px; border-radius: 6px; border: 1px solid {{statsChipBorder}}; color: {{statsChipColor}}">{{statsChip}}</span>
+<span style="font-family: 'Geist', system-ui, sans-serif; font-size: 12px; color: #9BA19A">{{statsNote}}</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1px">
+<sc-for list="{{stats}}" as="st" hint-placeholder-count="5">
+<div style="padding: 14px">
+<div style="font-family: 'Geist Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #9BA19A">{{st.k}}</div>
+<div style="font-family: 'Geist Mono', monospace; font-size: 26px; font-weight: 600; line-height: 1.2">{{st.v}}</div>
+<div style="font-size: 12px; color: #9BA19A">{{st.d}}</div>
+</div>
+</sc-for>
+</div>
 </section>
 
 <!-- trust strip -->
@@ -102,22 +127,22 @@ button,input{font-family:inherit}
 <div style="background: #0E100E; padding: 20px; display: flex; flex-direction: column; gap: 6px">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"></path><path d="M8.5 12l2.5 2.5 4.5-5"></path></svg>
 <span style="font-weight: 600">Static + sandbox scan</span>
-<span style="font-size: 13px; color: #9BA19A">Every file run through drainer, key-grab and obfuscation checks.</span>
+<span style="font-size: 13px; color: #9BA19A">Drainer, key-grab and obfuscation rules, then a run on a burner wallet.</span>
 </div>
 <div style="background: #0E100E; padding: 20px; display: flex; flex-direction: column; gap: 6px">
-<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-4 3-6 7-6s7 2 7 6"></path><path d="M17 11l2 2 4-4"></path></svg>
-<span style="font-weight: 600">Human review</span>
-<span style="font-size: 13px; color: #9BA19A">A staked verifier signs off on each version before it goes live.</span>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M9 9h6v6H9z"></path><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"></path></svg>
+<span style="font-weight: 600">AI verification</span>
+<span style="font-size: 13px; color: #9BA19A">An automated verifier reads the scan and the creator's notes, then signs an attestation.</span>
 </div>
 <div style="background: #0E100E; padding: 20px; display: flex; flex-direction: column; gap: 6px">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
 <span style="font-weight: 600">Hash-pinned versions</span>
-<span style="font-size: 13px; color: #9BA19A">What was reviewed is exactly what you download. Any change re-triggers review.</span>
+<span style="font-size: 13px; color: #9BA19A">You download the exact sha256 that passed. Any change runs the whole pipeline again.</span>
 </div>
 <div style="background: #0E100E; padding: 20px; display: flex; flex-direction: column; gap: 6px">
 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C6F432" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v12H3z"></path><path d="M3 11h18"></path><path d="M7 15h3"></path></svg>
 <span style="font-weight: 600">Escrowed payouts</span>
-<span style="font-size: 13px; color: #9BA19A">SOL held 48h on-chain. Report a bad listing and the buyer is refunded.</span>
+<span style="font-size: 13px; color: #9BA19A">Your SOL waits 48h in a multisig escrow vault. The download unlocks when it's released. If the listing isn't as described, you're refunded.</span>
 </div>
 </section>
 
@@ -148,9 +173,19 @@ button,input{font-family:inherit}
 </sc-for>
 </div>
 </div>
+<sc-if value="{{loggedOut}}" hint-placeholder-val="{{ true }}">
+<div data-testid="preview-notice" role="note" style="display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; padding: 14px 16px; border-radius: 12px; background: #0F1620; border: 1px solid #1E3448">
+<span style="flex: 0 0 22px; height: 22px; border-radius: 6px; background: #7CC4FF; color: #0A0B0A; display: grid; place-items: center; font-size: 12px; font-weight: 700" aria-hidden="true">i</span>
+<div style="flex: 1 1 320px; display: flex; flex-direction: column">
+<span style="font-weight: 600">Preview prices</span>
+<span style="font-size: 13px; color: #B4BAB2">You're seeing list prices. Connect your wallet to see your exact price with your $TRENCH tier discount (up to 100% off the 5% fee).</span>
+</div>
+<button type="button" onClick="{{connect}}" style="height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid #646C63; background: transparent; color: #EDEFEA; font-weight: 500; cursor: pointer">Connect to see your price</button>
+</div>
+</sc-if>
 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px">
 <sc-for list="{{listings}}" as="l" hint-placeholder-count="8">
-<a href="Listing.dc.html" style="display: flex; flex-direction: column; background: #121412; border: 1px solid #262A26; border-radius: 14px; overflow: hidden; color: #EDEFEA">
+<a href="Listing.dc.html" data-testid="listing-card" style="display: flex; flex-direction: column; background: #121412; border: 1px solid #262A26; border-radius: 14px; overflow: hidden; color: #EDEFEA">
 <div style="height: 120px; background: {{l.bg}}; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; border-bottom: 1px solid #1E221E">
 <div style="display: flex; gap: 6px; align-items: center">
 <span style="font-family: 'Geist Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 6px; background: #0A0B0A; color: {{l.color}}">{{l.type}}</span>
@@ -161,17 +196,18 @@ button,input{font-family:inherit}
 <div style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
 <div style="display: flex; flex-direction: column; gap: 2px">
 <span style="font-weight: 600">{{l.title}}</span>
-<span style="font-size: 13px; color: #9BA19A">by {{l.creator}} · ★ {{l.rating}} · {{l.sales}} sold</span>
+<span style="font-size: 13px; color: #9BA19A">{{l.creator}} · bond {{l.bond}} SOL · {{l.sales}} sold · ★ {{l.rating}}</span>
 </div>
 <div style="display: flex; align-items: baseline; gap: 8px">
-<span style="font-family: 'Geist Mono', monospace; font-size: 17px; font-weight: 600">{{l.price}} SOL</span>
-<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #C6F432">holders {{l.holder}}</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 17px; font-weight: 600">{{l.shown}} SOL</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #9BA19A">{{l.usd}} · {{l.priceNote}}</span>
 </div>
+<span style="margin-top: -6px; font-family: 'Geist Mono', monospace; font-size: 12px; color: #868D86">{{l.feeNote}}</span>
 </div>
 </a>
 </sc-for>
 </div>
-<p style="margin: 0; font-size: 12px; color: #6E756D; font-family: 'Geist Mono', monospace">Sample listings for the POC.</p>
+<p style="margin: 0; font-size: 12px; color: #868D86; font-family: 'Geist Mono', monospace">Sample listings for the POC · USD at $180.00/SOL, estimate.</p>
 </section>
 
 <!-- creators + holder banner -->
@@ -183,24 +219,24 @@ button,input{font-family:inherit}
 </div>
 <sc-for list="{{creators}}" as="cr" hint-placeholder-count="4">
 <div style="display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #1E221E">
-<span style="font-family: 'Geist Mono', monospace; color: #6E756D; width: 20px">{{cr.rank}}</span>
+<span style="font-family: 'Geist Mono', monospace; color: #868D86; width: 20px">{{cr.rank}}</span>
 <span style="width: 36px; height: 36px; border-radius: 50%; background: {{cr.av}}"></span>
 <div style="display: flex; flex-direction: column; flex: 1; min-width: 0">
 <span style="font-weight: 600">{{cr.name}}</span>
 <span style="font-size: 12px; color: #9BA19A">{{cr.meta}}</span>
 </div>
-<span style="font-family: 'Geist Mono', monospace; font-size: 14px">{{cr.vol}} SOL</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end; font-family: 'Geist Mono', monospace; font-size: 14px">{{cr.vol}} SOL<span style="font-size: 11px; color: #9BA19A">{{cr.usd}}</span></span>
 </div>
 </sc-for>
 </div>
 <div style="background: #141A08; border: 1px solid #2E3A12; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px; justify-content: space-between">
 <span style="font-family: 'Geist Mono', monospace; font-size: 12px; color: #C6F432">$TRENCH · launching on pump.fun</span>
 <h2 style="margin: 0; font-size: 34px; line-height: 1.1; letter-spacing: -0.03em">Hold the token,<br>trade cheaper.</h2>
-<p style="margin: 0; color: #C9D0BE">Lower fees on every purchase, early access to new drops, holder-only listings, free verification for creators and a vote on what gets featured.</p>
+<p style="margin: 0; color: #C9D0BE">Creators keep 100% of the price. Holders pay less of the 5% buyer fee, get early access to new drops and holder-only listings, free verification for their own uploads, and a vote on what gets featured.</p>
 <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: 'Geist Mono', monospace; font-size: 12px">
-<div style="border: 1px solid #2E3A12; border-radius: 10px; padding: 12px"><div style="color: #9FAF86">Scout</div><div style="font-size: 16px; color: #EDEFEA">-25%</div></div>
-<div style="border: 1px solid #2E3A12; border-radius: 10px; padding: 12px"><div style="color: #9FAF86">Trencher</div><div style="font-size: 16px; color: #EDEFEA">-60%</div></div>
-<div style="border: 1px solid #C6F432; border-radius: 10px; padding: 12px"><div style="color: #C6F432">OG</div><div style="font-size: 16px; color: #EDEFEA">0 fee</div></div>
+<div style="border: 1px solid #2E3A12; border-radius: 10px; padding: 12px"><div style="color: #9FAF86">Scout</div><div style="font-size: 16px; color: #EDEFEA">−25% fee</div></div>
+<div style="border: 1px solid #2E3A12; border-radius: 10px; padding: 12px"><div style="color: #9FAF86">Trencher</div><div style="font-size: 16px; color: #EDEFEA">−60% fee</div></div>
+<div style="border: 1px solid #C6F432; border-radius: 10px; padding: 12px"><div style="color: #C6F432">OG</div><div style="font-size: 16px; color: #EDEFEA">−100% fee</div></div>
 </div>
 <a href="Economics.dc.html" style="align-self: flex-start; height: 44px; padding: 0 18px; display: inline-flex; align-items: center; border-radius: 10px; background: #C6F432; color: #0A0B0A; font-weight: 600">See fees &amp; perks</a>
 </div>
@@ -213,7 +249,7 @@ button,input{font-family:inherit}
 <span style="font-weight: 700; color: #EDEFEA">trenchmart</span>
 <a href="#" style="color: #9BA19A">Security policy</a>
 <a href="#" style="color: #9BA19A">Report a listing</a>
-<a href="#" style="color: #9BA19A">Become a verifier</a>
+<a href="#" style="color: #9BA19A">How AI verification works</a>
 <a href="#" style="color: #9BA19A">Docs</a>
 <span style="margin-left: auto">Not financial advice. Tools don't guarantee profits.</span>
 </div>
@@ -222,7 +258,7 @@ button,input{font-family:inherit}
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2380}}'>
 class Component extends DCLogic {
-  constructor(p) { super(p); this.state = { term: 'All' }; }
+  constructor(p) { super(p); this.state = { term: 'All', connected: false }; }
   renderVals() {
     const L = '#C6F432', A = '#F5A524', B = '#7CC4FF', P = '#C9A2FF', R = '#FF8A7A', T = '#6EE7C8';
     const categories = [
@@ -237,29 +273,54 @@ class Component extends DCLogic {
     const terminals = names.map((n) => {
       const on = this.state.term === n;
       return { name: n, pressed: on ? 'true' : 'false', pick: () => this.setState({ term: n }),
-        style: 'height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; cursor: pointer; border: 1px solid ' + (on ? '#C6F432' : '#262A26') + '; background: ' + (on ? '#C6F432' : '#121412') + '; color: ' + (on ? '#0A0B0A' : '#B4BAB2') };
+        style: 'height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; cursor: pointer; border: 1px solid ' + (on ? '#C6F432' : '#646C63') + '; background: ' + (on ? '#C6F432' : '#121412') + '; color: ' + (on ? '#0A0B0A' : '#B4BAB2') };
     });
-    const V = { badge: '✓ VERIFIED', badgeColor: L };
-    const N = { badge: '◷ IN REVIEW', badgeColor: A };
+    const V = { badge: '✓ AI-VERIFIED', badgeColor: L };
     const all = [
-      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'Axiom · GMGN', title: 'Sniper Filter Pack v2', creator: '@dev_degen', rating: '4.9', sales: 412, price: '1.50', holder: '1.20', t: ['Axiom', 'GMGN'], ...V },
-      { type: 'WALLET LIST', color: B, bg: '#0F1620', compat: 'GMGN · Photon · Axiom', title: '120 Early Wallets (Q4)', creator: '@onchainsleuth', rating: '4.7', sales: 268, price: '2.00', holder: '1.60', t: ['GMGN', 'Photon', 'Axiom'], ...V },
-      { type: 'FILTER', color: A, bg: '#1C160A', compat: 'Photon', title: 'Migration Sniper Presets', creator: '@pumpwatch', rating: '4.6', sales: 190, price: '0.80', holder: '0.64', t: ['Photon'], ...V },
-      { type: 'SETUP', color: P, bg: '#18121F', compat: 'Axiom · BullX', title: 'Full Trench Desk Setup', creator: '@nightshift', rating: '4.8', sales: 96, price: '3.50', holder: '2.80', t: ['Axiom', 'BullX'], ...V },
-      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'Axiom', title: 'Bundle Detector Overlay', creator: '@rugradar', rating: '4.9', sales: 533, price: '1.20', holder: '0.96', t: ['Axiom'], ...V },
-      { type: 'STRATEGY', color: T, bg: '#0E1A17', compat: 'Any terminal', title: 'Copy-Trade Exit Playbook', creator: '@calmape', rating: '4.5', sales: 74, price: '1.00', holder: '0.80', t: ['Axiom', 'GMGN', 'Photon', 'BullX', 'Padre'], ...V },
-      { type: 'ALERTS', color: R, bg: '#1F1210', compat: 'Telegram · Padre', title: 'KOL Buy Alerts Config', creator: '@signalboy', rating: '4.4', sales: 58, price: '0.60', holder: '0.48', t: ['Padre'], ...N },
-      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'GMGN · BullX', title: 'Dev Wallet History Tooltip', creator: '@dev_degen', rating: '4.8', sales: 301, price: '0.90', holder: '0.72', t: ['GMGN', 'BullX'], ...V }
+      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'Axiom · GMGN', title: 'Sniper Filter Pack v2', creator: '@dev_degen', bond: '5', rating: '4.9', sales: 412, price: '1.50', t: ['Axiom', 'GMGN'], ...V },
+      { type: 'WALLET LIST', color: B, bg: '#0F1620', compat: 'GMGN · Photon · Axiom', title: '120 Early Wallets (Q4)', creator: '@onchainsleuth', bond: '2', rating: '4.7', sales: 268, price: '2.00', t: ['GMGN', 'Photon', 'Axiom'], ...V },
+      { type: 'FILTER', color: A, bg: '#1C160A', compat: 'Photon', title: 'Migration Sniper Presets', creator: '@pumpwatch', bond: '1', rating: '4.6', sales: 190, price: '0.80', t: ['Photon'], ...V },
+      { type: 'SETUP', color: P, bg: '#18121F', compat: 'Axiom · BullX', title: 'Full Trench Desk Setup', creator: '@nightshift', bond: '5', rating: '4.8', sales: 96, price: '3.50', t: ['Axiom', 'BullX'], ...V },
+      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'Axiom', title: 'Bundle Detector Overlay', creator: '@rugradar', bond: '5', rating: '4.9', sales: 533, price: '1.20', t: ['Axiom'], ...V },
+      { type: 'STRATEGY', color: T, bg: '#0E1A17', compat: 'Any terminal', title: 'Copy-Trade Exit Playbook', creator: '@calmape', bond: '1', rating: '4.5', sales: 74, price: '1.00', t: ['Axiom', 'GMGN', 'Photon', 'BullX', 'Padre'], ...V },
+      { type: 'ALERTS', color: R, bg: '#1F1210', compat: 'Telegram · Padre', title: 'KOL Buy Alerts Config', creator: '@signalboy', bond: '5', rating: '4.4', sales: 58, price: '0.60', t: ['Padre'], ...V },
+      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'GMGN · BullX', title: 'Dev Wallet History Tooltip', creator: '@dev_degen', bond: '5', rating: '4.8', sales: 301, price: '0.90', t: ['GMGN', 'BullX'], ...V }
     ];
     const term = this.state.term;
-    const listings = term === 'All' ? all : all.filter((l) => l.t.indexOf(term) >= 0);
-    const creators = [
-      { rank: '01', name: '@dev_degen', meta: 'Userscripts · bond 50 SOL', vol: '[VOL]', av: '#C6F432' },
-      { rank: '02', name: '@rugradar', meta: 'Userscripts · bond 40 SOL', vol: '[VOL]', av: '#7CC4FF' },
-      { rank: '03', name: '@onchainsleuth', meta: 'Wallet lists · bond 25 SOL', vol: '[VOL]', av: '#C9A2FF' },
-      { rank: '04', name: '@nightshift', meta: 'Setups · bond 20 SOL', vol: '[VOL]', av: '#F5A524' }
+    // Display maths mirrors packages/shared fee.ts in lamports; never floats.
+    const sol = (l) => { const s = l.toString().padStart(10, '0'); let f = s.slice(-9).replace(/0+$/, ''); if (f.length < 2) f = f.padEnd(2, '0'); return s.slice(0, -9).replace(/^0+(?=\d)/, '') + '.' + f; };
+    const usd = (l) => { const c = (l * 18000n) / 1000000000n; if (c < 1n) return '< $0.01'; return '≈ $' + (c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + (c % 100n).toString().padStart(2, '0'); };
+    const lam = (str) => { const [w, f = ''] = str.split('.'); return BigInt(w) * 1000000000n + BigInt((f + '000000000').slice(0, 9)); };
+    const connected = this.state.connected, rebateBps = 6000n;
+    const priced = (l) => {
+      const p = lam(l.price), fee = (p * 500n) / 10000n, total = p + fee - (fee * rebateBps) / 10000n;
+      return connected
+        ? { ...l, shown: sol(total), usd: usd(total), priceNote: 'you pay · Trencher rate', feeNote: 'incl. 5% fee, 60% off with your tier' }
+        : { ...l, shown: sol(p), usd: usd(p), priceNote: 'list price', feeNote: '+ 5% fee · your tier can cut it' };
+    };
+    const listings = (term === 'All' ? all : all.filter((l) => l.t.indexOf(term) >= 0)).map(priced);
+    // Real stats replace the sample set automatically once the API has any (see docs/design-system.md · LandingStats).
+    const liveStats = null;
+    // Shape of GET /stats: { source: 'mock' | 'live', listings, creators, orders, volume: { lamports, sol, usdCents } }.
+    const stats = liveStats || { source: 'mock', listings: 8, creators: 4, orders: 128, volumeLamports: 11500000000n };
+    const isLive = stats.source === 'live';
+    const tiles = [
+      { k: 'AI-verified tools', v: String(stats.listings), d: 'live listings' },
+      { k: 'Creators', v: String(stats.creators), d: 'bonded and X-linked' },
+      { k: 'Trades', v: String(stats.orders), d: 'paid through escrow' },
+      { k: 'Volume', v: sol(stats.volumeLamports) + ' SOL', d: usd(stats.volumeLamports) }
     ];
-    return { categories, terminals, listings, creators };
+    const creators = [
+      { rank: '01', name: '@dev_degen', meta: 'Userscripts · bond 5 SOL', vol: '618.00', usd: usd(618000000000n), av: '#C6F432' },
+      { rank: '02', name: '@rugradar', meta: 'Userscripts · bond 5 SOL', vol: '639.60', usd: usd(639600000000n), av: '#7CC4FF' },
+      { rank: '03', name: '@onchainsleuth', meta: 'Wallet lists · bond 2 SOL', vol: '536.00', usd: usd(536000000000n), av: '#C9A2FF' },
+      { rank: '04', name: '@nightshift', meta: 'Setups · bond 5 SOL', vol: '336.00', usd: usd(336000000000n), av: '#F5A524' }
+    ];
+    return { categories, terminals, listings, creators, connected, loggedOut: !connected,
+      connect: () => this.setState({ connected: true }), disconnect: () => this.setState({ connected: false }),
+      stats: tiles, statsSource: stats.source,
+      statsChip: isLive ? '● LIVE' : 'SAMPLE DATA', statsChipColor: isLive ? '#C6F432' : '#B4BAB2', statsChipBorder: isLive ? '#2E3A12' : '#646C63',
+      statsNote: isLive ? 'Devnet · updated just now' : 'Illustrative numbers until the first real trades. Switches to live automatically.' };
   }
 }
 </script>

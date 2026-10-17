@@ -5,15 +5,17 @@
 
 ## Tiers (thresholds are placeholders)
 
-| Tier | Requirement | Perks |
-|---|---|---|
-| None | — | Standard 5% fee |
-| **Scout** | min balance ≥ `[X]` | −25% marketplace fee · holder price on listings · holder badge on reviews |
-| **Trencher** | ≥ `[Y]` | −60% fee · free verification for own uploads · 48h early access to new listings · holder-only listings · vote on featured (phase 2) |
-| **OG** | ≥ `[Z]` | 0% marketplace fee · everything in Trencher · 50% creator bond · private alpha room link · can apply to be a verifier |
+| Tier         | Requirement         | Perks                                                                                                                               |
+| ------------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| None         | —                   | Standard 5% fee                                                                                                                     |
+| **Scout**    | min balance ≥ `[X]` | −25% marketplace fee · holder price on listings · holder badge on reviews                                                           |
+| **Trencher** | ≥ `[Y]`             | −60% fee · free verification for own uploads · 48h early access to new listings · holder-only listings · vote on featured (phase 2) |
+| **OG**       | ≥ `[Z]`             | 0% marketplace fee · everything in Trencher · 50% creator bond · private alpha room link · can apply to be a verifier               |
 
 ## Anti-gaming rule
+
 Tier = based on the **lowest balance held at any point in the last 72h** (`tier_window_hours`).
+
 - One tier per wallet. Linked wallets don't stack (POC: tiers only look at the signed-in wallet).
 - Re-computed at quote time and stored on the order (`tier_at_purchase`).
 - Phase 2: count tokens staked in an on-site staking program as held.
@@ -54,19 +56,25 @@ select coalesce(min(amount), 0) as min_balance from (
     where wallet = $1 and ts > w.start)
 ) b;
 ```
+
 Edge: a wallet whose first ever row is inside the window has no "at start" row. Treat missing pre-window history as **0** only if the first row is a `webhook` row (they acquired during the window); if the first row is a `snapshot` (we just never saw them before), trust the snapshot. Encode that in `packages/shared/tier.ts` with tests.
 
 ```ts
-export function tierFor(minBalance: bigint, t: {scout?: bigint, trencher?: bigint, og?: bigint}): Tier {
+export function tierFor(
+  minBalance: bigint,
+  t: { scout?: bigint; trencher?: bigint; og?: bigint },
+): Tier {
   if (t.og && minBalance >= t.og) return 'og';
   if (t.trencher && minBalance >= t.trencher) return 'trencher';
   if (t.scout && minBalance >= t.scout) return 'scout';
   return 'none';
 }
 ```
+
 Thresholds stored as strings in config; a value like `"[X]"` → undefined → tier disabled.
 
 ## Where tier is used
+
 - `/me` (navbar chip "Trencher tier · 60% off fees")
 - `/orders/quote` and `/orders` (rebate)
 - Browse: holder-only window (`listings.first_live_at + holder_only_hours > now()` → only tier ≥ scout can buy; others see a lock)
@@ -74,5 +82,6 @@ Thresholds stored as strings in config; a value like `"[X]"` → undefined → t
 - Verifier application gating
 
 ## Revenue → token
+
 - POC: `bucket:buyback` accumulates in the ledger; ops manually swaps SOL→$TRENCH (Jupiter) on a published schedule and posts tx sigs on the $TRENCH page. Burn vs reward split decided later by governance.
 - Show on the $TRENCH page: total buyback SOL to date, last buyback tx (from a `buybacks` admin-entered table, add if needed).
