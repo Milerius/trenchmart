@@ -78,7 +78,7 @@ Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission.
 </tr>
 <tr>
 <td width="50%"><img src="docs/screenshots/04-escrow-status.webp" alt="Purchases page showing escrow timers and locked downloads" /></td>
-<td width="50%" align="center"><img src="docs/screenshots/07-mobile-checkout.webp" alt="Mobile checkout with the fee receipt" width="58%" /></td>
+<td width="50%" align="center"><img src="docs/screenshots/07-mobile-checkout.webp" alt="Mobile checkout with the fee receipt" width="42%" /></td>
 </tr>
 <tr>
 <td align="center"><sub><b>Escrow status.</b> Live countdowns, disputes and downloads that unlock on release.</sub></td>
