@@ -52,9 +52,7 @@ export default function CreatorPage() {
       <div className="flex flex-wrap items-end justify-between gap-4 rounded-panel border border-line bg-surface p-6">
         <div>
           <Label>Creator</Label>
-          <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
-            @{profile.handle ?? profile.wallet.slice(0, 4)}
-          </h1>
+          <h1 className="m-0 mt-1 text-[32px]">@{profile.handle ?? profile.wallet.slice(0, 4)}</h1>
           <p className="m-0 mt-1 font-mono text-xs text-muted">
             {profile.wallet.slice(0, 4)}…{profile.wallet.slice(-4)}
             {profile.xHandle ? ` · X @${profile.xHandle}` : ''}

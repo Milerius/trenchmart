@@ -34,7 +34,10 @@ function Ticker() {
     <div className="hidden border-b border-line-soft bg-inset font-mono text-xs text-muted sm:block">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-7 gap-y-1 px-6 py-2">
         <span className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
+          <span
+            className="h-2 w-2 bg-sol-green shadow-[0_0_8px_var(--color-sol-green)]"
+            aria-hidden="true"
+          />
           Solana devnet · live
         </span>
         <span>
@@ -80,7 +83,7 @@ function Nav() {
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header data-testid="nav" className="border-b border-line-soft">
+    <header data-testid="nav" className="relative">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-6 sm:py-4">
         <Logo />
         <nav
@@ -92,7 +95,7 @@ function Nav() {
               key={link.href}
               href={link.href}
               aria-current={active(link.href) ? 'page' : undefined}
-              className={`rounded-lg px-3 py-2.5 whitespace-nowrap ${active(link.href) ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'}`}
+              className={`rounded-lg px-3 py-2.5 whitespace-nowrap ${active(link.href) ? 'bg-surface-2 text-ink shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-muted hover:text-ink'}`}
             >
               {link.label}
             </Link>
@@ -139,7 +142,7 @@ function Nav() {
           <button
             data-testid="connect"
             type="button"
-            className="h-11 rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover disabled:opacity-100"
+            className="pixel-shadow h-11 rounded-ctl bg-accent px-4 font-display text-sm font-bold text-onaccent hover:bg-accent-hover disabled:opacity-100"
             onClick={() => void (wallet.session ? wallet.logout() : wallet.connect())}
             disabled={wallet.busy}
             aria-busy={wallet.busy || undefined}
@@ -157,6 +160,7 @@ function Nav() {
           {wallet.error}
         </p>
       ) : null}
+      <div aria-hidden="true" className="sol-bar h-px opacity-70" />
     </header>
   );
 }

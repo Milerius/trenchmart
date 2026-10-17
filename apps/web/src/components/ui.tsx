@@ -8,8 +8,8 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg' | 'xl';
 
 const VARIANT: Record<Variant, string> = {
-  primary: 'bg-accent text-onaccent font-semibold hover:bg-accent-hover',
-  secondary: 'border border-line-control text-ink hover:bg-surface-2',
+  primary: 'pixel-shadow bg-accent text-onaccent hover:bg-accent-hover',
+  secondary: 'border border-line-control text-ink hover:border-accent hover:text-accent',
   ghost: 'text-ink-2 hover:text-ink hover:bg-surface-2',
   danger: 'border border-danger-line text-danger hover:bg-danger-bg',
 };
@@ -23,7 +23,7 @@ const DISABLED =
   'disabled:cursor-not-allowed disabled:border disabled:border-line disabled:bg-surface-2 disabled:text-faint disabled:hover:bg-surface-2';
 
 export function buttonClass(variant: Variant = 'primary', size: Size = 'md', extra = ''): string {
-  return `inline-flex items-center justify-center gap-2 rounded-ctl whitespace-nowrap transition-colors ${VARIANT[variant]} ${SIZE[size]} ${DISABLED} ${extra}`;
+  return `inline-flex items-center justify-center gap-2 rounded-ctl font-display font-bold whitespace-nowrap transition-colors ${VARIANT[variant]} ${SIZE[size]} ${DISABLED} ${extra}`;
 }
 
 export function Button({
@@ -44,12 +44,13 @@ export function ButtonLink({
   return <Link className={buttonClass(variant, size, className)} {...props} />;
 }
 
-export type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
+export type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'violet' | 'neutral';
 const TONE: Record<Tone, string> = {
   ok: 'text-accent border-accent-line bg-accent-bg',
   warn: 'text-warn border-warn-line bg-warn-bg',
   danger: 'text-danger border-danger-line bg-danger-bg',
   info: 'text-info border-info-line bg-info-bg',
+  violet: 'text-violet border-violet-line bg-violet-bg',
   neutral: 'text-ink-2 border-line bg-surface',
 };
 
@@ -117,6 +118,7 @@ const SQUARE: Record<Tone, string> = {
   warn: 'bg-warn text-onaccent',
   danger: 'bg-danger text-onaccent',
   info: 'bg-info text-onaccent',
+  violet: 'bg-violet text-onaccent',
   neutral: 'border border-line-strong text-ink-2',
 };
 
@@ -132,7 +134,9 @@ export function Square({ tone = 'neutral', children }: { tone?: Tone; children: 
 }
 
 export function Card({ className = '', ...props }: ComponentProps<'div'>) {
-  return <div className={`rounded-card border border-line bg-surface ${className}`} {...props} />;
+  return (
+    <div className={`crt rounded-card border border-line bg-surface ${className}`} {...props} />
+  );
 }
 
 const PANEL: Record<Tone, string> = {
@@ -140,6 +144,7 @@ const PANEL: Record<Tone, string> = {
   warn: 'border-warn-line bg-warn-bg',
   danger: 'border-danger-line bg-danger-bg',
   info: 'border-info-line bg-info-bg',
+  violet: 'border-violet-line bg-violet-bg',
   neutral: 'border-line bg-surface',
 };
 
@@ -149,6 +154,72 @@ export function Panel({
   ...props
 }: ComponentProps<'div'> & { tone?: Tone }) {
   return <div className={`rounded-card border ${PANEL[tone]} ${className}`} {...props} />;
+}
+
+/** Terminal window title bar: three Solana-colour squares, a mono title and optional actions. */
+export function WindowBar({
+  title,
+  children,
+  className = '',
+}: {
+  title: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 border-b border-line-soft bg-inset px-4 py-2.5 ${className}`}
+    >
+      <span aria-hidden="true" className="flex shrink-0 gap-1.5">
+        <span className="h-2.5 w-2.5 bg-sol-purple" />
+        <span className="h-2.5 w-2.5 bg-sol-green" />
+        <span className="h-2.5 w-2.5 bg-accent" />
+      </span>
+      <div className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+/** Segmented retro meter. `value` is 0..1. */
+export function SegmentBar({
+  value,
+  label,
+  danger = false,
+  segments = 24,
+  className = '',
+}: {
+  value: number;
+  label: string;
+  danger?: boolean;
+  segments?: number;
+  className?: string;
+}) {
+  const filled = Math.round(Math.min(1, Math.max(0, value)) * segments);
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value * 100)}
+      className={`flex h-3 gap-[3px] ${className}`}
+    >
+      {Array.from({ length: segments }, (_, index) => (
+        <span
+          key={index}
+          aria-hidden="true"
+          className={`flex-1 rounded-[1px] ${
+            index < filled
+              ? danger
+                ? 'bg-danger'
+                : 'bg-accent shadow-[0_0_8px_rgb(198_244_50/0.35)]'
+              : 'bg-line-strong'
+          }`}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function Label({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -169,6 +240,7 @@ export function Money({
   className = '',
   stacked = false,
   strong = false,
+  display = false,
 }: {
   lamports: string | bigint;
   usdCents?: string | null;
@@ -176,6 +248,8 @@ export function Money({
   className?: string;
   stacked?: boolean;
   strong?: boolean;
+  /** Space Mono for headline amounts; USD stays in the body mono. */
+  display?: boolean;
 }) {
   const cents = usdCents !== undefined ? usdCents : usdFor(lamports, centsPerSol ?? null);
   const usd = usdText(cents, lamports.toString());
@@ -183,9 +257,13 @@ export function Money({
     <span
       className={`tabular font-mono ${stacked ? 'inline-flex flex-col' : 'inline-flex flex-wrap items-baseline gap-x-2'} ${className}`}
     >
-      <span className={strong ? 'font-semibold text-ink' : ''}>{solText(lamports)}</span>
+      <span
+        className={`${strong ? 'font-semibold text-ink' : ''} ${display ? 'font-display font-bold' : ''}`}
+      >
+        {solText(lamports)}
+      </span>
       {usd ? (
-        <span data-testid="usd-amount" className="text-[0.85em] font-normal text-muted">
+        <span data-testid="usd-amount" className="font-mono text-[0.85em] font-normal text-muted">
           {usd}
         </span>
       ) : null}

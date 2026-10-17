@@ -31,7 +31,7 @@ export default function VerifyPage() {
   return (
     <section className="mx-auto max-w-xl space-y-6">
       <div>
-        <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Verify a file</h1>
+        <h1 className="m-0 text-[32px]">Verify a file</h1>
         <p className="m-0 mt-2 text-ink-2">
           Drop a file you downloaded. A match means the bytes are exactly a version that passed AI
           verification. Nothing is stored.

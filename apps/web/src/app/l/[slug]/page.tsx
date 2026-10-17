@@ -22,6 +22,7 @@ import {
   StatusTag,
   Tag,
   utc,
+  WindowBar,
 } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
@@ -224,9 +225,7 @@ export default function ListingPage() {
           {verified ? <StatusTag status="live" /> : <Tag tone="warn">NOT VERIFIED</Tag>}
           {listing.holderOnly ? <Tag tone="info">HOLDER-ONLY</Tag> : null}
         </div>
-        <h1 className="mt-3 text-[34px] font-semibold leading-tight tracking-[-0.03em]">
-          {listing.title}
-        </h1>
+        <h1 className="mt-3 text-[32px] leading-tight">{listing.title}</h1>
         <p className="mt-2 text-[17px] text-ink-2">{listing.summary}</p>
         <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
           <CreatorLink creator={listing.creator} />
@@ -324,12 +323,13 @@ export default function ListingPage() {
         id="checkout"
         data-testid="checkout"
         aria-label="Checkout"
-        className="rounded-panel border border-line bg-surface lg:sticky lg:top-6"
+        className="crt sol-frame overflow-hidden rounded-panel shadow-[6px_6px_0_0_rgb(153_69_255/0.35)] lg:sticky lg:top-6"
       >
+        <WindowBar title="checkout · escrow on Solana devnet" />
         <div className="border-b border-line-soft p-5">
           <Label>Price</Label>
-          <div className="mt-1 text-2xl font-semibold">
-            <Money lamports={listing.price} centsPerSol={centsPerSol} strong />
+          <div className="mt-1 text-[28px] leading-tight">
+            <Money lamports={listing.price} centsPerSol={centsPerSol} strong display />
           </div>
           {tier ? (
             <p className="mt-1 text-[13px] text-ink-2">
@@ -398,11 +398,12 @@ export default function ListingPage() {
 
       <div
         hidden={checkoutVisible}
-        className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-surface px-4 py-3 lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 bg-surface px-4 py-3 lg:hidden"
       >
+        <span aria-hidden="true" className="sol-bar absolute inset-x-0 top-0 h-0.5" />
         <div className="flex min-w-0 flex-col">
           <Label>{tier ? 'You pay' : 'You pay before discount'}</Label>
-          <Money lamports={youPay} centsPerSol={centsPerSol} strong className="text-sm" />
+          <Money lamports={youPay} centsPerSol={centsPerSol} strong display className="text-sm" />
         </div>
         <a href="#checkout" className={buttonClass('primary', 'md')}>
           Review and buy

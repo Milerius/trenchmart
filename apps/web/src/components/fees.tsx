@@ -161,13 +161,16 @@ export function FeeBreakdown({
         </Line>
       </dl>
       <div className="mt-3 flex items-baseline justify-between gap-3 border-t border-line pt-3">
-        <span className="font-semibold">{tier ? 'You pay' : 'You pay (before discount)'}</span>
+        <span className="font-display font-bold">
+          {tier ? 'You pay' : 'You pay (before discount)'}
+        </span>
         <Money
           lamports={q.total}
           centsPerSol={centsPerSol}
           strong
           stacked
-          className="text-right text-base"
+          display
+          className="text-right text-xl"
         />
       </div>
       <p className="mt-2 text-xs text-muted">

@@ -20,9 +20,7 @@ export default function CreatorsPage() {
     <section className="space-y-6">
       <div>
         <Label>Creators</Label>
-        <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
-          Top verified creators
-        </h1>
+        <h1 className="m-0 mt-1 text-[32px]">Top verified creators</h1>
         <p className="m-0 mt-1 text-ink-2">
           Ranked by sales volume. Every creator posts a SOL bond.
         </p>

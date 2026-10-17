@@ -15,6 +15,7 @@ import {
   Square,
   StatusTag,
   utc,
+  WindowBar,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
@@ -111,7 +112,7 @@ export default function StudioPage() {
   if (!wallet.session) {
     return (
       <section className="mx-auto max-w-lg py-10 text-center">
-        <h1 className="text-[28px] font-semibold tracking-[-0.025em]">Creator studio</h1>
+        <h1 className="text-[28px]">Creator studio</h1>
         <p className="mt-3 text-ink-2">Connect a wallet to open the studio.</p>
         <p className="mt-1 text-sm text-muted">
           List tooling with 0% commission. Every upload is AI-verified live, in seconds.
@@ -136,7 +137,7 @@ export default function StudioPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Label>Creator studio</Label>
-          <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
+          <h1 className="m-0 mt-1 text-[32px]">
             {wallet.session.handle ? `@${wallet.session.handle}` : 'Your studio'}
           </h1>
           <p className="m-0 mt-1 text-sm text-ink-2">
@@ -156,28 +157,40 @@ export default function StudioPage() {
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line lg:grid-cols-4">
         <Tile label="Paid out">
           {payouts ? (
-            <Money lamports={paidOut} centsPerSol={centsPerSol} stacked />
+            <Money
+              lamports={paidOut}
+              centsPerSol={centsPerSol}
+              stacked
+              display
+              className="glow text-[26px] leading-tight text-accent"
+            />
           ) : (
             <Skeleton className="h-7 w-24" />
           )}
         </Tile>
         <Tile label="Queued payouts">
           {payouts ? (
-            <Money lamports={queued} centsPerSol={centsPerSol} stacked />
+            <Money
+              lamports={queued}
+              centsPerSol={centsPerSol}
+              stacked
+              display
+              className="text-[26px] leading-tight text-violet"
+            />
           ) : (
             <Skeleton className="h-7 w-24" />
           )}
         </Tile>
         <Tile label="Live listings">
           {listings ? (
-            <span className="text-2xl font-semibold">{live.length}</span>
+            <span className="font-display text-[26px] leading-tight font-bold">{live.length}</span>
           ) : (
             <Skeleton className="h-7 w-10" />
           )}
         </Tile>
         <Tile label="Sales, last 7 days">
           {listings ? (
-            <span className="text-2xl font-semibold">{sales}</span>
+            <span className="font-display text-[26px] leading-tight font-bold">{sales}</span>
           ) : (
             <Skeleton className="h-7 w-10" />
           )}
@@ -186,11 +199,10 @@ export default function StudioPage() {
 
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
-          <div className="overflow-hidden rounded-panel border border-line bg-surface">
-            <div className="flex items-center justify-between border-b border-line-soft px-5 py-3">
-              <h2 className="m-0 text-base font-semibold">Listings</h2>
+          <div className="crt overflow-hidden rounded-panel border border-line bg-surface">
+            <WindowBar title={<h2 className="m-0 text-sm text-ink">Listings</h2>}>
               <span className="text-xs text-muted">{listings?.length ?? 0} total</span>
-            </div>
+            </WindowBar>
             {listings && listings.length === 0 ? (
               <div className="p-5">
                 <EmptyState
@@ -272,10 +284,10 @@ export default function StudioPage() {
 
           <section
             data-testid="dashboard"
-            className="overflow-hidden rounded-panel border border-line bg-surface"
+            className="crt overflow-hidden rounded-panel border border-line bg-surface"
           >
-            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line-soft px-5 py-3">
-              <h2 className="m-0 text-base font-semibold">Payouts</h2>
+            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line-soft bg-inset px-5 py-3">
+              <h2 className="m-0 text-sm">Payouts</h2>
               <span className="text-sm text-ink-2">
                 Total{' '}
                 {payouts ? (
@@ -323,8 +335,8 @@ export default function StudioPage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-panel border border-line bg-surface p-5">
-            <h2 className="m-0 text-base font-semibold">Ready to sell</h2>
+          <div className="crt sol-frame rounded-panel p-5">
+            <h2 className="m-0 text-sm">Ready to sell</h2>
             {requirements ? (
               <ul className="m-0 mt-4 space-y-3 p-0 text-sm">
                 <Requirement ok title="Wallet signed in" />
@@ -414,7 +426,7 @@ export default function StudioPage() {
 
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 bg-surface p-5">
+    <div className="crt flex flex-col gap-1 bg-surface p-5">
       <Label>{label}</Label>
       <div className="tabular mt-1 flex flex-col font-mono">{children}</div>
     </div>

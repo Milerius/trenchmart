@@ -42,7 +42,7 @@ export default function TokenPage() {
     <article className="space-y-14">
       <header className="max-w-3xl">
         <Label className="text-accent-label">$TRENCH · fair launch on pump.fun</Label>
-        <h1 className="mt-3 text-[40px] font-semibold leading-tight tracking-[-0.03em]">
+        <h1 className="mt-3 text-[40px] leading-tight">
           Fees fund the token. The token cuts your fees.
         </h1>
         <p className="mt-4 text-[17px] text-ink-2">
@@ -126,7 +126,7 @@ export default function TokenPage() {
       </section>
 
       <section>
-        <h2 className="m-0 text-[24px] font-semibold tracking-[-0.02em]">Where every fee goes</h2>
+        <h2 className="m-0 text-[24px]">Where every fee goes</h2>
         <p className="mt-2 max-w-2xl text-ink-2">
           The net fee, after your tier discount, is split four ways. The AI verification bucket
           funds automated review, not people.

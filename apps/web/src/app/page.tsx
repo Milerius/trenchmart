@@ -13,6 +13,7 @@ import {
   ShieldIcon,
   Skeleton,
   Tag,
+  WindowBar,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { usePublicConfig } from '@/lib/config';
@@ -61,14 +62,19 @@ export default function HomePage() {
 
   return (
     <div className="space-y-20">
-      <section className="grid items-center gap-10 pt-4 lg:grid-cols-[1.3fr_1fr]">
+      <section
+        data-testid="hero"
+        className="crt crt-hero crt-beam grid items-center gap-10 overflow-hidden rounded-panel border border-line px-5 py-10 sm:px-10 sm:py-14 lg:grid-cols-[1.3fr_1fr]"
+      >
         <div>
           <p className="m-0 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.08em] text-accent">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
+            <span aria-hidden="true">›</span>
             Solana marketplace · AI-verified · escrowed
           </p>
-          <h1 className="mt-4 text-[42px] font-semibold leading-[1.04] tracking-[-0.035em] sm:text-[58px]">
-            The verified edge, for sale.
+          <h1 className="mt-5 text-[36px] leading-[1.08] sm:text-[52px]">
+            The verified edge, <br className="hidden sm:block" />
+            <span className="sol-text">for sale.</span>
+            <span aria-hidden="true" className="cursor-block" />
           </h1>
           <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-ink-2">
             Buy and sell trading scripts, terminal filters and wallet lists. Every version is
@@ -121,8 +127,11 @@ export default function HomePage() {
               'When escrow releases, the download unlocks: a copy watermarked to your wallet.',
             ],
           ].map(([title, body], index) => (
-            <li key={title} className="list-none rounded-card border border-line bg-surface p-5">
-              <span className="font-mono text-xs text-accent">0{index + 1}</span>
+            <li
+              key={title}
+              className="crt list-none rounded-card border border-line bg-surface p-5"
+            >
+              <span className="font-display text-sm font-bold text-accent">[0{index + 1}]</span>
               <h3 className="mt-3 text-base font-semibold">{title}</h3>
               <p className="mt-2 text-sm text-ink-2">{body}</p>
             </li>
@@ -144,10 +153,10 @@ export default function HomePage() {
                 key={name}
                 type="button"
                 aria-pressed={terminal === name}
-                className={`h-9 rounded-full border px-3.5 text-[13px] transition-colors ${
+                className={`h-9 rounded-ctl border px-3.5 font-mono text-[13px] transition-colors ${
                   terminal === name
-                    ? 'border-accent bg-accent-bg text-accent'
-                    : 'border-line-control text-ink-2 hover:text-ink'
+                    ? 'border-accent bg-accent font-semibold text-onaccent'
+                    : 'border-line-control text-ink-2 hover:border-accent hover:text-accent'
                 }`}
                 onClick={() => setTerminal(name)}
               >
@@ -179,7 +188,7 @@ export default function HomePage() {
             <li key={cat.code} className="list-none">
               <Link
                 href={`/c/${cat.code}`}
-                className="flex h-full flex-col gap-2 rounded-card border border-line bg-surface p-5 transition-colors hover:border-line-strong"
+                className="crt retro-card flex h-full flex-col gap-2 rounded-card border border-line bg-surface p-5"
               >
                 <span className="font-mono text-[11px] tracking-wide" style={{ color: cat.color }}>
                   {cat.short}
@@ -203,7 +212,7 @@ export default function HomePage() {
             See tiers and savings
           </ButtonLink>
         </div>
-        <div className="rounded-panel border border-line bg-surface p-5">
+        <div className="crt rounded-panel border border-line bg-surface p-5">
           <TierTable config={config} current={wallet.session?.tier} />
         </div>
       </section>
@@ -229,7 +238,7 @@ export default function HomePage() {
               'Each file is statically scanned, run in an isolated sandbox with logged network calls, then reviewed by AI.',
             ],
           ].map(([title, body]) => (
-            <div key={title} className="rounded-card border border-line bg-surface p-5">
+            <div key={title} className="crt rounded-card border border-line bg-surface p-5">
               <ShieldIcon className="text-accent" />
               <h3 className="mt-3 text-base font-semibold">{title}</h3>
               <p className="mt-2 text-sm text-ink-2">{body}</p>
@@ -248,10 +257,12 @@ export default function HomePage() {
               <li key={creator.wallet} className="list-none">
                 <Link
                   href={`/u/${creator.handle ?? creator.wallet}`}
-                  className="flex items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3 hover:border-line-strong"
+                  className="retro-card flex items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3"
                 >
                   <span className="flex items-center gap-3">
-                    <span className="w-5 font-mono text-xs text-muted">{index + 1}</span>
+                    <span className="w-6 font-display text-xs font-bold text-violet">
+                      #{index + 1}
+                    </span>
                     <span className="font-medium">
                       @{creator.handle ?? creator.wallet.slice(0, 4)}
                     </span>
@@ -267,9 +278,11 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-6 rounded-panel border border-accent-line bg-accent-bg p-8">
+      <section className="crt sol-frame flex flex-wrap items-center justify-between gap-6 overflow-hidden rounded-panel p-8">
         <div>
-          <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">Have an edge? Sell it.</h2>
+          <h2 className="m-0 text-2xl">
+            Have an edge? <span className="sol-text">Sell it.</span>
+          </h2>
           <p className="mt-2 max-w-lg text-ink-2">
             Upload a file and watch AI verification run live. 0% commission, payouts in SOL.
           </p>
@@ -285,8 +298,11 @@ export default function HomePage() {
 function SectionHead({ id, kicker, title }: { id: string; kicker: string; title: string }) {
   return (
     <div>
-      <Label className="text-accent-label">{kicker}</Label>
-      <h2 id={id} className="mt-2 text-[28px] font-semibold tracking-[-0.025em]">
+      <Label className="text-accent-label">
+        <span aria-hidden="true">› </span>
+        {kicker}
+      </Label>
+      <h2 id={id} className="mt-2 text-[26px] leading-tight sm:text-[30px]">
         {title}
       </h2>
     </div>
@@ -308,13 +324,12 @@ function ReviewReceipt() {
     ['AI verdict', 'Behaviour matches description', '2.6s'],
   ];
   return (
-    <figure className="m-0 overflow-hidden rounded-panel border border-line bg-surface shadow-[0_30px_80px_-40px_rgba(198,244,50,0.25)]">
-      <div className="flex items-center justify-between border-b border-line-soft bg-inset px-5 py-3">
-        <span className="font-mono text-xs text-muted">ai-review · axiom-pulse-filter.user.js</span>
+    <figure className="crt sol-frame relative z-[2] m-0 overflow-hidden rounded-panel shadow-[8px_8px_0_0_rgb(153_69_255/0.4)]">
+      <WindowBar title="ai-review · axiom-pulse-filter.user.js">
         <Tag tone="ok">
           <span aria-hidden="true">✓</span> PASSED · 4.9s
         </Tag>
-      </div>
+      </WindowBar>
       <ol className="m-0 space-y-3 p-5">
         {steps.map(([name, detail, time]) => (
           <li key={name} className="flex list-none items-center gap-3">
@@ -362,6 +377,7 @@ function LandingStats({ stats, failed }: { stats: Stats | null; failed: boolean 
             lamports={stats.volume.lamports}
             usdCents={stats.volume.usdCents}
             stacked
+            display
           />,
         ],
       ]
@@ -379,9 +395,9 @@ function LandingStats({ stats, failed }: { stats: Stats | null; failed: boolean 
         className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line lg:grid-cols-4"
       >
         {tiles.map(([label, value]) => (
-          <div key={label} className="bg-surface p-5">
+          <div key={label} className="crt bg-surface p-5">
             <Label>{label}</Label>
-            <div className="tabular mt-2 font-mono text-2xl font-semibold text-ink">
+            <div className="tabular glow mt-2 font-display text-[28px] leading-tight font-bold text-accent">
               {value ?? (failed ? '—' : <Skeleton className="h-7 w-20" />)}
             </div>
           </div>

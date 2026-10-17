@@ -54,7 +54,7 @@ export default function DisputePage() {
         <Link href="/me/purchases" className="text-sm text-muted hover:text-ink">
           ← Purchases
         </Link>
-        <h1 className="mt-3 text-[28px] font-semibold tracking-[-0.025em]">Open a dispute</h1>
+        <h1 className="mt-3 text-[28px]">Open a dispute</h1>
         <p className="mt-2 text-ink-2">
           Release is paused as soon as you submit, and the download stays locked. If the dispute is
           upheld you are refunded. If it is rejected, the order returns to payout.

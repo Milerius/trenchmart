@@ -41,7 +41,7 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
     <Link
       data-testid="listing-card"
       href={`/l/${listing.slug}`}
-      className="group flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface transition-colors hover:border-line-strong"
+      className="crt retro-card group flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface"
     >
       <div
         className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3"
@@ -51,6 +51,7 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
           className="font-mono text-[11px] font-semibold tracking-wide"
           style={{ color: meta.color }}
         >
+          <span aria-hidden="true">▌</span>
           {meta.tag}
         </span>
         <Tag tone="ok">
@@ -58,7 +59,7 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
         </Tag>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="m-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-accent-hover">
+        <h3 className="m-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-accent">
           {listing.title}
         </h3>
         <p className="m-0 line-clamp-2 text-sm text-ink-2">{listing.summary}</p>
@@ -80,15 +81,18 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
         {total !== null ? (
           <div className="min-w-0">
             <p className="m-0 font-mono text-[11px] uppercase tracking-wide text-muted">You pay</p>
-            <Money lamports={total} centsPerSol={pricing.centsPerSol} strong />
+            <Money lamports={total} centsPerSol={pricing.centsPerSol} strong display />
           </div>
         ) : (
           <div className="min-w-0">
-            <Money lamports={listing.price} centsPerSol={pricing.centsPerSol} strong />
+            <Money lamports={listing.price} centsPerSol={pricing.centsPerSol} strong display />
             <p className="m-0 text-xs text-muted">+ 5% buyer fee · your tier can cut it</p>
           </div>
         )}
-        <span className="shrink-0 font-mono text-xs text-accent" aria-hidden="true">
+        <span
+          className="shrink-0 font-display text-xs font-bold text-accent transition-transform group-hover:translate-x-0.5"
+          aria-hidden="true"
+        >
           View →
         </span>
       </div>
@@ -117,7 +121,7 @@ export function ListingGrid({
     return (
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
         {[0, 1, 2].map((key) => (
-          <li key={key} className="rounded-card border border-line bg-surface p-4">
+          <li key={key} className="crt rounded-card border border-line bg-surface p-4">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="mt-4 h-5 w-3/4" />
             <Skeleton className="mt-3 h-4 w-full" />

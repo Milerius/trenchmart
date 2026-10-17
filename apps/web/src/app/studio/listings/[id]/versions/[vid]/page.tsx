@@ -220,7 +220,7 @@ export default function VersionPage() {
         </Link>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Live AI review</h1>
+            <h1 className="m-0 text-[32px]">Live AI review</h1>
             <p className="m-0 mt-1 max-w-2xl text-ink-2">
               Your file is checked the moment it lands. Static checks and the sandbox run together,
               then AI verification gives its verdict. Most reviews finish in seconds.

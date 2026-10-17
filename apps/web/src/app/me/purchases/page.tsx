@@ -11,6 +11,7 @@ import {
   Label,
   Money,
   Panel,
+  SegmentBar,
   Skeleton,
   StatusTag,
   remaining,
@@ -80,7 +81,7 @@ export default function PurchasesPage() {
   if (!wallet.session) {
     return (
       <section className="mx-auto max-w-lg py-10 text-center">
-        <h1 className="text-[28px] font-semibold tracking-[-0.025em]">Purchases</h1>
+        <h1 className="text-[28px]">Purchases</h1>
         <p className="mt-3 text-ink-2">Connect a wallet to see purchases.</p>
         <p className="mt-1 text-sm text-muted">
           Every order shows its escrow timer here, and its download once escrow releases.
@@ -101,7 +102,7 @@ export default function PurchasesPage() {
     <section data-testid="dashboard" className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Purchases</h1>
+          <h1 className="m-0 text-[32px]">Purchases</h1>
           <p className="mt-2 max-w-2xl text-ink-2">
             Real totals in SOL with USD beside them. Downloads stay locked while funds are in escrow
             and unlock when it releases.
@@ -115,16 +116,24 @@ export default function PurchasesPage() {
       {orders && orders.length ? (
         <div className="grid gap-px overflow-hidden rounded-panel border border-line bg-line sm:grid-cols-3">
           <Tile label="In escrow">
-            <Money lamports={escrowTotal} usdCents={centsPerSol(escrowTotal)} stacked />
+            <Money
+              lamports={escrowTotal}
+              usdCents={centsPerSol(escrowTotal)}
+              stacked
+              display
+              className="glow text-[26px] leading-tight text-accent"
+            />
             <span className="text-xs text-muted">
               {inEscrow.length} order{inEscrow.length === 1 ? '' : 's'}
             </span>
           </Tile>
           <Tile label="Ready to download">
-            <span className="text-2xl font-semibold">{ready.length}</span>
+            <span className="font-display text-[26px] leading-tight font-bold">{ready.length}</span>
           </Tile>
           <Tile label="All orders">
-            <span className="text-2xl font-semibold">{orders.length}</span>
+            <span className="font-display text-[26px] leading-tight font-bold">
+              {orders.length}
+            </span>
           </Tile>
         </div>
       ) : null}
@@ -186,7 +195,7 @@ function escrowCents(orders: Order[]) {
 
 function Tile({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 bg-surface p-5">
+    <div className="crt flex flex-col gap-1 bg-surface p-5">
       <Label>{label}</Label>
       <div className="tabular mt-1 flex flex-col font-mono">{children}</div>
     </div>
@@ -205,7 +214,7 @@ function OrderRow({
   onDownload: () => void;
 }) {
   return (
-    <li className="list-none rounded-card border border-line bg-surface p-5">
+    <li className="crt list-none rounded-card border border-line bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -241,7 +250,14 @@ function OrderRow({
           </p>
         </div>
         <div className="text-right">
-          <Money lamports={order.amount.lamports} usdCents={order.amount.usdCents} strong stacked />
+          <Money
+            lamports={order.amount.lamports}
+            usdCents={order.amount.usdCents}
+            strong
+            stacked
+            display
+            className="text-lg"
+          />
         </div>
       </div>
       <EscrowTimeline order={order} now={now} />
@@ -307,25 +323,17 @@ function EscrowTimeline({ order, now }: { order: Order; now: number }) {
   ];
   return (
     <div data-testid="escrow-timeline" className="mt-5">
-      <div
-        className="h-1.5 overflow-hidden rounded-full bg-surface-2"
-        role="progressbar"
-        aria-label="Escrow progress"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(progress * 100)}
-      >
-        <div
-          className={`h-full rounded-full ${order.status === 'disputed' ? 'bg-danger' : 'bg-accent'}`}
-          style={{ width: `${Math.round(progress * 100)}%` }}
-        />
-      </div>
+      <SegmentBar value={progress} label="Escrow progress" danger={order.status === 'disputed'} />
       <ol className="m-0 mt-3 grid grid-cols-2 gap-3 p-0 sm:grid-cols-4">
         {steps.map(([label, detail, reached]) => (
           <li key={label} className="list-none">
             <span
-              className={`block text-[13px] font-medium ${reached ? 'text-ink' : 'text-muted'}`}
+              className={`flex items-center gap-1.5 text-[13px] font-medium ${reached ? 'text-ink' : 'text-muted'}`}
             >
+              <span
+                aria-hidden="true"
+                className={`h-2 w-2 shrink-0 ${reached ? 'bg-accent' : 'border border-line-control'}`}
+              />
               {label}
             </span>
             <span className="block font-mono text-xs text-muted">{detail}</span>

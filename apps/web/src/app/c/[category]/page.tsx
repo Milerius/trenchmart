@@ -30,7 +30,7 @@ export default function CategoryPage() {
         <span className="font-mono text-xs tracking-wide" style={{ color: meta.color }}>
           {meta.short}
         </span>
-        <h1 className="m-0 mt-2 text-[32px] font-semibold tracking-[-0.03em]">{meta.label}</h1>
+        <h1 className="m-0 mt-2 text-[32px]">{meta.label}</h1>
         <p className="m-0 mt-1 text-ink-2">{meta.desc}</p>
       </div>
       {!wallet.session ? <PreviewNotice onConnect={() => void wallet.connect()} /> : null}

@@ -80,7 +80,7 @@ export default function NewListingPage() {
   if (!wallet.session) {
     return (
       <section className="mx-auto max-w-lg py-10 text-center">
-        <h1 className="text-[28px] font-semibold tracking-[-0.025em]">New listing</h1>
+        <h1 className="text-[28px]">New listing</h1>
         <p className="mt-3 text-ink-2">Connect a wallet first.</p>
         <Button className="mt-6" onClick={() => void wallet.connect()} disabled={wallet.busy}>
           {wallet.busy ? 'Check your wallet…' : 'Connect wallet'}
@@ -107,7 +107,7 @@ export default function NewListingPage() {
           <Link href="/studio" className="text-sm text-muted hover:text-ink">
             ← Studio
           </Link>
-          <h1 className="m-0 mt-3 text-[32px] font-semibold tracking-[-0.03em]">New listing</h1>
+          <h1 className="m-0 mt-3 text-[32px]">New listing</h1>
           <p className="m-0 mt-1 text-ink-2">
             Describe it, set a price, drop the file. AI verification starts the moment it uploads.
           </p>

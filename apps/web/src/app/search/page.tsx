@@ -29,9 +29,7 @@ function Results() {
     <section className="space-y-6">
       <div>
         <Label>Search</Label>
-        <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
-          {q ? `Results for “${q}”` : 'All live listings'}
-        </h1>
+        <h1 className="m-0 mt-1 text-[32px]">{q ? `Results for “${q}”` : 'All live listings'}</h1>
         {listings ? (
           <p className="m-0 mt-1 text-sm text-muted">
             {listings.length} AI-verified listing{listings.length === 1 ? '' : 's'}

@@ -18,7 +18,7 @@ export default function SellPage() {
     <article className="space-y-10">
       <header className="max-w-2xl">
         <Label className="text-accent-label">Sell on TrenchMart</Label>
-        <h1 className="m-0 mt-2 text-[40px] font-semibold leading-tight tracking-[-0.03em]">
+        <h1 className="m-0 mt-2 text-[40px] leading-tight">
           Sell your tooling. Keep 100% of the price.
         </h1>
         <p className="m-0 mt-3 text-[17px] text-ink-2">
