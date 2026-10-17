@@ -66,7 +66,25 @@ const PIPELINE: [string, string][] = [
 
 function seconds(durationMs: number | undefined): string {
   if (durationMs === undefined) return '';
-  return `${(durationMs / 1000).toFixed(1)}s`;
+  return durationMs < 1000 ? `${Math.round(durationMs)} ms` : `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+const OUTCOME_WORDS: Record<string, string> = {
+  pass: 'All checks passed',
+  warn: 'Passed with warnings',
+  fail: 'Failed checks',
+  na: 'Not needed for this file type',
+  approve: 'Approved: behaviour matches the listing',
+  request_changes: 'Changes requested',
+  reject: 'Rejected',
+};
+
+function describe(event: ReviewEvent | undefined, fallback: string): string {
+  if (!event || event.status === 'running') return fallback;
+  if (event.status === 'skipped')
+    return `Skipped: already passed (${event.summary ?? event.verdict ?? 'pass'})`;
+  const key = event.decision ?? event.verdict ?? event.summary;
+  return (key && OUTCOME_WORDS[key]) ?? event.summary ?? fallback;
 }
 
 function stepTone(event: ReviewEvent | undefined): Tone {
@@ -211,7 +229,7 @@ export default function VersionPage() {
           <div className="text-right" aria-live="off">
             <Label>{running ? 'Elapsed' : 'Review time'}</Label>
             <p className="tabular m-0 font-mono text-2xl font-semibold">
-              {startedAt ? `${(elapsed / 1000).toFixed(1)}s` : '—'}
+              {startedAt ? seconds(elapsed) : '—'}
             </p>
           </div>
         </div>
@@ -268,9 +286,7 @@ export default function VersionPage() {
                     </span>
                   ) : null}
                 </span>
-                <span className="block text-[13px] text-muted">
-                  {event?.summary ?? description}
-                </span>
+                <span className="block text-[13px] text-muted">{describe(event, description)}</span>
               </span>
             </>
           );
@@ -317,7 +333,6 @@ export default function VersionPage() {
             data-testid="sandbox-log"
             className="m-0 max-h-72 overflow-auto p-4 font-mono text-xs leading-relaxed text-ink-2"
           >
-            {sandbox.log.egress === 'blocked' ? 'egress blocked\n' : ''}
             {(sandbox.log.log ?? []).join('\n')}
             {(sandbox.log.walletCalls ?? []).length
               ? `\nwallet ${sandbox.log.walletCalls?.join(', ')}`
@@ -339,8 +354,8 @@ export default function VersionPage() {
           <div className="min-w-0 flex-1">
             <p className="m-0 font-semibold">Approved and live</p>
             <p className="m-0 text-sm text-accent-body">
-              AI-verified{totalMs ? ` in ${(totalMs / 1000).toFixed(1)}s` : ''}. Buyers see the
-              checks and the pinned hash on your listing.
+              AI-verified{totalMs ? ` in ${seconds(totalMs)}` : ''}. Buyers see the checks and the
+              pinned hash on your listing.
             </p>
           </div>
           <ButtonLink href="/studio" variant="secondary">

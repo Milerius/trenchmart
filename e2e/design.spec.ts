@@ -172,9 +172,9 @@ test('downloads stay locked until escrow releases', async ({ page }) => {
   await expect(buttons.nth(0)).toHaveAttribute('data-state', 'locked');
   await expect(buttons.nth(0)).toBeDisabled();
   await expect(buttons.nth(0)).toContainText('Unlocks in 41h');
-  await expect(buttons.nth(1)).toHaveAttribute('data-state', 'ready');
-  await expect(buttons.nth(1)).toBeEnabled();
-  await expect(buttons.nth(2)).toContainText('Locked during dispute');
+  await expect(buttons.nth(1)).toContainText('Locked during dispute');
+  await expect(buttons.nth(2)).toHaveAttribute('data-state', 'ready');
+  await expect(buttons.nth(2)).toBeEnabled();
   await expect(page.getByTestId('escrow-timeline')).toHaveCount(3);
   await expect(page.locator('[data-testid="status-tag"][data-status="paid"]')).toContainText(
     'PAID · IN ESCROW',
@@ -228,7 +228,7 @@ test('live AI review streams each step to an outcome', async ({ page }) => {
         requests: [],
         walletCalls: [],
         errors: [],
-        log: ['loaded https://axiom.trade/pulse'],
+        log: ['egress blocked', 'loaded https://axiom.trade/pulse'],
         egress: 'blocked',
       },
     },
@@ -261,7 +261,7 @@ test('live AI review streams each step to an outcome', async ({ page }) => {
   );
   await page.goto('/studio/listings/l1/versions/v1');
   await expect(page.getByTestId('review-step')).toHaveCount(3);
-  await expect(page.getByTestId('review-timing').first()).toHaveText('0.4s');
+  await expect(page.getByTestId('review-timing').first()).toHaveText('420 ms');
   await expect(page.getByTestId('sandbox-log')).toContainText('egress blocked');
   await expect(page.getByTestId('review-outcome')).toContainText('Approved and live');
   await expect(page.getByTestId('studio')).not.toContainText(/human|appeal/i);
