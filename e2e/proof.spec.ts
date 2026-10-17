@@ -62,7 +62,7 @@ const facts = {
     exists: true,
     programData: member(4),
     lastDeploySlot: '512000000',
-    upgradeAuthority: member(5),
+    upgradeAuthority: member(8),
     deployedBytes: 177112,
     sha256: 'cd'.repeat(32),
     securityTxt: { name: 'TrenchMart Escrow' },
@@ -115,8 +115,11 @@ test('the proof page shows live program, multisig and escrows, and checks a sign
   const proof = page.getByTestId('proof');
   await expect(proof).toContainText('177112 bytes');
   await expect(proof).toContainText('cd'.repeat(32));
-  await expect(proof).toContainText('fund, initialize');
+  await expect(proof.getByRole('list', { name: 'Instructions' })).toContainText('initialize');
   await expect(page.getByTestId('multisig')).toContainText('2 of 3 signers');
+  // The upgrade authority is the Squads vault, so the chip says MULTISIG.
+  await expect(proof.getByTestId('upgrade-authority')).toContainText('MULTISIG');
+  await expect(page.getByTestId('proof-summary')).toContainText('6 of 7 checks confirmed');
   await expect(page.getByTestId('recent-escrows')).toContainText('Proof Pack');
   await expect(
     proof.locator(`a[href*="${ESCROW_PROGRAM_ID}?cluster=devnet"]`).first(),
