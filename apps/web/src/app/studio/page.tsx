@@ -17,6 +17,7 @@ import {
   utc,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { submitPayment } from '@/lib/studio';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
 
@@ -100,10 +101,7 @@ export default function StudioPage() {
       body: JSON.stringify({ amount: lamports }),
     });
     const signature = await wallet.signAndSend(created.txBase64);
-    await api(`/studio/bond/${created.bondId}/submitted`, {
-      method: 'POST',
-      body: JSON.stringify({ txSig: signature }),
-    });
+    await submitPayment(api, `/studio/bond/${created.bondId}/submitted`, signature);
     setMessage('Bond submitted.');
     await load();
   }

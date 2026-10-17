@@ -15,6 +15,8 @@ import {
   type Tone,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { ensureVerificationFee } from '@/lib/studio';
+import { useWallet } from '@/lib/wallet';
 
 type SandboxLog = {
   requests?: { host: string; method: string; count: number }[];
@@ -98,6 +100,7 @@ function stepTone(event: ReviewEvent | undefined): Tone {
 
 export default function VersionPage() {
   const params = useParams<{ id: string; vid: string }>();
+  const wallet = useWallet();
   const [view, setView] = useState<VersionView | null>(null);
   const [events, setEvents] = useState<ReviewEvent[]>([]);
   const [note, setNote] = useState('');
@@ -169,11 +172,16 @@ export default function VersionPage() {
   useEffect(() => {
     if (!view || running || events.length > 0) return;
     if (view.version.status === 'uploading' || view.version.status === 'scanning') {
-      const path =
-        view.version.status === 'uploading'
-          ? `/api/v1/studio/versions/${params.vid}/complete?stream=1`
-          : `/api/v1/studio/versions/${params.vid}/review?stream=1`;
-      void stream(path).catch((err: Error) => setMessage(err.message));
+      const uploading = view.version.status === 'uploading';
+      const path = uploading
+        ? `/api/v1/studio/versions/${params.vid}/complete?stream=1`
+        : `/api/v1/studio/versions/${params.vid}/review?stream=1`;
+      // A fee left unpaid (wallet closed, page reloaded) would make /complete fail with
+      // FEE_REQUIRED, so settle it first. This is a no-op when it is paid or waived.
+      const ready = uploading
+        ? ensureVerificationFee({ api, versionId: params.vid, signAndSend: wallet.signAndSend })
+        : Promise.resolve(false);
+      void ready.then(() => stream(path)).catch((err: Error) => setMessage(err.message));
     }
   }, [view, params.vid]);
 

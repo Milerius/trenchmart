@@ -7,6 +7,7 @@ import { CATEGORIES, solToLamports } from '@trenchmart/shared';
 import { Button, Label, Money, Panel, Square } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
+import { payVerificationFee, type UnsignedTx } from '@/lib/studio';
 import { useWallet } from '@/lib/wallet';
 
 const INPUT =
@@ -55,18 +56,30 @@ export default function NewListingPage() {
       return;
     }
     setBusy('Uploading file…');
-    const version = await api<{ versionId: string; uploadUrl: string }>(
-      `/studio/listings/${created.id}/versions`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          semver: '1.0.0',
-          changelog: 'initial',
-          fileName: file.name,
-          fileSize: file.size,
-        }),
-      },
-    );
+    const version = await api<{
+      versionId: string;
+      uploadUrl: string;
+      feeTx: UnsignedTx | null;
+    }>(`/studio/listings/${created.id}/versions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        semver: '1.0.0',
+        changelog: 'initial',
+        fileName: file.name,
+        fileSize: file.size,
+      }),
+    });
+    if (version.feeTx) {
+      // Pay while the fee transaction's blockhash is fresh. /complete refuses an unpaid fee.
+      setBusy('Paying verification fee…');
+      await payVerificationFee({
+        api,
+        versionId: version.versionId,
+        feeTx: version.feeTx,
+        signAndSend: wallet.signAndSend,
+      });
+      setBusy('Uploading file…');
+    }
     const target = new URL(version.uploadUrl, window.location.origin);
     const put = await fetch(`${target.pathname}${target.search}`, {
       method: 'PUT',

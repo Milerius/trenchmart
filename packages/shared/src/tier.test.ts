@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bondToList,
   minBalanceInWindow,
   nextTierNeed,
   parseThreshold,
@@ -60,6 +61,25 @@ describe('tierFor', () => {
     expect(requiredBondLamports(['filter', 'missing'], { filter: 100n }, 'none', 5000)).toBe(100n);
     expect(requiredBondLamports(['userscript'], { userscript: 100n }, 'og', 5000)).toBe(50n);
     expect(requiredBondLamports([], {}, 'none', 5000)).toBe(0n);
+  });
+});
+
+describe('bondToList', () => {
+  const bonds = { filter: 1_000n, userscript: 5_000n };
+
+  it('asks a new creator for at least the cheapest category bond, never 0', () => {
+    expect(bondToList([], bonds, 'none', 5000)).toBe(1_000n);
+    expect(bondToList([], bonds, 'og', 5000)).toBe(500n);
+  });
+
+  it('uses the live category bond when it is higher', () => {
+    expect(bondToList(['userscript'], bonds, 'none', 5000)).toBe(5_000n);
+    expect(bondToList(['filter'], bonds, 'none', 5000)).toBe(1_000n);
+  });
+
+  it('is 0 only when no category needs a bond', () => {
+    expect(bondToList([], {}, 'none', 5000)).toBe(0n);
+    expect(bondToList([], { filter: 0n }, 'none', 5000)).toBe(0n);
   });
 });
 
