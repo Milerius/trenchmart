@@ -105,7 +105,7 @@ Your tier is based on your lowest $TRENCH balance over the last 72 hours, so it 
 
 **Escrow on every order.** Payment goes to escrow, not to the creator. The creator is paid only after 48 hours with no dispute. A dispute pauses release until it is settled: upheld means a refund, rejected means the order returns to payout.
 
-**Squads multisig vault.** Escrowed SOL sits in a [Squads](https://squads.so) multisig vault backed by an off-chain ledger. The API holds no key that can move vault funds, and payouts are proposed to multisig signers. An on-chain Anchor escrow program is planned for a later, audited phase.
+**Squads multisig vault.** Escrowed SOL sits in a [Squads](https://squads.so) multisig vault backed by an off-chain ledger. The API holds no key that can move vault funds, and payouts are proposed to multisig signers. The repo also has an on-chain Anchor escrow program, [`trench_escrow`](programs/trench_escrow), that handles fund, release, dispute and refund with the same fee maths. CI builds and tests it on every pull request, but it is not the launch custody path. Custody stays on Squads until the program is audited.
 
 **Sandboxed AI review.** Every version passes three stages before it can be sold:
 
@@ -136,7 +136,7 @@ Approved files are pinned by SHA-256. Buyers only ever receive that exact file, 
 
 ## Tech stack
 
-Next.js 16 · React 19 · Tailwind CSS 4 · Hono · PostgreSQL · Solana (devnet) · Squads · Playwright + axe · TypeScript 7 · pnpm + Turborepo
+Next.js 16 · React 19 · Tailwind CSS 4 · Hono · PostgreSQL · Solana (devnet) · Squads · Anchor (Rust) · Playwright + axe · TypeScript 7 · pnpm + Turborepo
 
 ## Quickstart
 
@@ -171,18 +171,18 @@ Every other setting has a working local default. See [`.env.example`](.env.examp
 
 ## Documentation
 
-| Topic                  | Doc                                                                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Product and scope      | [`docs/01-product.md`](docs/01-product.md) · [`docs/13-product-decisions.md`](docs/13-product-decisions.md)                |
-| Architecture           | [`docs/02-architecture.md`](docs/02-architecture.md) · [`docs/TOOLCHAIN.md`](docs/TOOLCHAIN.md)                            |
-| Data model and API     | [`docs/03-data-model.md`](docs/03-data-model.md) · [`docs/04-api.md`](docs/04-api.md)                                      |
-| Security pipeline      | [`docs/05-security-pipeline.md`](docs/05-security-pipeline.md)                                                             |
-| Payments and escrow    | [`docs/06-payments-escrow.md`](docs/06-payments-escrow.md)                                                                 |
-| $TRENCH tiers          | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                         |
-| Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/) |
-| Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                              |
-| Costs and budget       | [`docs/11-costs.md`](docs/11-costs.md) · [`docs/12-budget.md`](docs/12-budget.md)                                          |
-| Brief for build agents | [`AGENT_PROMPT.md`](AGENT_PROMPT.md)                                                                                       |
+| Topic                  | Doc                                                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Product and scope      | [`docs/01-product.md`](docs/01-product.md) · [`docs/13-product-decisions.md`](docs/13-product-decisions.md)                      |
+| Architecture           | [`docs/02-architecture.md`](docs/02-architecture.md) · [`docs/TOOLCHAIN.md`](docs/TOOLCHAIN.md)                                  |
+| Data model and API     | [`docs/03-data-model.md`](docs/03-data-model.md) · [`docs/04-api.md`](docs/04-api.md)                                            |
+| Security pipeline      | [`docs/05-security-pipeline.md`](docs/05-security-pipeline.md)                                                                   |
+| Payments and escrow    | [`docs/06-payments-escrow.md`](docs/06-payments-escrow.md)                                                                       |
+| $TRENCH tiers          | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                               |
+| Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/)       |
+| Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                                    |
+| Costs and budget       | [`docs/11-costs.md`](docs/11-costs.md) · [`docs/12-budget.md`](docs/12-budget.md) · [`DEPLOYMENT_COSTS.md`](DEPLOYMENT_COSTS.md) |
+| Brief for build agents | [`AGENT_PROMPT.md`](AGENT_PROMPT.md)                                                                                             |
 
 <div align="center">
 <sub>Devnet proof of concept. Not financial advice. Tools don't guarantee profits.</sub>
