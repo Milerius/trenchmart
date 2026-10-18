@@ -143,9 +143,14 @@ export default function StudioPage() {
             payouts in SOL from the Squads vault
           </p>
         </div>
-        <ButtonLink href="/studio/listings/new" size="lg">
-          New listing
-        </ButtonLink>
+        <div className="flex gap-2">
+          <ButtonLink href="/studio/profile" size="lg" variant="secondary">
+            Edit profile
+          </ButtonLink>
+          <ButtonLink href="/studio/listings/new" size="lg">
+            New listing
+          </ButtonLink>
+        </div>
       </header>
 
       {loadError ? (

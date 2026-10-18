@@ -52,7 +52,7 @@ async function reset() {
       audit_log, ledger, notifications, downloads, listing_reviews, disputes, licenses, payouts,
       orders, scan_checks, scans, ai_reviews, sandbox_jobs, listing_content, listing_media, versions, listings,
       bonds, token_balances, auth_nonces, reports, buybacks, rate_buckets, update_periods,
-      update_renewals, supplements, verifications, users
+      update_renewals, supplements, verifications, profile_media, users
     restart identity cascade
   `;
 }
@@ -2167,5 +2167,249 @@ describe('versioning: updates, entitlement windows, limits and supplements', () 
     // Midnight UTC resets the free check.
     clock = new Date('2026-06-02T00:00:00.000Z');
     expect((await post(a, '/verify', cookie, body, ip)).status).toBe(200);
+  });
+});
+
+describe('creator profiles', () => {
+  beforeEach(async () => {
+    sql = createSql(databaseUrl);
+    await migrate(sql);
+    await reset();
+  });
+
+  afterAll(async () => {
+    await sql?.end();
+  });
+
+  const put = (app: ReturnType<typeof createApp>, cookie: string, body: unknown) =>
+    app.request('/api/v1/studio/profile', {
+      method: 'PUT',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  async function pngOf(width: number, height: number) {
+    const req = createRequire(import.meta.url);
+    const module = new (
+      globalThis as unknown as { WebAssembly: { Module: new (b: Uint8Array) => object } }
+    ).WebAssembly.Module(readFileSync(req.resolve('@jsquash/png/codec/pkg/squoosh_png_bg.wasm')));
+    await initPngEncode(module as never);
+    const data = new Uint8ClampedArray(width * height * 4).fill(200);
+    return new Uint8Array(await encodePng({ data, width, height } as never));
+  }
+
+  it('saves and validates the profile, reports per-field errors and keeps handles unique', async () => {
+    const app = await appFor();
+    const alice = keypair();
+    const cookie = await login(app, alice);
+    const empty = (await (
+      await app.request('/api/v1/studio/profile', { headers: { cookie } })
+    ).json()) as Record<string, unknown>;
+    expect(empty).toMatchObject({
+      wallet: alice.publicKey,
+      displayName: null,
+      bio: null,
+      avatar: null,
+      xVerified: false,
+      contact: { enabled: false, channels: [] },
+    });
+
+    const saved = await put(app, cookie, {
+      handle: 'Alice_Builds',
+      displayName: '  Alice  ',
+      bio: 'Axiom scripts. Ships weekly.',
+      socials: {
+        telegram: '@alicetg',
+        github: 'https://github.com/alice',
+        website: 'https://alice.dev',
+      },
+      contact: {
+        enabled: true,
+        channels: [
+          { kind: 'telegram', value: '@alicetg', audience: 'everyone' },
+          { kind: 'email', value: 'alice@example.com', audience: 'buyers' },
+        ],
+      },
+    });
+    expect(saved.status).toBe(200);
+    const body = (await saved.json()) as Record<string, any>;
+    expect(body.handle).toBe('alice_builds');
+    expect(body.displayName).toBe('Alice');
+    expect(body.socials).toEqual({
+      telegram: 'alicetg',
+      github: 'alice',
+      website: 'https://alice.dev',
+    });
+
+    const bad = await put(app, cookie, {
+      socials: { website: 'http://axi0m-trade.com', github: 'not a user!' },
+    });
+    expect(bad.status).toBe(400);
+    const badBody = (await bad.json()) as {
+      error: { code: string; fields: Record<string, string> };
+    };
+    expect(badBody.error.code).toBe('PROFILE_INVALID');
+    expect(Object.keys(badBody.error.fields).sort()).toEqual(['socials.github', 'socials.website']);
+
+    const lookalike = await put(app, cookie, { socials: { website: 'https://axiom-trade.app' } });
+    expect(lookalike.status).toBe(400);
+
+    const bob = keypair();
+    const bobCookie = await login(app, bob);
+    const taken = await put(app, bobCookie, { handle: 'alice_builds' });
+    expect(taken.status).toBe(400);
+    expect(((await taken.json()) as any).error.fields.handle).toMatch(/taken/);
+    const reserved = await put(app, bobCookie, { handle: 'admin' });
+    expect(reserved.status).toBe(400);
+
+    // Unknown keys are refused rather than silently stored.
+    expect((await put(app, cookie, { avatarUrl: 'https://evil.example/x.png' })).status).toBe(400);
+    const audit = await sql`select 1 from audit_log where action = 'profile.update'`;
+    expect(audit.length).toBe(1);
+  });
+
+  it('uploads an avatar, serves it publicly only while current, and rejects non-images', async () => {
+    const app = await appFor();
+    const alice = keypair();
+    const cookie = await login(app, alice);
+    const upload = (kind: string, bytes: Uint8Array) =>
+      app.request(`/api/v1/studio/profile/${kind}`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/octet-stream' },
+        body: bytes,
+      });
+    expect((await upload('avatar', new TextEncoder().encode('<svg onload=alert(1)>'))).status).toBe(
+      400,
+    );
+    expect((await upload('avatar', await pngOf(20, 20))).status).toBe(400);
+    const res = await upload('avatar', await pngOf(96, 96));
+    expect(res.status).toBe(200);
+    const image = (await res.json()) as { id: string; url: string };
+    expect(image.url).toBe(`/api/v1/profile-media/${image.id}`);
+    const served = await app.request(image.url);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('content-type')).toMatch(/^image\//);
+    expect(served.headers.get('x-content-type-options')).toBe('nosniff');
+    const me = (await (await app.request('/api/v1/me', { headers: { cookie } })).json()) as any;
+    expect(me.user.avatarUrl).toBe(image.url);
+
+    const replaced = (await (await upload('avatar', await pngOf(128, 128))).json()) as {
+      id: string;
+    };
+    expect((await app.request(image.url)).status).toBe(404);
+    expect((await app.request(`/api/v1/profile-media/${replaced.id}`)).status).toBe(200);
+    await app.request('/api/v1/studio/profile/avatar', { method: 'DELETE', headers: { cookie } });
+    expect((await app.request(`/api/v1/profile-media/${replaced.id}`)).status).toBe(404);
+    expect((await app.request('/api/v1/profile-media/not-a-uuid')).status).toBe(404);
+  });
+
+  it('public profile: real stats only, buyers-only contact, verified X and wallet lookup', async () => {
+    const app = await appFor();
+    const seller = keypair();
+    const sellerCookie = await login(app, seller);
+    await put(app, sellerCookie, {
+      handle: 'maker',
+      displayName: 'Maker',
+      contact: {
+        enabled: true,
+        channels: [
+          { kind: 'telegram', value: '@makertg', audience: 'everyone' },
+          { kind: 'email', value: 'maker@example.com', audience: 'buyers' },
+        ],
+      },
+    });
+    const [sellerRow] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${seller.publicKey}`;
+    const sellerId = sellerRow!.id;
+
+    type Pub = Record<string, any>;
+    const view = async (key: string, cookie?: string) => {
+      const res = await app.request(
+        `/api/v1/creators/${key}`,
+        cookie ? { headers: { cookie } } : {},
+      );
+      return { status: res.status, body: (await res.json()) as Pub };
+    };
+
+    const fresh = await view('maker');
+    expect(fresh.status).toBe(200);
+    expect(fresh.body.stats).toEqual({
+      sales: 0,
+      sales30d: 0,
+      ratingCount: 0,
+      ratingAvg: null,
+      liveListings: 0,
+      versionsShipped: 0,
+      disputesUpheld: 0,
+      disputesResolved: 0,
+    });
+    expect(fresh.body.reviews).toEqual([]);
+    expect(fresh.body.escrowHours).toBeGreaterThan(0);
+    expect(fresh.body.contact).toEqual([
+      { kind: 'telegram', value: 'makertg', audience: 'everyone' },
+    ]);
+    expect(fresh.body.contactHiddenForBuyers).toBe(true);
+    expect(JSON.stringify(fresh.body)).not.toContain('maker@example.com');
+    expect((await view(seller.publicKey)).body.handle).toBe('maker');
+
+    // One live listing with a paid order and a review from a buyer.
+    const buyer = keypair();
+    const buyerCookie = await login(app, buyer);
+    const [buyerRow] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${buyer.publicKey}`;
+    const listingId = randomUUID();
+    const versionId = randomUUID();
+    const orderId = randomUUID();
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price)
+      values (${listingId}, ${sellerId}, 'maker-pack', 'Maker Pack', 'Sum', 'Desc', 'userscript', ${1_000_000_000n})
+    `;
+    await sql`
+      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status)
+      values (${versionId}, ${listingId}, '1.0.0', 'pack.user.js', 5, 'abc', 'blobs/abc', 'live')
+    `;
+    await sql`update listings set live_version_id = ${versionId}, first_live_at = ${now} where id = ${listingId}`;
+    await sql`
+      insert into orders (
+        id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total,
+        tier_at_purchase, memo, status, paid_at, escrow_until, expires_at
+      ) values (
+        ${orderId}, ${buyerRow!.id}, ${listingId}, ${versionId}, ${1_000_000_000n}, 500, 0, 0, 0, ${1_000_000_000n},
+        'none', ${'tm:' + orderId.slice(0, 8)}, 'released', ${now}, ${now}, ${now}
+      )
+    `;
+    await sql`
+      insert into listing_reviews (order_id, listing_id, rating, body)
+      values (${orderId}, ${listingId}, 4, 'Works on Axiom.')
+    `;
+    const asBuyer = await view('maker', buyerCookie);
+    expect(asBuyer.body.stats).toMatchObject({
+      sales: 1,
+      sales30d: 1,
+      ratingCount: 1,
+      ratingAvg: 4,
+      liveListings: 1,
+      versionsShipped: 1,
+    });
+    expect(asBuyer.body.reviews).toEqual([
+      expect.objectContaining({
+        rating: 4,
+        body: 'Works on Axiom.',
+        listing: { title: 'Maker Pack', slug: 'maker-pack' },
+        buyer: `${buyer.publicKey.slice(0, 4)}…${buyer.publicKey.slice(-4)}`,
+      }),
+    ]);
+    expect(asBuyer.body.contact.map((c: Pub) => c.kind)).toEqual(['telegram', 'email']);
+    expect(asBuyer.body.contactHiddenForBuyers).toBe(false);
+    expect(asBuyer.body.listings).toHaveLength(1);
+
+    // X: a dev-linked handle is unverified and does not resolve the profile; a real X id does.
+    await sql`update users set x_handle = 'makerx', x_user_id = 'dev:makerx' where id = ${sellerId}`;
+    expect((await view('maker')).body).toMatchObject({ xHandle: 'makerx', xVerified: false });
+    expect((await view('makerx')).status).toBe(404);
+    await sql`update users set x_user_id = '12345' where id = ${sellerId}`;
+    expect((await view('makerx')).body).toMatchObject({ handle: 'maker', xVerified: true });
   });
 });

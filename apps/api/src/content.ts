@@ -118,7 +118,7 @@ export async function uploadImage(
 }
 
 /** WebP re-encode when it is smaller; the result goes through the same image checks. */
-async function optimized(deps: Deps, clean: CleanImage): Promise<CleanImage> {
+export async function optimized(deps: Deps, clean: CleanImage): Promise<CleanImage> {
   if (!deps.optimizeImage) return clean;
   try {
     const out = await deps.optimizeImage(clean.bytes, clean.mime);
