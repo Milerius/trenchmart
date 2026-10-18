@@ -220,20 +220,22 @@ test('/creators leaderboard: podium, table, filters and rules', async ({ page })
   await lb.getByRole('button', { name: '7 days' }).click();
   await expect(page).toHaveURL(/range=7d/);
   // Controlled by the URL, so the box flips once the route updates.
-  await lb.getByLabel('𝕏 verified only').click();
+  await lb.getByText('verified only', { exact: true }).click();
   await expect(page).toHaveURL(/verified=1/);
-  await expect(lb.getByLabel('𝕏 verified only')).toBeChecked();
+  await expect(lb.getByLabel('X verified only')).toBeChecked();
   await lb.getByLabel('Category').selectOption('wallet_list');
   await expect(page).toHaveURL(/category=wallet_list/);
-  expect(
-    seen.some(
-      (entry) =>
-        entry.includes('tab=upvoted') &&
-        entry.includes('range=7d') &&
-        entry.includes('verified=1') &&
-        entry.includes('category=wallet_list'),
-    ),
-  ).toBe(true);
+  await expect
+    .poll(() =>
+      seen.some(
+        (entry) =>
+          entry.includes('tab=upvoted') &&
+          entry.includes('range=7d') &&
+          entry.includes('verified=1') &&
+          entry.includes('category=wallet_list'),
+      ),
+    )
+    .toBe(true);
 });
 
 test('/creators fits a phone screen', async ({ page }) => {

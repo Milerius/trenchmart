@@ -2,6 +2,7 @@
 
 import type { PublicIdentity } from '@trenchmart/shared';
 import Link from 'next/link';
+import { XIcon } from '@/components/icons';
 import { Avatar, VerifiedBadge } from '@/components/profile';
 import { Money, Tag } from '@/components/ui';
 
@@ -66,7 +67,7 @@ export function KindLabel({ who }: { who: PublicIdentity }) {
   if (who.kind === 'x')
     return (
       <span className="inline-flex items-center gap-1 text-accent">
-        <span aria-hidden="true">𝕏</span> verified
+        <XIcon className="h-3 w-3" /> verified
       </span>
     );
   return <span>{who.kind === 'pseudonym' ? 'pseudonym' : 'wallet only'}</span>;
@@ -85,7 +86,45 @@ export function CreatorName({ who, className = '' }: { who: PublicIdentity; clas
   );
 }
 
+/** Deterministic 5×5 mirrored pattern from the wallet address, for creators with no profile. */
+export function Identicon({ wallet, className }: { wallet: string; className: string }) {
+  let hash = 2166136261;
+  for (const ch of wallet) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const hue = hash % 360;
+  const cells: { x: number; y: number }[] = [];
+  let bits = hash;
+  for (let y = 0; y < 5; y++)
+    for (let x = 0; x < 3; x++) {
+      if (bits & 1) {
+        cells.push({ x, y });
+        if (x < 2) cells.push({ x: 4 - x, y });
+      }
+      bits = (bits >>> 1) | ((bits & 1) << 31);
+    }
+  return (
+    <span
+      data-testid="avatar"
+      className={`grid shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 ${className}`}
+    >
+      <svg viewBox="-1 -1 7 7" className="h-[70%] w-[70%]" aria-hidden="true">
+        {cells.map((cell) => (
+          <rect
+            key={`${cell.x}-${cell.y}`}
+            x={cell.x}
+            y={cell.y}
+            width="1"
+            height="1"
+            fill={`hsl(${hue} 70% 62%)`}
+          />
+        ))}
+      </svg>
+    </span>
+  );
+}
+
 export function CreatorAvatar({ who, className }: { who: PublicIdentity; className: string }) {
+  if (who.kind === 'wallet' && !who.avatarUrl)
+    return <Identicon wallet={who.wallet} className={className} />;
   return (
     <Avatar
       image={who.avatarUrl}
