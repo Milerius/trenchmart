@@ -314,7 +314,7 @@ async function insertKey(
     const minted = await newApiKey();
     const rows = await tx<Row[]>`
       insert into api_keys (user_id, name, prefix, key_hash, scopes, rate_limit_per_min, created_via, created_at)
-      values (${userId}, ${input.name}, ${minted.prefix}, ${minted.hash}, ${tx.array(input.scopes)},
+      values (${userId}, ${input.name}, ${minted.prefix}, ${minted.hash}, ${tx.array(input.scopes)}::text[],
         ${input.rateLimitPerMin}, ${input.via}, ${deps.now()})
       returning *
     `;
@@ -397,7 +397,7 @@ export function registerAgentRoutes(api: Hono<Vars>, deps: Deps): void {
     const expiresAt = new Date(issuedAt.getTime() + CHALLENGE_TTL_MS);
     await deps.sql`
       insert into agent_challenges (nonce, wallet, message, name, scopes, rate_limit_per_min, expires_at)
-      values (${nonce}, ${body.wallet}, ${message}, ${body.name}, ${deps.sql.array(body.scopes)}, ${rate}, ${expiresAt})
+      values (${nonce}, ${body.wallet}, ${message}, ${body.name}, ${deps.sql.array(body.scopes)}::text[], ${rate}, ${expiresAt})
     `;
     return c.json({ nonce, message, expiresAt: expiresAt.toISOString() });
   });
