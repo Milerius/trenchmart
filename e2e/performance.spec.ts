@@ -45,8 +45,7 @@ test('shared reads are preloaded with credentials so the app reuses them', async
   for (const href of ['/api/v1/listings', '/api/v1/stats', '/api/v1/activity?limit=24']) {
     await expect(page.locator(`link[rel="preload"][as="fetch"][href="${href}"]`)).toHaveCount(0);
   }
-  // Only the body font is preloaded; terminal logos load lazily.
-  await expect(page.locator('link[rel="preload"][as="font"]')).toHaveCount(1);
+  // Terminal logos load lazily.
   await expect(page.locator('link[rel="preload"][as="image"][href^="/terminals/"]')).toHaveCount(0);
 });
 

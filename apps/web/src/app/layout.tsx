@@ -5,9 +5,7 @@ import { DEVNET_ADDRESSES, ESCROW_CLUSTER, ESCROW_PROGRAM_ID } from '@/lib/proto
 import './globals.css';
 
 const sans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
-// Only the body face is preloaded: the mono labels and the serif accent swap in when they
-// arrive, so the first paint does not wait behind ~45 KB of secondary fonts on a phone.
-const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono', preload: false });
+const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 // Display accent only (italic words in headings). One weight, one style, latin only: ~20 KB.
 const serif = Instrument_Serif({
   weight: '400',
@@ -15,7 +13,6 @@ const serif = Instrument_Serif({
   subsets: ['latin'],
   variable: '--font-instrument-serif',
   display: 'swap',
-  preload: false,
 });
 
 export const metadata: Metadata = {
