@@ -11,7 +11,9 @@ const KB = 1024;
 
 // Budgets in gzip KB. The baseline before the perf pass was ~240 KB per page.
 export const BUDGETS: Record<string, number> = {
-  '/': 180,
+  // 180 -> 186 (redesign, 2026-10): the approved light React Bits components on home, StarBorder
+  // CTAs (+4.6 KB) and SpotlightCard cards (+2.7 KB). Heavy effects stay out of first load.
+  '/': 186,
   '/search': 175,
   '/studio': 185,
   '/me/purchases': 190,
