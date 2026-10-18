@@ -43,7 +43,8 @@ describe('protocol facts', () => {
     expect(protocol.verificationFeeLamports).toBe(250_000_000);
     expect(protocol.verificationFeeFreeFrom).toBe('trencher');
     expect(protocol.ogBondDiscount).toBe('50%');
-    expect(protocol.escrowHours).toBe(48);
+    expect(protocol.escrowHours).toBe(1);
+    expect(protocol.escrowWindow).toBe('1 hour');
     expect(protocol.orderTtlMinutes).toBe(20);
     expect(protocol.paymentGraceMinutes).toBe(5);
     expect(PAYMENT_GRACE_MS).toBe(5 * 60 * 1000);

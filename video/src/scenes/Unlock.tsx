@@ -258,7 +258,7 @@ export const UnlockCard: React.FC = () => {
             opacity: Math.min(lin(frame, FF_FROM, FF_FROM + 4), 1 - lin(frame, FF_TO - 4, FF_TO)),
           }}
         >
-          ▸▸ 48H LATER
+          ▸▸ 1H LATER
         </div>
       ) : null}
 

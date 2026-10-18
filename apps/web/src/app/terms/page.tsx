@@ -48,9 +48,9 @@ export default function TermsPage() {
         </p>
         <p>
           Once the escrow account holds the full total, the order is paid and held for{' '}
-          {protocol.escrowHours} hours. If you do not open a dispute, release pays the seller the
-          list price and splits the net fee. You can download the file as soon as the order is paid,
-          only for a wallet that holds the license, and not while a dispute is open. The file is
+          {protocol.escrowWindow}. If you do not open a dispute, release pays the seller the list
+          price and splits the net fee. You can download the file as soon as the order is paid, only
+          for a wallet that holds the license, and not while a dispute is open. The file is
           watermarked with the order, the wallet, and the file hash.
         </p>
         <p>

@@ -265,7 +265,7 @@ create table audit_log (
   "trench_decimals": 6,
   "tier_window_hours": 72,
   "fee_split_bps": { "buyback": 4000, "verifiers": 2500, "ops": 2000, "safety": 1500 },
-  "escrow_hours": 48,
+  "escrow_hours": 1,
   "order_ttl_minutes": 20,
   "verification_fee_lamports": 250000000,
   "verification_fee_free_from_tier": "trencher",

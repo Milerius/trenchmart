@@ -102,3 +102,17 @@ export function canOpenDispute(input: {
 export function escrowUntilFrom(paidAt: Date, escrowHours: number): Date {
   return new Date(paidAt.getTime() + escrowHours * 3_600_000);
 }
+
+/** "1 hour", "2 hours", "30 minutes": escrow window copy that reads right for any config. */
+export function escrowWindowLabel(hours: number): string {
+  if (hours > 0 && hours < 1) {
+    const minutes = Math.round(hours * 60);
+    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
+}
+
+/** Short form for chips: "1h", "30m". */
+export function escrowWindowShort(hours: number): string {
+  return hours > 0 && hours < 1 ? `${Math.round(hours * 60)}m` : `${hours}h`;
+}

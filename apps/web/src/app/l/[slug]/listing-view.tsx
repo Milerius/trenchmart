@@ -1,5 +1,6 @@
 'use client';
 
+import { DEFAULT_ESCROW_HOURS, escrowWindowLabel } from '@trenchmart/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type KeyboardEvent } from 'react';
@@ -204,7 +205,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   const verified = security?.review?.decision === 'approve';
   const tier = wallet.session?.tier;
   const busy = step === 'quoting' || step === 'signing' || step === 'confirming';
-  const escrowHours = config?.escrowHours ?? 48;
+  const escrowHours = config?.escrowHours ?? DEFAULT_ESCROW_HOURS;
   const rating = listing.ratingAvg ? Number(listing.ratingAvg) : null;
   const fees = config ?? DEFAULT_FEES;
   const youPay = quote
@@ -402,7 +403,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
                   <p className="m-0 font-semibold text-ink">Paid · in escrow</p>
                   <p role="status" className="m-0 mt-1 text-sm text-ink-2">
                     {message ||
-                      `Your SOL is in escrow for ${escrowHours}h. The download unlocks when it releases.`}
+                      `Your SOL is in escrow for ${escrowWindowLabel(escrowHours)}. Your download is ready in Purchases now.`}
                   </p>
                 </div>
               </div>
@@ -432,7 +433,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
           <ul className="m-0 space-y-2 p-0 text-[13px] text-ink-2">
             <li className="flex list-none gap-2">
               <ShieldIcon className="h-4 w-4 shrink-0 text-accent" />
-              Held in escrow for {escrowHours}h. Dispute any time in that window.
+              Held in escrow for {escrowWindowLabel(escrowHours)}. Dispute any time in that window.
             </li>
             <li className="flex list-none gap-2">
               <span className="shrink-0 text-muted">

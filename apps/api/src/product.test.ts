@@ -1111,6 +1111,10 @@ describe('owner product decisions', () => {
       Record<string, any>[]
     >`select * from orders where id = ${order.orderId}`;
     const row = stored[0]!;
+    // Owner decision: the escrow window is 1 hour, started when the checkout is built
+    // (it lands within ~90 s), so it never ends later than 1 hour after payment.
+    expect((row.escrow_until as Date).getTime() - clock.getTime()).toBe(3_600_000);
+    expect(new Date(order.escrowUntil).getTime()).toBe((row.escrow_until as Date).getTime());
     const fundedAccount = (overrides: Partial<ReturnType<typeof decodeEscrow>> = {}) => ({
       buyer: buyer.publicKey,
       seller: seller.publicKey,

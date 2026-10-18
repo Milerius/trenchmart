@@ -116,5 +116,5 @@ Expiration Time: <iso +10m>
 1. Fetch tx via Helius `getTransaction` (commitment `confirmed`, then re-check `finalized` before release).
 2. Assert: a SystemProgram transfer from `buyer.wallet` to `VAULT_ADDRESS` of exactly `order.total` lamports, and a Memo instruction equal to `order.memo`.
 3. Order still `pending` and not expired (allow a 5-min grace after `expires_at` if tx block time is before it).
-4. Set `paid`, `tx_sig`, `paid_at`, `escrow_until = paid_at + escrow_hours`; ledger `+total vault`; create `licenses` row.
+4. Set `paid`, `tx_sig`, `paid_at`, `escrow_until = paid_at + escrow_hours` (1h max; escrow orders: fixed on chain at checkout, ≤ paid_at + 1h); ledger `+total vault`; create `licenses` row.
 5. Over/under-payment → order stays pending, flag for admin, never auto-refund.

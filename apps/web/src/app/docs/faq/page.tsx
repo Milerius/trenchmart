@@ -7,11 +7,11 @@ export const metadata: Metadata = { title: 'FAQ · TrenchMart docs' };
 const QA: [string, string][] = [
   [
     'When can I download?',
-    `As soon as your payment is confirmed in the escrow account. Downloads pause while a dispute is open. The seller is paid only after the ${protocol.escrowHours}-hour window.`,
+    `As soon as your payment is confirmed in the escrow account. Downloads pause while a dispute is open. The seller is paid only after the ${protocol.escrowWindow} window.`,
   ],
   [
     'Who holds the SOL?',
-    `Your order's own escrow account, a PDA of the trench_escrow program on ${protocol.cluster}. After the ${protocol.escrowHours}-hour window the program pays the seller and the fee buckets; during a dispute the resolver can refund you. Bonds and verification fees sit in a Squads multisig vault. Every address is on /verify.`,
+    `Your order's own escrow account, a PDA of the trench_escrow program on ${protocol.cluster}. After the ${protocol.escrowWindow} window the program pays the seller and the fee buckets; during a dispute the resolver can refund you. Bonds and verification fees sit in a Squads multisig vault. Every address is on /verify.`,
   ],
   [
     'What does the seller receive?',
@@ -23,7 +23,7 @@ const QA: [string, string][] = [
   ],
   [
     'How long do I have to dispute?',
-    `Until the ${protocol.escrowHours}-hour window ends, or ${protocol.maliciousDisputeDays} days from payment if the reason is malicious.`,
+    `Until the ${protocol.escrowWindow} window ends, or ${protocol.maliciousDisputeDays} days from payment if the reason is malicious.`,
   ],
   [
     'Who reviews listings?',

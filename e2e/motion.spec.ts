@@ -38,7 +38,7 @@ async function stubHome(page: Page) {
           tierRebateBps: { none: 0, scout: 2500, trencher: 6000, og: 10000 },
           tierThresholds: { scout: '100000', trencher: '1000000', og: '10000000' },
           feeSplitBps: { buyback: 4000, ai_verification: 2500, ops: 2000, safety: 1500 },
-          escrowHours: 48,
+          escrowHours: 1,
           verificationFeeLamports: '0',
           bondLamportsByCategory: { userscript: '5000000000' },
         },

@@ -87,7 +87,7 @@ Plain, short, specific. Say what happened, what it means for the user's money, a
 3. **Approve 1.53 SOL in wallet** moves to Awaiting signature: "Check Phantom. Your wallet should show a transfer of 1.53 SOL to 9WzD…Tm4q with memo tm:8c1d2e0a. If it shows anything else, reject it."
 4. Confirming: signed ✓ → processed ✓ → confirmed ◑ → checked by TrenchMart ○, with a Solscan (devnet) link. "You can close this. The order keeps confirming and shows up in Purchases."
 5. Confirmed: "Payment confirmed · 1.53 SOL (≈ $275.40) is in escrow" + `● PAID · IN ESCROW` + a disabled `download-button` "Download unlocks 19 Oct 06:01 UTC" + receipt + "Open a dispute before release" + a link to Purchases.
-6. Released (after 48h with no dispute, or a rejected dispute): the order becomes `RELEASED`, the download button turns primary ("Download"), and a toast/notification says "Trade finished. Your download is ready."
+6. Released (after the 1h escrow window with no dispute, or a rejected dispute): the order becomes `RELEASED`, the download button turns primary ("Download"), and a toast/notification says "Trade finished. Your download is ready."
 
 ### Escrow and disputes
 
