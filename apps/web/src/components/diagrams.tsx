@@ -1,10 +1,10 @@
 import { feeSplit, orderEdges, protocol, type OrderEdge } from '@/lib/protocol-facts';
 
-const INK = '#edefea';
+const INK = '#eef0ea';
 const MUTED = '#9ba19a';
 const LINE = '#646c63';
-const SURFACE = '#121412';
-const BORDER = '#262a26';
+const SURFACE = '#101210';
+const BORDER = '#232823';
 const ACCENT = '#c6f432';
 const ON = '#0a0b0a';
 

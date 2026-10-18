@@ -1,17 +1,17 @@
 @import 'tailwindcss';
 
-/* Values mirror design/tokens.json v2.1. Text tokens are >= 4.5:1 on surface; line-control >= 3:1. */
+/* Values mirror design/tokens.json v2.2. Text tokens are >= 4.5:1 on surface; line-control >= 3:1. */
 @theme {
-  --color-bg: #0a0b0a;
-  --color-inset: #0e100e;
-  --color-surface: #121412;
+  --color-bg: #070807;
+  --color-inset: #0c0e0c;
+  --color-surface: #101210;
   --color-surface-2: #161916;
-  --color-line: #262a26;
-  --color-line-soft: #1e221e;
+  --color-line: #232823;
+  --color-line-soft: #1a1e1a;
   --color-line-strong: #343a34;
   --color-line-control: #646c63;
-  --color-ink: #edefea;
-  --color-ink-2: #b4bab2;
+  --color-ink: #eef0ea;
+  --color-ink-2: #b8bdb5;
   --color-muted: #9ba19a;
   --color-faint: #868d86;
   --color-decor: #6e756d;
@@ -31,13 +31,18 @@
   --color-info: #7cc4ff;
   --color-info-bg: #0f1620;
   --color-info-line: #1e3448;
+  /* Category / split accents (text-safe on surface: violet 9.05:1, mint 12.48:1). */
+  --color-violet: #c9a2ff;
+  --color-mint: #6ee7c8;
   --font-sans: var(--font-geist-sans), Geist, ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace;
   --font-serif: var(--font-instrument-serif), 'Instrument Serif', Georgia, serif;
   --radius-tag: 6px;
   --radius-ctl: 10px;
-  --radius-card: 14px;
-  --radius-panel: 16px;
+  --radius-card: 16px;
+  --radius-panel: 22px;
+  --radius-sheet: 26px;
+  --radius-hero: 36px;
 }
 
 html {
