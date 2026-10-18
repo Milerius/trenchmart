@@ -263,15 +263,17 @@ export async function reconcileBalance(deps: Deps, wallet: string): Promise<void
   if (!last) return ensureSnapshot(deps, wallet);
   if (nowMs - new Date(last.ts).getTime() < BALANCE_RECONCILE_MS) return;
   const amount = await readTrench(deps, wallet);
-  if (amount !== null) {
-    if (reconciledAt.size >= RECONCILED_MAX) reconciledAt.clear();
-    reconciledAt.set(wallet, nowMs);
+  if (amount === null) return;
+  if (amount !== BigInt(last.amount)) {
+    await deps.sql`
+      insert into token_balances (wallet, amount, ts, source)
+      values (${wallet}, ${amount.toString()}, ${deps.now()}, 'reconcile')
+    `;
   }
-  if (amount === null || amount === BigInt(last.amount)) return;
-  await deps.sql`
-    insert into token_balances (wallet, amount, ts, source)
-    values (${wallet}, ${amount.toString()}, ${deps.now()}, 'reconcile')
-  `;
+  // Only once the chain read is stored (or matched the stored row): a failed insert must not
+  // skip the next reconcile.
+  if (reconciledAt.size >= RECONCILED_MAX) reconciledAt.clear();
+  reconciledAt.set(wallet, nowMs);
 }
 
 function unsignedTx(input: {

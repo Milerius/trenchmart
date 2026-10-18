@@ -97,18 +97,33 @@ export default function StudioPage() {
   const [message, setMessage] = useState('');
   const [tab, setTab] = useState<Bucket | 'all'>('all');
   const inflight = useRef(false);
+  const [dropped, setDropped] = useState(0);
   const sessionWallet = wallet.session?.wallet ?? null;
-  const sessionRef = useRef(sessionWallet);
-  sessionRef.current = sessionWallet;
+  // The latest session for async callbacks; written in an effect (declared before the mount
+  // load below, so it is current when that load settles).
+  const sessionRef = useRef({ wallet: sessionWallet, checked: wallet.checked });
+  useEffect(() => {
+    sessionRef.current = { wallet: sessionWallet, checked: wallet.checked };
+  }, [sessionWallet, wallet.checked]);
 
   async function load() {
     inflight.current = true;
+    const startedFor = sessionRef.current.wallet;
     try {
       const [req, view, pay] = await Promise.all([
         api<Requirements>('/studio/requirements'),
         api<Overview>('/studio/overview'),
         api<Payouts>('/studio/payouts'),
       ]);
+      // Drop answers that no longer belong to the session (signed out or switched wallet
+      // while they were in flight). While the first session check is pending, keep them.
+      const now = sessionRef.current;
+      if (now.wallet ? now.wallet !== view.creator.wallet : now.checked) {
+        // The session changed meanwhile: let the session effect read again for it (once per
+        // change, so a cookie that answers for another wallet cannot loop).
+        if (now.wallet !== startedFor) setDropped((n) => n + 1);
+        return;
+      }
       setRequirements(req);
       setOverview(view);
       setPayouts(pay);
@@ -127,7 +142,7 @@ export default function StudioPage() {
   // asking), instead of waiting for /me first. Signed out, they are 401s and are ignored.
   useEffect(() => {
     void load().catch((err: Error) => {
-      if (sessionRef.current) setLoadError(err.message);
+      if (sessionRef.current.wallet) setLoadError(err.message);
     });
   }, []);
 
@@ -142,7 +157,7 @@ export default function StudioPage() {
       setPayouts(null);
     }
     reload();
-  }, [sessionWallet, overview]);
+  }, [sessionWallet, overview, dropped]);
 
   // X linking lives on the profile now; older X callbacks still land here, so forward them.
   useEffect(() => {

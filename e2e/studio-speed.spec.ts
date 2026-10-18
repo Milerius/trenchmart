@@ -76,9 +76,12 @@ test('studio reads start in parallel with the session check, with no connect fla
   const me = calls.find((c) => c.path === '/me')!;
   const overview = calls.find((c) => c.path === '/studio/overview')!;
   expect(overview.at).toBeLessThan(me.done ?? Infinity);
-  // Exactly one read of each: the session arriving does not trigger a second round.
+  // The session arriving does not trigger a second round of reads. (The HTML preload and the
+  // page's own fetch can both show up here when the browser does not reuse the preload.)
+  await expect.poll(() => me.done).toBeTruthy();
   await page.waitForTimeout(300);
-  expect(calls.filter((c) => c.path === '/studio/overview')).toHaveLength(1);
+  const late = calls.filter((c) => c.path === '/studio/overview' && c.at >= me.done!);
+  expect(late).toHaveLength(0);
 });
 
 test('coming back to the studio renders the last data at once, then refreshes', async ({
