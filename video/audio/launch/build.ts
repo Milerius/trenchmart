@@ -12,6 +12,7 @@ import { master, mixWithVo, renderVoBus } from '../mix';
 import { renderLaunchMusic } from './music';
 import { escrow } from './escrow';
 import { security } from './security';
+import { sellers } from './sellers';
 import { tiers } from './tiers';
 import type { LaunchAudio } from './spec';
 
@@ -20,7 +21,7 @@ const ROOT = path.join(HERE, '..', '..');
 const PUBLIC = path.join(ROOT, 'public', 'audio', 'launch');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const VIDEOS: Record<string, LaunchAudio<any>> = { security, escrow, tiers };
+const VIDEOS: Record<string, LaunchAudio<any>> = { security, escrow, tiers, sellers };
 
 const build = <T extends string>(spec: LaunchAudio<T>) => {
   const dir = path.join(HERE, '..', 'build', 'launch', spec.id);

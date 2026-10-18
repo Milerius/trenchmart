@@ -361,7 +361,7 @@ const DisputeCard: React.FC = () => {
     <div style={{ position: 'relative' }}>
       <VaultCard
         s={{
-          status: open ? { text: 'Disputed', tone: 'warn' } : { text: 'Paid', tone: 'ok' },
+          status: open ? { text: 'Disputed', tone: 'danger' } : { text: 'Paid', tone: 'ok' },
           amount: 0.105,
           clock: open ? 'frozen' : clock(3600 - elapsed),
           clockTone: open ? C.info : C.text,
