@@ -12,6 +12,7 @@
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.12",
     "@trenchmart/chain": "workspace:*",
+    "@trenchmart/sdk": "workspace:*",
     "@trenchmart/shared": "workspace:*",
     "@wallet-standard/app": "1.1.1",
     "@wallet-standard/base": "1.1.1",

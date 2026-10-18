@@ -28,7 +28,9 @@ const programId = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
 const blockhash = bs58.encode(new Uint8Array(32).fill(5));
 const vault = randomKeypair();
 const resolver = randomKeypair();
-const buckets = [randomKeypair(), randomKeypair(), randomKeypair(), randomKeypair()].map((k) => k.publicKey);
+const buckets = [randomKeypair(), randomKeypair(), randomKeypair(), randomKeypair()].map(
+  (k) => k.publicKey,
+);
 const script = `// ==UserScript==
 // @name SDK Pack
 // @match https://axiom.trade/*
@@ -60,7 +62,10 @@ async function world() {
   });
   const clock = { now: new Date('2026-06-01T00:00:00.000Z') };
   const accounts = new Map<string, Uint8Array>();
-  const txs = new Map<string, { memos: string[]; transfers: { source: string; destination: string; lamports: bigint }[] }>();
+  const txs = new Map<
+    string,
+    { memos: string[]; transfers: { source: string; destination: string; lamports: bigint }[] }
+  >();
   const deps: Deps = {
     sql,
     blob: filesystemBlob(await mkdtemp(join(tmpdir(), 'tm-sdk-')), env.sessionSecret, env.apiUrl),
@@ -100,10 +105,16 @@ async function world() {
       const decoded = decodeTransfersAndMemos(tx);
       txs.set(signature, decoded);
       const memo = decoded.memos[0];
-      const [order] = memo ? await sql<Record<string, any>[]>`select * from orders where memo = ${memo}` : [];
+      const [order] = memo
+        ? await sql<Record<string, any>[]>`select * from orders where memo = ${memo}`
+        : [];
       if (order) {
-        const [seller] = await sql<{ wallet: string }[]>`select u.wallet from listings l join users u on u.id = l.creator_id where l.id = ${order.listing_id}`;
-        const [buyer] = await sql<{ wallet: string }[]>`select wallet from users where id = ${order.buyer_id}`;
+        const [seller] = await sql<
+          { wallet: string }[]
+        >`select u.wallet from listings l join users u on u.id = l.creator_id where l.id = ${order.listing_id}`;
+        const [buyer] = await sql<
+          { wallet: string }[]
+        >`select wallet from users where id = ${order.buyer_id}`;
         accounts.set(
           order.escrow_address,
           encodeEscrowForTest({
@@ -151,7 +162,6 @@ async function world() {
   return { app, deps, clock, client };
 }
 
-
 async function restoreConfig() {
   await sql`update config set value = '5'::jsonb where key = 'upload_limit_per_creator_day'`;
   await sql`update config set value = '250000000'::jsonb where key = 'verification_fee_lamports'`;
@@ -193,7 +203,10 @@ describe('SDK against the API', () => {
 
     const signer = keypairSigner(nacl.sign.keyPair().secretKey);
     const sdk = w.client();
-    const key = await sdk.createApiKey(signer, { name: 'sdk buyer', scopes: ['read', 'trade', 'review'] });
+    const key = await sdk.createApiKey(signer, {
+      name: 'sdk buyer',
+      scopes: ['read', 'trade', 'review'],
+    });
     expect(key.key).toMatch(/^tmk_/);
     expect((await sdk.keyInfo()).wallet).toBe(signer.publicKey);
 
@@ -217,16 +230,27 @@ describe('SDK against the API', () => {
     // The creator replies with its own key.
     const creatorSdk = w.client();
     const creatorSigner = keypairSigner(seller.secretKey);
-    await creatorSdk.createApiKey(creatorSigner, { name: 'creator', scopes: ['read', 'sell', 'review'] });
+    await creatorSdk.createApiKey(creatorSigner, {
+      name: 'creator',
+      scopes: ['read', 'sell', 'review'],
+    });
     const open = await creatorSdk.creatorReviews({ unreplied: true });
     expect(open.reviews.map((r) => r.id)).toContain(review.id);
     expect((await creatorSdk.replyToReview(review.id, 'Thanks for buying!')).ok).toBe(true);
-    expect((await creatorSdk.creatorReviews({ unreplied: true })).reviews.map((r) => r.id)).not.toContain(review.id);
+    expect(
+      (await creatorSdk.creatorReviews({ unreplied: true })).reviews.map((r) => r.id),
+    ).not.toContain(review.id);
     const all = await creatorSdk.creatorReviews();
-    expect(all.reviews.find((r) => r.id === review.id)).toMatchObject({ rating: 5, reply: 'Thanks for buying!' });
+    expect(all.reviews.find((r) => r.id === review.id)).toMatchObject({
+      rating: 5,
+      reply: 'Thanks for buying!',
+    });
     // Sales and subscribers carry the purchase (free update period or lifetime updates).
     const sales = await creatorSdk.sales({ limit: 10 });
-    expect(sales.sales.find((sale) => sale.id === bought.orderId)).toMatchObject({ status: 'released', buyer: signer.publicKey });
+    expect(sales.sales.find((sale) => sale.id === bought.orderId)).toMatchObject({
+      status: 'released',
+      buyer: signer.publicKey,
+    });
     const subs = await creatorSdk.subscribers();
     const sub = subs.subscribers.find((entry) => entry.orderId === bought.orderId);
     expect(['free', 'forever']).toContain(sub?.status);
@@ -241,26 +265,23 @@ describe('SDK against the API', () => {
     const w = await world();
     const signer = keypairSigner(nacl.sign.keyPair().secretKey);
     const sdk = w.client();
-    await sdk.createApiKey(signer, { name: 'sdk seller', scopes: ['read', 'sell', 'profile', 'review'] });
-    await sdk.updateProfile({ displayName: 'Seller Agent', bio: 'Autonomous seller.', socials: { website: 'example.com' } });
+    await sdk.createApiKey(signer, {
+      name: 'sdk seller',
+      scopes: ['read', 'sell', 'profile', 'review'],
+    });
+    await sdk.updateProfile({
+      displayName: 'Seller Agent',
+      bio: 'Autonomous seller.',
+      socials: { website: 'example.com' },
+    });
     await sdk.request('POST', '/studio/x', { body: { handle: 'sdk_seller' } });
-    const [user] = await sql<{ id: string }[]>`select id from users where wallet = ${signer.publicKey}`;
+    const [user] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${signer.publicKey}`;
     await sql`insert into bonds (user_id, amount, tx_sig, status) values (${user!.id}, ${1_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')`;
 
-    const created = await sdk.createListing({
-      title: 'SDK Wallet List',
-      summary: 'Smart money wallets.',
-      description: 'A labelled list.',
-      category: 'wallet_list',
-      terminals: ['Axiom'],
-      priceLamports: '300000000',
-      kind: 'wallet',
-      specs: { chain: 'solana', formats: ['csv'], walletCount: 120, cadence: 'weekly', columns: [] },
-    }).catch(async (err: unknown) => {
-      // wallet_list needs a 2 SOL bond: top it up, then retry.
-      expect((err as TrenchmartError).code).toBe('BOND_REQUIRED');
-      await sql`update bonds set amount = ${2_000_000_000n} where user_id = ${user!.id}`;
-      return sdk.createListing({
+    const created = await sdk
+      .createListing({
         title: 'SDK Wallet List',
         summary: 'Smart money wallets.',
         description: 'A labelled list.',
@@ -268,16 +289,48 @@ describe('SDK against the API', () => {
         terminals: ['Axiom'],
         priceLamports: '300000000',
         kind: 'wallet',
-        specs: { chain: 'solana', formats: ['csv'], walletCount: 120, cadence: 'weekly', columns: [] },
+        specs: {
+          chain: 'solana',
+          formats: ['csv'],
+          walletCount: 120,
+          cadence: 'weekly',
+          columns: [],
+        },
+      })
+      .catch(async (err: unknown) => {
+        // wallet_list needs a 2 SOL bond: top it up, then retry.
+        expect((err as TrenchmartError).code).toBe('BOND_REQUIRED');
+        await sql`update bonds set amount = ${2_000_000_000n} where user_id = ${user!.id}`;
+        return sdk.createListing({
+          title: 'SDK Wallet List',
+          summary: 'Smart money wallets.',
+          description: 'A labelled list.',
+          category: 'wallet_list',
+          terminals: ['Axiom'],
+          priceLamports: '300000000',
+          kind: 'wallet',
+          specs: {
+            chain: 'solana',
+            formats: ['csv'],
+            walletCount: 120,
+            cadence: 'weekly',
+            columns: [],
+          },
+        });
       });
-    });
     expect(created.id).toBeTruthy();
 
     // Daily upload limit used up: the version needs a supplement, plus the verification fee.
     await sql`update config set value = '0'::jsonb where key = 'upload_limit_per_creator_day'`;
-    const csv = new TextEncoder().encode('wallet,label\n5T68NkSrw951yTAkZpBS24ZsBdqvNmY52bLdGWo9EGxB,smart\n');
+    const csv = new TextEncoder().encode(
+      'wallet,label\n5T68NkSrw951yTAkZpBS24ZsBdqvNmY52bLdGWo9EGxB,smart\n',
+    );
     await expect(
-      sdk.publishVersion(signer, created.id, { semver: '1.0.0', fileName: 'wallets.csv', bytes: csv }),
+      sdk.publishVersion(signer, created.id, {
+        semver: '1.0.0',
+        fileName: 'wallets.csv',
+        bytes: csv,
+      }),
     ).rejects.toThrow(/SUPPLEMENT_REQUIRED/);
     const result = await sdk.publishVersion(
       signer,
@@ -287,9 +340,13 @@ describe('SDK against the API', () => {
     );
     expect(result.version.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(result.checks.length).toBeGreaterThan(0);
-    const [supplement] = await sql<{ status: string }[]>`select status from supplements where user_id = ${user!.id}`;
+    const [supplement] = await sql<
+      { status: string }[]
+    >`select status from supplements where user_id = ${user!.id}`;
     expect(['paid', 'used']).toContain(supplement!.status);
-    const [version] = await sql<{ vfee_sig: string | null }[]>`select vfee_sig from versions where id = ${result.version.id}`;
+    const [version] = await sql<
+      { vfee_sig: string | null }[]
+    >`select vfee_sig from versions where id = ${result.version.id}`;
     expect(version!.vfee_sig).toBeTruthy();
 
     await sdk.updateListing(created.id, { priceLamports: '350000000' });

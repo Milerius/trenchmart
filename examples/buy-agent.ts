@@ -32,10 +32,16 @@ async function main() {
     const listing = await client.listing(slug);
     if (listing.creator.wallet === signer.publicKey) continue;
     const report = await client.securityReport(listing.slug).catch(() => null);
-    const steps = ((report?.report as { steps?: { kind: string; summary: string }[] } | undefined)?.steps ?? []).map(
-      (step) => `${step.kind}:${step.summary}`,
-    );
-    log('listing', { slug: listing.slug, title: listing.title, price: listing.price, seller: listing.creator.wallet, scan: steps });
+    const steps = (
+      (report?.report as { steps?: { kind: string; summary: string }[] } | undefined)?.steps ?? []
+    ).map((step) => `${step.kind}:${step.summary}`);
+    log('listing', {
+      slug: listing.slug,
+      title: listing.title,
+      price: listing.price,
+      seller: listing.creator.wallet,
+      scan: steps,
+    });
 
     // 2. Buy: the SDK checks the unsigned escrow transaction (programs, signer, total,
     //    seller), signs it locally, relays it through the validated broadcast endpoint and
@@ -43,10 +49,15 @@ async function main() {
     let bought;
     try {
       bought = await client.buy(signer, listing.slug, {
-        maxTotalLamports: process.env.TM_MAX_LAMPORTS ? BigInt(process.env.TM_MAX_LAMPORTS) : undefined,
+        maxTotalLamports: process.env.TM_MAX_LAMPORTS
+          ? BigInt(process.env.TM_MAX_LAMPORTS)
+          : undefined,
       });
     } catch (err) {
-      if (err instanceof TrenchmartError && ['ALREADY_OWNED', 'OWN_LISTING', 'HOLDER_ONLY', 'HOLDER_WINDOW'].includes(err.code)) {
+      if (
+        err instanceof TrenchmartError &&
+        ['ALREADY_OWNED', 'OWN_LISTING', 'HOLDER_ONLY', 'HOLDER_WINDOW'].includes(err.code)
+      ) {
         log('skip', { slug: listing.slug, reason: err.code });
         continue;
       }
@@ -58,7 +69,10 @@ async function main() {
   }
   throw new Error('no listing this wallet can buy');
 
-  async function afterPurchase(bought: { orderId: string; escrowUntil: string }, terminal?: string) {
+  async function afterPurchase(
+    bought: { orderId: string; escrowUntil: string },
+    terminal?: string,
+  ) {
     // 3. Download the watermarked file through its short-lived signed URL.
     const file = await client.downloadFile(bought.orderId);
     log('downloaded', {
@@ -68,7 +82,10 @@ async function main() {
     });
 
     if (env('TM_WAIT_RELEASE', '0') !== '1') {
-      log('done', { note: `escrow releases after ${bought.escrowUntil}; rerun review then`, orderId: bought.orderId });
+      log('done', {
+        note: `escrow releases after ${bought.escrowUntil}; rerun review then`,
+        orderId: bought.orderId,
+      });
       return;
     }
     await releaseAndReview(bought.orderId, terminal);
@@ -80,7 +97,10 @@ async function main() {
     log('released', released);
     const review = await client.review(signer, orderId, {
       rating: 5,
-      body: env('TM_REVIEW', 'Bought, downloaded and installed by an autonomous agent; it matched the listing.'),
+      body: env(
+        'TM_REVIEW',
+        'Bought, downloaded and installed by an autonomous agent; it matched the listing.',
+      ),
       terminal,
     });
     log('reviewed', review);
@@ -88,7 +108,8 @@ async function main() {
 }
 
 main().catch((err: unknown) => {
-  if (err instanceof TrenchmartError) log('error', { status: err.status, code: err.code, message: err.message });
+  if (err instanceof TrenchmartError)
+    log('error', { status: err.status, code: err.code, message: err.message });
   else log('error', { message: (err as Error).message });
   process.exit(1);
 });

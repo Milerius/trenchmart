@@ -89,7 +89,12 @@ export class TrenchmartClient {
   async request<T = Json>(
     method: string,
     path: string,
-    opts: { body?: unknown; raw?: Uint8Array; query?: Record<string, unknown>; auth?: boolean } = {},
+    opts: {
+      body?: unknown;
+      raw?: Uint8Array;
+      query?: Record<string, unknown>;
+      auth?: boolean;
+    } = {},
   ): Promise<T> {
     const url = new URL(`${this.baseUrl}/api/v1${path}`);
     for (const [k, v] of Object.entries(opts.query ?? {}))
@@ -106,7 +111,10 @@ export class TrenchmartClient {
     }
     for (let attempt = 0; ; attempt += 1) {
       const res = await this.fetchImpl(url.toString(), { method, headers, body });
-      if ((res.status === 429 || res.status === 502 || res.status === 503) && attempt < this.maxRetries) {
+      if (
+        (res.status === 429 || res.status === 502 || res.status === 503) &&
+        attempt < this.maxRetries
+      ) {
         const wait = Number(res.headers.get('retry-after') ?? '') || 2 ** attempt;
         await sleep(Math.min(wait, 60) * 1000);
         continue;
@@ -190,7 +198,9 @@ export class TrenchmartClient {
     return this.request('GET', '/categories');
   }
 
-  listings(query: ListingsQuery = {}): Promise<ListingSummary[] | { items: ListingSummary[]; nextCursor: string | null }> {
+  listings(
+    query: ListingsQuery = {},
+  ): Promise<ListingSummary[] | { items: ListingSummary[]; nextCursor: string | null }> {
     return this.request('GET', '/listings', { query });
   }
 
@@ -208,7 +218,9 @@ export class TrenchmartClient {
   }
 
   reviews(slug: string, sort?: string): Promise<Json> {
-    return this.request('GET', `/listings/${encodeURIComponent(slug)}/reviews`, { query: { sort } });
+    return this.request('GET', `/listings/${encodeURIComponent(slug)}/reviews`, {
+      query: { sort },
+    });
   }
 
   creator(handle: string): Promise<Json> {
@@ -235,7 +247,8 @@ export class TrenchmartClient {
       }),
     });
     const json = (await res.json()) as { result?: string; error?: { message?: string } };
-    if (!json.result) throw new TrenchmartError(502, 'RPC', json.error?.message ?? 'sendTransaction failed');
+    if (!json.result)
+      throw new TrenchmartError(502, 'RPC', json.error?.message ?? 'sendTransaction failed');
     return json.result;
   }
 
@@ -266,7 +279,11 @@ export class TrenchmartClient {
     confirmPath: string,
     opts: { broadcast?: BroadcastMode } & ConfirmOptions = {},
   ): Promise<{ signature: string }> {
-    inspectVaultPayment(payment.txBase64, { payer: signer.publicKey, vault: this.vaultAddress, lamports });
+    inspectVaultPayment(payment.txBase64, {
+      payer: signer.publicKey,
+      vault: this.vaultAddress,
+      lamports,
+    });
     const signature = await this.signAndSend(signer, payment.txBase64, opts.broadcast ?? 'api');
     await this.confirm(confirmPath, signature, opts);
     return { signature };
@@ -307,7 +324,13 @@ export class TrenchmartClient {
     signer: AgentSigner,
     listingSlugOrId: string,
     opts: { broadcast?: BroadcastMode; maxTotalLamports?: bigint | string } & ConfirmOptions = {},
-  ): Promise<{ orderId: string; signature: string; total: string; escrow: string; escrowUntil: string }> {
+  ): Promise<{
+    orderId: string;
+    signature: string;
+    total: string;
+    escrow: string;
+    escrowUntil: string;
+  }> {
     const listing = await this.listing(listingSlugOrId);
     const quote = await this.quote(listing.id);
     if (opts.maxTotalLamports !== undefined && BigInt(quote.total) > BigInt(opts.maxTotalLamports))
@@ -336,11 +359,16 @@ export class TrenchmartClient {
 
   /** Short-lived signed, watermarked download URL. */
   download(orderId: string, versionId?: string): Promise<Download> {
-    return this.request('POST', `/orders/${orderId}/download`, { body: versionId ? { versionId } : {} });
+    return this.request('POST', `/orders/${orderId}/download`, {
+      body: versionId ? { versionId } : {},
+    });
   }
 
   /** Download and return the file bytes. */
-  async downloadFile(orderId: string, versionId?: string): Promise<{ bytes: Uint8Array; meta: Download }> {
+  async downloadFile(
+    orderId: string,
+    versionId?: string,
+  ): Promise<{ bytes: Uint8Array; meta: Download }> {
     const meta = await this.download(orderId, versionId);
     const res = await this.fetchImpl(meta.url);
     if (!res.ok) throw new TrenchmartError(res.status, 'DOWNLOAD', 'signed URL fetch failed');
@@ -392,7 +420,8 @@ export class TrenchmartClient {
       try {
         return await this.release(orderId);
       } catch (err) {
-        const wait = err instanceof TrenchmartError && ['ESCROW_WINDOW', 'RELEASE_PENDING'].includes(err.code);
+        const wait =
+          err instanceof TrenchmartError && ['ESCROW_WINDOW', 'RELEASE_PENDING'].includes(err.code);
         if (!wait || Date.now() > deadline) throw err;
         await sleep(opts.pollMs ?? 30_000);
       }
@@ -483,11 +512,21 @@ export class TrenchmartClient {
   }
 
   /** Pays a creator bond (1-5 SOL) to the vault and confirms it. */
-  async payBond(signer: AgentSigner, lamports: bigint | string, opts: { broadcast?: BroadcastMode } = {}) {
+  async payBond(
+    signer: AgentSigner,
+    lamports: bigint | string,
+    opts: { broadcast?: BroadcastMode } = {},
+  ) {
     const bond = await this.request<UnsignedPayment & { bondId: string }>('POST', '/studio/bond', {
       body: { amount: String(lamports) },
     });
-    const paid = await this.payVault(signer, bond, lamports, `/studio/bond/${bond.bondId}/submitted`, opts);
+    const paid = await this.payVault(
+      signer,
+      bond,
+      lamports,
+      `/studio/bond/${bond.bondId}/submitted`,
+      opts,
+    );
     return { bondId: bond.bondId, ...paid };
   }
 
@@ -510,16 +549,27 @@ export class TrenchmartClient {
 
   saveContent(
     listingId: string,
-    draft: { readme?: string; howto?: string; requirements?: string; gallery?: { imageId: string; alt?: string }[]; coverImageId?: string | null },
+    draft: {
+      readme?: string;
+      howto?: string;
+      requirements?: string;
+      gallery?: { imageId: string; alt?: string }[];
+      coverImageId?: string | null;
+    },
   ): Promise<Json> {
     return this.request('PUT', `/studio/listings/${listingId}/content`, { body: draft });
   }
 
   publishContent(listingId: string, note?: string): Promise<Json> {
-    return this.request('POST', `/studio/listings/${listingId}/content/review`, { body: note ? { note } : {} });
+    return this.request('POST', `/studio/listings/${listingId}/content/review`, {
+      body: note ? { note } : {},
+    });
   }
 
-  uploadImage(listingId: string, bytes: Uint8Array): Promise<{ imageId: string; [k: string]: unknown }> {
+  uploadImage(
+    listingId: string,
+    bytes: Uint8Array,
+  ): Promise<{ imageId: string; [k: string]: unknown }> {
     return this.request('POST', `/studio/listings/${listingId}/images`, { raw: bytes });
   }
 
@@ -529,7 +579,13 @@ export class TrenchmartClient {
 
   startVersion(
     listingId: string,
-    input: { semver: string; changelog?: string; fileName: string; fileSize: number; acceptSupplementLamports?: string },
+    input: {
+      semver: string;
+      changelog?: string;
+      fileName: string;
+      fileSize: number;
+      acceptSupplementLamports?: string;
+    },
   ): Promise<StartedVersion> {
     return this.request('POST', `/studio/listings/${listingId}/versions`, { body: input });
   }
@@ -565,23 +621,47 @@ export class TrenchmartClient {
     signer: AgentSigner,
     listingId: string,
     input: { semver: string; changelog?: string; fileName: string; bytes: Uint8Array },
-    opts: { acceptSupplement?: boolean; broadcast?: BroadcastMode; pollMs?: number; timeoutMs?: number; intervalMs?: number } = {},
+    opts: {
+      acceptSupplement?: boolean;
+      broadcast?: BroadcastMode;
+      pollMs?: number;
+      timeoutMs?: number;
+      intervalMs?: number;
+    } = {},
   ): Promise<VersionResult> {
-    const base = { semver: input.semver, changelog: input.changelog ?? '', fileName: input.fileName, fileSize: input.bytes.length };
+    const base = {
+      semver: input.semver,
+      changelog: input.changelog ?? '',
+      fileName: input.fileName,
+      fileSize: input.bytes.length,
+    };
     let started: StartedVersion;
     try {
       started = await this.startVersion(listingId, base);
     } catch (err) {
-      const due = err instanceof TrenchmartError && err.code === 'SUPPLEMENT_REQUIRED'
-        ? (err.data?.supplement as { lamports?: string } | undefined)?.lamports
-        : undefined;
+      const due =
+        err instanceof TrenchmartError && err.code === 'SUPPLEMENT_REQUIRED'
+          ? (err.data?.supplement as { lamports?: string } | undefined)?.lamports
+          : undefined;
       if (!due || !opts.acceptSupplement) throw err;
       started = await this.startVersion(listingId, { ...base, acceptSupplementLamports: due });
     }
     if (started.supplement?.tx)
-      await this.payVault(signer, started.supplement.tx, started.supplement.lamports, `/supplements/${started.supplement.id}/submitted`, opts);
+      await this.payVault(
+        signer,
+        started.supplement.tx,
+        started.supplement.lamports,
+        `/supplements/${started.supplement.id}/submitted`,
+        opts,
+      );
     if (started.feeTx)
-      await this.payVault(signer, started.feeTx, started.verificationFee, `/studio/versions/${started.versionId}/fee`, opts);
+      await this.payVault(
+        signer,
+        started.feeTx,
+        started.verificationFee,
+        `/studio/versions/${started.versionId}/fee`,
+        opts,
+      );
     await this.uploadFile(started.uploadUrl, input.bytes);
     await this.completeVersion(started.versionId);
     const deadline = Date.now() + (opts.timeoutMs ?? 10 * 60_000);
@@ -606,7 +686,10 @@ export class TrenchmartClient {
   }
 
   /** Buyers who currently receive updates, with counts per status. */
-  subscribers(): Promise<{ counts: { forever: number; paying: number; free: number }; subscribers: Subscriber[] }> {
+  subscribers(): Promise<{
+    counts: { forever: number; paying: number; free: number };
+    subscribers: Subscriber[];
+  }> {
     return this.request('GET', '/studio/subscribers');
   }
 
@@ -615,7 +698,9 @@ export class TrenchmartClient {
     opts: Page & { unreplied?: boolean } = {},
   ): Promise<{ reviews: CreatorReview[]; nextBefore: string | null }> {
     const { unreplied, ...page } = opts;
-    return this.request('GET', '/studio/reviews', { query: { ...page, unreplied: unreplied ? 1 : undefined } });
+    return this.request('GET', '/studio/reviews', {
+      query: { ...page, unreplied: unreplied ? 1 : undefined },
+    });
   }
 
   delist(listingId: string): Promise<{ ok: true }> {
@@ -632,20 +717,31 @@ function parseTx(txBase64: string) {
   return parseTransaction(fromBase64(txBase64));
 }
 
+// eslint-disable-next-line no-control-regex -- stripping control characters is the point
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g;
 
 /** Same normalisation as the API before hashing a review body. */
 export function cleanReviewText(text: string): string {
   return text
     .split('\n')
-    .map((line) => line.replace(CONTROL, ' ').replace(/[ \t]+/g, ' ').trim())
+    .map((line) =>
+      line
+        .replace(CONTROL, ' ')
+        .replace(/[ \t]+/g, ' ')
+        .trim(),
+    )
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
 /** The exact text a wallet signs for a review. */
-export function reviewMessage(input: { orderId: string; rating: number; semver: string; bodySha256: string }): string {
+export function reviewMessage(input: {
+  orderId: string;
+  rating: number;
+  semver: string;
+  bodySha256: string;
+}): string {
   return [
     'TrenchMart review',
     `Order: ${input.orderId}`,

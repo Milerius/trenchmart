@@ -194,7 +194,11 @@ function pageOf(limit: string | undefined, before: string | undefined) {
 }
 
 /** Every completed sale of the creator's listings, newest first (paid, released, disputed, refunded). */
-export async function studioSales(deps: Deps, user: Row, query: { limit?: string; before?: string }) {
+export async function studioSales(
+  deps: Deps,
+  user: Row,
+  query: { limit?: string; before?: string },
+) {
   const page = pageOf(query.limit, query.before);
   const rows = await deps.sql<Row[]>`
     select o.id, o.listing_id, l.slug, l.title, b.wallet as buyer, v.semver, o.price, o.fee, o.rebate,
@@ -234,8 +238,17 @@ export async function studioSubscribers(deps: Deps, user: Row) {
     const status = row.updates_forever ? 'forever' : renewal && renewal > now ? 'paying' : 'free';
     const until = row.updates_forever
       ? null
-      : [row.updates_until as Date | null, renewal].filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-    return { orderId: row.order_id, listingId: row.listing_id, slug: row.slug, buyer: row.buyer, status, until };
+      : ([row.updates_until as Date | null, renewal]
+          .filter((d): d is Date => !!d)
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null);
+    return {
+      orderId: row.order_id,
+      listingId: row.listing_id,
+      slug: row.slug,
+      buyer: row.buyer,
+      status,
+      until,
+    };
   });
   return {
     counts: {

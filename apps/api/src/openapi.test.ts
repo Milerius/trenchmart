@@ -20,9 +20,15 @@ describe('OpenAPI spec', () => {
       expect(op['x-scope']).toBe(scopeOf(route));
     }
     expect(scopeOf(ROUTES.find((r) => r.path === '/orders' && r.method === 'post')!)).toBe('trade');
-    expect(scopeOf(ROUTES.find((r) => r.path === '/studio/listings' && r.method === 'post')!)).toBe('sell');
-    expect(scopeOf(ROUTES.find((r) => r.path === '/studio/profile' && r.method === 'put')!)).toBe('profile');
-    expect(scopeOf(ROUTES.find((r) => r.path === '/orders/{id}/review' && r.method === 'post')!)).toBe('review');
+    expect(scopeOf(ROUTES.find((r) => r.path === '/studio/listings' && r.method === 'post')!)).toBe(
+      'sell',
+    );
+    expect(scopeOf(ROUTES.find((r) => r.path === '/studio/profile' && r.method === 'put')!)).toBe(
+      'profile',
+    );
+    expect(
+      scopeOf(ROUTES.find((r) => r.path === '/orders/{id}/review' && r.method === 'post')!),
+    ).toBe('review');
     expect(scopeOf(ROUTES.find((r) => r.path === '/listings' && r.method === 'get')!)).toBe('none');
   });
 });

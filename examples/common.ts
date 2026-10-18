@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { DEVNET, TrenchmartClient, keypairSigner, type AgentSigner, type Scope } from '@trenchmart/sdk';
+import {
+  DEVNET,
+  TrenchmartClient,
+  keypairSigner,
+  type AgentSigner,
+  type Scope,
+} from '@trenchmart/sdk';
 
 /** Shared setup for the example agents. Everything runs on Solana devnet. */
 export type AgentEnv = {
@@ -35,7 +41,11 @@ export async function setup(name: string, scopes: Scope[]): Promise<AgentEnv> {
   const connection = new Connection(client.rpcUrl, 'confirmed');
   if (!client.apiKey) {
     const key = await client.createApiKey(signer, { name, scopes });
-    log('api key created', { prefix: key.prefix, scopes: key.scopes, rateLimitPerMin: key.rateLimitPerMin });
+    log('api key created', {
+      prefix: key.prefix,
+      scopes: key.scopes,
+      rateLimitPerMin: key.rateLimitPerMin,
+    });
   }
   // Informational only: the agent never needs its own RPC (the API relays transactions).
   const sol = await Promise.race([

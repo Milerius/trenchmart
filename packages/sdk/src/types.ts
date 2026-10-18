@@ -109,7 +109,8 @@ export type UnsignedPayment = {
   lastValidBlockHeight: number;
 };
 
-export type ListingKind = 'script' | 'bot' | 'wallet' | 'filter' | 'indicator' | 'telegram' | 'other';
+export type ListingKind =
+  'script' | 'bot' | 'wallet' | 'filter' | 'indicator' | 'telegram' | 'other';
 
 export type CreateListingInput = {
   title: string;
@@ -163,7 +164,8 @@ export type VersionResult = {
   version: {
     id: string;
     semver: string;
-    status: 'pending_upload' | 'scanning' | 'live' | 'needs_creator' | 'rejected' | 'superseded' | string;
+    status:
+      'pending_upload' | 'scanning' | 'live' | 'needs_creator' | 'rejected' | 'superseded' | string;
     sha256: string | null;
     [extra: string]: unknown;
   };
@@ -178,7 +180,11 @@ export type ProfileInput = {
   socials?: { telegram?: string; discord?: string; website?: string; github?: string };
   contact?: {
     enabled: boolean;
-    channels: { kind: 'telegram' | 'discord' | 'email'; value: string; audience: 'everyone' | 'buyers' }[];
+    channels: {
+      kind: 'telegram' | 'discord' | 'email';
+      value: string;
+      audience: 'everyone' | 'buyers';
+    }[];
   };
 };
 

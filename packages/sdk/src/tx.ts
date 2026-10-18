@@ -75,7 +75,11 @@ export function parseTransaction(tx: Uint8Array): ParsedTx {
     }
     const len = compact(message, cursor);
     cursor = len.next;
-    instructions.push({ programId, accounts: keys, data: message.slice(cursor, cursor + len.value) });
+    instructions.push({
+      programId,
+      accounts: keys,
+      data: message.slice(cursor, cursor + len.value),
+    });
     cursor += len.value;
   }
   if (cursor !== message.length) throw new UnsafeTransactionError('trailing bytes');
@@ -101,7 +105,8 @@ export function attachSignature(tx: Uint8Array, signer: string, signature: Uint8
 }
 
 const u16 = (d: Uint8Array, o: number) => new DataView(d.buffer, d.byteOffset).getUint16(o, true);
-const u64 = (d: Uint8Array, o: number) => new DataView(d.buffer, d.byteOffset).getBigUint64(o, true);
+const u64 = (d: Uint8Array, o: number) =>
+  new DataView(d.buffer, d.byteOffset).getBigUint64(o, true);
 const i64 = (d: Uint8Array, o: number) => new DataView(d.buffer, d.byteOffset).getBigInt64(o, true);
 
 export type CheckoutTerms = {
@@ -147,7 +152,9 @@ export function inspectCheckout(
   const fee = (price * BigInt(feeBps)) / 10_000n;
   const total = price + fee - (fee * BigInt(rebateBps)) / 10_000n;
   if (total !== BigInt(expect.total))
-    throw new UnsafeTransactionError(`escrow total ${total} differs from the quoted ${expect.total}`);
+    throw new UnsafeTransactionError(
+      `escrow total ${total} differs from the quoted ${expect.total}`,
+    );
   if (expect.seller && seller !== expect.seller)
     throw new UnsafeTransactionError('escrow seller differs from the listing creator');
   if (init.accounts[0] !== expect.buyer || escrowIxs[1]!.accounts[0] !== expect.buyer)
@@ -171,7 +178,10 @@ export function inspectVaultPayment(
     if (ix.programId === COMPUTE_BUDGET_PROGRAM || ix.programId === MEMO_PROGRAM) continue;
     if (ix.programId !== SYSTEM_PROGRAM)
       throw new UnsafeTransactionError(`unexpected program ${ix.programId}`);
-    const kind = ix.data.length >= 12 ? new DataView(ix.data.buffer, ix.data.byteOffset).getUint32(0, true) : -1;
+    const kind =
+      ix.data.length >= 12
+        ? new DataView(ix.data.buffer, ix.data.byteOffset).getUint32(0, true)
+        : -1;
     if (kind !== 2 || ix.accounts[0] !== expect.payer || ix.accounts[1] !== expect.vault)
       throw new UnsafeTransactionError('unexpected system instruction');
     paid += u64(ix.data, 4);

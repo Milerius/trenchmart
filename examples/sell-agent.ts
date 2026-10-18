@@ -25,7 +25,12 @@ import { env, log, setup } from './common';
 const flag = (name: string) => process.env[name] === '1';
 
 async function main() {
-  const { client, signer } = await setup('example seller agent', ['read', 'sell', 'profile', 'review']);
+  const { client, signer } = await setup('example seller agent', [
+    'read',
+    'sell',
+    'profile',
+    'review',
+  ]);
 
   // 1. Profile and socials.
   if (process.env.TM_DISPLAY_NAME || process.env.TM_BIO || process.env.TM_WEBSITE) {
@@ -36,7 +41,11 @@ async function main() {
     });
   }
   const profile = await client.profile();
-  log('profile', { handle: profile.handle, displayName: profile.displayName, socials: profile.socials });
+  log('profile', {
+    handle: profile.handle,
+    displayName: profile.displayName,
+    socials: profile.socials,
+  });
 
   // 2. What selling needs: verified X link, category bond, verification fee.
   const req = await client.requirements();
@@ -49,26 +58,50 @@ async function main() {
     await client.linkXDev(process.env.TM_X_DEV_HANDLE);
     req.xLinked = true;
   }
-  if (!listingId && flag('TM_CREATE_LISTING')) listingId = await createListing(Boolean(req.xLinked));
+  if (!listingId && flag('TM_CREATE_LISTING'))
+    listingId = await createListing(Boolean(req.xLinked));
   if (!listingId) {
     const mine = await client.myListings();
-    log('my listings', { listings: mine.map((l) => ({ id: l.id, slug: l.slug, price: l.price, live: l.semver })) });
+    log('my listings', {
+      listings: mine.map((l) => ({ id: l.id, slug: l.slug, price: l.price, live: l.semver })),
+    });
   }
 
   // 4. Publish a version: supplement and verification fee are unsigned txs signed here; the
   //    hybrid scan (static rules + AI review) runs and the verdict comes back with reasons.
   if (listingId && flag('TM_PUBLISH')) {
     const quota = await client.uploadQuota(listingId);
-    log('upload quota', pick(quota, ['uploadsToday', 'updatesToday', 'limits', 'supplementRequired', 'supplementLamports', 'reasons', 'verificationFee', 'feeWaived', 'suggestedSemver']));
-    const path = process.env.TM_FILE ?? new URL('./fixtures/hello.user.js', import.meta.url).pathname;
+    log(
+      'upload quota',
+      pick(quota, [
+        'uploadsToday',
+        'updatesToday',
+        'limits',
+        'supplementRequired',
+        'supplementLamports',
+        'reasons',
+        'verificationFee',
+        'feeWaived',
+        'suggestedSemver',
+      ]),
+    );
+    const path =
+      process.env.TM_FILE ?? new URL('./fixtures/hello.user.js', import.meta.url).pathname;
     const semver =
-      process.env.TM_SEMVER ?? (quota.suggestedSemver as string | undefined) ?? nextPatch(quota.currentSemver as string | undefined);
+      process.env.TM_SEMVER ??
+      (quota.suggestedSemver as string | undefined) ??
+      nextPatch(quota.currentSemver as string | undefined);
     let source = readFileSync(path, 'utf8');
     if (path.endsWith('.user.js')) source = source.replace(/(@version\s+)\S+/, `$1${semver}`);
     const result = await client.publishVersion(
       signer,
       listingId,
-      { semver, changelog: 'Published by the seller agent', fileName: basename(path), bytes: new TextEncoder().encode(source) },
+      {
+        semver,
+        changelog: 'Published by the seller agent',
+        fileName: basename(path),
+        bytes: new TextEncoder().encode(source),
+      },
       { acceptSupplement: flag('TM_ACCEPT_SUPPLEMENT') },
     );
     logVerdict(result);
@@ -87,14 +120,21 @@ async function main() {
   const payouts = await client.payouts();
   log('business', {
     overview: pick(overview, ['totals', 'sales7d', 'revenue', 'subscribers', 'rating']),
-    recentSales: sales.sales.map((s) => ({ slug: s.slug, status: s.status, price: s.price, paidAt: s.paid_at })),
+    recentSales: sales.sales.map((s) => ({
+      slug: s.slug,
+      status: s.status,
+      price: s.price,
+      paidAt: s.paid_at,
+    })),
     subscribers: subscribers.counts,
     payoutsTotal: (payouts.total as { sol?: string } | undefined)?.sol ?? payouts.total,
   });
 
   // 7. Reviews awaiting a reply.
   const open = await client.creatorReviews({ unreplied: true });
-  log('reviews awaiting reply', { reviews: open.reviews.map((r) => ({ id: r.id, slug: r.slug, rating: r.rating, body: r.body })) });
+  log('reviews awaiting reply', {
+    reviews: open.reviews.map((r) => ({ id: r.id, slug: r.slug, rating: r.rating, body: r.body })),
+  });
   const reply = process.env.TM_REPLY;
   if (reply) {
     for (const review of open.reviews) {
@@ -106,13 +146,17 @@ async function main() {
 
   async function createListing(xLinked: boolean): Promise<string | undefined> {
     if (!xLinked) {
-      log('skip listing', { reason: 'X_REQUIRED', note: 'verify X once in the studio (Profile > Link X) with this wallet' });
+      log('skip listing', {
+        reason: 'X_REQUIRED',
+        note: 'verify X once in the studio (Profile > Link X) with this wallet',
+      });
       return undefined;
     }
     const input = {
       title: env('TM_TITLE', 'Agent Hello Badge'),
       summary: 'A tiny badge userscript published end to end by an agent.',
-      description: 'Shows the page title in a corner badge on Axiom. Example listing created by the TrenchMart seller agent on devnet.',
+      description:
+        'Shows the page title in a corner badge on Axiom. Example listing created by the TrenchMart seller agent on devnet.',
       category: 'userscript' as const,
       terminals: ['Axiom'],
       priceLamports: env('TM_PRICE_LAMPORTS', '10000000'),
@@ -131,12 +175,18 @@ async function main() {
     try {
       return (await client.createListing(input)).id;
     } catch (err) {
-      if (!(err instanceof TrenchmartError) || err.code !== 'BOND_REQUIRED' || !flag('TM_PAY_BOND')) throw err;
+      if (!(err instanceof TrenchmartError) || err.code !== 'BOND_REQUIRED' || !flag('TM_PAY_BOND'))
+        throw err;
       // Each category has its own bond (bondByCategory); stake the difference (1 to 5 SOL per stake).
       const now = await client.requirements();
-      const needed = BigInt(String((now.bondByCategory as Record<string, string>)[input.category] ?? '0'));
+      const needed = BigInt(
+        String((now.bondByCategory as Record<string, string>)[input.category] ?? '0'),
+      );
       const missing = needed - BigInt(String(now.bondActive ?? '0'));
-      const bond = await client.payBond(signer, missing > 1_000_000_000n ? missing : 1_000_000_000n);
+      const bond = await client.payBond(
+        signer,
+        missing > 1_000_000_000n ? missing : 1_000_000_000n,
+      );
       log('bond staked', bond);
       return (await client.createListing(input)).id;
     }
@@ -149,8 +199,12 @@ function logVerdict(result: VersionResult) {
     semver: result.version.semver,
     status: result.version.status,
     sha256: result.version.sha256,
-    failed: result.checks.filter((c) => c.result === 'fail').map((c) => `${c.rule_id}: ${c.detail}`),
-    warnings: result.checks.filter((c) => c.result === 'warn').map((c) => `${c.rule_id}: ${c.detail}`),
+    failed: result.checks
+      .filter((c) => c.result === 'fail')
+      .map((c) => `${c.rule_id}: ${c.detail}`),
+    warnings: result.checks
+      .filter((c) => c.result === 'warn')
+      .map((c) => `${c.rule_id}: ${c.detail}`),
     ai: result.review ? { decision: result.review.decision, notes: result.review.notes } : null,
   });
 }
@@ -165,7 +219,8 @@ function pick(obj: Record<string, unknown>, keys: string[]) {
 }
 
 main().catch((err: unknown) => {
-  if (err instanceof TrenchmartError) log('error', { status: err.status, code: err.code, message: err.message, data: err.data });
+  if (err instanceof TrenchmartError)
+    log('error', { status: err.status, code: err.code, message: err.message, data: err.data });
   else log('error', { message: (err as Error).message });
   process.exit(1);
 });

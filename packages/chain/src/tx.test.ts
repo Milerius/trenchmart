@@ -114,7 +114,13 @@ describe('parseLegacyTx', () => {
   const from = randomKeypair();
   const to = randomKeypair();
   const unsigned = () =>
-    compileUnsignedTransferMemo({ from: from.publicKey, to: to.publicKey, lamports: 42n, memo: 'tm:abc', recentBlockhash: blockhash });
+    compileUnsignedTransferMemo({
+      from: from.publicKey,
+      to: to.publicKey,
+      lamports: 42n,
+      memo: 'tm:abc',
+      recentBlockhash: blockhash,
+    });
 
   it('parses keys, blockhash and instructions and verifies signatures', () => {
     const parsed = parseLegacyTx(unsigned());
@@ -123,7 +129,9 @@ describe('parseLegacyTx', () => {
     expect(parsed.numRequiredSignatures).toBe(1);
     expect(parsed.instructions.map((ix) => ix.programId)).toContain(MEMO_PROGRAM);
     expect(verifyTxSignatures(parsed)).toBe(false);
-    expect(verifyTxSignatures(parseLegacyTx(signLegacyTransaction(unsigned(), from.secretKey)))).toBe(true);
+    expect(
+      verifyTxSignatures(parseLegacyTx(signLegacyTransaction(unsigned(), from.secretKey))),
+    ).toBe(true);
   });
 
   it('rejects versioned messages, trailing bytes, truncation and oversize', () => {

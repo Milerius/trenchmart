@@ -161,7 +161,12 @@ async function call(
   app: App,
   method: string,
   path: string,
-  opts: { key?: string; cookie?: string; body?: unknown; raw?: NonNullable<RequestInit['body']> } = {},
+  opts: {
+    key?: string;
+    cookie?: string;
+    body?: unknown;
+    raw?: NonNullable<RequestInit['body']>;
+  } = {},
 ): Promise<Res> {
   const headers: Record<string, string> = {};
   if (opts.key) headers.authorization = `Bearer ${opts.key}`;
@@ -259,7 +264,6 @@ function tamper(txBase64: string, mutate: (message: Uint8Array) => void, signer:
   return toBase64(signTx(out, [signer.secretKey]));
 }
 
-
 async function restoreConfig() {
   await sql`update config set value = '5'::jsonb where key = 'upload_limit_per_creator_day'`;
   await sql`update config set value = '250000000'::jsonb where key = 'verification_fee_lamports'`;
@@ -288,7 +292,12 @@ describe('agent API', () => {
     const { app } = await harness();
     const wallet = keypair();
     const challenge = await call(app, 'POST', '/agent/auth/challenge', {
-      body: { wallet: wallet.publicKey, name: 'buyer bot', scopes: ['trade', 'read'], rateLimitPerMin: 30 },
+      body: {
+        wallet: wallet.publicKey,
+        name: 'buyer bot',
+        scopes: ['trade', 'read'],
+        rateLimitPerMin: 30,
+      },
     });
     expect(challenge.status).toBe(200);
     const message = challenge.body.message as string;
@@ -301,7 +310,11 @@ describe('agent API', () => {
     // A signature by another wallet, or of another text, is refused.
     const other = keypair();
     const wrong = await call(app, 'POST', '/agent/auth/key', {
-      body: { wallet: wallet.publicKey, nonce: challenge.body.nonce, signature: signText(message, other) },
+      body: {
+        wallet: wallet.publicKey,
+        nonce: challenge.body.nonce,
+        signature: signText(message, other),
+      },
     });
     expect(wrong.status).toBe(401);
     expect(wrong.body.error.code).toBe('BAD_SIGNATURE');
@@ -315,7 +328,11 @@ describe('agent API', () => {
     expect(altered.status).toBe(401);
 
     const ok = await call(app, 'POST', '/agent/auth/key', {
-      body: { wallet: wallet.publicKey, nonce: challenge.body.nonce, signature: signText(message, wallet) },
+      body: {
+        wallet: wallet.publicKey,
+        nonce: challenge.body.nonce,
+        signature: signText(message, wallet),
+      },
     });
     expect(ok.status).toBe(200);
     expect(ok.body.key).toMatch(/^tmk_[A-Za-z0-9_-]{43}$/);
@@ -324,7 +341,9 @@ describe('agent API', () => {
     expect(ok.body.createdVia).toBe('wallet');
 
     // Stored hashed only.
-    const rows = await sql<{ key_hash: string; prefix: string }[]>`select key_hash, prefix from api_keys`;
+    const rows = await sql<
+      { key_hash: string; prefix: string }[]
+    >`select key_hash, prefix from api_keys`;
     expect(rows).toHaveLength(1);
     expect(rows[0]!.key_hash).toBe(await sha256Hex(new TextEncoder().encode(ok.body.key)));
     expect(JSON.stringify(rows)).not.toContain(ok.body.key);
@@ -332,7 +351,11 @@ describe('agent API', () => {
 
     // Replay of the same signed challenge fails.
     const replay = await call(app, 'POST', '/agent/auth/key', {
-      body: { wallet: wallet.publicKey, nonce: challenge.body.nonce, signature: signText(message, wallet) },
+      body: {
+        wallet: wallet.publicKey,
+        nonce: challenge.body.nonce,
+        signature: signText(message, wallet),
+      },
     });
     expect(replay.status).toBe(401);
 
@@ -376,7 +399,11 @@ describe('agent API', () => {
     const h = await harness();
     const wallet = keypair();
     const key = await mintKey(h.app, wallet, ['read']);
-    for (const bad of ['tmk_short', `tmk_${'A'.repeat(43)}`, key.slice(0, -1) + (key.endsWith('A') ? 'B' : 'A')]) {
+    for (const bad of [
+      'tmk_short',
+      `tmk_${'A'.repeat(43)}`,
+      key.slice(0, -1) + (key.endsWith('A') ? 'B' : 'A'),
+    ]) {
       const res = await call(h.app, 'GET', '/me', { key: bad });
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe('INVALID_API_KEY');
@@ -416,11 +443,15 @@ describe('agent API', () => {
     expect(listed.body.keys[0].prefix).toBe(created.body.key.slice(0, 12));
 
     // The key works, then the studio revokes it.
-    expect((await call(h.app, 'GET', '/studio/overview', { key: created.body.key })).status).toBe(200);
+    expect((await call(h.app, 'GET', '/studio/overview', { key: created.body.key })).status).toBe(
+      200,
+    );
     const revoked = await call(h.app, 'DELETE', `/agent/keys/${created.body.id}`, { cookie });
     expect(revoked.status).toBe(200);
     expect(revoked.body.revokedAt).toBeTruthy();
-    expect((await call(h.app, 'GET', '/studio/overview', { key: created.body.key })).status).toBe(401);
+    expect((await call(h.app, 'GET', '/studio/overview', { key: created.body.key })).status).toBe(
+      401,
+    );
 
     // Someone else's key id is not found.
     const otherCookie = await login(h.app, keypair());
@@ -428,7 +459,9 @@ describe('agent API', () => {
       cookie: otherCookie,
       body: { name: 'other', scopes: ['read'] },
     });
-    expect((await call(h.app, 'DELETE', `/agent/keys/${foreign.body.id}`, { cookie })).status).toBe(404);
+    expect((await call(h.app, 'DELETE', `/agent/keys/${foreign.body.id}`, { cookie })).status).toBe(
+      404,
+    );
 
     // Without a session: 401. With a key: key management is not available.
     expect((await call(h.app, 'GET', '/agent/keys')).status).toBe(401);
@@ -439,14 +472,23 @@ describe('agent API', () => {
     expect(asKey.status).toBe(403);
     expect(asKey.body.error.code).toBe('KEY_FORBIDDEN');
     expect((await call(h.app, 'GET', '/agent/keys', { key: foreign.body.key })).status).toBe(403);
-    expect((await call(h.app, 'DELETE', `/agent/keys/${foreign.body.id}`, { key: foreign.body.key })).status).toBe(403);
+    expect(
+      (await call(h.app, 'DELETE', `/agent/keys/${foreign.body.id}`, { key: foreign.body.key }))
+        .status,
+    ).toBe(403);
 
     // At most 10 active keys per wallet; revoked ones do not count.
     for (let i = 0; i < 10; i += 1) {
-      const res = await call(h.app, 'POST', '/agent/keys', { cookie, body: { name: `k${i}`, scopes: ['read'] } });
+      const res = await call(h.app, 'POST', '/agent/keys', {
+        cookie,
+        body: { name: `k${i}`, scopes: ['read'] },
+      });
       expect(res.status).toBe(200);
     }
-    const capped = await call(h.app, 'POST', '/agent/keys', { cookie, body: { name: 'k11', scopes: ['read'] } });
+    const capped = await call(h.app, 'POST', '/agent/keys', {
+      cookie,
+      body: { name: 'k11', scopes: ['read'] },
+    });
     expect(capped.status).toBe(409);
     expect(capped.body.error.code).toBe('KEY_LIMIT');
   });
@@ -460,18 +502,36 @@ describe('agent API', () => {
     const all = await mintKey(h.app, wallet);
 
     expect((await call(h.app, 'GET', '/listings', { key: read })).status).toBe(200);
-    expect((await call(h.app, 'GET', `/listings/${listing.listingId}`, { key: read })).status).toBe(200);
-    const buy = await call(h.app, 'POST', '/orders', { key: read, body: { listingId: listing.listingId } });
+    expect((await call(h.app, 'GET', `/listings/${listing.listingId}`, { key: read })).status).toBe(
+      200,
+    );
+    const buy = await call(h.app, 'POST', '/orders', {
+      key: read,
+      body: { listingId: listing.listingId },
+    });
     expect(buy.status).toBe(403);
     expect(buy.body.error.code).toBe('INSUFFICIENT_SCOPE');
     expect((await call(h.app, 'GET', '/studio/overview', { key: read })).status).toBe(403);
-    expect((await call(h.app, 'PUT', '/studio/profile', { key: read, body: { bio: 'x' } })).status).toBe(403);
-    expect((await call(h.app, 'POST', '/agent/tx/broadcast', { key: read, body: { txBase64: 'A'.repeat(200) } })).status).toBe(403);
+    expect(
+      (await call(h.app, 'PUT', '/studio/profile', { key: read, body: { bio: 'x' } })).status,
+    ).toBe(403);
+    expect(
+      (
+        await call(h.app, 'POST', '/agent/tx/broadcast', {
+          key: read,
+          body: { txBase64: 'A'.repeat(200) },
+        })
+      ).status,
+    ).toBe(403);
 
     // A profile key edits the profile but cannot sell or read.
     const edited = await call(h.app, 'PUT', '/studio/profile', {
       key: profile,
-      body: { displayName: 'Agent Smith', bio: 'I am an agent.', socials: { github: 'agent-smith' } },
+      body: {
+        displayName: 'Agent Smith',
+        bio: 'I am an agent.',
+        socials: { github: 'agent-smith' },
+      },
     });
     expect(edited.status).toBe(200);
     expect((await call(h.app, 'GET', '/studio/listings', { key: profile })).status).toBe(403);
@@ -490,7 +550,10 @@ describe('agent API', () => {
       ['POST', '/agent/keys'],
       ['GET', '/agent/unknown'],
     ] as const) {
-      const res = await call(h.app, method, path, { key: all, body: method === 'GET' ? undefined : {} });
+      const res = await call(h.app, method, path, {
+        key: all,
+        body: method === 'GET' ? undefined : {},
+      });
       expect(res.status, `${method} ${path}`).toBe(403);
       expect(res.body.error.code).toBe('KEY_FORBIDDEN');
     }
@@ -526,7 +589,10 @@ describe('agent API', () => {
       if (route.sessionOnly || route.public) continue;
       // Every documented key route is reachable by some scope (never KEY_FORBIDDEN).
       const sample = route.path.replace(/\{[^}]+\}/g, randomUUID());
-      expect(scopeFor(route.method.toUpperCase(), sample), `${route.method} ${route.path}`).not.toBe('denied');
+      expect(
+        scopeFor(route.method.toUpperCase(), sample),
+        `${route.method} ${route.path}`,
+      ).not.toBe('denied');
     }
     // Every documented path is routed (an unknown route answers Hono's plain-text 404).
     for (const route of ROUTES) {
@@ -567,7 +633,10 @@ describe('agent API', () => {
     const listing = await seedListing();
     const buyer = keypair();
     const key = await mintKey(h.app, buyer, ['read', 'trade']);
-    const order = await call(h.app, 'POST', '/orders', { key, body: { listingId: listing.listingId } });
+    const order = await call(h.app, 'POST', '/orders', {
+      key,
+      body: { listingId: listing.listingId },
+    });
     expect(order.status).toBe(200);
     const unsigned = order.body.txBase64 as string;
     const parsed = parseLegacyTx(fromBase64(unsigned));
@@ -596,18 +665,26 @@ describe('agent API', () => {
     })();
     expect(dataAt).toBeGreaterThan(0);
     for (const offset of [8 + 16 + 32 * 6 + 1, initIx.data.length - 1]) {
-      const changed = tamper(signed, (m) => {
-        m[dataAt + offset] = (m[dataAt + offset]! + 1) % 256;
-      }, buyer);
+      const changed = tamper(
+        signed,
+        (m) => {
+          m[dataAt + offset] = (m[dataAt + offset]! + 1) % 256;
+        },
+        buyer,
+      );
       const res = await broadcast(changed);
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('NOT_ISSUED');
     }
     // Tampered blockhash and tampered account key (seller swapped): refused.
     const bhAt = 3 + 1 + parsed.accountKeys.length * 32;
-    const swappedBlockhash = tamper(signed, (m) => {
-      m[bhAt] = (m[bhAt]! + 1) % 256;
-    }, buyer);
+    const swappedBlockhash = tamper(
+      signed,
+      (m) => {
+        m[bhAt] = (m[bhAt]! + 1) % 256;
+      },
+      buyer,
+    );
     expect((await broadcast(swappedBlockhash)).body.error.code).toBe('NOT_ISSUED');
     // Swapping any non-program account (the escrow PDA, the config): not the issued message.
     const programIds = new Set(parsed.instructions.map((ix) => ix.programId));
@@ -617,17 +694,25 @@ describe('agent API', () => {
       .map(({ i }) => i);
     expect(plainAccounts.length).toBeGreaterThan(0);
     for (const index of plainAccounts) {
-      const swappedAccount = tamper(signed, (m) => {
-        const at = 3 + 1 + 32 * index;
-        m[at] = (m[at]! + 1) % 256;
-      }, buyer);
+      const swappedAccount = tamper(
+        signed,
+        (m) => {
+          const at = 3 + 1 + 32 * index;
+          m[at] = (m[at]! + 1) % 256;
+        },
+        buyer,
+      );
       expect((await broadcast(swappedAccount)).body.error.code).toBe('NOT_ISSUED');
     }
     // Swapping a program id (the last, read-only keys) is caught as a foreign program.
-    const swappedProgram = tamper(signed, (m) => {
-      const at = 3 + 1 + 32 * (parsed.accountKeys.length - 1);
-      m[at] = (m[at]! + 1) % 256;
-    }, buyer);
+    const swappedProgram = tamper(
+      signed,
+      (m) => {
+        const at = 3 + 1 + 32 * (parsed.accountKeys.length - 1);
+        m[at] = (m[at]! + 1) % 256;
+      },
+      buyer,
+    );
     expect((await broadcast(swappedProgram)).body.error.code).toBe('FOREIGN_PROGRAM');
     // A transaction the API never issued is refused even when it only uses allowed programs.
     const transfer = compileLegacyTx({
@@ -635,14 +720,18 @@ describe('agent API', () => {
       instructions: [memoIx(order.body.memo, buyer.publicKey)],
       recentBlockhash: blockhash,
     });
-    expect((await broadcast(toBase64(signTx(transfer, [buyer.secretKey])))).body.error.code).toBe('NOT_ISSUED');
+    expect((await broadcast(toBase64(signTx(transfer, [buyer.secretKey])))).body.error.code).toBe(
+      'NOT_ISSUED',
+    );
     // An instruction to a foreign program is refused before the lookup.
     const foreign = compileLegacyTx({
       feePayer: buyer.publicKey,
       instructions: [{ programId: randomKeypair().publicKey, keys: [], data: new Uint8Array([1]) }],
       recentBlockhash: blockhash,
     });
-    expect((await broadcast(toBase64(signTx(foreign, [buyer.secretKey])))).body.error.code).toBe('FOREIGN_PROGRAM');
+    expect((await broadcast(toBase64(signTx(foreign, [buyer.secretKey])))).body.error.code).toBe(
+      'FOREIGN_PROGRAM',
+    );
     // An extra co-signer is refused.
     const cosigner = keypair();
     const twoSigners = compileLegacyTx({
@@ -651,7 +740,8 @@ describe('agent API', () => {
       recentBlockhash: blockhash,
     });
     expect(
-      (await broadcast(toBase64(signTx(twoSigners, [buyer.secretKey, cosigner.secretKey])))).body.error.code,
+      (await broadcast(toBase64(signTx(twoSigners, [buyer.secretKey, cosigner.secretKey])))).body
+        .error.code,
     ).toBe('WRONG_SIGNER');
     // Versioned (v0) message, trailing bytes and garbage: refused.
     const v0 = fromBase64(signed);
@@ -675,7 +765,10 @@ describe('agent API', () => {
     expect(ok.body.signature).toBe(bs58.encode(fromBase64(signed).slice(1, 65)));
 
     // After the relay window it expires.
-    const order2 = await call(h.app, 'POST', '/orders', { key, body: { listingId: listing.listingId } });
+    const order2 = await call(h.app, 'POST', '/orders', {
+      key,
+      body: { listingId: listing.listingId },
+    });
     const signed2 = toBase64(signTx(fromBase64(order2.body.txBase64), [buyer.secretKey]));
     h.clock.now = new Date(h.clock.now.getTime() + 4 * 60_000);
     const expired = await broadcast(signed2);
@@ -694,13 +787,22 @@ describe('agent API', () => {
     expect(found.status).toBe(200);
     const report = await call(h.app, 'GET', `/listings/${listing.listingId}`, { key });
     expect(report.status).toBe(200);
-    const quote = await call(h.app, 'POST', '/orders/quote', { key, body: { listingId: listing.listingId } });
+    const quote = await call(h.app, 'POST', '/orders/quote', {
+      key,
+      body: { listingId: listing.listingId },
+    });
     expect(quote.status).toBe(200);
     expect(quote.body.total).toBe('105000000');
-    const order = await call(h.app, 'POST', '/orders', { key, body: { listingId: listing.listingId } });
+    const order = await call(h.app, 'POST', '/orders', {
+      key,
+      body: { listingId: listing.listingId },
+    });
     expect(order.status).toBe(200);
     const signed = toBase64(signTx(fromBase64(order.body.txBase64), [buyer.secretKey]));
-    const sent = await call(h.app, 'POST', '/agent/tx/broadcast', { key, body: { txBase64: signed } });
+    const sent = await call(h.app, 'POST', '/agent/tx/broadcast', {
+      key,
+      body: { txBase64: signed },
+    });
     expect(sent.status).toBe(200);
     const signature = sent.body.signature as string;
 
@@ -711,9 +813,14 @@ describe('agent API', () => {
     });
     expect(early.status).toBe(400);
     expect(early.body.error.code).toBe('TX_NOT_FOUND');
-    const [row] = await sql<Record<string, any>[]>`select * from orders where id = ${order.body.orderId}`;
+    const [row] = await sql<
+      Record<string, any>[]
+    >`select * from orders where id = ${order.body.orderId}`;
     h.txs.set(signature, { memos: [order.body.memo], err: null });
-    h.accounts.set(order.body.escrow, fundedEscrow(row!, buyer.publicKey, listing.seller.publicKey));
+    h.accounts.set(
+      order.body.escrow,
+      fundedEscrow(row!, buyer.publicKey, listing.seller.publicKey),
+    );
     const confirmed = await call(h.app, 'POST', `/orders/${order.body.orderId}/submitted`, {
       key,
       body: { txSig: signature },
@@ -728,16 +835,23 @@ describe('agent API', () => {
     expect(await file.text()).toContain('Agent Filter Pack');
 
     // Reviews open after release; release is refused before the window ends.
-    const tooEarly = await call(h.app, 'POST', `/agent/orders/${order.body.orderId}/release`, { key });
+    const tooEarly = await call(h.app, 'POST', `/agent/orders/${order.body.orderId}/release`, {
+      key,
+    });
     expect(tooEarly.status).toBe(409);
     expect(tooEarly.body.error.code).toBe('ESCROW_WINDOW');
     h.clock.now = new Date((row!.escrow_until as Date).getTime() + 1000);
-    const released = await call(h.app, 'POST', `/agent/orders/${order.body.orderId}/release`, { key });
+    const released = await call(h.app, 'POST', `/agent/orders/${order.body.orderId}/release`, {
+      key,
+    });
     expect(released.status).toBe(200);
     expect(released.body.released).toBe(true);
     // Someone else's order cannot be released by this key.
     const stranger = await mintKey(h.app, keypair(), ['trade']);
-    expect((await call(h.app, 'POST', `/agent/orders/${order.body.orderId}/release`, { key: stranger })).status).toBe(404);
+    expect(
+      (await call(h.app, 'POST', `/agent/orders/${order.body.orderId}/release`, { key: stranger }))
+        .status,
+    ).toBe(404);
 
     const form = await call(h.app, 'GET', `/orders/${order.body.orderId}/review-form`, { key });
     expect(form.status).toBe(200);
@@ -757,7 +871,13 @@ describe('agent API', () => {
     expect(noScope.status).toBe(403);
     const review = await call(h.app, 'POST', `/orders/${order.body.orderId}/review`, {
       key,
-      body: { rating: 5, body: REVIEW, versionId: version.id, terminal: 'Axiom', signature: signText(message, buyer) },
+      body: {
+        rating: 5,
+        body: REVIEW,
+        versionId: version.id,
+        terminal: 'Axiom',
+        signature: signText(message, buyer),
+      },
     });
     expect(review.status).toBe(200);
     expect(review.body.ok).toBe(true);
@@ -767,9 +887,14 @@ describe('agent API', () => {
     const h = await harness();
     const creator = keypair();
     const key = await mintKey(h.app, creator, ['read', 'sell', 'profile']);
-    const [user] = await sql<{ id: string }[]>`select id from users where wallet = ${creator.publicKey}`;
+    const [user] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
     // X link (unverified dev link where X OAuth is off) through the profile scope.
-    const linked = await call(h.app, 'POST', '/studio/x', { key, body: { handle: 'agent_seller' } });
+    const linked = await call(h.app, 'POST', '/studio/x', {
+      key,
+      body: { handle: 'agent_seller' },
+    });
     expect(linked.status).toBe(200);
     await sql`insert into bonds (user_id, amount, tx_sig, status) values (${user!.id}, ${5_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')`;
     await sql`update config set value = '0'::jsonb where key = 'verification_fee_lamports'`;
@@ -818,7 +943,12 @@ describe('agent API', () => {
 
     const started = await call(h.app, 'POST', `/studio/listings/${listingId}/versions`, {
       key,
-      body: { semver: '1.0.0', changelog: 'first', fileName: 'agent.user.js', fileSize: clean.length },
+      body: {
+        semver: '1.0.0',
+        changelog: 'first',
+        fileName: 'agent.user.js',
+        fileSize: clean.length,
+      },
     });
     expect(started.status).toBe(200);
     const target = new URL(started.body.uploadUrl);
@@ -828,7 +958,9 @@ describe('agent API', () => {
       body: new TextEncoder().encode(clean),
     });
     expect(put.status).toBeLessThan(300);
-    const done = await call(h.app, 'POST', `/studio/versions/${started.body.versionId}/complete`, { key });
+    const done = await call(h.app, 'POST', `/studio/versions/${started.body.versionId}/complete`, {
+      key,
+    });
     expect(done.status).toBe(200);
     const result = await call(h.app, 'GET', `/studio/versions/${started.body.versionId}`, { key });
     expect(result.status).toBe(200);
@@ -841,12 +973,16 @@ describe('agent API', () => {
       body: { priceLamports: '175000000', updatePriceLamports: '0' },
     });
     expect(repriced.status).toBe(200);
-    const [stored] = await sql<{ price: bigint; license: string; kind: string }[]>`select price, license, kind from listings where id = ${listingId}`;
+    const [stored] = await sql<
+      { price: bigint; license: string; kind: string }[]
+    >`select price, license, kind from listings where id = ${listingId}`;
     expect(stored!.price).toBe(175_000_000n);
     expect(stored!.license).toBe('subscription');
     expect(stored!.kind).toBe('script');
     expect((await call(h.app, 'GET', '/studio/overview', { key })).status).toBe(200);
     expect((await call(h.app, 'GET', '/studio/payouts', { key })).status).toBe(200);
-    expect((await call(h.app, 'GET', `/studio/listings/${listingId}/upload-quota`, { key })).status).toBe(200);
+    expect(
+      (await call(h.app, 'GET', `/studio/listings/${listingId}/upload-quota`, { key })).status,
+    ).toBe(200);
   });
 });

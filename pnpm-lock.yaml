@@ -315,6 +315,9 @@ importers:
       '@trenchmart/chain':
         specifier: workspace:*
         version: link:../../packages/chain
+      '@trenchmart/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@trenchmart/shared':
         specifier: workspace:*
         version: link:../../packages/shared

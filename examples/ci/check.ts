@@ -25,6 +25,9 @@ assert.ok(review.reply, 'the seller agent replied to the review');
 const listing = await client.listing(sale.slug);
 assert.equal(listing.ratingCount, 1);
 const subs = await client.subscribers();
-assert.ok(subs.subscribers.some((s) => s.buyer === buyer), 'buyer receives updates');
+assert.ok(
+  subs.subscribers.some((s) => s.buyer === buyer),
+  'buyer receives updates',
+);
 await client.revokeKey();
 console.log(JSON.stringify({ ok: true, sale: sale.id, review: review.id, slug: sale.slug }));

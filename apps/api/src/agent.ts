@@ -11,7 +11,17 @@ import {
   verifyTxSignatures,
   type ParsedLegacyTx,
 } from '@trenchmart/chain';
-import { jsonSafe, randomNonce, verifySiwsSignature } from '@trenchmart/shared';
+import {
+  API_SCOPES,
+  CHALLENGE_TTL_MS,
+  DEFAULT_KEY_RATE,
+  MAX_ACTIVE_KEYS,
+  MAX_KEY_RATE,
+  jsonSafe,
+  randomNonce,
+  verifySiwsSignature,
+  type ApiScope,
+} from '@trenchmart/shared';
 import { audit, ensureSnapshot, HttpError, releaseOrders, sha256Hex, type Deps } from './logic';
 
 /**
@@ -21,13 +31,15 @@ import { audit, ensureSnapshot, HttpError, releaseOrders, sha256Hex, type Deps }
  * management, the validated broadcast relay and the single-order release.
  */
 
-export const API_SCOPES = ['read', 'trade', 'sell', 'profile', 'review'] as const;
-export type ApiScope = (typeof API_SCOPES)[number];
+export {
+  API_SCOPES,
+  CHALLENGE_TTL_MS,
+  DEFAULT_KEY_RATE,
+  MAX_ACTIVE_KEYS,
+  MAX_KEY_RATE,
+  type ApiScope,
+};
 export const API_KEY_PREFIX = 'tmk_';
-export const MAX_ACTIVE_KEYS = 10;
-export const DEFAULT_KEY_RATE = 60;
-export const MAX_KEY_RATE = 300;
-export const CHALLENGE_TTL_MS = 10 * 60_000;
 
 export type ApiKeyContext = {
   id: string;
@@ -209,8 +221,7 @@ export function scopeFor(method: string, path: string): ScopeRule {
   if (/^\/orders\/[^/]+\/review(-form)?$/.test(p)) return { anyOf: ['review'] };
   if (/^\/reviews\/[^/]+\/(reply|vote|report)$/.test(p) && m !== 'GET')
     return { anyOf: ['review'] };
-  if (/^\/listings\/[^/]+\/(upvote|report)$/.test(p) && m === 'POST')
-    return { anyOf: ['review'] };
+  if (/^\/listings\/[^/]+\/(upvote|report)$/.test(p) && m === 'POST') return { anyOf: ['review'] };
   // Supplements are settled by buyers (verify) and sellers (daily upload limit).
   if (/^\/supplements\/[^/]+\/submitted$/.test(p) && m === 'POST')
     return { anyOf: ['trade', 'sell'] };
@@ -399,7 +410,10 @@ export function registerAgentRoutes(api: Hono<Vars>, deps: Deps): void {
       where nonce = ${body.nonce} and wallet = ${body.wallet} and used_at is null and expires_at > ${deps.now()}
     `;
     const challenge = rows[0];
-    if (!challenge || !verifySiwsSignature(challenge.message as string, body.signature, body.wallet))
+    if (
+      !challenge ||
+      !verifySiwsSignature(challenge.message as string, body.signature, body.wallet)
+    )
       throw new HttpError(401, 'BAD_SIGNATURE', 'signature does not match an open challenge');
     const used = await deps.sql`
       update agent_challenges set used_at = ${deps.now()} where nonce = ${body.nonce} and used_at is null returning nonce
@@ -532,12 +546,16 @@ export function registerAgentRoutes(api: Hono<Vars>, deps: Deps): void {
     if (order.status !== 'paid')
       throw new HttpError(409, 'NOT_RELEASABLE', `order is ${order.status as string}`);
     if ((order.escrow_until as Date).getTime() > deps.now().getTime())
-      throw new HttpError(409, 'ESCROW_WINDOW', 'the escrow window has not ended', );
+      throw new HttpError(409, 'ESCROW_WINDOW', 'the escrow window has not ended');
     await releaseOrders(deps, { orderId: id });
     const fresh = await deps.sql<Row[]>`select status, release_sig from orders where id = ${id}`;
     const done = fresh[0]?.status === 'released';
     if (!done)
-      throw new HttpError(503, 'RELEASE_PENDING', 'release did not land yet; the crank retries every 5 minutes');
+      throw new HttpError(
+        503,
+        'RELEASE_PENDING',
+        'release did not land yet; the crank retries every 5 minutes',
+      );
     return c.json(jsonSafe({ released: true, releaseSig: fresh[0]?.release_sig ?? null }));
   });
 }

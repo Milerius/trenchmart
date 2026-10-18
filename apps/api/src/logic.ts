@@ -27,6 +27,7 @@ import {
   releaseDue,
   releasePayouts,
   refundPayout,
+  ISSUED_TX_TTL_MS,
   requiredBondLamports,
   tierAtLeast,
   tierFor,
@@ -271,8 +272,6 @@ function unsignedTx(input: {
  * would fail is refused here with the real reason instead. An unreachable RPC does not
  * block: the wallet and the broadcast preflight still check it.
  */
-/** How long an issued unsigned transaction can be relayed by /agent/tx/broadcast. */
-export const ISSUED_TX_TTL_MS = 3 * 60_000;
 
 /**
  * Records the SHA-256 of an unsigned transaction message the API built for a wallet. The

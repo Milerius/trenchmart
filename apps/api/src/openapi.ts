@@ -194,8 +194,19 @@ export const ROUTES: RouteDoc[] = [
     summary: 'On-chain escrow and treasury state',
     public: true,
   },
-  { method: 'get', path: '/prices/sol', tag: 'Discovery', summary: 'SOL/USD used for display', public: true },
-  { method: 'get', path: '/me', tag: 'Account', summary: 'The wallet behind the key, roles and tier' },
+  {
+    method: 'get',
+    path: '/prices/sol',
+    tag: 'Discovery',
+    summary: 'SOL/USD used for display',
+    public: true,
+  },
+  {
+    method: 'get',
+    path: '/me',
+    tag: 'Account',
+    summary: 'The wallet behind the key, roles and tier',
+  },
   // Buying
   {
     method: 'post',
@@ -223,8 +234,18 @@ export const ROUTES: RouteDoc[] = [
     body: submittedBody,
   },
   { method: 'get', path: '/orders/{id}', tag: 'Buy', summary: 'One of your orders' },
-  { method: 'get', path: '/orders/{id}/escrow', tag: 'Buy', summary: 'Live escrow account of an order' },
-  { method: 'get', path: '/me/orders', tag: 'Buy', summary: 'Your orders with update entitlements' },
+  {
+    method: 'get',
+    path: '/orders/{id}/escrow',
+    tag: 'Buy',
+    summary: 'Live escrow account of an order',
+  },
+  {
+    method: 'get',
+    path: '/me/orders',
+    tag: 'Buy',
+    summary: 'Your orders with update entitlements',
+  },
   {
     method: 'post',
     path: '/orders/{id}/download',
@@ -233,8 +254,18 @@ export const ROUTES: RouteDoc[] = [
     description:
       'Paid or released orders only. Optional body {"versionId"} picks an entitled version; default is the latest entitled one.',
   },
-  { method: 'get', path: '/orders/{id}/versions', tag: 'Buy', summary: 'Versions this order is entitled to' },
-  { method: 'post', path: '/orders/{id}/updates/quote', tag: 'Buy', summary: 'Quote an update renewal' },
+  {
+    method: 'get',
+    path: '/orders/{id}/versions',
+    tag: 'Buy',
+    summary: 'Versions this order is entitled to',
+  },
+  {
+    method: 'post',
+    path: '/orders/{id}/updates/quote',
+    tag: 'Buy',
+    summary: 'Quote an update renewal',
+  },
   {
     method: 'post',
     path: '/orders/{id}/updates/renew',
@@ -339,7 +370,12 @@ export const ROUTES: RouteDoc[] = [
     summary: 'Edit title, summary, description, price, update price, holder gating',
     body: listingPatch,
   },
-  { method: 'get', path: '/studio/listings/{id}/content', tag: 'Sell', summary: 'Page content (draft and live)' },
+  {
+    method: 'get',
+    path: '/studio/listings/{id}/content',
+    tag: 'Sell',
+    summary: 'Page content (draft and live)',
+  },
   {
     method: 'put',
     path: '/studio/listings/{id}/content',
@@ -443,7 +479,8 @@ export const ROUTES: RouteDoc[] = [
     method: 'get',
     path: '/studio/sales',
     tag: 'Sell',
-    summary: 'Every completed sale of your listings, newest first (query: limit 1-100, before ISO cursor)',
+    summary:
+      'Every completed sale of your listings, newest first (query: limit 1-100, before ISO cursor)',
   },
   {
     method: 'get',
@@ -457,7 +494,12 @@ export const ROUTES: RouteDoc[] = [
     tag: 'Sell',
     summary: 'Reviews on your listings with replies (query: unreplied=1, limit, before)',
   },
-  { method: 'post', path: '/studio/listings/{id}/delist', tag: 'Sell', summary: 'Delist a listing' },
+  {
+    method: 'post',
+    path: '/studio/listings/{id}/delist',
+    tag: 'Sell',
+    summary: 'Delist a listing',
+  },
   // Profile
   { method: 'get', path: '/studio/profile', tag: 'Profile', summary: 'Your editable profile' },
   {
@@ -474,7 +516,12 @@ export const ROUTES: RouteDoc[] = [
     summary: 'Upload an avatar (raw image body, max 3 MB)',
     bodyType: 'binary',
   },
-  { method: 'delete', path: '/studio/profile/avatar', tag: 'Profile', summary: 'Remove the avatar' },
+  {
+    method: 'delete',
+    path: '/studio/profile/avatar',
+    tag: 'Profile',
+    summary: 'Remove the avatar',
+  },
   {
     method: 'post',
     path: '/studio/profile/banner',
@@ -482,7 +529,12 @@ export const ROUTES: RouteDoc[] = [
     summary: 'Upload a banner (raw image body, max 3 MB)',
     bodyType: 'binary',
   },
-  { method: 'delete', path: '/studio/profile/banner', tag: 'Profile', summary: 'Remove the banner' },
+  {
+    method: 'delete',
+    path: '/studio/profile/banner',
+    tag: 'Profile',
+    summary: 'Remove the banner',
+  },
   {
     method: 'post',
     path: '/studio/x',
@@ -528,7 +580,12 @@ export const ROUTES: RouteDoc[] = [
     summary: 'Report a review',
     body: reviewReportBody,
   },
-  { method: 'post', path: '/listings/{slug}/upvote', tag: 'Reviews', summary: 'Toggle your upvote' },
+  {
+    method: 'post',
+    path: '/listings/{slug}/upvote',
+    tag: 'Reviews',
+    summary: 'Toggle your upvote',
+  },
   {
     method: 'post',
     path: '/listings/{slug}/report',
@@ -587,7 +644,10 @@ export function openApiSpec(input: { apiUrl: string; cluster: string }): object 
         })),
       ],
       responses: {
-        '200': { description: 'OK', content: { 'application/json': { schema: { type: 'object' } } } },
+        '200': {
+          description: 'OK',
+          content: { 'application/json': { schema: { type: 'object' } } },
+        },
         default: {
           description: 'Error',
           content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
@@ -645,7 +705,12 @@ export function openApiSpec(input: { apiUrl: string; cluster: string }): object 
           bearerFormat: 'tmk_ API key',
           description: 'Scoped API key. Per-key limit 1-300 requests/min (default 60).',
         },
-        session: { type: 'apiKey', in: 'cookie', name: 'tm_session', description: 'Studio wallet session' },
+        session: {
+          type: 'apiKey',
+          in: 'cookie',
+          name: 'tm_session',
+          description: 'Studio wallet session',
+        },
       },
       schemas: {
         Error: {

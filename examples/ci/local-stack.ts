@@ -20,10 +20,23 @@ import {
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 
-const ESCROW_PROGRAM_ID = new PublicKey(process.env.ESCROW_PROGRAM_ID ?? 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw');
+const ESCROW_PROGRAM_ID = new PublicKey(
+  process.env.ESCROW_PROGRAM_ID ?? 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw',
+);
 const LOADER = new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111');
 const RPC = process.env.SOLANA_RPC_URL ?? 'http://127.0.0.1:8899';
-const NAMES = ['authority', 'resolver', 'crank', 'vault', 'buyback', 'ai', 'ops', 'safety', 'creator', 'buyer'] as const;
+const NAMES = [
+  'authority',
+  'resolver',
+  'crank',
+  'vault',
+  'buyback',
+  'ai',
+  'ops',
+  'safety',
+  'creator',
+  'buyer',
+] as const;
 type Name = (typeof NAMES)[number];
 
 const [command, dir] = process.argv.slice(2);
@@ -37,13 +50,18 @@ function keyPath(name: Name) {
 }
 
 function load(name: Name): Keypair {
-  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(keyPath(name), 'utf8')) as number[]));
+  return Keypair.fromSecretKey(
+    Uint8Array.from(JSON.parse(readFileSync(keyPath(name), 'utf8')) as number[]),
+  );
 }
 
 if (command === 'keys') {
   mkdirSync(dir, { recursive: true });
   for (const name of NAMES) {
-    if (!existsSync(keyPath(name))) writeFileSync(keyPath(name), JSON.stringify([...Keypair.generate().secretKey]), { mode: 0o600 });
+    if (!existsSync(keyPath(name)))
+      writeFileSync(keyPath(name), JSON.stringify([...Keypair.generate().secretKey]), {
+        mode: 0o600,
+      });
   }
   console.log(`keys ready in ${dir} (authority ${load('authority').publicKey.toBase58()})`);
   process.exit(0);
@@ -79,7 +97,9 @@ if (!(await connection.getAccountInfo(config))) {
     ],
     data,
   });
-  await sendAndConfirmTransaction(connection, new Transaction().add(ix), [keys.authority], { commitment: 'confirmed' });
+  await sendAndConfirmTransaction(connection, new Transaction().add(ix), [keys.authority], {
+    commitment: 'confirmed',
+  });
 }
 
 const secret = (name: Name) => bs58.encode(keys[name].secretKey);
@@ -108,7 +128,9 @@ const env = {
 };
 writeFileSync(
   join(dir, 'api.env'),
-  Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n') + '\n',
+  Object.entries(env)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n') + '\n',
   { mode: 0o600 },
 );
 console.log(`stack ready: config ${config.toBase58()}, env in ${join(dir, 'api.env')}`);
