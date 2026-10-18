@@ -467,7 +467,8 @@ export default function NewListingPage() {
         />
       </>
     );
-    aside = null;
+    // Step 1: the market card preview only (the prototype's right column); no spec card yet.
+    aside = preview;
   } else if (step === 2 && draft.kind) {
     const k = draft.kind;
     const terminalTitle =
@@ -1040,7 +1041,7 @@ export default function NewListingPage() {
           <Link href="/studio" className="text-sm text-muted hover:text-ink">
             ← Studio
           </Link>
-          <h1 className="m-0 mt-3 text-[24px] font-semibold tracking-[-0.03em] sm:text-[32px]">
+          <h1 className="m-0 mt-3 text-[32px] leading-none font-semibold tracking-[-0.045em] sm:text-5xl">
             New listing
           </h1>
           <p className="m-0 mt-1 hidden text-ink-2 sm:block">
