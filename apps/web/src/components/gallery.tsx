@@ -22,12 +22,16 @@ export function Gallery({ images, title }: { images: GalleryImage[]; title: stri
   if (!images.length) return null;
   const current = images[Math.min(active, images.length - 1)]!;
   return (
-    <section aria-label={`${title} images`} data-testid="gallery" className="mt-6">
+    <section
+      aria-label={`${title} images`}
+      data-testid="gallery"
+      className={`grid gap-3 ${images.length > 1 ? 'sm:grid-cols-[minmax(0,1fr)_180px]' : ''}`}
+    >
       <button
         type="button"
         data-testid="gallery-hero"
         onClick={() => setOpen(active)}
-        className="motion-press group relative block aspect-[16/9] w-full overflow-hidden rounded-panel border border-line bg-inset"
+        className="motion-press group relative block aspect-[16/9] w-full overflow-hidden rounded-[22px] border border-line bg-inset sm:aspect-auto sm:h-[340px]"
       >
         <img
           src={current.url}
@@ -45,18 +49,18 @@ export function Gallery({ images, title }: { images: GalleryImage[]; title: stri
       {images.length > 1 ? (
         <ul
           data-testid="gallery-thumbs"
-          className="m-0 mt-3 flex gap-2 overflow-x-auto p-0 pb-1"
+          className="m-0 flex gap-2 overflow-x-auto p-0 pb-1 sm:max-h-[340px] sm:flex-col sm:gap-3 sm:overflow-y-auto sm:overflow-x-visible sm:pb-0 [scrollbar-width:none]"
           aria-label="Choose an image"
         >
           {images.map((image, index) => (
-            <li key={image.id} className="list-none">
+            <li key={image.id} className="shrink-0 list-none sm:w-full">
               <button
                 type="button"
                 aria-label={`Show image ${index + 1}${image.alt ? `: ${image.alt}` : ''}`}
                 aria-current={index === active || undefined}
                 onClick={() => setActive(index)}
                 onDoubleClick={() => setOpen(index)}
-                className={`motion-press block h-[62px] w-[110px] overflow-hidden rounded-ctl border-2 bg-inset ${
+                className={`motion-press block h-[62px] w-[110px] overflow-hidden rounded-xl border-2 bg-inset sm:h-[105px] sm:w-full sm:rounded-2xl ${
                   index === active ? 'border-accent' : 'border-line opacity-70 hover:opacity-100'
                 }`}
               >

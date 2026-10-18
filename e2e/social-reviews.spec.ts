@@ -283,8 +283,8 @@ test('listing page: terminal badges and "used on" tags carry the terminal logos'
   await page.goto(`/l/${SLUG}`);
   const badges = page.getByTestId('listing-terminals');
   await expect(badges).toHaveText('Axiom · GMGN');
-  await expectTerminalLogo(badges, 'Axiom', 16);
-  await expectTerminalLogo(badges, 'GMGN', 16);
+  await expectTerminalLogo(badges, 'Axiom', 20);
+  await expectTerminalLogo(badges, 'GMGN', 20);
   await page.getByRole('tab', { name: /Reviews/ }).click();
   const first = page.getByTestId('review').nth(0);
   await expect(first).toContainText('used on Axiom');
