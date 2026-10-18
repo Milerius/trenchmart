@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
-import { bayesianRating, CATEGORIES, jsonSafe } from '@trenchmart/shared';
+import { bayesianRating, CATEGORIES, jsonSafe, utcDay } from '@trenchmart/shared';
 import type { Deps } from './logic';
+import { featuredToday } from './featuring';
 import { loadRankConfig } from './ranking';
 import {
   identityColumns,
@@ -249,6 +250,12 @@ export async function activityFeed(deps: Deps, limit = 24) {
       where l.first_live_at > ${since} and l.delisted_at is null and l.live_version_id is not null
       order by l.first_live_at desc limit ${limit})
     union all
+    (select 'featured', greatest(b.start_day::timestamptz, b.paid_at), l.title, l.slug, l.category::text, null, null, b.kind
+      from feature_bookings b join listings l on l.id = b.listing_id
+      where b.status in ('paid', 'completed') and b.start_day <= ${utcDay(deps.now())}::date and b.start_day > ${utcDay(since)}::date
+        and l.delisted_at is null
+      order by b.start_day desc limit ${limit})
+    union all
     (select 'update', v.created_at, l.title, l.slug, l.category::text, null, null, v.semver
       from versions v join listings l on l.id = v.listing_id
       where v.status = 'live' and v.created_at > ${since} and l.delisted_at is null
@@ -258,12 +265,13 @@ export async function activityFeed(deps: Deps, limit = 24) {
     limit ${limit}
   `;
   return rows.map((r) => ({
-    kind: r.kind as 'sale' | 'review' | 'new' | 'update',
+    kind: r.kind as 'sale' | 'review' | 'new' | 'update' | 'featured',
     at: r.at,
     listing: { title: r.title, slug: r.slug, category: r.category },
     amountLamports: r.amount === null ? null : BigInt(r.amount as string | number),
     rating: r.rating ?? null,
-    semver: r.semver ?? null,
+    semver: r.kind === 'featured' ? null : (r.semver ?? null),
+    placement: r.kind === 'featured' ? (r.semver as string) : null,
   }));
 }
 
@@ -322,6 +330,29 @@ export function registerLeaderboardRoutes(api: Hono<SocialVars>, deps: Deps): vo
 
   api.get('/activity', async (c) => {
     const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 24));
-    return c.json(jsonSafe({ events: await activityFeed(deps, limit) }));
+    const sponsored = await featuredToday(deps, 'band', null);
+    const cards = sponsored.length
+      ? await deps.sql<Row[]>`
+          select id, title, slug, category::text as category from listings
+          where id in ${deps.sql(sponsored.map((s) => s.listingId))}
+        `
+      : [];
+    return c.json(
+      jsonSafe({
+        events: await activityFeed(deps, limit),
+        // Paid "band" slots for today, in hourly rotation; always labelled as sponsored.
+        sponsored: sponsored.flatMap((s) => {
+          const card = cards.find((row) => row.id === s.listingId);
+          return card
+            ? [
+                {
+                  bookingId: s.bookingId,
+                  listing: { title: card.title, slug: card.slug, category: card.category },
+                },
+              ]
+            : [];
+        }),
+      }),
+    );
   });
 }

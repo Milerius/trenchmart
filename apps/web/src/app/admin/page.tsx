@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { FeaturingAdmin } from '@/components/featuring-admin';
 import { ReviewModeration } from '@/components/review-moderation';
 import { api } from '@/lib/api';
 import { useWallet } from '@/lib/wallet';
@@ -68,6 +69,7 @@ export default function AdminPage() {
       </ul>
       {message ? <p>{message}</p> : null}
       <ReviewModeration />
+      <FeaturingAdmin />
     </section>
   );
 }

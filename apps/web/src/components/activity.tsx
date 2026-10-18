@@ -15,8 +15,17 @@ export type ActivityEvent = {
   amountLamports: string | null;
   rating: number | null;
   semver: string | null;
+  placement?: string | null;
   creator?: PublicIdentity | null;
 };
+
+/** Paid band slots for today; always shown first and labelled. */
+export type SponsoredChip = {
+  bookingId: string;
+  listing: { title: string; slug: string; category: string };
+};
+
+export type Activity = { events: ActivityEvent[]; sponsored: SponsoredChip[] };
 
 export const ACTIVITY_LABEL: Record<ActivityEvent['kind'], string> = {
   sale: 'SALE',
@@ -31,7 +40,7 @@ export function activityDetail(event: ActivityEvent): string {
   if (event.kind === 'review' && event.rating) return `${'★'.repeat(event.rating)}`;
   if (event.kind === 'new' && event.amountLamports) return solText(event.amountLamports);
   if (event.kind === 'update' && event.semver) return `v${event.semver}`;
-  if (event.kind === 'featured') return 'Featured';
+  if (event.kind === 'featured') return 'Featured · Sponsored';
   return '';
 }
 
@@ -49,13 +58,20 @@ function ago(iso: string): string {
 }
 
 export function useActivity(limit = 24) {
-  const [events, setEvents] = useState<ActivityEvent[] | null>(null);
+  const [events, setEvents] = useState<Activity | null>(null);
   useEffect(() => {
     let stop = false;
     const load = () =>
-      void api<{ events: ActivityEvent[] }>(`/activity?limit=${limit}`)
-        .then((body) => !stop && setEvents(Array.isArray(body?.events) ? body.events : []))
-        .catch(() => !stop && setEvents((prev) => prev ?? []));
+      void api<Partial<Activity>>(`/activity?limit=${limit}`)
+        .then(
+          (body) =>
+            !stop &&
+            setEvents({
+              events: Array.isArray(body?.events) ? body.events : [],
+              sponsored: Array.isArray(body?.sponsored) ? body.sponsored : [],
+            }),
+        )
+        .catch(() => !stop && setEvents((prev) => prev ?? { events: [], sponsored: [] }));
     load();
     const timer = window.setInterval(load, 60_000);
     return () => {
@@ -75,10 +91,34 @@ const TONE: Record<ActivityEvent['kind'], string> = {
 };
 
 /** Home "Live on TrenchMart" band. Hidden entirely when nothing has happened yet. */
-export function ActivityBand({ events }: { events: ActivityEvent[] | null }) {
-  if (!events || events.length === 0) return null;
-  const row = (copy: string) =>
-    events.map((event, index) => {
+export function ActivityBand({ activity }: { activity: Activity | null }) {
+  if (!activity || (activity.events.length === 0 && activity.sponsored.length === 0)) return null;
+  const { events, sponsored } = activity;
+  const row = (copy: string) => [
+    ...sponsored.map((chip) => {
+      const meta = categoryMeta(chip.listing.category);
+      return (
+        <Link
+          key={`${copy}-s-${chip.bookingId}`}
+          href={`/l/${chip.listing.slug}`}
+          tabIndex={copy === 'b' ? -1 : undefined}
+          data-testid={copy === 'a' ? 'band-sponsored' : undefined}
+          title="Paid placement. Never affects ranking."
+          className="inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-ctl border border-warn-line bg-warn-bg px-3 py-2"
+        >
+          <span className="font-mono text-[11px] font-semibold text-warn">
+            FEATURED · SPONSORED
+          </span>
+          <span
+            aria-hidden="true"
+            className="h-5 w-5 shrink-0 rounded"
+            style={{ background: meta.bg, border: `1px solid ${meta.color}` }}
+          />
+          <span className="text-[13px] text-ink">{chip.listing.title}</span>
+        </Link>
+      );
+    }),
+    ...events.map((event, index) => {
       const meta = categoryMeta(event.listing.category);
       return (
         <Link
@@ -102,7 +142,8 @@ export function ActivityBand({ events }: { events: ActivityEvent[] | null }) {
           <span className="font-mono text-[11px] text-muted">{ago(event.at)}</span>
         </Link>
       );
-    });
+    }),
+  ];
   return (
     <section data-testid="activity-band" aria-label="Live on TrenchMart" className="space-y-3">
       <div className="flex items-center justify-between gap-3">

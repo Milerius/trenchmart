@@ -25,6 +25,8 @@ export type Listing = {
   upvotes?: number;
   /** Ranking job output; null until the listing has counted sales or upvotes. */
   rank?: { category: number | null; overall: number | null } | null;
+  /** Paid featuring slot (always labelled; never affects rank). */
+  sponsored?: { bookingId: string; placement: string } | null;
 };
 
 export type Pricing = {
@@ -77,8 +79,17 @@ export function ListingCard({
         >
           {meta.tag}
         </span>
-        <span className="flex items-center gap-1.5">
-          {rankBadge(listing.rank?.category, meta.label) ? (
+        <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+          {listing.sponsored ? (
+            <Tag
+              tone="warn"
+              data-testid="sponsored-tag"
+              title="Paid placement. Never affects ranking."
+            >
+              <span aria-hidden="true">★</span> FEATURED · SPONSORED
+            </Tag>
+          ) : null}
+          {!listing.sponsored && rankBadge(listing.rank?.category, meta.label) ? (
             <Tag tone="info" data-testid="rank-badge">
               {rankBadge(listing.rank?.category, meta.label)}
             </Tag>

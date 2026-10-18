@@ -79,6 +79,7 @@ import {
 import { studioOverview } from './studio';
 import { registerReviewRoutes } from './reviews';
 import { computeRanks, registerUpvoteRoutes } from './ranking';
+import { featuredToday, registerFeaturingRoutes, featureMaintenance } from './featuring';
 import { paidToCreators, registerLeaderboardRoutes } from './leaderboard';
 import { scanWalletIntel } from './social';
 import {
@@ -620,6 +621,28 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   registerUpvoteRoutes(api, deps);
   // Creator leaderboard and the live activity feed (leaderboard.ts); before /creators/:handle.
   registerLeaderboardRoutes(api, deps);
+  // Paid featuring: booking, payment, refunds, admin (featuring.ts).
+  registerFeaturingRoutes(api, deps, (ids) => searchListings(deps, { ids, limit: 50 }, 'none'));
+
+  // Today's "Featured · Sponsored" listings for a placement, in hourly rotation.
+  api.get('/featured', async (c) => {
+    const placement = c.req.query('placement') === 'category' ? 'category' : 'home';
+    const category = c.req.query('category') ?? null;
+    if (placement === 'category' && !category)
+      throw new HttpError(400, 'BAD_REQUEST', 'category required');
+    const slots = await featuredToday(deps, placement, category);
+    if (slots.length === 0) return c.json({ placement, items: [] });
+    const cards = await searchListings(
+      deps,
+      { ids: slots.map((s) => s.listingId), limit: 50 },
+      'none',
+    );
+    const items = slots.flatMap((slot) => {
+      const card = cards.find((row) => row.id === slot.listingId);
+      return card ? [{ ...card, sponsored: { bookingId: slot.bookingId, placement } }] : [];
+    });
+    return c.json(jsonSafe({ placement, items }));
+  });
 
   api.get('/creators/top', async (c) => {
     const rows = await deps.sql<Record<string, any>[]>`
@@ -1635,6 +1658,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (job === 'ledger') return c.json(jsonSafe({ vault: await ledgerVault(deps.sql) }));
     if (job === 'ranking')
       return c.json(jsonSafe({ ranks: await computeRanks(deps, { force: true }) }));
+    if (job === 'featuring') return c.json(await featureMaintenance(deps));
     if (job === 'wallet-intel') return c.json({ scanned: await scanWalletIntel(deps) });
     if (job === 'optimize-media') return c.json({ optimized: await optimizeStoredImages(deps) });
     throw new HttpError(404, 'NOT_FOUND', 'unknown job');
@@ -1842,6 +1866,7 @@ async function searchListings(
     sort?: string;
     cursor?: string;
     limit?: number;
+    ids?: string[];
   },
   tier: string,
 ) {
@@ -1873,6 +1898,7 @@ async function searchListings(
       and (${query.category ?? null}::text is null or l.category::text = ${query.category ?? null})
       and (${terminalFilter}::text is null or exists (select 1 from unnest(l.terminals) t where lower(t) = lower(${terminalFilter})))
       and (${query.q ?? null}::text is null or l.search @@ plainto_tsquery('english', ${query.q ?? ''}))
+      and (${query.ids ? query.ids : null}::uuid[] is null or l.id = any(${query.ids ?? []}::uuid[]))
     order by ${deps.sql.unsafe(order)}
     limit ${limit}
   `;

@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { solText } from '@/lib/money';
 import { CATEGORIES } from '@trenchmart/shared';
 import { ActivityBand, useActivity } from '@/components/activity';
+import { FeaturedRow, useFeatured } from '@/components/featured';
 import { TierTable } from '@/components/fees';
 import { type Board, type BoardTab, CreatorCards, TAB_LABEL } from '@/components/leaderboard';
 import { ListingGrid, TERMINALS, type Listing } from '@/components/listings';
@@ -52,6 +53,7 @@ export default function HomePage() {
   const [creatorTab, setCreatorTab] = useState<BoardTab>('earners');
   const [board, setBoard] = useState<Board | null | 'error'>(null);
   const activity = useActivity(24);
+  const featured = useFeatured('home');
 
   useEffect(() => {
     const query =
@@ -137,46 +139,68 @@ export default function HomePage() {
       <Reveal>
         <div className="space-y-8">
           <LandingStats stats={stats} failed={statsFailed} />
-          <ActivityBand events={activity} />
+          <ActivityBand activity={activity} />
         </div>
       </Reveal>
 
+      {featured.length ? (
+        <FeaturedRow
+          items={featured}
+          centsPerSol={cents}
+          config={config}
+          tier={wallet.session?.tier}
+        />
+      ) : null}
+
       <Reveal>
-        <section aria-labelledby="how-heading">
-          <SectionHead
-            id="how-heading"
-            kicker="How buying works"
-            title="Four steps, no surprises."
-          />
-          <ol className="stagger mt-8 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              [
-                'Pick a verified tool',
-                'Every listing shows its review result, the checks it passed, the file hash and a signed scan report.',
-              ],
-              [
-                'See your exact price',
-                'Price, 5% fee, your tier discount and 0% creator commission, itemised before you sign.',
-              ],
-              [
-                'Pay into escrow',
-                `Your SOL is held in escrow for ${escrowWindowLabel(escrowHours)}. Open a dispute any time in that window.`,
-              ],
-              [
-                'Download on release',
-                'Once payment is confirmed in escrow, download a copy watermarked to your wallet.',
-              ],
-            ].map(([title, body], index) => (
-              <li
-                key={title}
-                className="motion-card list-none rounded-card border border-line bg-surface p-5"
-              >
-                <span className="font-mono text-xs text-accent">0{index + 1}</span>
-                <h3 className="mt-3 text-base font-semibold">{title}</h3>
-                <p className="mt-2 text-sm text-ink-2">{body}</p>
-              </li>
-            ))}
-          </ol>
+        <section aria-labelledby="creators-heading" data-testid="top-creators">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead id="creators-heading" kicker="Creators" title="Top creators this month" />
+            <div className="flex flex-wrap items-center gap-2">
+              <div role="tablist" aria-label="Top creators" className="flex gap-1">
+                {HOME_TABS.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={creatorTab === value}
+                    onClick={() => setCreatorTab(value)}
+                    className={`motion-press h-9 rounded-full border px-3.5 text-[13px] ${
+                      creatorTab === value
+                        ? 'border-accent bg-accent-bg text-accent'
+                        : 'border-line-control text-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    {TAB_LABEL[value]}
+                  </button>
+                ))}
+              </div>
+              <ButtonLink href="/creators" variant="ghost" size="sm">
+                Full leaderboard →
+              </ButtonLink>
+            </div>
+          </div>
+          <div className="mt-6">
+            {board === null ? (
+              <p className="m-0 text-muted">Loading creators…</p>
+            ) : board === 'error' ? (
+              <p className="m-0 text-muted">Creator rankings are unavailable right now.</p>
+            ) : board.rows.length === 0 ? (
+              <p className="m-0 text-muted" data-testid="top-creators-empty">
+                {creatorTab === 'earners'
+                  ? 'No creator payouts in the last 30 days yet. The first released order puts a creator here.'
+                  : creatorTab === 'rated'
+                    ? `No creator has ${board.rules.topRatedMinReviews}+ verified reviews yet.`
+                    : `No creator has ${board.rules.risingMinSales}+ sales this month yet.`}
+              </p>
+            ) : (
+              <CreatorCards rows={board.rows} tab={creatorTab} centsPerSol={cents} />
+            )}
+            <p className="mt-3 text-xs text-muted">
+              Ranked on released sales, verified-buyer reviews and weighted upvotes. Paid featuring
+              never changes a rank.
+            </p>
+          </div>
         </section>
       </Reveal>
 
@@ -221,6 +245,45 @@ export default function HomePage() {
           />
         </div>
       </section>
+
+      <Reveal>
+        <section aria-labelledby="how-heading">
+          <SectionHead
+            id="how-heading"
+            kicker="How buying works"
+            title="Four steps, no surprises."
+          />
+          <ol className="stagger mt-8 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              [
+                'Pick a verified tool',
+                'Every listing shows its review result, the checks it passed, the file hash and a signed scan report.',
+              ],
+              [
+                'See your exact price',
+                'Price, 5% fee, your tier discount and 0% creator commission, itemised before you sign.',
+              ],
+              [
+                'Pay into escrow',
+                `Your SOL is held in escrow for ${escrowWindowLabel(escrowHours)}. Open a dispute any time in that window.`,
+              ],
+              [
+                'Download on release',
+                'Once payment is confirmed in escrow, download a copy watermarked to your wallet.',
+              ],
+            ].map(([title, body], index) => (
+              <li
+                key={title}
+                className="motion-card list-none rounded-card border border-line bg-surface p-5"
+              >
+                <span className="font-mono text-xs text-accent">0{index + 1}</span>
+                <h3 className="mt-3 text-base font-semibold">{title}</h3>
+                <p className="mt-2 text-sm text-ink-2">{body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </Reveal>
 
       <Reveal>
         <section aria-labelledby="cat-heading">
@@ -296,58 +359,6 @@ export default function HomePage() {
                 <p className="mt-2 text-sm text-ink-2">{body}</p>
               </div>
             ))}
-          </div>
-        </section>
-      </Reveal>
-
-      <Reveal>
-        <section aria-labelledby="creators-heading" data-testid="top-creators">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <SectionHead id="creators-heading" kicker="Creators" title="Top creators this month" />
-            <div className="flex flex-wrap items-center gap-2">
-              <div role="tablist" aria-label="Top creators" className="flex gap-1">
-                {HOME_TABS.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="tab"
-                    aria-selected={creatorTab === value}
-                    onClick={() => setCreatorTab(value)}
-                    className={`motion-press h-9 rounded-full border px-3.5 text-[13px] ${
-                      creatorTab === value
-                        ? 'border-accent bg-accent-bg text-accent'
-                        : 'border-line-control text-ink-2 hover:text-ink'
-                    }`}
-                  >
-                    {TAB_LABEL[value]}
-                  </button>
-                ))}
-              </div>
-              <ButtonLink href="/creators" variant="ghost" size="sm">
-                Full leaderboard →
-              </ButtonLink>
-            </div>
-          </div>
-          <div className="mt-6">
-            {board === null ? (
-              <p className="m-0 text-muted">Loading creators…</p>
-            ) : board === 'error' ? (
-              <p className="m-0 text-muted">Creator rankings are unavailable right now.</p>
-            ) : board.rows.length === 0 ? (
-              <p className="m-0 text-muted" data-testid="top-creators-empty">
-                {creatorTab === 'earners'
-                  ? 'No creator payouts in the last 30 days yet. The first released order puts a creator here.'
-                  : creatorTab === 'rated'
-                    ? `No creator has ${board.rules.topRatedMinReviews}+ verified reviews yet.`
-                    : `No creator has ${board.rules.risingMinSales}+ sales this month yet.`}
-              </p>
-            ) : (
-              <CreatorCards rows={board.rows} tab={creatorTab} centsPerSol={cents} />
-            )}
-            <p className="mt-3 text-xs text-muted">
-              Ranked on released sales, verified-buyer reviews and weighted upvotes. Paid featuring
-              never changes a rank.
-            </p>
           </div>
         </section>
       </Reveal>
