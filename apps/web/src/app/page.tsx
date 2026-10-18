@@ -150,6 +150,12 @@ export default function HomePage() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-gradient-to-b from-bg/30 via-bg/55 to-bg/20 sm:hidden"
         />
+        {/* Scrim behind the copy column: keeps the headline, body and chips readable over the aurora. */}
+        <div
+          aria-hidden="true"
+          data-testid="hero-scrim"
+          className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(60%_85%_at_24%_50%,rgba(7,8,7,0.82),rgba(7,8,7,0.5)_55%,rgba(7,8,7,0.15)_100%)] sm:block"
+        />
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-48 bg-gradient-to-b from-transparent to-bg"
@@ -181,7 +187,7 @@ export default function HomePage() {
               </span>
             </h1>
             <p
-              className="rise m-0 max-w-xl text-lg leading-relaxed text-ink-2 sm:text-xl"
+              className="rise m-0 max-w-xl text-lg leading-relaxed text-ink sm:text-xl"
               style={{ animationDelay: '150ms' }}
             >
               Trading <TradingWords /> — every version scanned, scripts sandboxed, and an AI review
@@ -214,7 +220,7 @@ export default function HomePage() {
                 [escrowWindowShort(escrowHours), 'escrow window'],
               ].map(([value, label]) => (
                 <div key={label} className="glass flex flex-col gap-0.5 px-4 py-3.5">
-                  <dt className="order-2 text-xs text-muted">{label}</dt>
+                  <dt className="order-2 text-xs text-ink-2">{label}</dt>
                   <dd className="m-0 text-2xl font-semibold tracking-tight">{value}</dd>
                 </div>
               ))}

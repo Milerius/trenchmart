@@ -22,15 +22,21 @@ export function HeroAurora() {
   const Aurora = useFxModule(loadAurora);
   if (!Aurora) return null;
   return (
-    <div data-fx="aurora" aria-hidden="true" className="fx-in pointer-events-none absolute inset-0">
+    // Dimmed well below the prototype's raw values: the hero copy sits on top of it and must stay
+    // readable at every frame (body text keeps 4.5:1 or better; see the hero contrast test).
+    <div
+      data-fx="aurora"
+      aria-hidden="true"
+      className="fx-in pointer-events-none absolute inset-0 opacity-45"
+    >
       <Aurora
         colorStops={['#C6F432', '#3b82ff', '#a66bff']}
-        amplitude={1.2}
-        blend={0.6}
-        speed={0.7}
-        glow={1}
-        brightness={1.5}
-        height={1.1}
+        amplitude={0.7}
+        blend={0.5}
+        speed={0.6}
+        glow={0.6}
+        brightness={0.8}
+        height={1}
         scale={1.2}
       />
     </div>
@@ -45,7 +51,9 @@ export function Shiny({ text }: { text: string }) {
 }
 
 const ROTATING = ['userscripts', 'wallet lists', 'terminal filters', 'full setups', 'alert bots'];
-const ROTATING_CLASS = 'inline-flex overflow-hidden rounded-md bg-accent/12 px-2 text-accent';
+// A solid dark pill so the word reads on any frame of the aurora behind it.
+const ROTATING_CLASS =
+  'inline-flex overflow-hidden rounded-md bg-[#0b0d0b]/90 px-2 font-medium text-accent ring-1 ring-accent/35';
 
 /** "Trading <thing>" word rotator; the fallback shows the first word in the same pill. */
 export function TradingWords() {
@@ -55,9 +63,11 @@ export function TradingWords() {
     <RotatingText
       texts={ROTATING}
       effect="slide"
-      rotationInterval={2200}
+      rotationInterval={2800}
       mainClassName={ROTATING_CLASS}
-      staggerDuration={0.02}
+      // A quick swap: the pill is never empty for long, so the word stays readable.
+      transition={{ type: 'tween', duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      staggerDuration={0.008}
     />
   );
 }

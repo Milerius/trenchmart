@@ -420,6 +420,20 @@ test.describe('phase 6: home', () => {
     await expect(page.locator('[data-fx="aurora"] canvas')).toBeAttached({ timeout: 15_000 });
     await expect(page.locator('[data-fx="rays"] canvas')).toBeAttached();
     expect((await fxChunks(page)).length).toBeGreaterThan(0);
+    // Readability over the effect: the aurora is dimmed, a scrim sits behind the copy, the body
+    // text is the full ink colour and the rotating word sits in a solid dark pill.
+    const aurora = page.locator('[data-fx="aurora"]');
+    await expect
+      .poll(async () => Number(await aurora.evaluate((el) => getComputedStyle(el).opacity)))
+      .toBeLessThanOrEqual(0.5);
+    await expect(page.getByTestId('hero-scrim')).toBeVisible();
+    const body = page.getByTestId('hero').locator('p').first();
+    expect(await body.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(238, 240, 234)');
+    const chipBg = await body
+      .locator('span')
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(chipBg).not.toMatch(/rgba?\(198, 244, 50/);
     // The split-letter H1 and the shine keep the accessible name.
     await expect(
       page.getByRole('heading', { level: 1, name: 'The verified edge, for sale.' }),
