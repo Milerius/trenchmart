@@ -103,3 +103,9 @@ insert into config (key, value) values
   ('verify_free_per_day', '1'),
   ('verify_supplement_lamports', '10000000')
   on conflict (key) do nothing;
+
+-- Same as every other table: no access through the Supabase Data API; the API connects as owner.
+alter table update_periods enable row level security;
+alter table update_renewals enable row level security;
+alter table supplements enable row level security;
+alter table verifications enable row level security;
