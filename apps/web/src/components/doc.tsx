@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Label } from '@/components/ui';
 
 export function DocHeader({
   kicker,
@@ -7,16 +6,18 @@ export function DocHeader({
   lede,
 }: {
   kicker: string;
-  title: string;
+  title: ReactNode;
   lede: string;
 }) {
   return (
-    <header className="max-w-2xl">
-      <Label className="text-accent-label">{kicker}</Label>
-      <h1 className="m-0 mt-2 text-[40px] font-semibold leading-tight tracking-[-0.03em]">
+    <header className="flex max-w-3xl flex-col gap-3">
+      <span className="font-mono text-xs font-medium tracking-[.18em] text-accent uppercase">
+        {kicker}
+      </span>
+      <h1 className="m-0 text-[40px] leading-[1.05] font-semibold tracking-[-0.045em] sm:text-5xl">
         {title}
       </h1>
-      <p className="m-0 mt-3 text-[17px] text-ink-2">{lede}</p>
+      <p className="m-0 text-lg text-ink-2">{lede}</p>
     </header>
   );
 }
@@ -32,7 +33,7 @@ export function DocSection({
 }) {
   return (
     <section id={id} className="mt-10 max-w-3xl">
-      <h2 className="m-0 text-xl font-semibold tracking-[-0.02em]">{title}</h2>
+      <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">{title}</h2>
       <div className="mt-3 space-y-3 text-[15px] leading-7 text-ink-2">{children}</div>
     </section>
   );

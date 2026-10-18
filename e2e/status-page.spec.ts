@@ -196,3 +196,16 @@ test('API failure shows an error with retry, and refresh refetches', async ({ pa
   await expect(page.getByTestId('status-overall')).toContainText('All systems operational');
   expect(calls.filter((c) => c === '/status').length).toBeGreaterThanOrEqual(1);
 });
+
+test('prototype header and the glowing all-clear card', async ({ page }) => {
+  await stub(page, 'healthy');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/status');
+  const h1 = page.getByRole('heading', { level: 1, name: 'System status' });
+  await expect(h1).toBeVisible();
+  await expect(h1.locator('em')).toHaveText('status');
+  expect(await h1.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBe(48);
+  const overall = page.getByTestId('status-overall');
+  await expect(overall).toContainText('All systems operational');
+  expect(await overall.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('26px');
+});

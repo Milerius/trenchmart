@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
+import { Serif } from '@/components/ui';
 import { PurchaseDiagram } from '@/components/diagrams';
 import { CONTACT_LABEL, CONTACT_URL, protocol } from '@/lib/protocol-facts';
 
@@ -10,9 +11,16 @@ export default function DocsOverviewPage() {
     <article>
       <DocHeader
         kicker="Protocol"
-        title="How TrenchMart works"
+        title={
+          <>
+            How TrenchMart <Serif>works</Serif>
+          </>
+        }
         lede="A non-custodial Solana marketplace for trading tools. Buyers pay into escrow, sellers post a bond, and automated checks review every upload."
       />
+      <DocSection id="flow" title="The purchase flow">
+        <PurchaseDiagram />
+      </DocSection>
       <DocSection id="where" title="Where the figures come from">
         <p>
           The numbers on these pages are the seeded defaults in the shared config. A deployed config
@@ -43,7 +51,6 @@ export default function DocsOverviewPage() {
           .
         </p>
       </DocSection>
-      <PurchaseDiagram />
     </article>
   );
 }

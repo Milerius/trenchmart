@@ -18,53 +18,24 @@ function ArrowDefs({ id }: { id: string }) {
   );
 }
 
+/** A numbered sequence: the prototype's step cards (readable at any width, unlike an SVG). */
 function FlowDiagram({ testId, title, steps }: { testId: string; title: string; steps: string[] }) {
-  const width = 680;
-  const boxW = 520;
-  const boxH = 52;
-  const gap = 34;
-  const x = (width - boxW) / 2;
-  const height = 24 + steps.length * boxH + (steps.length - 1) * gap;
-  const marker = `${testId}-arrow`;
   return (
     <figure className="m-0 mt-6" data-testid={testId}>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-labelledby={`${testId}-title`}
-        className="h-auto w-full font-sans"
-      >
-        <title id={`${testId}-title`}>{title}</title>
-        <ArrowDefs id={marker} />
-        {steps.map((step, index) => {
-          const y = 12 + index * (boxH + gap);
-          return (
-            <g key={step}>
-              {index > 0 ? (
-                <line
-                  x1={width / 2}
-                  y1={y - gap + 4}
-                  x2={width / 2}
-                  y2={y - 2}
-                  stroke={LINE}
-                  markerEnd={`url(#${marker})`}
-                />
-              ) : null}
-              <rect x={x} y={y} width={boxW} height={boxH} rx="10" fill={SURFACE} stroke={BORDER} />
-              <text
-                x={width / 2}
-                y={y + 32}
-                textAnchor="middle"
-                fill={INK}
-                fontSize="15"
-                fontFamily="inherit"
-              >
-                {step}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+      <figcaption className="sr-only">{title}</figcaption>
+      <ol className="m-0 flex flex-col gap-3 p-0">
+        {steps.map((step, index) => (
+          <li
+            key={step}
+            className="flex list-none items-center gap-4 rounded-2xl border border-line bg-surface/60 p-4"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-bg font-mono text-sm text-accent ring-1 ring-accent-line">
+              {index + 1}
+            </span>
+            <span className="text-ink-2">{step}</span>
+          </li>
+        ))}
+      </ol>
     </figure>
   );
 }
