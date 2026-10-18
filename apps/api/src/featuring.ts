@@ -40,7 +40,7 @@ import { adminOnly, parseBody, signedIn, type Row, type SocialVars } from './soc
  * (`feature_slots`, `feature_discount_bps`, `feature_rules`), editable by admins.
  */
 
-const bookingBody = z.object({
+export const bookingBody = z.object({
   listingId: z.string().uuid(),
   kind: z.enum(FEATURE_KINDS),
   startDay: z.string(),

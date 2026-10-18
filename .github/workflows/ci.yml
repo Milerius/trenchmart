@@ -54,8 +54,9 @@ jobs:
       # Coverage gates live in packages/shared (fee/tier 100, escrow state 90, payouts 85).
       # The API integration file needs Postgres and runs in the integration job.
       # A Workers vitest pool is not used: the API imports postgres.js.
-      - run: pnpm --filter @trenchmart/shared --filter @trenchmart/scanner --filter @trenchmart/chain --filter @trenchmart/ai-verifier --filter @trenchmart/db --filter @trenchmart/web test
-      - run: pnpm --filter @trenchmart/api exec vitest run src/price.test.ts src/sandbox.test.ts src/dispatch.test.ts src/edge-cache.test.ts
+      - run: pnpm --filter @trenchmart/shared --filter @trenchmart/scanner --filter @trenchmart/chain --filter @trenchmart/ai-verifier --filter @trenchmart/db --filter @trenchmart/web --filter @trenchmart/sdk test
+      - run: pnpm --filter @trenchmart/api exec vitest run src/price.test.ts src/sandbox.test.ts src/dispatch.test.ts src/edge-cache.test.ts src/openapi.test.ts
+      - run: pnpm --filter @trenchmart/sdk build
 
   integration:
     name: integration
@@ -84,7 +85,7 @@ jobs:
           node-version: 26.12.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @trenchmart/api exec vitest run src/product.test.ts src/social.test.ts src/x-oauth.test.ts src/studio.test.ts src/cache-privacy.test.ts src/tier-balance.test.ts
+      - run: pnpm --filter @trenchmart/api exec vitest run src/product.test.ts src/social.test.ts src/x-oauth.test.ts src/studio.test.ts src/cache-privacy.test.ts src/agent.test.ts src/sdk.test.ts src/openapi.test.ts src/tier-balance.test.ts
 
   e2e:
     name: e2e
@@ -229,6 +230,66 @@ jobs:
           solana-keygen new --no-bip39-passphrase --force -o target/deploy/trench_escrow-keypair.json
           anchor keys sync
           anchor build
+      # The agent-e2e job deploys this build on a local validator (address = this throwaway keypair).
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: escrow-program
+          path: |
+            target/deploy/trench_escrow.so
+            target/deploy/trench_escrow-keypair.json
+          if-no-files-found: error
+          retention-days: 3
+
+  agent-e2e:
+    name: agent e2e (local validator)
+    needs: anchor-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trenchmart
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d trenchmart"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/trenchmart
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: escrow-program
+          path: .data/escrow
+      - name: solana cli
+        run: |
+          set -euo pipefail
+          curl -fsSL https://release.anza.xyz/v4.3.2/install | sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: seller agent + buyer agent against a local validator
+        run: |
+          set -euo pipefail
+          export ESCROW_SO="$PWD/.data/escrow/trench_escrow.so"
+          ESCROW_PROGRAM_ID="$(solana-keygen pubkey .data/escrow/trench_escrow-keypair.json)"
+          export ESCROW_PROGRAM_ID
+          bash examples/ci/run.sh
+      - name: logs
+        if: failure()
+        run: |
+          tail -n 200 .data/agent-e2e/api.log || true
+          tail -n 50 .data/agent-e2e/validator.log || true
 
   anchor-test:
     name: anchor test
@@ -326,6 +387,7 @@ jobs:
       - audit
       - gitleaks
       - anchor-build
+      - agent-e2e
       - anchor-test
       - clippy
       - fmt
@@ -343,6 +405,7 @@ jobs:
           AUDIT: ${{ needs.audit.result }}
           GITLEAKS: ${{ needs.gitleaks.result }}
           ANCHOR_BUILD: ${{ needs.anchor-build.result }}
+          AGENT_E2E: ${{ needs.agent-e2e.result }}
           ANCHOR_TEST: ${{ needs.anchor-test.result }}
           CLIPPY: ${{ needs.clippy.result }}
           FMT: ${{ needs.fmt.result }}
@@ -360,6 +423,7 @@ jobs:
               "audit": os.environ["AUDIT"],
               "gitleaks": os.environ["GITLEAKS"],
               "anchor-build": os.environ["ANCHOR_BUILD"],
+              "agent-e2e": os.environ["AGENT_E2E"],
               "anchor-test": os.environ["ANCHOR_TEST"],
               "clippy": os.environ["CLIPPY"],
               "fmt": os.environ["FMT"],

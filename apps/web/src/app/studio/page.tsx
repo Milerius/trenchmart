@@ -255,6 +255,9 @@ export default function StudioPage() {
           <ButtonLink href="/studio/featuring" variant="secondary">
             Feature a listing
           </ButtonLink>
+          <ButtonLink href="/studio/api-keys" variant="secondary">
+            API keys
+          </ButtonLink>
           <ButtonLink href="/studio/listings/new">+ New listing</ButtonLink>
         </div>
       </header>

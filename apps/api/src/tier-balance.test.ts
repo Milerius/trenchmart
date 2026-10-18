@@ -82,4 +82,21 @@ describe('$TRENCH holder tiers read from chain', () => {
     await tierForWallet(counting(), wallet, config);
     expect(reads).toBe(2);
   });
+
+  it('the display read (/me) never waits on the chain once a wallet has history', async () => {
+    let reads = 0;
+    const counting = () =>
+      ({ ...deps(), trenchBalance: async () => (reads++, 150_000n * WHOLE) }) as unknown as Deps;
+    const other = 'TierWa11et2222222222222222222222222222222222';
+    await sql`delete from token_balances where wallet = ${other}`;
+    // First sight still snapshots from chain, once.
+    expect((await tierForWallet(counting(), other, config, { reconcile: false })).tier).toBe(
+      'scout',
+    );
+    clock = new Date(clock.getTime() + 10 * BALANCE_RECONCILE_MS);
+    for (let i = 0; i < 3; i++)
+      await tierForWallet(counting(), other, config, { reconcile: false });
+    expect(reads).toBe(1);
+    await sql`delete from token_balances where wallet = ${other}`;
+  });
 });

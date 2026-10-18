@@ -14,3 +14,4 @@ evidence
 video/node_modules
 video/out
 packages/scanner/src/__fixtures__
+packages/sdk/openapi.json

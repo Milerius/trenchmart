@@ -9,6 +9,7 @@ import { type ActivityEvent, activityText, type SponsoredChip } from '@/componen
 import { api } from '@/lib/api';
 import { tierChip, usePublicConfig } from '@/lib/config';
 import { useWallet, WalletProvider } from '@/lib/wallet';
+import { WalletMenu } from '@/components/wallet-menu';
 import { ESCROW_PROGRAM_ID, explorerAddress, shortKey } from '@/lib/protocol-facts';
 
 /** Same geometry as brand/logo-mark.svg. */
@@ -101,10 +102,6 @@ function Nav() {
   const router = useRouter();
   const pathname = usePathname();
   const config = usePublicConfig();
-  useEffect(() => {
-    void wallet.refresh();
-  }, []);
-
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -183,29 +180,25 @@ function Nav() {
               {tierChip(wallet.session.tier, config)}
             </span>
           ) : null}
-          <button
-            data-testid="connect"
-            type="button"
-            className="motion-press h-11 rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover disabled:opacity-100"
-            onClick={() => void (wallet.session ? wallet.logout() : wallet.connect())}
-            disabled={wallet.busy}
-            aria-busy={wallet.busy || undefined}
-          >
-            {wallet.session
-              ? `${wallet.session.wallet.slice(0, 4)}…${wallet.session.wallet.slice(-4)}`
-              : wallet.busy
-                ? 'Check your wallet…'
-                : 'Connect wallet'}
-          </button>
+          <WalletMenu />
         </div>
       </div>
       {wallet.error ? (
         <p
           role="alert"
           data-testid="toast"
-          className="toast mx-auto max-w-7xl px-6 pb-3 text-sm text-danger"
+          className="toast mx-auto flex max-w-7xl items-start gap-3 px-6 pb-3 text-sm text-danger"
         >
-          {wallet.error}
+          <span className="flex-1">{wallet.error}</span>
+          <button
+            type="button"
+            data-testid="toast-dismiss"
+            aria-label="Dismiss"
+            className="text-muted hover:text-ink"
+            onClick={wallet.clearError}
+          >
+            ×
+          </button>
         </p>
       ) : null}
     </header>

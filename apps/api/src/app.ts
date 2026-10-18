@@ -77,12 +77,21 @@ import {
   saveProfile,
   uploadProfileImage,
 } from './profile';
-import { studioOverview } from './studio';
+import { studioOverview, studioReviews, studioSales, studioSubscribers } from './studio';
 import { registerReviewRoutes } from './reviews';
 import { computeRanks, registerUpvoteRoutes } from './ranking';
 import { featuredToday, registerFeaturingRoutes, featureMaintenance } from './featuring';
 import { paidToCreators, registerLeaderboardRoutes } from './leaderboard';
 import { scanWalletIntel } from './social';
+import {
+  authenticateApiKey,
+  consumeKeyRate,
+  isApiKeyHeader,
+  registerAgentRoutes,
+  scopeFor,
+  type ApiKeyContext,
+} from './agent';
+import { openApiSpec } from './openapi';
 import {
   activeBond,
   applyPayment,
@@ -132,7 +141,13 @@ import {
   verifyQuota,
 } from './versioning';
 
-type Vars = { user: Record<string, any> | null };
+/** Session lifetime; refreshed (no new signature) once it is a day old. */
+export const SESSION_TTL_S = 30 * 24 * 3600;
+const SESSION_REFRESH_AFTER_S = 24 * 3600;
+
+type Vars = { user: Record<string, any> | null; apiKey: ApiKeyContext | null };
+/** Expiry (unix seconds) of the session cookie that authenticated each request. */
+const sessionExpiry = new WeakMap<Request, number>();
 type App = Hono<{ Variables: Vars }>;
 
 async function bodyOf<T>(schema: z.ZodType<T>, raw: unknown): Promise<T> {
@@ -252,8 +267,45 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   app.use('*', async (c, next) => {
     const token = getCookie(c, 'tm_session');
     c.set('user', null);
-    if (token) {
-      const payload = await verifyJwt<{ sub?: string }>(
+    c.set('apiKey', null);
+    const authorization = c.req.header('authorization');
+    if (isApiKeyHeader(authorization) && c.req.path.startsWith('/api/v1/')) {
+      // Agent API key: the cookie is ignored, scopes are enforced deny-by-default, and every
+      // request (reads included) counts against the key's own per-minute limit.
+      const rule = scopeFor(c.req.method, c.req.path.slice('/api/v1'.length));
+      if (rule === 'denied')
+        return c.json(
+          { error: { code: 'KEY_FORBIDDEN', message: 'this route is not available to API keys' } },
+          403,
+        );
+      const authed = await authenticateApiKey(deps, authorization as string);
+      if (authed.user.banned_at)
+        return c.json({ error: { code: 'BANNED', message: 'this wallet is banned' } }, 403);
+      if (rule !== 'open' && !rule.anyOf.some((scope) => authed.key.scopes.includes(scope)))
+        return c.json(
+          {
+            error: {
+              code: 'INSUFFICIENT_SCOPE',
+              message: `this key needs the ${rule.anyOf.join(' or ')} scope`,
+            },
+          },
+          403,
+        );
+      const budget = await consumeKeyRate(deps, authed.key);
+      c.header('X-RateLimit-Limit', String(authed.key.rateLimitPerMin));
+      c.header('X-RateLimit-Remaining', String(budget.remaining));
+      c.header('X-RateLimit-Reset', String(budget.resetSec));
+      if (!budget.ok) {
+        c.header('Retry-After', String(budget.resetSec));
+        return c.json(
+          { error: { code: 'RATE_LIMIT', message: 'API key rate limit exceeded' } },
+          429,
+        );
+      }
+      c.set('user', authed.user);
+      c.set('apiKey', authed.key);
+    } else if (token) {
+      const payload = await verifyJwt<{ sub?: string; exp?: number }>(
         token,
         deps.env.sessionSecret,
         deps.now().getTime(),
@@ -262,7 +314,10 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         const rows = await deps.sql<
           Record<string, any>[]
         >`select * from users where id = ${payload.sub}`;
-        if (rows[0]) c.set('user', rows[0]);
+        if (rows[0]) {
+          c.set('user', rows[0]);
+          if (typeof payload.exp === 'number') sessionExpiry.set(c.req.raw, payload.exp);
+        }
       }
     }
     const path = c.req.path;
@@ -302,6 +357,12 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       return c.json({ ok: false, cluster: deps.env.cluster, code: 'SCHEMA_BEHIND', pending }, 503);
     return c.json({ ok: true, cluster: deps.env.cluster });
   });
+  api.get('/openapi.json', (c) => {
+    c.header('access-control-allow-origin', '*');
+    return c.json(openApiSpec({ apiUrl: deps.env.apiUrl, cluster: deps.env.cluster }));
+  });
+  // Agent API: wallet-signed key minting, key management, validated broadcast, release.
+  registerAgentRoutes(api, deps);
 
   api.post('/tx/send', async (c) => {
     requireUser(c);
@@ -323,6 +384,24 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.get('/files', async (c) => serveFile(c, deps, 'GET'));
   api.put('/files', async (c) => serveFile(c, deps, 'PUT'));
+
+  async function issueSession(c: Parameters<typeof setCookie>[0], userId: string): Promise<number> {
+    const exp = Math.floor(deps.now().getTime() / 1000) + SESSION_TTL_S;
+    const token = await signJwt({ sub: userId, exp }, deps.env.sessionSecret);
+    setCookie(c, 'tm_session', token, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_TTL_S,
+    });
+    return exp;
+  }
+
+  function sessionInfo(exp: number) {
+    const expiresAt = new Date(exp * 1000).toISOString();
+    const refreshAfter = new Date((exp - SESSION_TTL_S + SESSION_REFRESH_AFTER_S) * 1000);
+    return { expiresAt, refreshAfter: refreshAfter.toISOString() };
+  }
 
   api.post('/auth/nonce', async (c) => {
     const body = await bodyOf(nonceBody, await c.req.json());
@@ -365,13 +444,17 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     }
     if (!matched)
       throw new HttpError(401, 'BAD_SIGNATURE', 'signature does not match an open nonce');
-    const used = await deps.sql`
-      update auth_nonces set used_at = ${deps.now()} where nonce = ${matched.nonce} and used_at is null returning nonce
-    `;
+    // The signature is valid: consume the nonce, look up the user and take the first
+    // balance snapshot in one round trip instead of three (sign-in waited ~3 s).
+    const [used, existing] = await Promise.all([
+      deps.sql`
+        update auth_nonces set used_at = ${deps.now()} where nonce = ${matched.nonce} and used_at is null returning nonce
+      `,
+      deps.sql<Record<string, any>[]>`select * from users where wallet = ${body.wallet}`,
+      ensureSnapshot(deps, body.wallet),
+    ]);
     if (used.length === 0) throw new HttpError(401, 'NONCE_USED', 'nonce already used');
-    let users = await deps.sql<
-      Record<string, any>[]
-    >`select * from users where wallet = ${body.wallet}`;
+    let users = existing;
     if (!users[0]) {
       users = await deps.sql<Record<string, any>[]>`
         insert into users (wallet, roles) values (${body.wallet}, ${deps.sql.array(['buyer'])}::user_role[]) returning *
@@ -379,35 +462,41 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     }
     const user = users[0];
     if (!user) throw new HttpError(500, 'INTERNAL', 'could not create user');
-    await ensureSnapshot(deps, body.wallet);
-    const token = await signJwt(
-      { sub: user.id, exp: Math.floor(deps.now().getTime() / 1000) + 14 * 24 * 3600 },
-      deps.env.sessionSecret,
-    );
-    setCookie(c, 'tm_session', token, {
-      httpOnly: true,
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: 14 * 24 * 3600,
-    });
-    return c.json(jsonSafe({ user: publicUser(user) }));
+    const exp = await issueSession(c, user.id as string);
+    return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
   });
 
+  // Idempotent: an expired or missing session still gets its cookie cleared, so the
+  // browser never stays half signed in because logout answered 401.
   api.post('/auth/logout', (c) => {
-    requireUser(c);
     setCookie(c, 'tm_session', '', { httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 0 });
     return c.body(null, 204);
+  });
+
+  // One signature per session: a live session slides forward without a new wallet prompt.
+  api.post('/auth/refresh', async (c) => {
+    const user = requireUser(c);
+    const exp = await issueSession(c, user.id as string);
+    return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
+  });
+
+  api.get('/auth/session', (c) => {
+    const user = c.get('user');
+    if (!user) return c.json({ user: null, session: null });
+    const exp = sessionExpiry.get(c.req.raw) ?? 0;
+    return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
   });
 
   api.get('/me', async (c) => {
     const user = requireUser(c);
     const config = await loadConfig(deps);
-    const tier = await tierForWallet(deps, user.wallet as string, config);
+    const tier = await tierForWallet(deps, user.wallet as string, config, { reconcile: false });
     return c.json(
       jsonSafe({
         user: publicUser(user),
         roles: user.roles,
         tier: tier.tier,
+        session: sessionExpiry.has(c.req.raw) ? sessionInfo(sessionExpiry.get(c.req.raw)!) : null,
         tierDetail: {
           minBalance: tier.minBalance,
           windowHours: config.tier_window_hours,
@@ -650,13 +739,19 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   // Reviews, creator replies, helpful votes, reports, moderation (reviews.ts).
-  registerReviewRoutes(api, deps);
+  // The social modules type their context with `user` only; apiKey is an extra variable.
+  const socialApi = api as unknown as Parameters<typeof registerReviewRoutes>[0];
+  registerReviewRoutes(socialApi, deps);
   // Weighted listing upvotes (ranking.ts).
-  registerUpvoteRoutes(api, deps);
+  registerUpvoteRoutes(socialApi, deps);
   // Creator leaderboard and the live activity feed (leaderboard.ts); before /creators/:handle.
-  registerLeaderboardRoutes(api, deps);
+  registerLeaderboardRoutes(socialApi, deps);
   // Paid featuring: booking, payment, refunds, admin (featuring.ts).
-  registerFeaturingRoutes(api, deps, (ids) => searchListings(deps, { ids, limit: 50 }, 'none'));
+  registerFeaturingRoutes(
+    socialApi as unknown as Parameters<typeof registerFeaturingRoutes>[0],
+    deps,
+    (ids) => searchListings(deps, { ids, limit: 50 }, 'none'),
+  );
 
   // Today's "Featured · Sponsored" listings for a placement, in hourly rotation.
   api.get('/featured', async (c) => {
@@ -1427,6 +1522,21 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/studio/overview', async (c) => {
     const user = requireUser(c);
     return c.json(jsonSafe(await studioOverview(deps, user)));
+  });
+
+  api.get('/studio/sales', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await studioSales(deps, user, c.req.query())));
+  });
+
+  api.get('/studio/subscribers', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await studioSubscribers(deps, user)));
+  });
+
+  api.get('/studio/reviews', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await studioReviews(deps, user, c.req.query())));
   });
 
   api.get('/studio/listings', async (c) => {
