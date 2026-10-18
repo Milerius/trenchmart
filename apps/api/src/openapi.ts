@@ -339,7 +339,7 @@ export const ROUTES: RouteDoc[] = [
     method: 'get',
     path: '/studio/requirements',
     tag: 'Sell',
-    summary: 'What listing needs: verified X, category bond, verification fee',
+    summary: 'What listing needs: category bond, verification fee (X is optional)',
   },
   {
     method: 'post',
@@ -361,7 +361,7 @@ export const ROUTES: RouteDoc[] = [
     tag: 'Sell',
     summary: 'Create a listing (any kind, with its specs)',
     description:
-      'Needs a verified X link and the category bond. license=subscription with subPeriodDays makes a subscription. kind + specs follow the per-kind schemas in components.schemas (ListingSpecs_*).',
+      'Needs the category bond (X is optional). license=subscription with subPeriodDays makes a subscription. kind + specs follow the per-kind schemas in components.schemas (ListingSpecs_*).',
     body: listingBody,
   },
   { method: 'get', path: '/studio/listings', tag: 'Sell', summary: 'Your listings' },

@@ -11,6 +11,7 @@ import { specRows, walletCountLabel, type WalletCount } from '@trenchmart/shared
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
+import { VerifiedBadge } from '@/components/profile';
 import { ReviewsPanel } from '@/components/reviews';
 import { TerminalNames } from '@/components/terminal-logo';
 import { RankPanel, UpvoteChip, UpvotePanel, useUpvotes } from '@/components/upvotes';
@@ -70,7 +71,13 @@ export type Listing = {
   } | null;
   /** Wallet lists: the live version's wallet count, counted from its file by the scan. */
   walletCount?: WalletCount | null;
-  creator: { handle: string | null; wallet: string; bondLamports: string };
+  creator: {
+    handle: string | null;
+    wallet: string;
+    bondLamports: string;
+    xHandle?: string | null;
+    xVerified?: boolean;
+  };
   preview: string | null;
   /** Approved rich content. Drafts never reach the public listing. */
   content?: {
@@ -711,12 +718,25 @@ function ChangelogPanel({ versions }: { versions: VersionNote[] }) {
   );
 }
 
+/**
+ * The creator's pseudonym (or short wallet). The X badge shows only for an X account verified
+ * through X sign-in; X is optional and never required to sell.
+ */
 function CreatorLink({ creator }: { creator: Listing['creator'] }) {
-  const handle = creator.handle ?? creator.wallet;
+  const key = creator.handle ?? creator.wallet;
+  const verified = Boolean(creator.xVerified && creator.xHandle);
   return (
-    <Link href={`/u/${handle}`} className="text-ink-2 hover:text-ink">
-      @{creator.handle ?? handle.slice(0, 4)}
-    </Link>
+    <span className="inline-flex items-center gap-1.5" data-testid="listing-creator">
+      <Link href={`/u/${key}`} className="text-ink-2 hover:text-ink">
+        {creator.handle ? `@${creator.handle}` : shortKey(creator.wallet)}
+      </Link>
+      {verified ? (
+        <span className="inline-flex items-center gap-1" data-testid="creator-x-verified">
+          <VerifiedBadge className="h-4 w-4" />
+          <span className="text-ink-2">X @{creator.xHandle}</span>
+        </span>
+      ) : null}
+    </span>
   );
 }
 

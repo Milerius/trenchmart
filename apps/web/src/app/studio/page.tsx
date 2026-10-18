@@ -694,7 +694,7 @@ function Checklist({
   wallet: string;
 }) {
   const filled = overview?.creator.profileFilled;
-  const needed = requirements ? [true, requirements.xLinked, requirements.bondOk, true] : [];
+  const needed = requirements ? [true, requirements.bondOk, true] : [];
   return (
     <section
       aria-labelledby="ready-heading"
@@ -717,13 +717,19 @@ function Checklist({
               {shortWallet(wallet)} · payouts land here
             </span>
           </Requirement>
-          <Requirement ok={requirements.xLinked} title="X account linked">
+          <Requirement
+            ok={requirements.xLinked}
+            optional
+            title={requirements.xLinked ? 'X verified' : 'X badge (optional)'}
+          >
             <Link
               href="/studio/profile#socials"
               data-testid="link-x-profile"
               className="mt-1 block text-[13px] text-accent hover:text-accent-hover"
             >
-              {requirements.xLinked ? 'Manage in your profile →' : 'Link X in your profile →'}
+              {requirements.xLinked
+                ? 'Manage in your profile →'
+                : 'Verify with X for a trust badge →'}
             </Link>
           </Requirement>
           <Requirement ok={requirements.bondOk} title="Creator bond">
@@ -795,19 +801,24 @@ function Checklist({
 
 function Requirement({
   ok,
+  optional = false,
   title,
   children,
 }: {
   ok: boolean;
+  /** Not needed to sell: shown neutral (never a warning) until done. */
+  optional?: boolean;
   title: string;
   children?: ReactNode;
 }) {
   return (
     <li className="flex list-none gap-3">
-      <Square tone={ok ? 'ok' : 'warn'}>{ok ? '✓' : '!'}</Square>
+      <Square tone={ok ? 'ok' : optional ? 'neutral' : 'warn'}>
+        {ok ? '✓' : optional ? '·' : '!'}
+      </Square>
       <div className="min-w-0 flex-1">
         <span className="font-medium">{title}</span>
-        <span className="sr-only">{ok ? ' (done)' : ' (needed)'}</span>
+        <span className="sr-only">{ok ? ' (done)' : optional ? '' : ' (needed)'}</span>
         {children}
       </div>
     </li>

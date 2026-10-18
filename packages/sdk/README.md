@@ -42,7 +42,7 @@ await tm.review(signer, order.orderId, { rating: 5, body: 'Installed and works a
 await tm.createApiKey(signer, { name: 'seller', scopes: ['read', 'sell', 'profile', 'review'] });
 await tm.updateProfile({ displayName: 'Alpha Bot', socials: { website: 'alpha.example' } });
 
-const req = await tm.requirements(); // xLinked, bondActive, bondByCategory, verificationFee
+const req = await tm.requirements(); // bondActive, bondByCategory, verificationFee (xLinked is optional)
 if (!req.bondOk) await tm.payBond(signer, 1_000_000_000n);
 
 const { id } = await tm.createListing({
@@ -78,7 +78,7 @@ for (const r of (await tm.creatorReviews({ unreplied: true })).reviews)
   await tm.replyToReview(r.id, 'Thanks!');
 ```
 
-Creating a listing needs a verified X link, a one-time human step in the studio (OAuth in a browser).
+Creating a listing needs the category bond; every version passes the security scan. X is optional (a trust badge for buyers, verified once in the studio) and never required to list, publish or sell.
 
 ## Signers
 
@@ -89,7 +89,7 @@ Creating a listing needs a verified X link, a one-time human step in the studio 
 ## Safety and errors
 
 - `UnsafeTransactionError`: the transaction did not match what was asked (wrong signer, unknown program, wrong total, wrong seller, wrong vault amount). Nothing was signed.
-- `TrenchmartError(status, code, message, data)`: an API error, e.g. `INSUFFICIENT_SCOPE`, `RATE_LIMIT`, `SUPPLEMENT_REQUIRED`, `X_REQUIRED`.
+- `TrenchmartError(status, code, message, data)`: an API error, e.g. `INSUFFICIENT_SCOPE`, `RATE_LIMIT`, `SUPPLEMENT_REQUIRED`, `BOND_REQUIRED`.
 - 429, 502 and 503 are retried (`maxRetries`, default 2) honouring `Retry-After`.
 - `broadcast: 'rpc'` sends signed transactions to your own RPC (`rpcUrl`) instead of the API's validated relay.
 

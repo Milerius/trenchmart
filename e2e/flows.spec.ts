@@ -346,7 +346,7 @@ test('studio asks for a wallet before opening', async ({ page }) => {
   ).toBeVisible();
 });
 
-test('studio: X links from the profile, then stake the creator bond with a signed transaction', async ({
+test('studio: X is optional (linked from the profile), stake the creator bond with a signed transaction', async ({
   page,
 }) => {
   const { secret, address } = wallet();
@@ -354,9 +354,11 @@ test('studio: X links from the profile, then stake the creator bond with a signe
   const calls = await setup(page, address, secret, studioHandler(address, state));
   await page.goto('/studio');
   const ready = page.getByRole('region', { name: 'Ready to sell' });
-  await expect(ready).toContainText('X account linked (needed)');
+  // X is optional: never "needed", never counted in what selling requires.
+  await expect(ready).toContainText('X badge (optional)');
+  await expect(ready).not.toContainText('X account linked (needed)');
   await expect(ready).toContainText('Creator bond (needed)');
-  await expect(ready).toContainText('2 of 4 required');
+  await expect(ready).toContainText('2 of 3 required');
   // No inline X form any more: the checklist sends the creator to the profile editor.
   await expect(page.getByLabel('X handle')).toHaveCount(0);
   await expect(page.getByTestId('link-x-profile')).toHaveAttribute(
@@ -390,7 +392,7 @@ test('studio: an old X callback to /studio is forwarded to the profile with its 
   await page.waitForURL('**/studio/profile**');
 });
 
-test('studio upload: creates the listing, pays the verification fee, uploads the file, opens the live review', async ({
+test('studio upload: an unverified creator (no X) creates the listing, pays the verification fee, uploads the file, opens the live review', async ({
   page,
 }) => {
   const { secret, address } = wallet();
@@ -414,7 +416,13 @@ test('studio upload: creates the listing, pays the verification fee, uploads the
     if (method === 'POST' && path === '/studio/versions/V1/fee') return { json: { ok: true } };
     if (path === '/studio/requirements')
       return {
-        json: { xLinked: true, bondActive: '0', verificationFee: '250000000', feeWaived: false },
+        json: {
+          xLinked: false,
+          xRequired: false,
+          bondActive: '0',
+          verificationFee: '250000000',
+          feeWaived: false,
+        },
       };
     if (path.startsWith('/studio')) return { json: [] };
     return undefined;

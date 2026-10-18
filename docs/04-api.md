@@ -102,7 +102,7 @@ per line (`#` and `//` comments skipped). Upload the standard export as `.txt` o
 
 | Method | Path                            | Who | Notes                                                                                                                                                                             |
 | ------ | ------------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/studio/requirements`          | 👤  | `{walletSigned, xLinked, bondRequired, bondActive, verificationFee, feeWaived}`                                                                                                   |
+| GET    | `/studio/requirements`          | 👤  | `{walletSigned, bondRequired, bondActive, bondOk, verificationFee, feeWaived, xLinked (optional), xRequired: false}`                                                              |
 | POST   | `/studio/bond`                  | 👤  | `{amount}` → unsigned tx to vault with memo `bond:<id>`                                                                                                                           |
 | POST   | `/studio/bond/:id/submitted`    | 👤  | `{txSig}`                                                                                                                                                                         |
 | POST   | `/studio/listings`              | 🛠   | create draft listing                                                                                                                                                              |

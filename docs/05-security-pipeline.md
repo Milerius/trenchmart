@@ -4,7 +4,7 @@ Goal: nothing reaches a buyer unless (1) its bytes were frozen at upload, (2) au
 
 ```
  CREATOR                API / WORKERS              REVIEW                LIVE
- ① Sign in (SIWS), link X, stake bond
+ ① Sign in (SIWS), stake bond (X link optional: badge only)
  ② Upload ──▶ sha256 ──▶ R2 blobs/<hash> (immutable) ──▶ status=scanning
  ③ Static scan ─┬─ (userscript/alerts) ─▶ Sandbox run
                 └────────────┬──────────┘

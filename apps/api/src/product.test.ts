@@ -704,6 +704,104 @@ describe('owner product decisions', () => {
     expect(del.status).toBe(409);
   });
 
+  it('an unverified creator (no X at all, X OAuth on) with the bond lists and publishes; the badge shows only once X is verified', async () => {
+    const app = await appFor({ X_CLIENT_ID: 'client-1', X_CLIENT_SECRET: 'secret-1' });
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    const json = { cookie, 'content-type': 'application/json' };
+    await sql`update config set value = '0'::jsonb where key = 'verification_fee_lamports'`;
+    const [user] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
+    await sql`
+      insert into bonds (user_id, amount, tx_sig, status)
+      values (${user!.id}, ${5_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+    `;
+    const reqs = (await (
+      await app.request('/api/v1/studio/requirements', { headers: { cookie } })
+    ).json()) as { xLinked: boolean; xRequired: boolean; bondOk: boolean };
+    expect(reqs).toMatchObject({ xLinked: false, xRequired: false, bondOk: true });
+
+    const created = await app.request('/api/v1/studio/listings', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        title: 'No X Overlay',
+        summary: 'Listed without X.',
+        description: 'Reads the page only.',
+        category: 'userscript',
+        terminals: ['Axiom'],
+        priceLamports: '50000000',
+      }),
+    });
+    expect(created.status, await created.clone().text()).toBe(200);
+    const listing = (await created.json()) as { id: string; slug: string };
+    const version = await app.request(`/api/v1/studio/listings/${listing.id}/versions`, {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        semver: '1.0.0',
+        changelog: 'first',
+        fileName: 'overlay.user.js',
+        fileSize: clean.length,
+      }),
+    });
+    expect(version.status).toBe(200);
+    const issued = (await version.json()) as {
+      versionId: string;
+      uploadUrl: string;
+      feeTx: unknown;
+    };
+    expect(issued.feeTx).toBeNull();
+    const url = new URL(issued.uploadUrl);
+    expect(
+      (
+        await app.request(`${url.pathname}${url.search}`, {
+          method: 'PUT',
+          body: new TextEncoder().encode(clean),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await app.request(`/api/v1/studio/versions/${issued.versionId}/complete`, {
+          method: 'POST',
+          headers: { cookie },
+        })
+      ).status,
+    ).toBe(200);
+    let status = '';
+    for (let i = 0; i < 50 && status !== 'live'; i++) {
+      const v = (await (
+        await app.request(`/api/v1/studio/versions/${issued.versionId}`, { headers: { cookie } })
+      ).json()) as { version: { status: string } };
+      status = v.version.status;
+      if (status !== 'live') await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(status).toBe('live');
+
+    const publicListing = async () =>
+      (await (await app.request(`/api/v1/listings/${listing.slug}`)).json()) as {
+        creator: { xVerified: boolean; xHandle: string | null; wallet: string };
+      };
+    expect((await publicListing()).creator).toMatchObject({
+      xVerified: false,
+      wallet: creator.publicKey,
+    });
+    // A typed (dev) handle is never shown as verified.
+    await sql`update users set x_handle = 'typed_name', x_user_id = 'dev:typed_name' where id = ${user!.id}`;
+    expect((await publicListing()).creator.xVerified).toBe(false);
+    await sql`update users set x_handle = 'real_name', x_user_id = '12345' where id = ${user!.id}`;
+    expect((await publicListing()).creator).toMatchObject({
+      xVerified: true,
+      xHandle: 'real_name',
+    });
+    const profile = (await (await app.request(`/api/v1/creators/${creator.publicKey}`)).json()) as {
+      xVerified: boolean;
+    };
+    expect(profile.xVerified).toBe(true);
+  });
+
   it('lets a new creator list once the category bond is met, and keeps the fee gate', async () => {
     const app = await appFor();
     const creator = keypair();

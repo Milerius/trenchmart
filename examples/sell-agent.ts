@@ -7,7 +7,7 @@
  * Env:
  *   TM_KEYPAIR             keypair file (required)
  *   TM_DISPLAY_NAME/TM_BIO/TM_WEBSITE   update the profile and socials
- *   TM_CREATE_LISTING=1    create a userscript listing (needs a verified X link and the bond)
+ *   TM_CREATE_LISTING=1    create a userscript listing (needs the category bond; X is optional)
  *   TM_X_DEV_HANDLE        local stacks without X OAuth: link this handle unverified
  *   TM_PAY_BOND=1          stake the missing category bond (unsigned tx, signed locally)
  *   TM_LISTING_ID          work on an existing listing you own instead
@@ -49,19 +49,19 @@ async function main() {
     socials: profile.socials,
   });
 
-  // 2. What selling needs: verified X link, category bond, verification fee.
+  // 2. What selling needs: the category bond and the verification fee. X is optional (badge).
   const req = await client.requirements();
   log('requirements', req);
 
   // 3. A listing: create one, or use an existing one.
   let listingId = process.env.TM_LISTING_ID;
   if (!req.xLinked && process.env.TM_X_DEV_HANDLE) {
+    // Optional: an unverified dev handle for local stacks (shown as unverified).
     // Local stacks only: the live site requires X verified through OAuth in the studio.
     await client.linkXDev(process.env.TM_X_DEV_HANDLE);
     req.xLinked = true;
   }
-  if (!listingId && flag('TM_CREATE_LISTING'))
-    listingId = await createListing(Boolean(req.xLinked));
+  if (!listingId && flag('TM_CREATE_LISTING')) listingId = await createListing();
   if (!listingId) {
     const mine = await client.myListings();
     log('my listings', {
@@ -146,14 +146,7 @@ async function main() {
     }
   }
 
-  async function createListing(xLinked: boolean): Promise<string | undefined> {
-    if (!xLinked) {
-      log('skip listing', {
-        reason: 'X_REQUIRED',
-        note: 'verify X once in the studio (Profile > Link X) with this wallet',
-      });
-      return undefined;
-    }
+  async function createListing(): Promise<string | undefined> {
     const input = {
       title: env('TM_TITLE', 'Agent Hello Badge'),
       summary: 'A tiny badge userscript published end to end by an agent.',

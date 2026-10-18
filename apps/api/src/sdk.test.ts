@@ -293,7 +293,8 @@ describe('SDK against the API', () => {
       bio: 'Autonomous seller.',
       socials: { website: 'example.com' },
     });
-    await sdk.request('POST', '/studio/x', { body: { handle: 'sdk_seller' } });
+    // No X link at all: X is optional (badge only), the bond and the scan are the gates.
+    expect(await sdk.requirements()).toMatchObject({ xLinked: false, xRequired: false });
     const [user] = await sql<
       { id: string }[]
     >`select id from users where wallet = ${signer.publicKey}`;

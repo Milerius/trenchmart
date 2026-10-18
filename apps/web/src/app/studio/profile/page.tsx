@@ -814,7 +814,8 @@ export default function EditProfilePage() {
               ))}
             </ul>
             <p className="m-0 mt-3 text-[12px] text-muted">
-              Complete profiles convert better. Only a linked X account is required to publish.
+              Complete profiles convert better. None of this is required to publish; verifying X
+              adds a trust badge buyers can see.
             </p>
           </div>
         </aside>

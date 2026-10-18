@@ -26,7 +26,7 @@ TM_KEYPAIR=./creator.json TM_CREATE_LISTING=1 TM_PAY_BOND=1 TM_PUBLISH=1 TM_ACCE
 TM_KEYPAIR=./creator.json TM_REPLY="Thanks for the review!" pnpm --filter @trenchmart/examples sell
 ```
 
-Profile and socials, requirements, bond, a userscript listing with type-specific specs, a new version (supplement and verification fee signed locally) with the scan verdict and reasons, prices, then sales, subscribers, payouts and review replies. Every step that spends SOL or changes a listing is opt-in (see the header of `sell-agent.ts`). Creating a listing needs a verified X link: verify X once in the studio with the same wallet.
+Profile and socials, requirements, bond, a userscript listing with type-specific specs, a new version (supplement and verification fee signed locally) with the scan verdict and reasons, prices, then sales, subscribers, payouts and review replies. Every step that spends SOL or changes a listing is opt-in (see the header of `sell-agent.ts`). Creating a listing needs the category bond; X is optional (a trust badge).
 
 Output is one JSON line per step. Keys and secrets are never printed (only the key prefix). Each run mints a key and revokes it on exit (keys are capped at 10 per wallet); set `TM_KEEP_KEY=1` to keep it, or pass `TM_API_KEY` to reuse one.
 
