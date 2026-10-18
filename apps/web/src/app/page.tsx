@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { CATEGORIES } from '@trenchmart/shared';
 import { TierTable } from '@/components/fees';
 import { ListingGrid, TERMINALS, type Listing } from '@/components/listings';
+import { TerminalName } from '@/components/terminal-logo';
 import {
   ButtonLink,
   Label,
@@ -179,7 +180,7 @@ export default function HomePage() {
                 }`}
                 onClick={() => setTerminal(name)}
               >
-                {name}
+                {name === 'All' ? name : <TerminalName name={name} logoClassName="h-4 w-4" />}
               </button>
             ))}
           </div>

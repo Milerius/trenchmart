@@ -4,7 +4,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { TERMINALS } from '@trenchmart/shared';
+import { ListingCard } from '../components/listings';
+import { TerminalNames } from '../components/terminal-logo';
 import { TerminalPicker } from '../components/wizard';
+import { TERMINAL_LOGOS, terminalLogo } from './terminal-logos';
 import { TERMINAL_TILES } from './wizard';
 
 // The wizard's terminal cards show each terminal's own logo, bundled under apps/web/public.
@@ -50,5 +53,49 @@ describe('terminal logos', () => {
     }
     expect(html).not.toMatch(/https?:\/\/[^"]*\.(svg|png|ico)/);
     expect(html).toContain('TrenchMart is not affiliated with these terminals');
+  });
+});
+
+describe('terminal logos outside the wizard', () => {
+  it('terminalLogo resolves canonical names and aliases, and skips unknown ones', () => {
+    expect(terminalLogo('Axiom')).toBe('/terminals/axiom.svg');
+    expect(terminalLogo('axiom')).toBe('/terminals/axiom.svg');
+    expect(terminalLogo('padre')).toBe('/terminals/terminal.svg');
+    expect(terminalLogo('Any')).toBeNull();
+    expect(terminalLogo('BullX')).toBeNull();
+    expect(terminalLogo('SomeNewTerminal')).toBeNull();
+    for (const name of TERMINALS) expect(terminalLogo(name)).toBe(TERMINAL_LOGOS[name]);
+  });
+
+  it('TerminalNames keeps the "A · B" text and adds one logo per known terminal', () => {
+    const html = renderToStaticMarkup(
+      createElement(TerminalNames, { names: ['Axiom', 'GMGN', 'Custom'] }),
+    );
+    expect(html.replace(/<[^>]+>/g, '')).toBe('Axiom · GMGN · Custom');
+    expect(html).toContain('src="/terminals/axiom.svg"');
+    expect(html).toContain('src="/terminals/gmgn.png"');
+    expect(html.match(/<img /g)).toHaveLength(2);
+    expect(html).toContain('alt=""');
+  });
+
+  it('the market card (also the studio previews) shows the terminal logos next to the names', () => {
+    const html = renderToStaticMarkup(
+      createElement(ListingCard, {
+        listing: {
+          slug: 'intel',
+          title: 'Intel',
+          summary: 'Labels copycats.',
+          category: 'userscript',
+          terminals: ['Axiom', 'Photon', 'Trojan'],
+          price: '100000000',
+        },
+        pricing: { centsPerSol: null },
+      }),
+    );
+    for (const name of ['Axiom', 'Photon', 'Trojan']) {
+      expect(html).toContain(`data-terminal-logo="${name}"`);
+    }
+    expect(html).toContain('src="/terminals/photon.png"');
+    expect(html).not.toMatch(/src="https?:\/\//);
   });
 });

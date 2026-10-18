@@ -9,6 +9,7 @@ import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
 import { ReviewsPanel } from '@/components/reviews';
+import { TerminalNames } from '@/components/terminal-logo';
 import { RankPanel, UpvoteChip, UpvotePanel, useUpvotes } from '@/components/upvotes';
 import {
   Button,
@@ -292,7 +293,11 @@ export function ListingView({ initial }: { initial: Listing | null }) {
               )}
             </span>
           ) : null}
-          {listing.terminals.length ? <span>{listing.terminals.join(' · ')}</span> : null}
+          {listing.terminals.length ? (
+            <span data-testid="listing-terminals">
+              <TerminalNames names={listing.terminals} logoClassName="h-3.5 w-3.5" />
+            </span>
+          ) : null}
         </p>
 
         {listing.content?.gallery.length ? (
