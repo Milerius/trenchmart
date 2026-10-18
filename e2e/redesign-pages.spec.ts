@@ -120,6 +120,8 @@ test('/sell: the React Bits Stepper loads on desktop when effects are on', async
   const stepper = page.locator('[data-fx="stepper"]');
   await expect(stepper).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('sell-steps')).toHaveCount(0);
+  // The column is wide enough for the step titles in the indicator row.
+  await expect(stepper.getByText('Get paid in SOL', { exact: true })).toBeVisible();
   await stepper.getByRole('button', { name: 'Next step' }).click();
   await expect(stepper).toContainText('Post your creator bond');
 });

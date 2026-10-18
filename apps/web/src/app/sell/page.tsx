@@ -21,7 +21,9 @@ export default function SellPage() {
           <StudioLink />
         </div>
       </PageHero>
-      <div className={`${MARKET_WRAP} grid gap-10 py-14 lg:grid-cols-2`}>
+      <div
+        className={`${MARKET_WRAP} grid gap-10 py-14 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] lg:gap-8`}
+      >
         <section aria-labelledby="sell-how" className="flex min-w-0 flex-col gap-4">
           <h2 id="sell-how" className="m-0 text-3xl font-semibold tracking-[-0.03em]">
             How it works
