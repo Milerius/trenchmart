@@ -21,4 +21,21 @@ describe('listing page imports', () => {
     expect(source).not.toMatch(/from 'zod'/);
     expect(source).not.toMatch(/from '\.\/(listing-kinds|schemas)'/);
   });
+
+  it('listing page renders server-parsed Markdown without importing the parser', () => {
+    for (const file of [
+      'app/l/[slug]/listing-view.tsx',
+      'components/listing-markdown.tsx',
+      'components/markdown-tree.tsx',
+    ]) {
+      const source = readFileSync(join(root, file), 'utf8');
+      expect(source, file).not.toMatch(/@trenchmart\/shared\/markdown['"]/);
+      // The full renderer (with the parser) may only be loaded lazily.
+      expect(source.replace(/import\(\s*'@\/components\/markdown'\s*\)/g, ''), file).not.toMatch(
+        /from '@\/components\/markdown'/,
+      );
+    }
+    const tree = readFileSync(join(shared, 'markdown-tree.ts'), 'utf8');
+    expect(tree).not.toMatch(/^import (?!type)/m);
+  });
 });
