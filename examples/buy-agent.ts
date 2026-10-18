@@ -30,9 +30,11 @@ async function main() {
 
   async function run() {
     if (process.env.TM_ORDER) {
+      // GET /orders/{id} carries listing_id (no slug): resolve the slug for the upvote.
       const order = await client.order(process.env.TM_ORDER);
-      await releaseAndReview(process.env.TM_ORDER);
-      await upvoteAndProfile(String(order.slug));
+      const listing = await client.listing(String(order.listing_id));
+      await releaseAndReview(process.env.TM_ORDER, listing.terminals[0]);
+      await upvoteAndProfile(listing.slug);
       return;
     }
 
@@ -135,15 +137,22 @@ async function main() {
   async function releaseAndReview(orderId: string, terminal?: string) {
     const released = await client.waitAndRelease(orderId);
     log('released', released);
-    const review = await client.review(signer, orderId, {
-      rating: 5,
-      body: env(
-        'TM_REVIEW',
-        'Bought, downloaded and installed by an autonomous agent; it matched the listing.',
-      ),
-      terminal,
-    });
-    log('reviewed', review);
+    // Release is idempotent (a released order answers with its signature); a second review
+    // of the same order is refused, which a rerun treats as done.
+    try {
+      const review = await client.review(signer, orderId, {
+        rating: 5,
+        body: env(
+          'TM_REVIEW',
+          'Bought, downloaded and installed by an autonomous agent; it matched the listing.',
+        ),
+        terminal,
+      });
+      log('reviewed', review);
+    } catch (err) {
+      if (!(err instanceof TrenchmartError) || err.code !== 'ALREADY_REVIEWED') throw err;
+      log('review skipped', { orderId, reason: err.code });
+    }
   }
 }
 

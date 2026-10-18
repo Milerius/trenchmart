@@ -45,6 +45,7 @@ async function main() {
   log('profile', {
     handle: profile.handle,
     displayName: profile.displayName,
+    bio: profile.bio,
     socials: profile.socials,
   });
 
