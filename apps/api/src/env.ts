@@ -55,6 +55,8 @@ export type Env = {
   /** X OAuth 2.0 app (M-04). Empty: only the devnet-only unverified handle link works. */
   xClientId: string;
   xClientSecret: string;
+  /** X API origin for the OAuth token exchange and /2/users/me. Tests point it at a mock. */
+  xApiUrl: string;
   /** Server-side wasm WebP re-encode at upload (CPU heavy; off unless IMAGE_OPTIMIZE=1). */
   imageOptimize: boolean;
   /** Alert delivery (ops.ts). ntfy topic is a secret: anyone who knows it can read alerts. */
@@ -214,6 +216,7 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     proxySecret: blank(source.PROXY_SECRET),
     xClientId: blank(source.X_CLIENT_ID),
     xClientSecret: blank(source.X_CLIENT_SECRET),
+    xApiUrl: blank(source.X_API_URL) || 'https://api.x.com',
     imageOptimize: source.IMAGE_OPTIMIZE === '1',
     alertNtfyServer: blank(source.ALERT_NTFY_SERVER) || 'https://ntfy.sh',
     alertNtfyTopic: blank(source.ALERT_NTFY_TOPIC),

@@ -20,9 +20,14 @@ export const EDGE_RULES: Rule[] = [
   // On-chain proof for /verify: chain reads are cached about a minute.
   { pattern: /^\/api\/v1\/transparency$/, fresh: 60, stale: 300 },
   { pattern: /^\/api\/v1\/(categories|config\/public|stats|prices\/sol)$/, fresh: 60, stale: 600 },
+  { pattern: /^\/api\/v1\/activity$/, fresh: 30, stale: 120 },
   { pattern: /^\/api\/v1\/creators\/(top|[^/]+)$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/listings$/, fresh: 30, stale: 300 },
-  { pattern: /^\/api\/v1\/listings\/[^/]+(\/(versions|reviews|report))?$/, fresh: 60, stale: 600 },
+  {
+    pattern: /^\/api\/v1\/listings\/[^/]+(\/(versions|reviews|report|upvotes))?$/,
+    fresh: 60,
+    stale: 600,
+  },
 ];
 
 export function ruleFor(request: Request): Rule | null {

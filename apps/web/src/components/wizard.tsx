@@ -379,19 +379,31 @@ export function TypeStep({
 
 // ---------- Step 2 ----------
 
-function Monogram({
+/** The terminal's own logo in the same 44px tile the letter placeholder used. */
+export function TerminalLogo({
   name,
-  className = 'h-11 w-11 text-base',
+  src,
+  className = 'h-11 w-11',
 }: {
   name: string;
+  src: string;
   className?: string;
 }) {
   return (
     <span
       aria-hidden="true"
-      className={`grid shrink-0 place-items-center rounded-[10px] border border-line bg-surface-2 font-mono font-semibold text-ink ${className}`}
+      className={`grid shrink-0 place-items-center overflow-hidden rounded-[10px] border border-line bg-surface-2 ${className}`}
     >
-      {name.slice(0, 1)}
+      <img
+        src={src}
+        alt=""
+        data-testid={`terminal-logo-${name}`}
+        width={44}
+        height={44}
+        decoding="async"
+        draggable={false}
+        className="h-full w-full object-cover"
+      />
     </span>
   );
 }
@@ -425,7 +437,7 @@ export function TerminalPicker({
               title={t.host}
               className={`relative flex min-w-0 items-center gap-3 rounded-card border p-3 text-left sm:flex-col sm:items-start sm:p-4 ${on ? 'border-accent bg-accent-bg' : 'border-line-control/60 bg-inset hover:border-line-strong'}`}
             >
-              <Monogram name={t.name} className="h-9 w-9 text-sm sm:h-11 sm:w-11 sm:text-base" />
+              <TerminalLogo name={t.name} src={t.logo} className="h-9 w-9 sm:h-11 sm:w-11" />
               <span className="min-w-0 max-w-full">
                 <span className="block text-[15px] font-semibold">{t.name}</span>
                 <span className="block truncate font-mono text-[11px] text-muted">{t.host}</span>
@@ -455,8 +467,8 @@ export function TerminalPicker({
         </button>
       </div>
       <p className="m-0 mt-3 text-[12px] text-muted">
-        <span className="text-accent">{count}</span> · “Any site” clears the others. Names are shown
-        as text only; TrenchMart is not affiliated with these terminals.
+        <span className="text-accent">{count}</span> · “Any site” clears the others. Names and logos
+        belong to their owners; TrenchMart is not affiliated with these terminals.
       </p>
     </Section>
   );

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectTerminalLogo } from './terminal-logo-helpers';
 
 // New-listing wizard: type picker, type-specific step, details with the template editor,
 // media, pricing (real median only), file pre-check, review and submit. The CI e2e job runs
@@ -149,6 +150,51 @@ test('step 1 picks the type; step 2 asks for terminals and what the script touch
   await expect(page.getByText('Keys and signing')).toBeVisible();
   await next(page);
   await expect(page.getByTestId('wizard')).toHaveAttribute('data-step', '3');
+});
+
+test("terminal cards show each terminal's own logo, served locally", async ({ page }) => {
+  await stub(page);
+  await page.goto('/studio/listings/new');
+  await page.getByTestId('kind-script').click();
+  await next(page);
+  await expect(
+    page.getByRole('heading', { name: 'Which terminals does it run on?' }),
+  ).toBeVisible();
+  const terms = page.getByTestId('terminals');
+  const logos = {
+    Axiom: '/terminals/axiom.svg',
+    GMGN: '/terminals/gmgn.png',
+    Photon: '/terminals/photon.png',
+    Terminal: '/terminals/terminal.svg',
+    Trojan: '/terminals/trojan.png',
+  };
+  for (const [name, src] of Object.entries(logos)) {
+    const card = terms.getByRole('button', { name: new RegExp(name) });
+    const img = card.getByTestId(`terminal-logo-${name}`);
+    await expect(img).toBeVisible();
+    await expect(img).toHaveAttribute('src', src);
+    // Loaded and decoded, not a broken image.
+    await expect
+      .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+    const box = await img.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(30);
+    // No letter placeholder left in the tile.
+    await expect(card.locator('[aria-hidden="true"]').first()).toHaveText('');
+  }
+  await expect(terms.locator('img')).toHaveCount(5);
+  await expect(page.getByText('TrenchMart is not affiliated with these terminals')).toBeVisible();
+  // The live card preview in the studio shows the picked terminals with their logos too.
+  await terms.getByRole('button', { name: /Photon/ }).click();
+  await terms.getByRole('button', { name: /Trojan/ }).click();
+  const previewLine = page.getByTestId('card-preview').getByTestId('card-terminals');
+  await expect(previewLine).toHaveText('Photon · Trojan');
+  await expectTerminalLogo(previewLine, 'Photon', 14);
+  await expectTerminalLogo(previewLine, 'Trojan', 14);
+  // The asset itself is served by the app (not hotlinked).
+  const res = await page.request.get('/terminals/axiom.svg');
+  expect(res.ok()).toBe(true);
+  expect(res.headers()['content-type']).toContain('image/svg+xml');
 });
 
 test('wallet lists ask for format, count, cadence and imports', async ({ page }) => {

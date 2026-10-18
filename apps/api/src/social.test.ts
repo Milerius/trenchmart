@@ -13,6 +13,7 @@ import { filesystemBlob } from './blob';
 import { readEnv } from './env';
 import { sha256Hex, type Deps } from './logic';
 import { scanWalletIntel } from './social';
+import { computeRanks } from './ranking';
 
 /** Integration: verified-buyer reviews, creator replies, weighted helpful votes, reports. */
 
@@ -166,20 +167,20 @@ async function postReview(
   });
 }
 
+afterAll(async () => {
+  await sql?.end();
+});
+
 describe('social: reviews', () => {
   beforeEach(async () => {
     sql ??= createSql(databaseUrl);
     await migrate(sql);
     await sql`
       truncate table audit_log, ledger, notifications, downloads, listing_reviews, review_replies,
-        review_votes, review_reports, wallet_intel, disputes, licenses, payouts, orders, versions,
+        review_votes, review_reports, wallet_intel, listing_upvotes, creator_rank, disputes, licenses, payouts, orders, versions,
         listings, auth_nonces, users
       restart identity cascade
     `;
-  });
-
-  afterAll(async () => {
-    await sql?.end();
   });
 
   it('accepts one signed review per released order from its buyer, and updates the rating', async () => {
@@ -417,5 +418,206 @@ describe('social: reviews', () => {
     const [open] =
       await sql`select count(*)::int as n from review_reports where resolved_at is null`;
     expect(open!.n).toBe(0);
+  });
+});
+
+describe('social: upvotes and ranking', () => {
+  beforeEach(async () => {
+    sql ??= createSql(databaseUrl);
+    await migrate(sql);
+    await sql`
+      truncate table audit_log, ledger, notifications, downloads, listing_reviews, review_replies,
+        review_votes, review_reports, wallet_intel, listing_upvotes, creator_rank, disputes, licenses,
+        payouts, orders, versions, listings, auth_nonces, users
+      restart identity cascade
+    `;
+    await sql`delete from config where key in ('rank_config', 'social_rules')`;
+  });
+
+  it('weights upvotes, blocks your own listing, toggles, and caps upvotes per wallet per day', async () => {
+    const app = await appFor();
+    await sql`insert into config (key, value) values ('rank_config', ${sql.json({ upvotesPerDay: 2 })})`;
+    const creator = await user(app, { roles: ['buyer', 'creator'] });
+    const other = await user(app, { roles: ['buyer', 'creator'] });
+    await listing(creator.id, 'up-a');
+    await listing(creator.id, 'up-b');
+    const c = await listing(creator.id, 'up-c');
+    const elsewhere = await listing(other.id, 'up-else');
+
+    const own = await call(app, creator.cookie, 'POST', '/listings/up-a/upvote', { up: true });
+    expect(own.body.error.code).toBe('OWN_LISTING');
+
+    const buyer = await user(app);
+    await order(buyer.id, elsewhere);
+    const counted = await call(app, buyer.cookie, 'POST', '/listings/up-a/upvote', { up: true });
+    expect(counted.body).toMatchObject({
+      count: 1,
+      counted: 1,
+      mix: { buyers: 1, holders: 0, others: 0 },
+      viewer: { upvoted: true, weight: { bps: 10000 }, usedToday: 1, perDay: 2 },
+    });
+
+    const fresh = await user(app, { createdAt: now });
+    const shown = await call(app, fresh.cookie, 'POST', '/listings/up-a/upvote', { up: true });
+    expect(shown.body).toMatchObject({ count: 2, counted: 1, mix: { others: 1 } });
+    expect(shown.body.viewer.weight.reason).toMatch(/new/i);
+
+    await call(app, buyer.cookie, 'POST', '/listings/up-b/upvote', { up: true });
+    const capped = await call(app, buyer.cookie, 'POST', '/listings/up-c/upvote', { up: true });
+    expect(capped.status).toBe(429);
+    expect(capped.body.error.code).toBe('UPVOTE_LIMIT');
+    // Re-upvoting something already upvoted is not a new upvote.
+    expect(
+      (await call(app, buyer.cookie, 'POST', '/listings/up-a/upvote', { up: true })).status,
+    ).toBe(200);
+
+    const off = await call(app, buyer.cookie, 'POST', '/listings/up-a/upvote', { up: false });
+    expect(off.body).toMatchObject({ count: 1, counted: 0, viewer: { upvoted: false } });
+    const anon = await call(app, '', 'GET', '/listings/up-a/upvotes');
+    expect(anon.body).toMatchObject({ count: 1, viewer: null, rank: null });
+    expect(c.slug).toBe('up-c');
+  });
+
+  it('ranks by counted sales, Bayesian rating and counted upvotes; never counts self-buys, new or creator-funded wallets', async () => {
+    const app = await appFor();
+    const creator = await user(app, { roles: ['buyer', 'creator'] });
+    const rival = await user(app, { roles: ['buyer', 'creator'] });
+    const top = await listing(creator.id, 'rank-top');
+    const second = await listing(rival.id, 'rank-second');
+    const washed = await listing(rival.id, 'rank-washed');
+    const idle = await listing(creator.id, 'rank-idle');
+
+    for (let i = 0; i < 3; i++) await order((await user(app)).id, top);
+    await order((await user(app)).id, second);
+    await order(rival.id, second); // self-buy
+    await order((await user(app, { createdAt: now })).id, second); // brand-new wallet
+    for (let i = 0; i < 3; i++) {
+      const funded = await user(app);
+      await sql`
+        insert into wallet_intel (wallet, funders, oldest_seen_at)
+        values (${funded.wallet.publicKey}, ${sql.json([{ wallet: rival.wallet.publicKey, at: now.toISOString() }])}, ${longAgo})
+      `;
+      await order(funded.id, washed);
+    }
+    await sql`update listings set sales_7d = 999 where id = ${top.listingId}`;
+
+    const result = await computeRanks(lastDeps, { force: true });
+    expect(result).toMatchObject({ ranked: 2, listings: 4 });
+    expect(await computeRanks(lastDeps)).toBeNull(); // recomputes at most every 10 minutes
+
+    const rows =
+      await sql`select slug, rank_category, rank_overall, rank_parts, sales_7d from listings order by slug`;
+    const by = Object.fromEntries(rows.map((r) => [r.slug, r]));
+    expect(by['rank-top']).toMatchObject({ rank_category: 1, rank_overall: 1, sales_7d: 3 });
+    expect(by['rank-top']!.rank_parts).toMatchObject({ sales: 3, salesPart: 1 });
+    expect(by['rank-second']).toMatchObject({ rank_category: 2, rank_overall: 2 });
+    expect(by['rank-second']!.rank_parts.sales).toBe(1);
+    expect(by['rank-washed']).toMatchObject({ rank_category: null, rank_overall: null });
+    expect(by['rank-washed']!.rank_parts.paused).toBe('creator_funded_buyers');
+    expect(by['rank-idle']).toMatchObject({ rank_category: null, rank_overall: null });
+
+    const creators = await sql`select creator_id, rank, sales from creator_rank order by rank`;
+    expect(creators.map((r) => [r.creator_id, r.rank, r.sales])).toEqual([
+      [creator.id, 1, 3],
+      [rival.id, 2, 1],
+    ]);
+
+    const card = await call(app, '', 'GET', '/listings/rank-top');
+    expect(card.body).toMatchObject({ rank: { category: 1, overall: 1 }, upvotes: 0 });
+    const list = await call(app, '', 'GET', '/listings?sort=top');
+    expect(list.body.slice(0, 2).map((l: { slug: string }) => l.slug)).toEqual([
+      'rank-top',
+      'rank-second',
+    ]);
+    const panel = await call(app, '', 'GET', '/listings/rank-top/upvotes');
+    expect(panel.body.rank).toMatchObject({
+      category: 1,
+      categoryLabel: expect.any(String),
+      windowDays: 30,
+    });
+    expect(idle.slug).toBe('rank-idle');
+  });
+});
+
+describe('social: leaderboard, paid to creators, activity', () => {
+  beforeEach(async () => {
+    sql ??= createSql(databaseUrl);
+    await migrate(sql);
+    await sql`
+      truncate table audit_log, ledger, notifications, downloads, listing_reviews, review_replies,
+        review_votes, review_reports, wallet_intel, listing_upvotes, creator_rank, disputes, licenses,
+        payouts, orders, versions, listings, auth_nonces, users
+      restart identity cascade
+    `;
+    await sql`delete from config where key in ('rank_config', 'social_rules')`;
+  });
+
+  it('starts empty and honest: zero paid, no leaderboard rows, no activity', async () => {
+    const app = await appFor();
+    const stats = await call(app, '', 'GET', '/stats');
+    expect(stats.body.paidToCreators).toMatchObject({
+      lamports: '0',
+      last24hLamports: '0',
+      orders: 0,
+    });
+    const board = await call(app, '', 'GET', '/creators/leaderboard');
+    expect(board.body).toMatchObject({ tab: 'earners', range: '30d', total: 0, rows: [] });
+    expect(board.body.summary).toMatchObject({ paidLamports: '0', rankedCreators: 0 });
+    const activity = await call(app, '', 'GET', '/activity');
+    expect(activity.body.events).toEqual([]);
+  });
+
+  it('ranks creators by released payouts, rating, rising sales and counted upvotes', async () => {
+    const app = await appFor();
+    await sql`insert into config (key, value) values ('rank_config', ${sql.json({ topRatedMinReviews: 1, risingMinSales: 1 })})`;
+    const alpha = await user(app, { roles: ['buyer', 'creator'] });
+    const beta = await user(app, { roles: ['buyer', 'creator'] });
+    await sql`update users set display_name = 'Alpha Labs' where id = ${alpha.id}`;
+    const a = await listing(alpha.id, 'lb-a');
+    const b = await listing(beta.id, 'lb-b');
+    const buyers = [await user(app), await user(app), await user(app)];
+    for (const buyer of buyers) await order(buyer.id, a);
+    await order(buyers[0]!.id, b);
+    await order(beta.id, b); // self-buy: never counts
+    await order(buyers[1]!.id, b, 'paid'); // still in escrow: not paid out yet
+    const reviewOrder = await order(buyers[2]!.id, b);
+    await postReview(app, buyers[2]!, reviewOrder, b.versionId, 5);
+    await sql`update listings set upvote_weight = 25000, upvote_count = 4 where id = ${b.listingId}`;
+
+    const earners = await call(app, '', 'GET', '/creators/leaderboard?tab=earners&range=30d');
+    expect(earners.body.rows.map((r: any) => [r.creator.wallet, r.sales, r.paidLamports])).toEqual([
+      [alpha.wallet.publicKey, 3, '3000000000'],
+      [beta.wallet.publicKey, 2, '2000000000'],
+    ]);
+    expect(earners.body.rows[0]).toMatchObject({
+      position: 1,
+      creator: { kind: 'pseudonym', name: 'Alpha Labs' },
+      topListing: { slug: 'lb-a' },
+    });
+    expect(earners.body.rows[0].spark).toHaveLength(14);
+    expect(earners.body.summary.paidLamports).toBe('6000000000'); // all released, incl. the self-buy
+
+    const rated = await call(app, '', 'GET', '/creators/leaderboard?tab=rated');
+    expect(rated.body.rows.map((r: any) => r.creator.wallet)).toEqual([beta.wallet.publicKey]);
+    const upvoted = await call(app, '', 'GET', '/creators/leaderboard?tab=upvoted');
+    expect(upvoted.body.rows[0]).toMatchObject({ upvotes: { counted: 2.5, raw: 4 } });
+    const rising = await call(app, '', 'GET', '/creators/leaderboard?tab=rising&range=7d');
+    expect(rising.body.rows[0]).toMatchObject({ rising: { now: 3, prev: 0 } });
+    const verified = await call(app, '', 'GET', '/creators/leaderboard?verified=1');
+    expect(verified.body.rows).toEqual([]);
+    const scoped = await call(app, '', 'GET', '/creators/leaderboard?category=filter');
+    expect(scoped.body.rows).toEqual([]);
+
+    const stats = await call(app, '', 'GET', '/stats');
+    expect(stats.body.paidToCreators).toMatchObject({ lamports: '6000000000', orders: 6 });
+
+    const activity = await call(app, '', 'GET', '/activity?limit=50');
+    const kinds = activity.body.events.map((e: { kind: string }) => e.kind);
+    expect(kinds.filter((k: string) => k === 'sale')).toHaveLength(6); // the self-buy is left out
+    expect(kinds).toContain('review');
+    expect(activity.body.events.find((e: any) => e.kind === 'review')).toMatchObject({
+      rating: 5,
+      listing: { slug: 'lb-b' },
+    });
   });
 });

@@ -394,3 +394,30 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Home activity band: a slow marquee, paused on hover and for reduced motion. */
+@keyframes activity-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.activity-band {
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .activity-track {
+    animation: activity-marquee 60s linear infinite;
+  }
+  .activity-band:hover .activity-track,
+  .activity-band:focus-within .activity-track {
+    animation-play-state: paused;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-band {
+    overflow-x: auto;
+  }
+}

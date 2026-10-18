@@ -66,7 +66,7 @@ import {
 } from './content';
 import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
 import { EscrowError } from './escrow';
-import { checkXState, fetchXAccount, startXAuth, X_COOKIE, xVerified } from './x-oauth';
+import { checkXState, fetchXAccount, startXAuth, X_COOKIE, XAuthError, xVerified } from './x-oauth';
 import {
   findCreator,
   loadOwnProfile,
@@ -78,6 +78,8 @@ import {
 } from './profile';
 import { studioOverview } from './studio';
 import { registerReviewRoutes } from './reviews';
+import { computeRanks, registerUpvoteRoutes } from './ranking';
+import { paidToCreators, registerLeaderboardRoutes } from './leaderboard';
 import { scanWalletIntel } from './social';
 import {
   activeBond,
@@ -412,33 +414,55 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   api.get('/auth/x/callback', async (c) => {
-    const user = requireUser(c);
-    const done = (result: string) => c.redirect(`${deps.env.appUrl}/studio?x=${result}`, 302);
-    setCookie(c, X_COOKIE, '', { path: '/api/v1/auth/x', maxAge: 0 });
+    // Every outcome lands on the profile editor, whose X card says what happened and why.
+    const done = (result: string, reason?: string) =>
+      c.redirect(
+        `${deps.env.appUrl}/studio/profile?x=${result}${reason ? `&reason=${reason}` : ''}`,
+        302,
+      );
+    setCookie(c, X_COOKIE, '', {
+      httpOnly: true,
+      secure: deps.env.appUrl.startsWith('https://'),
+      sameSite: 'Lax',
+      path: '/api/v1/auth/x',
+      maxAge: 0,
+    });
+    // A top-level redirect from X: answer with a page the creator can read, not a JSON 401.
+    const user = c.get('user');
+    if (!user) {
+      console.error('x oauth failed', 'signed_out', 'no session cookie on the callback');
+      return done('failed', 'signed_out');
+    }
     if (!deps.env.xClientId) return done('unconfigured');
     if (c.req.query('error')) return done('denied');
-    const verifier = checkXState({
+    const checked = checkXState({
       cookie: getCookie(c, X_COOKIE),
       state: c.req.query('state'),
       userId: user.id as string,
       secret: deps.env.sessionSecret,
       now: deps.now(),
     });
+    if (!checked.ok) {
+      console.error('x oauth failed', checked.reason);
+      return done('invalid', checked.reason);
+    }
     const code = c.req.query('code');
-    if (!verifier || !code) return done('invalid');
+    if (!code) return done('invalid', 'no_code');
     let account: { id: string; username: string };
     try {
       account = await fetchXAccount({
-        fetch: deps.xFetch ?? fetch,
+        fetch: deps.xFetch,
+        apiUrl: deps.env.xApiUrl,
         clientId: deps.env.xClientId,
         clientSecret: deps.env.xClientSecret,
         redirectUri: xRedirectUri(),
         code,
-        verifier,
+        verifier: checked.verifier,
       });
     } catch (err) {
-      console.error('x oauth failed', (err as Error).message);
-      return done('failed');
+      const reason = err instanceof XAuthError ? err.reason : 'unexpected';
+      console.error('x oauth failed', reason, (err as Error).message);
+      return done('failed', reason);
     }
     const taken = await deps.sql`
       select 1 from users where x_user_id = ${account.id} and id <> ${user.id}
@@ -454,6 +478,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       xUserId: account.id,
       handle: account.username,
     });
+    console.log('x oauth linked', user.id, account.username);
     return done('linked');
   });
 
@@ -591,6 +616,10 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   // Reviews, creator replies, helpful votes, reports, moderation (reviews.ts).
   registerReviewRoutes(api, deps);
+  // Weighted listing upvotes (ranking.ts).
+  registerUpvoteRoutes(api, deps);
+  // Creator leaderboard and the live activity feed (leaderboard.ts); before /creators/:handle.
+  registerLeaderboardRoutes(api, deps);
 
   api.get('/creators/top', async (c) => {
     const rows = await deps.sql<Record<string, any>[]>`
@@ -1491,9 +1520,15 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/stats', async (c) => {
     const stats = await landingStats(deps);
     const price = await solPrice();
+    const paid = await paidToCreators(deps);
     return c.json(
       jsonSafe({
         ...stats,
+        paidToCreators: {
+          ...moneyView(paid.lamports, price.centsPerSol, formatSol(paid.lamports)),
+          last24hLamports: paid.last24h,
+          orders: paid.orders,
+        },
         volume: moneyView(
           BigInt(stats.volumeLamports),
           price.centsPerSol,
@@ -1598,6 +1633,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (job === 'release') return c.json({ released: await releaseOrders(deps) });
     if (job === 'payouts') return c.json({ batch: await proposePayouts(deps) });
     if (job === 'ledger') return c.json(jsonSafe({ vault: await ledgerVault(deps.sql) }));
+    if (job === 'ranking')
+      return c.json(jsonSafe({ ranks: await computeRanks(deps, { force: true }) }));
     if (job === 'wallet-intel') return c.json({ scanned: await scanWalletIntel(deps) });
     if (job === 'optimize-media') return c.json({ optimized: await optimizeStoredImages(deps) });
     throw new HttpError(404, 'NOT_FOUND', 'unknown job');
@@ -1684,6 +1721,11 @@ function publicListing(listing: Record<string, any>) {
     sales7d: listing.sales_7d,
     ratingAvg: listing.rating_avg,
     ratingCount: listing.rating_count,
+    upvotes: listing.upvote_count ?? 0,
+    rank:
+      listing.rank_category || listing.rank_overall
+        ? { category: listing.rank_category ?? null, overall: listing.rank_overall ?? null }
+        : null,
     firstLiveAt: listing.first_live_at,
     delistedAt: listing.delisted_at,
     updatePrice: listing.update_price ?? null,
@@ -1814,7 +1856,9 @@ async function searchListings(
           ? 'l.price desc'
           : sort === 'rating'
             ? 'l.rating_avg desc nulls last'
-            : 'l.sales_7d desc';
+            : sort === 'top'
+              ? 'l.rank_overall asc nulls last, l.sales_7d desc'
+              : 'l.sales_7d desc';
   // Padre links resolve to Terminal; matching ignores case (the Trojan listing stored 'trojan').
   const terminalFilter = query.terminal
     ? (canonicalTerminal(query.terminal) ?? query.terminal)
