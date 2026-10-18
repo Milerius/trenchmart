@@ -19,6 +19,27 @@ export function dayIndex(at: Date, now: Date, days = OVERVIEW_DAYS): number {
 /** Signed-in creator's dashboard: every number comes from orders, renewals, reviews and payouts. */
 const OVERVIEW_PARALLEL = 3;
 
+const TRANSIENT_DB =
+  /Network connection lost|CONNECTION_CLOSED|CONNECTION_ENDED|CONNECTION_DESTROYED|ECONNRESET/;
+
+/**
+ * Runs a read-only task again once when the database connection dropped under it. Live, about
+ * 1 in 15 overview reads (~16 queries) lost its Hyperdrive socket ("Network connection lost");
+ * postgres.js discards that connection, so the second attempt gets a fresh one. Never for writes.
+ */
+export async function retryTransientRead<T>(task: () => Promise<T>): Promise<T> {
+  try {
+    return await task();
+  } catch (err) {
+    if (
+      !(err instanceof Error) ||
+      !TRANSIENT_DB.test(`${err.message} ${(err as { code?: string }).code ?? ''}`)
+    )
+      throw err;
+    return task();
+  }
+}
+
 /** Runs the tasks with at most `n` in flight; results keep the input order. */
 export async function limited<T>(n: number, tasks: (() => PromiseLike<T> | T)[]): Promise<T[]> {
   const out = new Array<T>(tasks.length);
