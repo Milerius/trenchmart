@@ -6,6 +6,7 @@ import { expect, test } from '@playwright/test';
 const PAGES: [path: string, title: string][] = [
   ['/creators', 'Creator leaderboard'],
   ['/token', 'Fees fund the token. The token cuts your fees.'],
+  ['/verify', "Don't trust. Verify."],
 ];
 
 test.beforeEach(async ({ page }) => {
@@ -46,4 +47,22 @@ test('/token: tier cards, calculator tier radios and the fee split', async ({ pa
   await expect(calc.getByText('Enter a SOL amount with up to 9 decimals.')).toBeVisible();
   await expect(page.getByTestId('fee-split')).toHaveCount(4);
   await expect(page.locator('[data-fx="gradient-text"]')).toHaveCount(0);
+});
+
+test('/verify: file check and report check side by side on desktop, proof below', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/verify');
+  const file = page.getByRole('region', { name: 'Verify a file' });
+  const report = page.getByTestId('report-verifier');
+  await expect(file).toBeVisible();
+  const [a, b, proof] = await Promise.all([
+    file.boundingBox(),
+    report.boundingBox(),
+    page.getByTestId('proof').boundingBox(),
+  ]);
+  expect(Math.abs(a!.y - b!.y)).toBeLessThan(4);
+  expect(b!.x).toBeGreaterThan(a!.x + a!.width);
+  expect(proof!.y).toBeGreaterThan(Math.max(a!.y + a!.height, b!.y + b!.height));
 });

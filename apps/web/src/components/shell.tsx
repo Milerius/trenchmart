@@ -353,18 +353,15 @@ function Footer() {
 // preloaded: on a phone they would compete with the first paint for the connection.
 // The mode must match api(): same-origin with credentials ('use-credentials'), or the
 // browser fetches twice. These are hints only; nothing here changes what is cached.
+// Pages that draw their own full-width hero and content column.
+const FULL_BLEED = new Set(['/', '/search', '/creators', '/token', '/verify']);
+
 const PRELOADED_READS = ['/api/v1/me', '/api/v1/config/public'];
 
 export function Shell({ children }: { children: ReactNode }) {
-  // Home lays out its own full-bleed bands (hero, terminals); every other page gets the column.
+  // Redesigned pages lay out their own full-width hero and column; the rest get the column.
   const path = usePathname();
-  // Pages that draw their own full-width hero and content column.
-  const fullBleed =
-    path === '/' ||
-    path === '/search' ||
-    path === '/creators' ||
-    path === '/token' ||
-    path.startsWith('/c/');
+  const fullBleed = FULL_BLEED.has(path) || path.startsWith('/c/');
   for (const href of PRELOADED_READS)
     preload(href, { as: 'fetch', crossOrigin: 'use-credentials' });
   return (
