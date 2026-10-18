@@ -359,7 +359,8 @@ export function Shell({ children }: { children: ReactNode }) {
   // Home lays out its own full-bleed bands (hero, terminals); every other page gets the column.
   const path = usePathname();
   // Pages that draw their own full-width hero and content column.
-  const fullBleed = path === '/' || path === '/search' || path.startsWith('/c/');
+  const fullBleed =
+    path === '/' || path === '/search' || path === '/creators' || path.startsWith('/c/');
   for (const href of PRELOADED_READS)
     preload(href, { as: 'fetch', crossOrigin: 'use-credentials' });
   return (
