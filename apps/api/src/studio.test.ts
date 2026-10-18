@@ -8,7 +8,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createSql, migrate, pendingMigrations, type Sql } from '@trenchmart/db';
 import { randomKeypair } from '@trenchmart/chain';
 import { createApp } from './app';
-import { limited } from './studio';
+import { limited, retryTransientRead } from './studio';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
 import type { Deps } from './logic';
@@ -288,5 +288,34 @@ describe('overview reads are bounded', () => {
     );
     expect(out).toEqual([5, 1, 4, 2, 3, 0, 6]);
     expect(peak).toBe(3);
+  });
+});
+
+describe('a dropped database connection on a read', () => {
+  it('is retried once; other errors are not', async () => {
+    let n = 0;
+    const flaky = async () => {
+      n++;
+      if (n === 1) throw new Error('Network connection lost.');
+      return 'ok';
+    };
+    expect(await retryTransientRead(flaky)).toBe('ok');
+    expect(n).toBe(2);
+    let m = 0;
+    const broken = async () => {
+      m++;
+      throw new Error('column r.hidden_at does not exist');
+    };
+    await expect(retryTransientRead(broken)).rejects.toThrow('hidden_at');
+    expect(m).toBe(1);
+    let k = 0;
+    const down = async () => {
+      k++;
+      throw Object.assign(new Error('write CONNECTION_CLOSED host:5432'), {
+        code: 'CONNECTION_CLOSED',
+      });
+    };
+    await expect(retryTransientRead(down)).rejects.toThrow('CONNECTION_CLOSED');
+    expect(k).toBe(2);
   });
 });

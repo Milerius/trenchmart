@@ -77,7 +77,13 @@ import {
   saveProfile,
   uploadProfileImage,
 } from './profile';
-import { studioOverview, studioReviews, studioSales, studioSubscribers } from './studio';
+import {
+  retryTransientRead,
+  studioOverview,
+  studioReviews,
+  studioSales,
+  studioSubscribers,
+} from './studio';
 import { registerReviewRoutes } from './reviews';
 import { computeRanks, registerUpvoteRoutes } from './ranking';
 import { featuredToday, registerFeaturingRoutes, featureMaintenance } from './featuring';
@@ -1521,7 +1527,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.get('/studio/overview', async (c) => {
     const user = requireUser(c);
-    return c.json(jsonSafe(await studioOverview(deps, user)));
+    return c.json(jsonSafe(await retryTransientRead(() => studioOverview(deps, user))));
   });
 
   api.get('/studio/sales', async (c) => {
