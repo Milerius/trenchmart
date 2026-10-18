@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { expect, test, type Page } from '@playwright/test';
+import { studioListing, studioOverview } from './studio-fixtures';
 
 // Seller updates, buyer update entitlement, daily limits and SOL supplements (2026-10-18).
 // The CI e2e job has no API or RPC, so /api/v1 is stubbed in the browser and the wallet is the
@@ -115,29 +116,21 @@ async function setup(page: Page, address: string, secret: string | null, handler
 
 const LISTING_ID = '11111111-2222-4333-8444-555555555555';
 const STUDIO_ROWS = [
-  {
+  studioListing({
     id: LISTING_ID,
     slug: 'trojan-trenches-intel',
     title: 'Trojan Trenches Intel',
-    price: '100000000',
-    category: 'userscript',
-    sales_7d: 3,
-    version_status: 'live',
-    semver: '1.4.0',
-    delisted_at: null,
-    update_price: '10000000',
-  },
-  {
+    sales7d: 3,
+    sales: 3,
+    live: { semver: '1.4.0', status: 'live' },
+    latest: { id: 'v-140', semver: '1.4.0', status: 'live', at: '2026-10-17T10:00:00Z' },
+  }),
+  studioListing({
     id: '99999999-2222-4333-8444-555555555555',
     slug: 'draft-pack',
     title: 'Draft Pack',
-    price: '100000000',
-    category: 'userscript',
-    sales_7d: 0,
-    version_status: 'in_review',
-    semver: null,
-    delisted_at: null,
-  },
+    latest: { id: 'v-900', semver: '1.0.0', status: 'in_review', at: '2026-10-17T10:00:00Z' },
+  }),
 ];
 const REQUIREMENTS = {
   creator: true,
@@ -182,7 +175,7 @@ test('studio: live listings offer "Upload new version"; the form suggests a patc
   const { secret, address } = wallet();
   const calls = await setup(page, address, secret, ({ method, path }) => {
     if (path === '/studio/requirements') return { json: REQUIREMENTS };
-    if (path === '/studio/listings') return { json: STUDIO_ROWS };
+    if (path === '/studio/overview') return { json: studioOverview(address, {}, STUDIO_ROWS) };
     if (path === '/studio/payouts')
       return { json: { total: { lamports: '0', usdCents: null }, payouts: [] } };
     if (path === `/studio/listings/${LISTING_ID}/upload-quota`) return { json: quota() };
