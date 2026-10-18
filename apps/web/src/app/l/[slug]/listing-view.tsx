@@ -8,10 +8,18 @@ import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { categoryMeta } from '@trenchmart/shared/categories';
 import { quote as quoteFor } from '@trenchmart/shared/fee';
-import { specRows, walletCountLabel, type WalletCount } from '@trenchmart/shared/listing-kinds';
+import {
+  specRows,
+  walletCountLabel,
+  type WalletCount,
+} from '@trenchmart/shared/listing-kinds-display';
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
-import { Markdown } from '@/components/markdown';
+import {
+  ListingMarkdown as Markdown,
+  ParsedMarkdownContext,
+  type ParsedMarkdown,
+} from '@/components/listing-markdown';
 import { VerifiedBadge } from '@/components/profile';
 import { ReviewsPanel } from '@/components/reviews';
 import { CheckoutElectric, DecryptHash } from '@/components/listing-fx';
@@ -133,7 +141,14 @@ const TAB_LABEL: Record<Tab, string> = {
   reviews: 'Reviews',
 };
 
-export function ListingView({ initial }: { initial: Listing | null }) {
+export function ListingView({
+  initial,
+  markdown = {},
+}: {
+  initial: Listing | null;
+  /** README, how-to and requirements parsed on the server (keeps the parser off the page). */
+  markdown?: ParsedMarkdown;
+}) {
   const params = useParams<{ slug: string }>();
   const wallet = useWallet();
   const config = usePublicConfig();
@@ -307,7 +322,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   }
 
   return (
-    <>
+    <ParsedMarkdownContext.Provider value={markdown}>
       <article className="relative grid items-start gap-10 pb-24 lg:grid-cols-[minmax(0,1fr)_400px] lg:pb-0">
         <div
           aria-hidden="true"
@@ -673,7 +688,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
           </ul>
         </section>
       ) : null}
-    </>
+    </ParsedMarkdownContext.Provider>
   );
 }
 
