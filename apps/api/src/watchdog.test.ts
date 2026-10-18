@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runChecks, watchdog, type WatchdogEnv } from './watchdog';
+import { pushStatus, runChecks, watchdog, type WatchdogEnv } from './watchdog';
 
 const env: WatchdogEnv = {
   WEB_URL: 'https://web.example',
@@ -51,5 +51,44 @@ describe('external watchdog', () => {
     expect(await watchdog(env, f)).toEqual(['[TrenchMart devnet] watchdog DOWN api']);
     state.api = 200;
     expect(await watchdog(env, f)).toEqual([]);
+  });
+
+  it('pushes name, ok and latency (never the detail text) to the API status page', async () => {
+    const { state, f } = world();
+    const posts: { url: string; auth: string; body: string }[] = [];
+    const spy = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/v1/internal/status/external')) {
+        posts.push({
+          url,
+          auth: (init?.headers as Record<string, string>).authorization ?? '',
+          body: String(init?.body),
+        });
+        return Response.json({ recorded: 3 });
+      }
+      return f(input, init);
+    }) as typeof fetch;
+    // No token: no push.
+    await watchdog(env, spy);
+    expect(posts).toEqual([]);
+    const withToken = { ...env, STATUS_PUSH_TOKEN: 'push-token-push-token-push-token-0001' };
+    state.web = 503;
+    await watchdog(withToken, spy);
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.url).toBe('https://api.example/api/v1/internal/status/external');
+    expect(posts[0]!.auth).toBe('Bearer push-token-push-token-push-token-0001');
+    const body = JSON.parse(posts[0]!.body) as { checks: Record<string, unknown>[] };
+    expect(body.checks.map((c) => Object.keys(c).sort())).toEqual([
+      ['ms', 'name', 'ok'],
+      ['ms', 'name', 'ok'],
+      ['ms', 'name', 'ok'],
+    ]);
+    expect(body.checks.find((c) => c.name === 'web')!.ok).toBe(false);
+    expect(posts[0]!.body).not.toContain('HTTP');
+    // The API being unreachable never breaks the watchdog.
+    const down = (async () => {
+      throw new Error('connect timeout');
+    }) as typeof fetch;
+    expect(await pushStatus(withToken, await runChecks(env, f), down)).toBe(false);
   });
 });

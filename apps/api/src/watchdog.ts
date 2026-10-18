@@ -3,8 +3,9 @@
 // outage (which also stops the API's own cron alerts) still surfaces. Deployed with
 // `wrangler deploy -c watchdog.wrangler.toml`. Alert delivery is chat-only: the owner's
 // assistant polls GET / (this Worker) and GET /api/v1/internal/ops/alerts every 10 min.
-// The API Worker also calls GET / through a service binding (WATCHDOG) on its 5-minute cron and
-// records each check's state and latency for the public status page (status.ts).
+// Each cron tick also pushes the checks (name, ok, ms; never the detail text) to the API's
+// POST /api/v1/internal/status/external for the public status page (status.ts), authenticated
+// with STATUS_PUSH_TOKEN (a Worker secret that can do nothing else). Unset = no push.
 // Failures are logged as `ALERT {...}` in Workers Logs; there is no ntfy/email/Telegram push.
 
 export type WatchdogEnv = {
@@ -12,6 +13,7 @@ export type WatchdogEnv = {
   API_URL: string;
   RPC_URL: string;
   CLUSTER?: string;
+  STATUS_PUSH_TOKEN?: string;
 };
 
 // ms: wall time of the check, read by the API cron for the public status page (status.ts).
@@ -68,9 +70,37 @@ export async function runChecks(env: WatchdogEnv, f: typeof fetch = fetch): Prom
   ]);
 }
 
+/** Sends the checks to the API for the status page. Never throws: alerting must still run. */
+export async function pushStatus(
+  env: WatchdogEnv,
+  checks: Check[],
+  f: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!env.STATUS_PUSH_TOKEN) return false;
+  try {
+    const res = await timed(f, `${env.API_URL}/api/v1/internal/status/external`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${env.STATUS_PUSH_TOKEN}`,
+      },
+      body: JSON.stringify({
+        checks: checks.map((c) => ({ name: c.name, ok: c.ok, ms: Math.max(0, Math.round(c.ms)) })),
+      }),
+    });
+    if (!res.ok) console.error('STATUS_PUSH', res.status);
+    return res.ok;
+  } catch (err) {
+    // The API being down is exactly when this fails; the page then shows no data for the gap.
+    console.error('STATUS_PUSH', (err as Error).message);
+    return false;
+  }
+}
+
 /** Log failing checks; delivery is via the assistant poller, not push. */
 export async function watchdog(env: WatchdogEnv, f: typeof fetch = fetch): Promise<string[]> {
   const checks = await runChecks(env, f);
+  await pushStatus(env, checks, f);
   const logged: string[] = [];
   for (const c of checks) {
     if (c.ok) continue;

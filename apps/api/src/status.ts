@@ -6,8 +6,11 @@
 // probes up per UTC day for the 90-day bars. Stored rows hold component ids, states and numbers
 // only. Alert messages, addresses, balances and URLs never reach these tables.
 //
-// Web, API and Solana RPC are measured from outside the API Worker by the external watchdog
-// (service binding WATCHDOG); without the binding (local, tests) they are probed directly.
+// Web, API and Solana RPC are measured from outside the API Worker: the external watchdog pushes
+// its 5-minute checks to POST /internal/status/external (recordExternal). The API cannot ask the
+// watchdog itself: Cloudflare blocks the watchdog's fetch back to the calling Worker (a loop), so
+// the API row read "down" on every tick. Without STATUS_PUSH_TOKEN (local runs, tests) the cron
+// probes the three directly instead.
 import type { Deps } from './logic';
 import type { OpsAlert } from './ops';
 
@@ -84,29 +87,7 @@ async function measure(id: ComponentId, check: () => Promise<boolean>): Promise<
   return { component: id, state: stateOf(id, ok, ms), latencyMs: ms };
 }
 
-type WatchdogCheck = { name?: unknown; ok?: unknown; ms?: unknown };
-
-/** Web, API and RPC from the external watchdog, or null when it cannot be asked. */
-async function fromWatchdog(deps: Deps): Promise<Probe[] | null> {
-  if (!deps.watchdog) return null;
-  try {
-    const res = await deps.watchdog.fetch('https://watchdog/');
-    const body = (await res.json()) as { checks?: WatchdogCheck[] };
-    const probes: Probe[] = [];
-    for (const id of ['web', 'api', 'rpc'] as const) {
-      const check = body.checks?.find((c) => c.name === id);
-      if (!check || typeof check.ok !== 'boolean') return null;
-      const ms =
-        typeof check.ms === 'number' && Number.isFinite(check.ms) ? Math.round(check.ms) : null;
-      probes.push({ component: id, state: stateOf(id, check.ok, ms), latencyMs: ms });
-    }
-    return probes;
-  } catch {
-    return null;
-  }
-}
-
-/** Same three checks as the watchdog, made from here (local runs and the fallback). */
+/** Same three checks as the watchdog, made from here (local runs without a push token). */
 async function direct(deps: Deps): Promise<Probe[]> {
   const f = deps.opsFetch ?? fetch;
   const { appUrl, apiUrl, rpcUrl } = deps.env;
@@ -136,7 +117,8 @@ async function direct(deps: Deps): Promise<Probe[]> {
 
 /** One light probe per public component, then the ops alerts of the same tick on top. */
 export async function runStatusProbes(deps: Deps, alerts: OpsAlert[] = []): Promise<Probe[]> {
-  const external = (await fromWatchdog(deps)) ?? (await direct(deps));
+  // With a push token the watchdog reports these three from outside (recordExternal).
+  const external = deps.env.statusPushToken ? [] : await direct(deps);
   const internal = await Promise.all([
     deps.env.escrowProgramId && deps.escrowChain
       ? measure('escrow', async () => {
@@ -168,12 +150,42 @@ export async function runStatusProbes(deps: Deps, alerts: OpsAlert[] = []): Prom
     }),
   ]);
   const probes = [...external, ...internal.filter((p): p is Probe => p !== null)];
-  for (const alert of alerts) {
-    const mapped = ALERT_COMPONENT[alert.code];
+  return applyAlerts(
+    probes,
+    alerts.map((a) => a.code),
+  );
+}
+
+/** Makes components worse for each mapped alert code (codes only; messages never cross over). */
+function applyAlerts(probes: Probe[], codes: string[]): Probe[] {
+  for (const code of codes) {
+    const mapped = ALERT_COMPONENT[code];
     if (!mapped) continue;
     const probe = probes.find((p) => p.component === mapped[0]);
     if (probe) probe.state = worse(probe.state, mapped[1]);
   }
+  return probes;
+}
+
+export type ExternalCheck = { name: 'web' | 'api' | 'rpc'; ok: boolean; ms: number };
+
+/**
+ * Stores the watchdog's pushed web/API/RPC checks as probes. Open ops alerts (codes only) for
+ * those components are applied like on the cron tick.
+ */
+export async function recordExternal(deps: Deps, checks: ExternalCheck[]): Promise<Probe[]> {
+  const probes: Probe[] = checks.map((c) => {
+    const ms = Math.round(c.ms);
+    return { component: c.name, state: stateOf(c.name, c.ok, ms), latencyMs: ms };
+  });
+  const open = await deps.sql<{ code: string }[]>`
+    select code from ops_alerts where resolved_at is null
+  `;
+  applyAlerts(
+    probes,
+    open.map((r) => r.code),
+  );
+  await recordStatus(deps, probes);
   return probes;
 }
 

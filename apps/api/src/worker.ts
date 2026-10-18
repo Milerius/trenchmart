@@ -43,8 +43,6 @@ type Binding = Record<string, unknown> & {
   FILES?: R2BucketLike;
   // Workers Rate Limiting binding (M-03): edge counter, no database write per request.
   RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
-  // Service binding to the external watchdog Worker (status page probes, status.ts).
-  WATCHDOG?: { fetch(input: string): Promise<Response> };
 };
 
 type Ctx = { waitUntil: (p: Promise<unknown>) => void };
@@ -141,12 +139,7 @@ export default {
     const run = async (): Promise<Response> => {
       const deps = depsFor(env, dbUrl);
       const app = createApp(
-        {
-          ...deps,
-          sandboxQueue: env.SCAN_QUEUE,
-          rateLimiter: env.RATE_LIMITER,
-          watchdog: env.WATCHDOG,
-        },
+        { ...deps, sandboxQueue: env.SCAN_QUEUE, rateLimiter: env.RATE_LIMITER },
         priceCache,
       );
       const close = () => deps.sql.end({ timeout: 5 });
@@ -166,7 +159,7 @@ export default {
   async scheduled(_event: unknown, env: Binding, ctx: Ctx): Promise<void> {
     const dbUrl = databaseUrl(env);
     if (!dbUrl) return;
-    const deps = { ...depsFor(env, dbUrl), watchdog: env.WATCHDOG };
+    const deps = depsFor(env, dbUrl);
     // Each job runs even if an earlier one failed, and every failure is logged as an ALERT.
     const step = async (name: string, job: () => Promise<unknown>) => {
       try {
