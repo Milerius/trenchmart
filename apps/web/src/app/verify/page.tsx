@@ -5,32 +5,93 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import nacl from 'tweetnacl';
 import { reportMessage } from '@trenchmart/shared';
-import { Card, Label, Panel, StatusTag, Tag, type Tone, utc } from '@/components/ui';
+import { Button, Card, Label, Panel, StatusTag, Tag, type Tone, utc } from '@/components/ui';
 import { solText } from '@/lib/money';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
+import { paySupplement } from '@/lib/studio';
+import { useWallet } from '@/lib/wallet';
 import { explorerAddress, explorerTx, shortKey } from '@/lib/protocol-facts';
 
+type Quota = {
+  signedIn: boolean;
+  freeLeft: boolean;
+  freePerDay: number;
+  supplementLamports: string;
+  resetsAt: string;
+  paidCredits?: number;
+};
+
 export default function VerifyPage() {
+  const wallet = useWallet();
   const [result, setResult] = useState<{ match: boolean; message: string } | null>(null);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [quota, setQuota] = useState<Quota | null>(null);
+  // A file held back by the daily limit, with the supplement it needs.
+  const [held, setHeld] = useState<{ file: File; lamports: string } | null>(null);
+
+  function loadQuota() {
+    void api<Quota>('/verify/quota')
+      .then(setQuota)
+      .catch(() => setQuota(null));
+  }
+
+  useEffect(loadQuota, [wallet.session]);
+
+  async function check(file: File, supplementId?: string) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return api<{ match: boolean; message: string }>('/verify', {
+      method: 'POST',
+      body: JSON.stringify({
+        fileName: file.name,
+        contentBase64: btoa(binary),
+        ...(supplementId ? { supplementId } : {}),
+      }),
+    });
+  }
 
   async function onFile(file: File) {
     setError('');
     setResult(null);
-    setBusy(true);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let binary = '';
-    for (const byte of bytes) binary += String.fromCharCode(byte);
+    setHeld(null);
+    setBusy('Checking…');
     try {
-      setResult(
-        await api<{ match: boolean; message: string }>('/verify', {
-          method: 'POST',
-          body: JSON.stringify({ fileName: file.name, contentBase64: btoa(binary) }),
-        }),
-      );
+      setResult(await check(file));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'SUPPLEMENT_REQUIRED') {
+        setHeld({ file, lamports: quota?.supplementLamports ?? '10000000' });
+        return;
+      }
+      throw err;
     } finally {
-      setBusy(false);
+      setBusy('');
+      loadQuota();
+    }
+  }
+
+  /** Pay the verification supplement on chain, then check the held file with it. */
+  async function payAndCheck() {
+    if (!held) return;
+    setError('');
+    setBusy('Check your wallet…');
+    try {
+      const created = await api<{ supplementId: string; txBase64: string }>('/verify/supplement', {
+        method: 'POST',
+      });
+      await paySupplement({
+        api,
+        supplementId: created.supplementId,
+        tx: created,
+        signAndSend: wallet.signAndSend,
+      });
+      setBusy('Checking…');
+      setResult(await check(held.file, created.supplementId));
+      setHeld(null);
+    } finally {
+      setBusy('');
+      loadQuota();
     }
   }
 
@@ -41,29 +102,66 @@ export default function VerifyPage() {
           <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Verify a file</h1>
           <p className="m-0 mt-2 text-ink-2">
             Drop a file you downloaded. A match means the bytes are exactly a version that passed
-            automated review. Nothing is stored.
+            automated review. The file is not stored.
           </p>
         </div>
-        <label
-          htmlFor="verify-file"
-          className="flex cursor-pointer flex-col items-center gap-2 rounded-panel border border-dashed border-line-control bg-inset px-6 py-12 text-center hover:border-accent-line"
-        >
-          <span className="text-base font-semibold">
-            {busy ? 'Checking…' : 'Choose a file to check'}
-          </span>
-          <span className="text-[13px] text-muted">
-            We compare its SHA-256 with every reviewed version.
-          </span>
-          <input
-            id="verify-file"
-            type="file"
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void onFile(file).catch((err: Error) => setError(err.message));
-            }}
-          />
-        </label>
+        {wallet.session ? (
+          <>
+            <label
+              htmlFor="verify-file"
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-panel border border-dashed border-line-control bg-inset px-6 py-12 text-center hover:border-accent-line"
+            >
+              <span className="text-base font-semibold">{busy || 'Choose a file to check'}</span>
+              <span className="text-[13px] text-muted">
+                We compare its SHA-256 with every reviewed version.
+              </span>
+              <input
+                id="verify-file"
+                type="file"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void onFile(file).catch((err: Error) => setError(err.message));
+                }}
+              />
+            </label>
+            <p data-testid="verify-quota" className="m-0 text-[13px] text-ink-2">
+              {quota
+                ? quota.freeLeft
+                  ? `Your free verification for today (UTC) is available.`
+                  : `Free verification used today. Next free one at ${utc(quota.resetsAt)}; until then each check costs ${solText(quota.supplementLamports)}.`
+                : '1 free verification per wallet per day (UTC).'}
+            </p>
+          </>
+        ) : (
+          <Panel data-testid="verify-signin" className="p-5 text-sm">
+            <p className="m-0 font-semibold">Sign in with a wallet to verify a file</p>
+            <p className="m-0 mt-1 text-ink-2">
+              Each wallet gets 1 free verification per day (UTC), then a small SOL supplement per
+              check. Signing in costs nothing.
+            </p>
+            <Button className="mt-4" onClick={() => void wallet.connect()} disabled={wallet.busy}>
+              {wallet.busy ? 'Check your wallet…' : 'Connect wallet'}
+            </Button>
+          </Panel>
+        )}
+        {held ? (
+          <Panel tone="warn" data-testid="verify-supplement" className="space-y-3 p-4 text-sm">
+            <p className="m-0 font-semibold">Your free verification for today is used</p>
+            <p className="m-0 text-ink-2">
+              Verify <span className="font-mono">{held.file.name}</span> for{' '}
+              {solText(held.lamports)}, paid on chain from your wallet. Or come back after{' '}
+              {quota ? utc(quota.resetsAt) : 'midnight UTC'}.
+            </p>
+            <Button
+              data-testid="pay-verify"
+              disabled={!!busy}
+              onClick={() => void payAndCheck().catch((err: Error) => setError(err.message))}
+            >
+              {busy || `Pay ${solText(held.lamports)} and verify`}
+            </Button>
+          </Panel>
+        ) : null}
         {result ? (
           <Panel tone={result.match ? 'ok' : 'warn'} role="status" className="p-4 text-sm">
             <p className="m-0 font-semibold">{result.match ? '✓ Match' : 'No match'}</p>

@@ -67,6 +67,7 @@ import {
   type EscrowChain,
 } from './escrow';
 import type { IsolatedSandboxResult } from './sandbox';
+import { startUpdatePeriod } from './versioning';
 import type { BlobStore } from './blob';
 import type { Env } from './env';
 
@@ -518,6 +519,8 @@ async function settleOrder(deps: Deps, orderId: string, txSig: string, tx: Chain
     listingRows[0]?.license === 'subscription' ? listingRows[0]?.sub_period_days : null;
   const validUntil = period ? new Date(paidAt.getTime() + period * 86_400_000) : null;
   await deps.sql`insert into licenses (order_id, wallet, valid_until) values (${orderId}, ${buyer.wallet}, ${validUntil})`;
+  // Free updates for update_free_days from payment (forever when the seller prices updates at 0).
+  await startUpdatePeriod(deps.sql, config, order, paidAt);
   const holding = order.escrow_address ? 'escrow' : 'vault';
   await deps.sql`
     insert into ledger (account, delta, ref_type, ref_id) values (${holding}, ${order.total}, 'order', ${orderId})
@@ -1741,10 +1744,10 @@ async function decideWithAgent(
   `;
   if (decision.decision === 'approve' && summary !== 'fail') {
     await deps.sql`
-      update versions set status = 'superseded'
+      update versions set status = 'superseded', superseded_at = ${deps.now()}
       where listing_id = ${version.listing_id} and status = 'live' and id <> ${version.id}
     `;
-    await deps.sql`update versions set status = 'live' where id = ${version.id}`;
+    await deps.sql`update versions set status = 'live', live_at = ${deps.now()} where id = ${version.id}`;
     await deps.sql`
       update listings set live_version_id = ${version.id},
         first_live_at = coalesce(first_live_at, ${deps.now()})

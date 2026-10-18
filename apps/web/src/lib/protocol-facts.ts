@@ -182,6 +182,14 @@ export const protocol = {
   aiModel: AI_MODEL,
   aiReasoningEffort: AI_REASONING_EFFORT,
   scannerEngine: SCANNER_ENGINE,
+  updateFreeDays: DEFAULT_CONFIG_JSON.update_free_days,
+  updatePeriodDays: DEFAULT_CONFIG_JSON.update_period_days,
+  updatePriceDefault: bpsPercent(DEFAULT_CONFIG_JSON.update_price_default_bps),
+  updatesPerListingPerDay: DEFAULT_CONFIG_JSON.update_limit_per_listing_day,
+  uploadsPerCreatorPerDay: DEFAULT_CONFIG_JSON.upload_limit_per_creator_day,
+  uploadSupplement: solLabel(BigInt(DEFAULT_CONFIG_JSON.upload_supplement_lamports)),
+  verifyFreePerDay: DEFAULT_CONFIG_JSON.verify_free_per_day,
+  verifySupplement: solLabel(BigInt(DEFAULT_CONFIG_JSON.verify_supplement_lamports)),
 };
 
 export type OrderEdge = { from: OrderStatus; to: OrderStatus };
