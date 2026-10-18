@@ -262,14 +262,14 @@ class Component extends DCLogic {
   renderVals() {
     const L = '#C6F432', A = '#F5A524', B = '#7CC4FF', P = '#C9A2FF', R = '#FF8A7A', T = '#6EE7C8';
     const categories = [
-      { code: '01 / SCRIPTS', name: 'Userscripts', desc: 'Tampermonkey add-ons for Axiom, GMGN, Photon, BullX.', color: L },
+      { code: '01 / SCRIPTS', name: 'Userscripts', desc: 'Tampermonkey add-ons for Axiom, GMGN, Photon, Trojan.', color: L },
       { code: '02 / WALLETS', name: 'Wallet lists', desc: 'Curated smart-money and KOL tracker lists, ready to import.', color: B },
       { code: '03 / FILTERS', name: 'Terminal filters', desc: 'Sniper and scanner presets for new pairs and migrations.', color: A },
       { code: '04 / SETUPS', name: 'Full setups', desc: 'Layouts, hotkeys, alerts and presets bundled together.', color: P },
       { code: '05 / STRATS', name: 'Wallet strategies', desc: 'Documented entry and exit playbooks with rules.', color: T },
       { code: '06 / ALERTS', name: 'Alerts & bots', desc: 'Telegram and Discord alert configs and webhooks.', color: R }
     ];
-    const names = ['All', 'Axiom', 'GMGN', 'Photon', 'BullX', 'Padre'];
+    const names = ['All', 'Axiom', 'GMGN', 'Photon', 'Trojan', 'Terminal'];
     const terminals = names.map((n) => {
       const on = this.state.term === n;
       return { name: n, pressed: on ? 'true' : 'false', pick: () => this.setState({ term: n }),
@@ -280,11 +280,11 @@ class Component extends DCLogic {
       { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'Axiom · GMGN', title: 'Sniper Filter Pack v2', creator: '@dev_degen', bond: '5', rating: '4.9', sales: 412, price: '1.50', t: ['Axiom', 'GMGN'], ...V },
       { type: 'WALLET LIST', color: B, bg: '#0F1620', compat: 'GMGN · Photon · Axiom', title: '120 Early Wallets (Q4)', creator: '@onchainsleuth', bond: '2', rating: '4.7', sales: 268, price: '2.00', t: ['GMGN', 'Photon', 'Axiom'], ...V },
       { type: 'FILTER', color: A, bg: '#1C160A', compat: 'Photon', title: 'Migration Sniper Presets', creator: '@pumpwatch', bond: '1', rating: '4.6', sales: 190, price: '0.80', t: ['Photon'], ...V },
-      { type: 'SETUP', color: P, bg: '#18121F', compat: 'Axiom · BullX', title: 'Full Trench Desk Setup', creator: '@nightshift', bond: '5', rating: '4.8', sales: 96, price: '3.50', t: ['Axiom', 'BullX'], ...V },
+      { type: 'SETUP', color: P, bg: '#18121F', compat: 'Axiom · Trojan', title: 'Full Trench Desk Setup', creator: '@nightshift', bond: '5', rating: '4.8', sales: 96, price: '3.50', t: ['Axiom', 'Trojan'], ...V },
       { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'Axiom', title: 'Bundle Detector Overlay', creator: '@rugradar', bond: '5', rating: '4.9', sales: 533, price: '1.20', t: ['Axiom'], ...V },
-      { type: 'STRATEGY', color: T, bg: '#0E1A17', compat: 'Any terminal', title: 'Copy-Trade Exit Playbook', creator: '@calmape', bond: '1', rating: '4.5', sales: 74, price: '1.00', t: ['Axiom', 'GMGN', 'Photon', 'BullX', 'Padre'], ...V },
-      { type: 'ALERTS', color: R, bg: '#1F1210', compat: 'Telegram · Padre', title: 'KOL Buy Alerts Config', creator: '@signalboy', bond: '5', rating: '4.4', sales: 58, price: '0.60', t: ['Padre'], ...V },
-      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'GMGN · BullX', title: 'Dev Wallet History Tooltip', creator: '@dev_degen', bond: '5', rating: '4.8', sales: 301, price: '0.90', t: ['GMGN', 'BullX'], ...V }
+      { type: 'STRATEGY', color: T, bg: '#0E1A17', compat: 'Any terminal', title: 'Copy-Trade Exit Playbook', creator: '@calmape', bond: '1', rating: '4.5', sales: 74, price: '1.00', t: ['Axiom', 'GMGN', 'Photon', 'Trojan', 'Terminal'], ...V },
+      { type: 'ALERTS', color: R, bg: '#1F1210', compat: 'Telegram · Terminal', title: 'KOL Buy Alerts Config', creator: '@signalboy', bond: '5', rating: '4.4', sales: 58, price: '0.60', t: ['Terminal'], ...V },
+      { type: 'USERSCRIPT', color: L, bg: '#141A10', compat: 'GMGN · Trojan', title: 'Dev Wallet History Tooltip', creator: '@dev_degen', bond: '5', rating: '4.8', sales: 301, price: '0.90', t: ['GMGN', 'Trojan'], ...V }
     ];
     const term = this.state.term;
     // Display maths mirrors packages/shared fee.ts in lamports; never floats.

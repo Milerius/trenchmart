@@ -3,6 +3,12 @@ main = "src/worker.ts"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
+
+# Run the Worker next to the database (Supabase ap-south-1) instead of next to the visitor:
+# every request does several Postgres round trips.
+[placement]
+mode = "smart"
+
 [triggers]
 crons = ["*/5 * * * *"]
 

@@ -15,6 +15,7 @@ import { createApp, type PriceCacheBox } from './app';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
 import { readEnv } from './env';
 import { closeAfterResponse } from './lifetime';
+import { withEdgeCache } from './edge-cache';
 import { expireOrders, proposePayouts, releaseOrders } from './logic';
 
 type Binding = Record<string, unknown> & {
@@ -36,6 +37,11 @@ type Ctx = { waitUntil: (p: Promise<unknown>) => void };
 // fetch and scheduled invocation opens its own postgres.js client and closes it afterwards.
 const priceCache: PriceCacheBox = { value: null };
 configureSandboxWasm(quickjsWasm);
+
+function edgeCache() {
+  const caches = (globalThis as { caches?: { default?: unknown } }).caches;
+  return (caches?.default as Parameters<typeof withEdgeCache>[3]) ?? null;
+}
 
 export function databaseUrl(env: Binding): string | undefined {
   return env.HYPERDRIVE?.connectionString || env.DATABASE_URL || undefined;
@@ -88,18 +94,22 @@ export default {
     }
     const dbUrl = databaseUrl(env);
     if (!dbUrl) throw new Error('HYPERDRIVE or DATABASE_URL is required');
-    const deps = depsFor(env, dbUrl);
-    const app = createApp({ ...deps, sandboxQueue: env.SCAN_QUEUE }, priceCache);
-    const close = () => deps.sql.end({ timeout: 5 });
-    let response: Response;
-    try {
-      response = await app.fetch(request);
-    } catch (error) {
-      ctx.waitUntil(close());
-      throw error;
-    }
-    // Streamed reviews keep querying after the handler returns: close once the body is sent.
-    return closeAfterResponse(response, close, (p) => ctx.waitUntil(p));
+    const run = async (): Promise<Response> => {
+      const deps = depsFor(env, dbUrl);
+      const app = createApp({ ...deps, sandboxQueue: env.SCAN_QUEUE }, priceCache);
+      const close = () => deps.sql.end({ timeout: 5 });
+      let response: Response;
+      try {
+        response = await app.fetch(request.clone());
+      } catch (error) {
+        ctx.waitUntil(close());
+        throw error;
+      }
+      // Streamed reviews keep querying after the handler returns: close once the body is sent.
+      return closeAfterResponse(response, close, (p) => ctx.waitUntil(p));
+    };
+    // Anonymous public reads are served from the Cloudflare edge cache (s-maxage + SWR).
+    return withEdgeCache(request, run, (p) => ctx.waitUntil(p), edgeCache());
   },
   async scheduled(_event: unknown, env: Binding, ctx: Ctx): Promise<void> {
     const dbUrl = databaseUrl(env);

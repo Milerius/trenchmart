@@ -44,6 +44,7 @@ import {
   stripWatermark,
   formatSol,
   moneyView,
+  canonicalTerminal,
 } from '@trenchmart/shared';
 import { fromBase64, sendRaw } from '@trenchmart/chain';
 import { cachedSolUsd, fetchSolUsd, type PriceCache } from './price';
@@ -1388,6 +1389,10 @@ async function searchListings(
           : sort === 'rating'
             ? 'l.rating_avg desc nulls last'
             : 'l.sales_7d desc';
+  // Padre links resolve to Terminal; matching ignores case (the Trojan listing stored 'trojan').
+  const terminalFilter = query.terminal
+    ? (canonicalTerminal(query.terminal) ?? query.terminal)
+    : null;
   const rows = await deps.sql<Record<string, any>[]>`
     select l.*, u.handle,
       c.live->>'coverImageId' as cover_image_id,
@@ -1396,7 +1401,7 @@ async function searchListings(
     left join listing_content c on c.listing_id = l.id
     where l.delisted_at is null and l.paused_at is null and l.live_version_id is not null
       and (${query.category ?? null}::text is null or l.category::text = ${query.category ?? null})
-      and (${query.terminal ?? null}::text is null or ${query.terminal ?? null} = any(l.terminals))
+      and (${terminalFilter}::text is null or exists (select 1 from unnest(l.terminals) t where lower(t) = lower(${terminalFilter})))
       and (${query.q ?? null}::text is null or l.search @@ plainto_tsquery('english', ${query.q ?? ''}))
     order by ${deps.sql.unsafe(order)}
     limit ${limit}

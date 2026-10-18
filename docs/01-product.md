@@ -21,12 +21,12 @@ One wallet can hold several roles.
 | ------------- | ----------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `userscript`  | Userscripts       | `*.user.js`          | Tampermonkey / Violentmonkey. Full scan pipeline incl. sandbox.                                                           |
 | `wallet_list` | Wallet lists      | `.json` / `.csv`     | Smart-money / KOL tracker lists. Validated as Solana addresses, deduped, size-checked. Can be a subscription (live list). |
-| `filter`      | Terminal filters  | `.json`              | Presets for Axiom, GMGN, Photon, BullX, Padre etc. Schema-validated, no code.                                             |
+| `filter`      | Terminal filters  | `.json`              | Presets for Axiom, GMGN, Photon, Terminal, Trojan etc. Schema-validated, no code.                                         |
 | `setup`       | Full setups       | `.zip`               | Bundles of the above + docs. Each file inside scanned by its own type.                                                    |
 | `strategy`    | Wallet strategies | `.md` / `.pdf`       | Documented playbooks. Scanned for links/malware only.                                                                     |
 | `alerts`      | Alerts & bots     | `.json` / `.user.js` | Telegram/Discord configs, webhooks. Outbound calls must be declared.                                                      |
 
-Terminals for compatibility tags (config-driven list): Axiom, GMGN, Photon, BullX, Padre, Trojan, "Any".
+Terminals for compatibility tags (config-driven list): Axiom, GMGN, Photon, Terminal (formerly Padre), Trojan, "Any". BullX is no longer listed.
 
 ## Features — POC scope
 

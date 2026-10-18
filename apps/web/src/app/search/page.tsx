@@ -26,17 +26,18 @@ function Results() {
   }, [q, wallet.session?.wallet]);
 
   return (
-    <section className="space-y-6">
+    <section className="min-h-[70vh] space-y-6">
       <div>
         <Label>Search</Label>
         <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
           {q ? `Results for “${q}”` : 'All live listings'}
         </h1>
-        {listings ? (
-          <p className="m-0 mt-1 text-sm text-muted">
-            {listings.length} reviewed listing{listings.length === 1 ? '' : 's'}
-          </p>
-        ) : null}
+        {/* The line is always there so the grid below does not move when the count arrives. */}
+        <p className="m-0 mt-1 min-h-5 text-sm text-muted">
+          {listings
+            ? `${listings.length} reviewed listing${listings.length === 1 ? '' : 's'}`
+            : '\u00a0'}
+        </p>
       </div>
       {!wallet.session ? <PreviewNotice onConnect={() => void wallet.connect()} /> : null}
       <ListingGrid
@@ -56,7 +57,7 @@ export default function SearchPage() {
   return (
     <Suspense
       fallback={
-        <div aria-busy="true" className="space-y-3">
+        <div aria-busy="true" className="min-h-[70vh] space-y-3">
           <p className="sr-only">Searching…</p>
           <span className="skeleton block h-8 w-48" />
           <span className="skeleton block h-36 w-full" />
