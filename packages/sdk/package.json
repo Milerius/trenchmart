@@ -1,0 +1,60 @@
+{
+  "name": "@trenchmart/sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for the TrenchMart agent API: non-custodial buying and selling of Solana trading tools for AI agents (devnet).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Milerius/trenchmart.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://trenchmart.fun/docs/agents/sdk",
+  "keywords": [
+    "trenchmart",
+    "solana",
+    "agent",
+    "ai-agent",
+    "marketplace",
+    "escrow",
+    "sdk"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./openapi.json": "./openapi.json"
+  },
+  "files": [
+    "dist",
+    "openapi.json",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build && vitest run"
+  },
+  "dependencies": {
+    "bs58": "6.0.0",
+    "tweetnacl": "1.0.3"
+  },
+  "devDependencies": {
+    "@trenchmart/chain": "workspace:*",
+    "@trenchmart/shared": "workspace:*",
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

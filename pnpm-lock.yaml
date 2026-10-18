@@ -259,6 +259,9 @@ importers:
       '@trenchmart/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      bs58:
+        specifier: 6.0.0
+        version: 6.0.0
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -275,9 +278,6 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
-      bs58:
-        specifier: 6.0.0
-        version: 6.0.0
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -315,6 +315,9 @@ importers:
       '@trenchmart/chain':
         specifier: workspace:*
         version: link:../../packages/chain
+      '@trenchmart/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@trenchmart/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -367,6 +370,28 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  examples:
+    dependencies:
+      '@solana/web3.js':
+        specifier: 1.99.0
+        version: 1.99.0(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
+      '@trenchmart/sdk':
+        specifier: workspace:*
+        version: link:../packages/sdk
+      bs58:
+        specifier: 6.0.0
+        version: 6.0.0
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
 
   packages/ai-verifier:
     dependencies:
@@ -479,6 +504,31 @@ importers:
         specifier: 0.32.0
         version: 0.32.0
     devDependencies:
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@26.6.5)(@vitest/coverage-v8@5.0.5)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.36.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/sdk:
+    dependencies:
+      bs58:
+        specifier: 6.0.0
+        version: 6.0.0
+      tweetnacl:
+        specifier: 1.0.3
+        version: 1.0.3
+    devDependencies:
+      '@trenchmart/chain':
+        specifier: workspace:*
+        version: link:../chain
+      '@trenchmart/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5

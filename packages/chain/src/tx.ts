@@ -281,3 +281,106 @@ export function randomKeypair(): { publicKey: string; secretKey: Uint8Array } {
   const pair = nacl.sign.keyPair();
   return { publicKey: bs58.encode(pair.publicKey), secretKey: pair.secretKey };
 }
+
+export type ParsedInstruction = { programId: string; accounts: string[]; data: Uint8Array };
+export type ParsedLegacyTx = {
+  signatures: Uint8Array[];
+  message: Uint8Array;
+  numRequiredSignatures: number;
+  numReadonlySigned: number;
+  numReadonlyUnsigned: number;
+  accountKeys: string[];
+  recentBlockhash: string;
+  instructions: ParsedInstruction[];
+};
+
+/** Largest serialized transaction the cluster accepts (packet size). */
+export const MAX_TX_BYTES = 1232;
+
+/**
+ * Strictly parses a serialized legacy transaction. Versioned (v0) messages, trailing bytes,
+ * out-of-range indexes and inconsistent headers are rejected, so the result describes
+ * exactly the bytes a validator would execute.
+ */
+export function parseLegacyTx(tx: Uint8Array): ParsedLegacyTx {
+  if (tx.length > MAX_TX_BYTES) throw new Error('transaction is larger than a packet');
+  const sigCount = readCompact(tx, 0);
+  const sigStart = sigCount.next;
+  const messageStart = sigStart + sigCount.value * 64;
+  if (messageStart > tx.length) throw new Error('truncated signatures');
+  const signatures: Uint8Array[] = [];
+  for (let i = 0; i < sigCount.value; i += 1)
+    signatures.push(tx.slice(sigStart + i * 64, sigStart + (i + 1) * 64));
+  const message = tx.slice(messageStart);
+  if (message.length < 3) throw new Error('truncated message header');
+  const numRequiredSignatures = message[0]!;
+  if (numRequiredSignatures & 0x80) throw new Error('versioned transactions are not accepted');
+  const numReadonlySigned = message[1]!;
+  const numReadonlyUnsigned = message[2]!;
+  let cursor = 3;
+  const keyCount = readCompact(message, cursor);
+  cursor = keyCount.next;
+  const accountKeys: string[] = [];
+  for (let i = 0; i < keyCount.value; i += 1) {
+    if (cursor + 32 > message.length) throw new Error('truncated account keys');
+    accountKeys.push(bs58.encode(message.slice(cursor, cursor + 32)));
+    cursor += 32;
+  }
+  if (new Set(accountKeys).size !== accountKeys.length) throw new Error('duplicate account key');
+  if (
+    numRequiredSignatures === 0 ||
+    numRequiredSignatures > accountKeys.length ||
+    numReadonlySigned >= numRequiredSignatures ||
+    numReadonlyUnsigned > accountKeys.length - numRequiredSignatures
+  )
+    throw new Error('inconsistent message header');
+  if (sigCount.value !== numRequiredSignatures)
+    throw new Error('signature count does not match the header');
+  if (cursor + 32 > message.length) throw new Error('truncated blockhash');
+  const recentBlockhash = bs58.encode(message.slice(cursor, cursor + 32));
+  cursor += 32;
+  const ixCount = readCompact(message, cursor);
+  cursor = ixCount.next;
+  const instructions: ParsedInstruction[] = [];
+  for (let i = 0; i < ixCount.value; i += 1) {
+    const programIndex = message[cursor];
+    if (programIndex === undefined || programIndex >= accountKeys.length)
+      throw new Error('bad program index');
+    cursor += 1;
+    const accounts = readCompact(message, cursor);
+    cursor = accounts.next;
+    const keys: string[] = [];
+    for (let a = 0; a < accounts.value; a += 1) {
+      const index = message[cursor];
+      if (index === undefined || index >= accountKeys.length) throw new Error('bad account index');
+      keys.push(accountKeys[index]!);
+      cursor += 1;
+    }
+    const dataLen = readCompact(message, cursor);
+    cursor = dataLen.next;
+    if (cursor + dataLen.value > message.length) throw new Error('truncated instruction data');
+    const data = message.slice(cursor, cursor + dataLen.value);
+    cursor += dataLen.value;
+    instructions.push({ programId: accountKeys[programIndex]!, accounts: keys, data });
+  }
+  if (cursor !== message.length) throw new Error('trailing bytes after the message');
+  return {
+    signatures,
+    message,
+    numRequiredSignatures,
+    numReadonlySigned,
+    numReadonlyUnsigned,
+    accountKeys,
+    recentBlockhash,
+    instructions,
+  };
+}
+
+/** True when every required signature is a valid ed25519 signature of the message. */
+export function verifyTxSignatures(parsed: ParsedLegacyTx): boolean {
+  return parsed.signatures.every((signature, i) => {
+    const key = parsed.accountKeys[i];
+    if (!key) return false;
+    return nacl.sign.detached.verify(parsed.message, signature, bs58.decode(key));
+  });
+}

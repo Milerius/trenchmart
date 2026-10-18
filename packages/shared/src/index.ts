@@ -24,3 +24,4 @@ export * from './social';
 export * from './social-schemas';
 export * from './ranking';
 export * from './featuring';
+export * from './agent-api';
