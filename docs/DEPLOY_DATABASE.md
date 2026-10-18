@@ -43,6 +43,17 @@ runs `pnpm db:migrate`, then `pnpm db:pending` as a hard gate, then `wrangler de
 `/api/v1/health`. On 2026-10-18 the Worker for #54/#57 was deployed without `0020_reviews.sql`
 and `0021_upvotes_ranking.sql`, and `/studio` answered 500 for every creator.
 
+**Production target only.** The script ignores any inherited `DATABASE_URL`, `PG*` or
+`SUPABASE_*` variable and loads the target explicitly from `TM_DEPLOY_DB_ENV` (default
+`~/.config/trenchmart/supabase.env`). It refuses to migrate or deploy unless that target is the
+Supabase project the Worker's Hyperdrive connects to (origin user `postgres.<ref>` or host
+`db.<ref>.supabase.co`), and `TM_PROD_SUPABASE_REF` when set; a `DATABASE_URL` in the env file
+must be on that project too. `pnpm db:pending` then runs against the same target before
+`wrangler deploy`, and a `SCHEMA_BEHIND` health answer after the deploy fails the run. On
+2026-10-18 a `DATABASE_URL` left from local tests made the migrate step hit a local Postgres
+while the Worker shipped (sign-in failed for about 1.5 minutes). `scripts/deploy-api.test.sh`
+(CI, unit job) covers each refusal with fake pnpm, wrangler and curl.
+
 - `pnpm db:pending` lists repo migrations missing from `schema_migrations` and exits 1 if any.
   With `DATABASE_URL` it connects directly; without it, `SUPABASE_ACCESS_TOKEN` +
   `SUPABASE_PROJECT_REF` go through the Supabase Management API (one query per file, file and
