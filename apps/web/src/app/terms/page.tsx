@@ -75,6 +75,27 @@ export default function TermsPage() {
           change it.
         </p>
       </DocSection>
+      <DocSection id="updates" title="Versions, updates and limits">
+        <p data-testid="terms-updates">
+          A purchase includes the version you bought and new versions released in the{' '}
+          {protocol.updateFreeDays} days after payment. After that, new versions require an active
+          update renewal at the price the seller sets for the listing (0 means free updates
+          forever), plus the marketplace fee; each renewal adds {protocol.updatePeriodDays} days
+          from the later of the payment and the current expiry. Renewals are not refundable and do
+          not oblige the seller to release a new version. You keep access to every version you were
+          entitled to, watermarked to your order, unless it is removed after an upheld malicious
+          dispute.
+        </p>
+        <p>
+          Creators get {protocol.updatesPerListingPerDay} free update per listing and{' '}
+          {protocol.uploadsPerCreatorPerDay} free uploads per UTC day; each further upload costs a{' '}
+          {protocol.uploadSupplement} supplement. The verify page gives each signed-in wallet and
+          network {protocol.verifyFreePerDay} free check per UTC day, then{' '}
+          {protocol.verifySupplement} per check. Supplements are paid on chain to the vault and are
+          not refundable. The amounts can change in config; the amount due is always shown before
+          you sign.
+        </p>
+      </DocSection>
       <DocSection id="bonds" title="Creator bonds">
         <p>
           A creator posts a bond before listing. The amount depends on the category, from{' '}

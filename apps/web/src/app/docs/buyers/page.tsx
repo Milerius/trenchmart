@@ -90,6 +90,24 @@ export default function BuyersDocsPage() {
           dispute.
         </p>
       </DocSection>
+      <DocSection id="updates" title="Updates">
+        <p data-testid="buyer-updates">
+          New versions are free for{' '}
+          <span data-testid="buyer-update-days">{protocol.updateFreeDays} days</span> after your
+          purchase. After that, the seller&apos;s monthly update price (shown on the listing, 0
+          means free updates forever) plus the marketplace fee, less your tier rebate, renews
+          updates for {protocol.updatePeriodDays} days, counted from the later of now and your
+          current expiry. Renewals are a vault transfer with memo{' '}
+          <span className="font-mono text-ink">upd:</span>.
+        </p>
+        <p>
+          Download gives you the newest version you are entitled to. You can always download the
+          exact version you bought, and every version that went live while your updates were active.
+          Your Purchases page shows <span className="text-ink">Update available</span> with the
+          changelog and, when your updates have ended, the renewal price. Each copy is watermarked
+          to your order and wallet.
+        </p>
+      </DocSection>
       <DocSection id="download" title="Download integrity">
         <p>
           The download route accepts the order only when its payment is confirmed in escrow (paid)
@@ -97,7 +115,9 @@ export default function BuyersDocsPage() {
           watermarked with the order id, your wallet, and the version sha256, then stored and handed
           out through a signed URL that lasts {protocol.downloadUrlSeconds} seconds. The version
           hash is checked on upload, and the same bytes cannot be listed by a different creator. The
-          public verify page matches a file you already have against that hash.
+          verify page matches a file you already have against that hash: sign in with a wallet, and
+          you get {protocol.verifyFreePerDay} free check per day (UTC) per wallet and network, then{' '}
+          {protocol.verifySupplement} per check, paid on chain.
         </p>
       </DocSection>
       <PurchaseDiagram />

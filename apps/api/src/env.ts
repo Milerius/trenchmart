@@ -52,6 +52,8 @@ export type Env = {
   checkoutPaused: boolean;
   /** Shared secret the web proxy sends with the real client IP (M-03). */
   proxySecret: string;
+  /** Server-side wasm WebP re-encode at upload (CPU heavy; off unless IMAGE_OPTIMIZE=1). */
+  imageOptimize: boolean;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
 
@@ -184,6 +186,7 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     escrowCrankSecret: blank(source.ESCROW_CRANK_SECRET),
     checkoutPaused: /^(1|true|yes)$/i.test(source.CHECKOUT_PAUSED ?? ''),
     proxySecret: blank(source.PROXY_SECRET),
+    imageOptimize: source.IMAGE_OPTIMIZE === '1',
     r2:
       accountId && accessKeyId && secretAccessKey
         ? {

@@ -251,6 +251,15 @@ export default function StudioPage() {
                               </span>
                             ) : null}
                           </span>
+                          {listing.version_status === 'live' && !listing.delisted_at ? (
+                            <Link
+                              href={`/studio/listings/${listing.id}/versions/new`}
+                              data-testid="upload-new-version"
+                              className="mt-1 block text-xs text-accent hover:text-accent-hover"
+                            >
+                              Upload new version →
+                            </Link>
+                          ) : null}
                         </td>
                         <td className="px-3 py-3 text-right">
                           <Money lamports={listing.price} centsPerSol={centsPerSol} stacked />

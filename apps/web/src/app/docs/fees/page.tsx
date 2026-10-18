@@ -28,6 +28,16 @@ export default function FeesDocsPage() {
           },
           { testId: 'fee-verification', label: 'Verification fee', text: protocol.verificationFee },
           { testId: 'fee-og-bond', label: 'OG bond discount', text: protocol.ogBondDiscount },
+          {
+            testId: 'fee-upload-supplement',
+            label: 'Upload supplement',
+            text: protocol.uploadSupplement,
+          },
+          {
+            testId: 'fee-verify-supplement',
+            label: 'Verify supplement',
+            text: protocol.verifySupplement,
+          },
         ]}
       />
       <DocSection id="split" title="Where the fee goes">
@@ -92,6 +102,20 @@ export default function FeesDocsPage() {
             </tbody>
           </table>
         </div>
+      </DocSection>
+      <DocSection id="supplements" title="Updates and supplements">
+        <p>
+          Update renewals cost the seller&apos;s monthly update price plus the{' '}
+          {protocol.marketplaceFeeLabel} marketplace fee, with the same tier rebates as a purchase.
+          The seller receives the update price; the net fee is split as above.
+        </p>
+        <p>
+          Supplements are flat SOL amounts set in config: {protocol.uploadSupplement} per upload
+          beyond {protocol.updatesPerListingPerDay} update per listing or{' '}
+          {protocol.uploadsPerCreatorPerDay} uploads per creator in a UTC day, and{' '}
+          {protocol.verifySupplement} per file verification beyond {protocol.verifyFreePerDay} free
+          per day. Both are split across the fee buckets.
+        </p>
       </DocSection>
       <DocSection id="bonds" title="Bonds">
         <ul className="m-0 grid gap-2 p-0 sm:grid-cols-2">

@@ -18,7 +18,11 @@ import {
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import type { EscrowChain } from './escrow';
-import { escrowHousekeeping, opsCheck, releaseOrders, resolveDispute } from './logic';
+import { escrowHousekeeping, releaseOrders, resolveDispute } from './logic';
+import { optimizeStoredImages, uploadImage } from './content';
+import { createImageOptimizer } from './image-optimize';
+import { createRequire } from 'node:module';
+import encodePng, { init as initPngEncode } from '@jsquash/png/encode';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
@@ -47,7 +51,8 @@ async function reset() {
     truncate table
       audit_log, ledger, notifications, downloads, listing_reviews, disputes, licenses, payouts,
       orders, scan_checks, scans, ai_reviews, sandbox_jobs, listing_content, listing_media, versions, listings,
-      bonds, token_balances, auth_nonces, reports, buybacks, rate_buckets, users
+      bonds, token_balances, auth_nonces, reports, buybacks, rate_buckets, update_periods,
+      update_renewals, supplements, verifications, users
     restart identity cascade
   `;
 }
@@ -1591,64 +1596,576 @@ describe('owner product decisions', () => {
     >`select amount::text as amount from token_balances where wallet = ${wallet}`;
     expect(rows).toEqual([{ amount: '42' }]);
   });
-  it('ops check: low hot-wallet balance, stuck release, internal endpoint', async () => {
-    const resolver = nacl.sign.keyPair();
+  it('re-encodes listing images to WebP at upload and backfills stored PNGs', async () => {
+    const req = createRequire(import.meta.url);
+    const wasm = (path: string): object =>
+      new (
+        globalThis as unknown as { WebAssembly: { Module: new (b: Uint8Array) => object } }
+      ).WebAssembly.Module(readFileSync(req.resolve(path)));
+    const modules = () => ({
+      png: wasm('@jsquash/png/codec/pkg/squoosh_png_bg.wasm'),
+      jpeg: wasm('@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm'),
+      webpEncode: wasm('@jsquash/webp/codec/enc/webp_enc_simd.wasm'),
+      resize: wasm('@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm'),
+    });
+    await initPngEncode(modules().png as never);
+    const width = 1800;
+    const height = 900;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = (i / 4) % 251;
+      data[i + 1] = (i / 7) % 199;
+      data[i + 2] = 90;
+      data[i + 3] = 255;
+    }
+    const png = new Uint8Array(await encodePng({ data, width, height } as never));
     const env = readEnv({
       SOLANA_CLUSTER: 'devnet',
       VAULT_ADDRESS: vault.publicKey,
       SESSION_SECRET: 'test-secret-test-secret-test-secret',
-      INTERNAL_TOKEN: 'internal',
       API_URL: 'http://localhost:8787',
-      ESCROW_PROGRAM_ID: 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw',
-      ESCROW_RESOLVER_SECRET: bs58.encode(resolver.secretKey),
     });
-    let lamports = 1_000_000_000n;
-    const deps: Deps = {
+    const blob = filesystemBlob(
+      await mkdtemp(join(tmpdir(), 'tm-img-')),
+      env.sessionSecret,
+      env.apiUrl,
+    );
+    const base: Deps = {
       sql,
-      blob: filesystemBlob(await mkdtemp(join(tmpdir(), 'tm-ops-')), env.sessionSecret, env.apiUrl),
+      blob,
       env,
       now: () => now,
       getTx: async () => null,
       blockhash: async () => ({ blockhash, lastValidBlockHeight: 1 }),
-      escrowChain: {
-        account: async () => ({
-          data: new Uint8Array(),
-          owner: '11111111111111111111111111111111',
-          lamports,
-        }),
-        sendAndConfirm: async () => '',
-      },
     };
-    expect(await opsCheck(deps)).toEqual([]);
-    lamports = 1_000n;
-    expect((await opsCheck(deps)).map((a) => a.code)).toEqual(['LOW_BALANCE']);
-    lamports = 1_000_000_000n;
-    const buyerId = randomUUID();
     const creatorId = randomUUID();
     const listingId = randomUUID();
-    const versionId = randomUUID();
-    await sql`insert into users (id, wallet) values (${buyerId}, ${randomKeypair().publicKey}), (${creatorId}, ${randomKeypair().publicKey})`;
+    await sql`insert into users (id, wallet, roles) values (${creatorId}, ${randomKeypair().publicKey}, ${sql.array(['creator'])}::user_role[])`;
     await sql`
       insert into listings (id, creator_id, slug, title, summary, description, category, price)
-      values (${listingId}, ${creatorId}, 'ops', 'Ops', 'Sum', 'Desc', 'userscript', ${1n})
+      values (${listingId}, ${creatorId}, 'img', 'Img', 'Sum', 'Desc', 'userscript', ${1n})
     `;
-    await sql`
-      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status)
-      values (${versionId}, ${listingId}, '1.0.0', 'o.user.js', 1, 'o', 'blobs/o', 'live')
-    `;
-    await sql`
-      insert into orders (id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total, tier_at_purchase, memo, status, expires_at, escrow_until)
-      values (${randomUUID()}, ${buyerId}, ${listingId}, ${versionId}, 1, 0, 0, 0, 0, 1, 'none', 'tm:ops', 'paid', ${now}, ${new Date(now.getTime() - 3_600_000)})
-    `;
-    expect((await opsCheck(deps)).map((a) => a.code)).toEqual(['RELEASE_STUCK']);
-    const app = createApp(deps);
-    expect((await app.request('/api/v1/internal/ops')).status).toBe(401);
-    const res = await app.request('/api/v1/internal/ops', {
-      headers: { authorization: 'Bearer internal' },
+    // Without an optimizer (old behaviour) the PNG is stored as is...
+    const legacy = await uploadImage(base, listingId, creatorId, png);
+    const stored = await sql<
+      { mime: string; bytes: number }[]
+    >`select mime, bytes from listing_media where id = ${legacy.id}`;
+    expect(stored[0]).toEqual({ mime: 'image/png', bytes: png.length });
+    // ...and the backfill converts it in place, keeping the row id the live page points at.
+    const deps = { ...base, optimizeImage: createImageOptimizer(modules) };
+    const backfilled = await optimizeStoredImages(deps);
+    expect(backfilled.map((b) => b.id)).toEqual([legacy.id]);
+    const after = (
+      await sql<Record<string, any>[]>`select * from listing_media where id = ${legacy.id}`
+    )[0]!;
+    expect(after.mime).toBe('image/webp');
+    expect([after.width, after.height]).toEqual([1600, 800]);
+    expect(after.bytes).toBeLessThan(png.length);
+    expect(await blob.get(after.r2_key as string)).not.toBeNull();
+    // New uploads are converted on the way in.
+    const fresh = await uploadImage(deps, listingId, creatorId, png);
+    const row = (
+      await sql<Record<string, any>[]>`select mime, width from listing_media where id = ${fresh.id}`
+    )[0]!;
+    expect(row).toEqual({ mime: 'image/webp', width: 1600 });
+  });
+});
+
+// Seller updates, buyer update entitlement, daily limits and SOL supplements (2026-10-18).
+describe('versioning: updates, entitlement windows, limits and supplements', () => {
+  const DAY = 86_400_000;
+  let clock = new Date('2026-06-01T10:00:00.000Z');
+  const txs = new Map<string, import('@trenchmart/chain').ChainTx>();
+
+  beforeEach(async () => {
+    sql = createSql(databaseUrl);
+    await migrate(sql);
+    await reset();
+    txs.clear();
+    clock = new Date('2026-06-01T10:00:00.000Z');
+    // The verification fee is covered elsewhere; zero keeps these flows to the new gates.
+    await sql`update config set value = '0' where key = 'verification_fee_lamports'`;
+  });
+
+  afterAll(async () => {
+    await sql?.end();
+  });
+
+  async function app(dir?: string) {
+    return appFor({}, { now: () => clock, getTx: async (sig) => txs.get(sig) ?? null }, dir);
+  }
+
+  /** A confirmed vault transfer with the memo the server asked for. */
+  function paid(from: string, lamports: bigint | string, memo: string): string {
+    const sig = bs58.encode(nacl.randomBytes(64));
+    txs.set(sig, {
+      signature: sig,
+      err: null,
+      blockTime: Math.floor(clock.getTime() / 1000),
+      confirmationStatus: 'finalized',
+      transfers: [{ source: from, destination: vault.publicKey, lamports: BigInt(lamports) }],
+      memos: [memo],
     });
-    expect(res.status).toBe(503);
-    expect(((await res.json()) as { alerts: { code: string }[] }).alerts[0]!.code).toBe(
-      'RELEASE_STUCK',
+    return sig;
+  }
+
+  async function json(res: Response) {
+    return (await res.json()) as Record<string, any>;
+  }
+
+  async function post(
+    a: Awaited<ReturnType<typeof app>>,
+    path: string,
+    cookie: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+  ) {
+    return a.request(`/api/v1${path}`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json', ...headers },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  async function creatorWithListing(
+    a: Awaited<ReturnType<typeof app>>,
+    opts: { updatePrice?: bigint } = {},
+  ) {
+    const wallet = keypair();
+    const cookie = await login(a, wallet);
+    const [user] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${wallet.publicKey}`;
+    await sql`update users set roles = '{buyer,creator}', x_handle = 'maker' where id = ${user!.id}`;
+    const listingId = randomUUID();
+    const v1 = randomUUID();
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price, update_price)
+      values (${listingId}, ${user!.id}, ${'pack-' + listingId.slice(0, 6)}, 'Pack', 'Sum', 'Desc', 'userscript',
+        ${1_000_000_000n}, ${opts.updatePrice ?? 100_000_000n})
+    `;
+    await sql`
+      insert into versions (id, listing_id, semver, changelog, file_name, file_size, sha256, r2_key, status, live_at, created_at)
+      values (${v1}, ${listingId}, '1.0.0', 'initial', 'pack.user.js', 5, 'h100', 'blobs/h100', 'live', ${clock}, ${new Date(clock.getTime() - DAY)})
+    `;
+    await sql`update listings set live_version_id = ${v1}, first_live_at = ${clock} where id = ${listingId}`;
+    return { wallet, cookie, userId: user!.id, listingId, v1 };
+  }
+
+  it('suggests a patch bump, needs a changelog and a newer semver, and allows one free update a day', async () => {
+    const a = await app();
+    const seller = await creatorWithListing(a);
+    const quota = await json(
+      await a.request(`/api/v1/studio/listings/${seller.listingId}/upload-quota`, {
+        headers: { cookie: seller.cookie },
+      }),
     );
+    expect(quota).toMatchObject({
+      isUpdate: true,
+      currentSemver: '1.0.0',
+      suggestedSemver: '1.0.1',
+      updatesToday: 0,
+      supplementRequired: false,
+      supplementLamports: '50000000',
+      resetsAt: '2026-06-02T00:00:00.000Z',
+    });
+    const base = { fileName: 'pack.user.js', fileSize: 10 };
+    const noLog = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      ...base,
+      semver: '1.0.1',
+      changelog: '',
+    });
+    expect((await json(noLog)).error.code).toBe('CHANGELOG_REQUIRED');
+    const older = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      ...base,
+      semver: '1.0.0',
+      changelog: 'same',
+    });
+    expect((await json(older)).error.code).toBe('SEMVER_NOT_NEWER');
+    const first = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      ...base,
+      semver: '1.0.1',
+      changelog: 'Fixes the badge',
+    });
+    expect(first.status).toBe(200);
+    expect((await json(first)).supplement).toBeNull();
+
+    // Second update the same UTC day: 402 with the amount, until the creator accepts it.
+    const second = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      ...base,
+      semver: '1.0.2',
+      changelog: 'Another fix',
+    });
+    expect(second.status).toBe(402);
+    const due = await json(second);
+    expect(due.error).toMatchObject({
+      code: 'SUPPLEMENT_REQUIRED',
+      supplement: { kind: 'upload', lamports: '50000000', reasons: ['listing_update_limit'] },
+    });
+    const wrong = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      ...base,
+      semver: '1.0.2',
+      changelog: 'Another fix',
+      acceptSupplementLamports: '1',
+    });
+    expect(wrong.status).toBe(402);
+    const accepted = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      ...base,
+      semver: '1.0.2',
+      changelog: 'Another fix',
+      acceptSupplementLamports: '50000000',
+    });
+    expect(accepted.status).toBe(200);
+    const created = await json(accepted);
+    expect(created.supplement).toMatchObject({ lamports: '50000000' });
+    expect(created.supplement.tx.txBase64).toBeTruthy();
+
+    // /complete refuses until the supplement is paid on chain to the vault.
+    const blocked = await post(a, `/studio/versions/${created.versionId}/complete`, seller.cookie);
+    expect((await json(blocked)).error.code).toBe('SUPPLEMENT_UNPAID');
+    const [row] = await sql<
+      { memo: string }[]
+    >`select memo from supplements where id = ${created.supplement.id}`;
+    const short = paid(seller.wallet.publicKey, 49_000_000n, row!.memo);
+    expect(
+      (
+        await json(
+          await post(a, `/supplements/${created.supplement.id}/submitted`, seller.cookie, {
+            txSig: short,
+          }),
+        )
+      ).error.code,
+    ).toBe('WRONG_AMOUNT');
+    const sig = paid(seller.wallet.publicKey, 50_000_000n, row!.memo);
+    expect(
+      (
+        await post(a, `/supplements/${created.supplement.id}/submitted`, seller.cookie, {
+          txSig: sig,
+        })
+      ).status,
+    ).toBe(200);
+    // Past the supplement gate; the file was never uploaded here.
+    const after = await post(a, `/studio/versions/${created.versionId}/complete`, seller.cookie);
+    expect((await json(after)).error.code).toBe('FILE_MISSING');
+    const payouts = await sql<
+      { bucket: string; amount: bigint }[]
+    >`select bucket, amount from payouts order by bucket`;
+    expect(payouts.reduce((sum, p) => sum + p.amount, 0n)).toBe(50_000_000n);
+    expect(payouts.some((p) => p.bucket === 'creator')).toBe(false);
+
+    // A new UTC day resets the limit.
+    clock = new Date('2026-06-02T00:00:01.000Z');
+    const nextDay = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      ...base,
+      semver: '1.0.3',
+      changelog: 'Next day',
+    });
+    expect(nextDay.status).toBe(200);
+  });
+
+  it('allows five free uploads per creator per UTC day across listings, then needs the supplement', async () => {
+    const a = await app();
+    const seller = await creatorWithListing(a);
+    const others: string[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      const id = randomUUID();
+      await sql`
+        insert into listings (id, creator_id, slug, title, summary, description, category, price)
+        values (${id}, ${seller.userId}, ${'new-' + i}, 'New', 'Sum', 'Desc', 'userscript', 1)
+      `;
+      others.push(id);
+    }
+    for (let i = 0; i < 5; i += 1) {
+      const res = await post(a, `/studio/listings/${others[i]}/versions`, seller.cookie, {
+        semver: '1.0.0',
+        changelog: 'initial',
+        fileName: 'a.user.js',
+        fileSize: 5,
+      });
+      expect(res.status, JSON.stringify(await res.clone().json())).toBe(200);
+    }
+    const sixth = await post(a, `/studio/listings/${others[5]}/versions`, seller.cookie, {
+      semver: '1.0.0',
+      changelog: 'initial',
+      fileName: 'a.user.js',
+      fileSize: 5,
+    });
+    expect(sixth.status).toBe(402);
+    expect((await json(sixth)).error.supplement.reasons).toEqual(['creator_upload_limit']);
+    // The update on the live listing is over both limits now.
+    const update = await post(a, `/studio/listings/${seller.listingId}/versions`, seller.cookie, {
+      semver: '1.1.0',
+      changelog: 'More',
+      fileName: 'a.user.js',
+      fileSize: 5,
+    });
+    expect((await json(update)).error.supplement.reasons).toEqual(['creator_upload_limit']);
+    // The supplement amount comes from the config table.
+    await sql`insert into config (key, value) values ('upload_supplement_lamports', '70000000') on conflict (key) do update set value = excluded.value`;
+    const quota = await json(
+      await a.request(`/api/v1/studio/listings/${others[5]}/upload-quota`, {
+        headers: { cookie: seller.cookie },
+      }),
+    );
+    expect(quota).toMatchObject({
+      supplementRequired: true,
+      supplementLamports: '70000000',
+      uploadsToday: 5,
+    });
+    await sql`update config set value = '50000000' where key = 'upload_supplement_lamports'`;
+  });
+
+  it('serves the latest entitled version by default, the exact purchased one on request, and renews monthly', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'tm-blob-'));
+    const a = await app(dir);
+    const blob = filesystemBlob(
+      dir,
+      'test-secret-test-secret-test-secret',
+      'http://localhost:8787',
+    );
+    const seller = await creatorWithListing(a);
+    const buyer = keypair();
+    let cookie = await login(a, buyer);
+    // Checkout through the vault and pay it.
+    const order = await json(await post(a, '/orders', cookie, { listingId: seller.listingId }));
+    const sig = paid(buyer.publicKey, order.total, order.memo);
+    expect(
+      (await post(a, `/orders/${order.orderId}/submitted`, cookie, { txSig: sig })).status,
+    ).toBe(200);
+    const [row] = await sql<
+      Record<string, any>[]
+    >`select updates_until, updates_forever from orders where id = ${order.orderId}`;
+    expect(row!.updates_until.toISOString()).toBe(
+      new Date(clock.getTime() + 30 * DAY).toISOString(),
+    );
+    expect(row!.updates_forever).toBe(false);
+
+    const t0 = clock.getTime();
+    async function release(semver: string, atDay: number, file: string) {
+      const id = randomUUID();
+      const at = new Date(t0 + atDay * DAY);
+      await sql`update versions set status = 'superseded', superseded_at = ${at} where listing_id = ${seller.listingId} and status = 'live'`;
+      await sql`
+        insert into versions (id, listing_id, semver, changelog, file_name, file_size, sha256, r2_key, status, live_at, created_at)
+        values (${id}, ${seller.listingId}, ${semver}, ${'Changes in ' + semver}, 'pack.user.js', 5, ${'h' + semver}, ${'blobs/' + file}, 'live', ${at}, ${at})
+      `;
+      await sql`update listings set live_version_id = ${id} where id = ${seller.listingId}`;
+      await blob.put(`blobs/${file}`, new TextEncoder().encode(`// ${semver}\nconsole.log(1);\n`));
+      return id;
+    }
+    await blob.put('blobs/h100', new TextEncoder().encode('// 1.0.0\nconsole.log(1);\n'));
+    async function download(versionId?: string) {
+      const res = await post(
+        a,
+        `/orders/${order.orderId}/download`,
+        cookie,
+        versionId ? { versionId } : undefined,
+      );
+      return { status: res.status, body: await json(res) };
+    }
+
+    await release('1.0.1', 10, 'f101');
+    clock = new Date(t0 + 12 * DAY);
+    expect((await download()).body.semver).toBe('1.0.1');
+    expect((await download(seller.v1)).body.semver).toBe('1.0.0');
+    // Watermarked per order, from the chosen version.
+    const signed = await download(seller.v1);
+    const file = await a.request(signed.body.url.replace('http://localhost:8787', ''));
+    expect(await file.text()).toContain(order.orderId);
+
+    // Day 33: a version released after the free month, superseded inside the gap.
+    const gap = await release('1.0.2', 33, 'f102');
+    const v110 = await release('1.1.0', 40, 'f110');
+    clock = new Date(t0 + 45 * DAY);
+    cookie = await login(a, buyer);
+    const lapsed = await download();
+    expect(lapsed.body.semver, JSON.stringify(lapsed.body)).toBe('1.0.1');
+    const refused = await download(v110);
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe('NOT_ENTITLED');
+
+    const list = await json(await a.request('/api/v1/me/orders', { headers: { cookie } }));
+    const updates = list.orders[0].updates;
+    expect(updates).toMatchObject({
+      updateAvailable: true,
+      entitledToLatest: false,
+      active: false,
+      current: { semver: '1.0.1' },
+      latest: { semver: '1.1.0', changelog: 'Changes in 1.1.0' },
+      latestEntitled: { semver: '1.0.1' },
+      updatePrice: '100000000',
+      renewTotal: '105000000',
+      periodDays: 30,
+    });
+    expect(updates.versions.map((v: { semver: string }) => v.semver)).toEqual(['1.0.1', '1.0.0']);
+
+    // Renew: platform fee on top, 30 days from now because updates had lapsed.
+    const quote = await json(await post(a, `/orders/${order.orderId}/updates/quote`, cookie));
+    expect(quote).toMatchObject({
+      price: '100000000',
+      fee: '5000000',
+      total: '105000000',
+      startsAt: clock.toISOString(),
+    });
+    const renewal = await json(await post(a, `/orders/${order.orderId}/updates/renew`, cookie));
+    expect(renewal.txBase64).toBeTruthy();
+    const underpaid = paid(buyer.publicKey, 100_000_000n, renewal.memo);
+    expect(
+      (
+        await json(
+          await post(a, `/orders/${order.orderId}/updates/${renewal.renewalId}/submitted`, cookie, {
+            txSig: underpaid,
+          }),
+        )
+      ).error.code,
+    ).toBe('WRONG_AMOUNT');
+    const renewSig = paid(buyer.publicKey, renewal.total, renewal.memo);
+    const renewed = await json(
+      await post(a, `/orders/${order.orderId}/updates/${renewal.renewalId}/submitted`, cookie, {
+        txSig: renewSig,
+      }),
+    );
+    expect(renewed.updatesUntil).toBe(new Date(t0 + 75 * DAY).toISOString());
+    expect((await download()).body.semver).toBe('1.1.0');
+    // The version that came and went while updates were lapsed stays out of reach.
+    expect((await download(gap)).status).toBe(403);
+    const creatorPayout = await sql<
+      { amount: bigint }[]
+    >`select amount from payouts where bucket = 'creator' and recipient = ${seller.wallet.publicKey}`;
+    expect(creatorPayout.map((p) => p.amount)).toEqual([100_000_000n]);
+
+    // Renewing while active extends from the current expiry, not from now.
+    clock = new Date(t0 + 50 * DAY);
+    cookie = await login(a, buyer);
+    const again = await json(await post(a, `/orders/${order.orderId}/updates/renew`, cookie));
+    const againSig = paid(buyer.publicKey, again.total, again.memo);
+    const extended = await json(
+      await post(a, `/orders/${order.orderId}/updates/${again.renewalId}/submitted`, cookie, {
+        txSig: againSig,
+      }),
+    );
+    expect(extended.updatesUntil).toBe(new Date(t0 + 105 * DAY).toISOString());
+    // The same signature cannot pay twice.
+    const third = await json(await post(a, `/orders/${order.orderId}/updates/renew`, cookie));
+    expect(
+      (
+        await json(
+          await post(a, `/orders/${order.orderId}/updates/${third.renewalId}/submitted`, cookie, {
+            txSig: againSig,
+          }),
+        )
+      ).error.code,
+    ).toBeTruthy();
+
+    // Another wallet cannot use this order.
+    const stranger = await login(a, keypair());
+    expect((await post(a, `/orders/${order.orderId}/download`, stranger)).status).toBe(404);
+  });
+
+  it('keeps updates free forever when the seller prices them at 0', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'tm-blob-'));
+    const a = await app(dir);
+    const blob = filesystemBlob(
+      dir,
+      'test-secret-test-secret-test-secret',
+      'http://localhost:8787',
+    );
+    const seller = await creatorWithListing(a, { updatePrice: 0n });
+    const buyer = keypair();
+    let cookie = await login(a, buyer);
+    const order = await json(await post(a, '/orders', cookie, { listingId: seller.listingId }));
+    expect(
+      (
+        await post(a, `/orders/${order.orderId}/submitted`, cookie, {
+          txSig: paid(buyer.publicKey, order.total, order.memo),
+        })
+      ).status,
+    ).toBe(200);
+    const id = randomUUID();
+    const later = new Date(clock.getTime() + 400 * DAY);
+    await sql`update versions set status = 'superseded', superseded_at = ${later} where id = ${seller.v1}`;
+    await sql`
+      insert into versions (id, listing_id, semver, changelog, file_name, file_size, sha256, r2_key, status, live_at)
+      values (${id}, ${seller.listingId}, '2.0.0', 'Big', 'pack.user.js', 5, 'h2', 'blobs/h2', 'live', ${later})
+    `;
+    await blob.put('blobs/h2', new TextEncoder().encode('// 2\n'));
+    clock = new Date(later.getTime() + DAY);
+    cookie = await login(a, buyer);
+    const dl = await json(await post(a, `/orders/${order.orderId}/download`, cookie));
+    expect(dl.semver).toBe('2.0.0');
+    const renew = await post(a, `/orders/${order.orderId}/updates/quote`, cookie);
+    expect((await json(renew)).error.code).toBe('FREE_UPDATES');
+  });
+
+  it('gives one free file verification per wallet and network per UTC day, then needs the supplement', async () => {
+    const a = await app();
+    const body = { fileName: 'x.user.js', contentBase64: btoa('console.log(1)') };
+    const anon = await a.request('/api/v1/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    expect(anon.status).toBe(401);
+    expect((await json(anon)).error.code).toBe('SIGN_IN_REQUIRED');
+
+    const wallet = keypair();
+    const cookie = await login(a, wallet);
+    const ip = { 'cf-connecting-ip': '203.0.113.7' };
+    const quota = await json(
+      await a.request('/api/v1/verify/quota', { headers: { cookie, ...ip } }),
+    );
+    expect(quota).toMatchObject({ signedIn: true, freeLeft: true, supplementLamports: '10000000' });
+    const first = await post(a, '/verify', cookie, body, ip);
+    expect(first.status).toBe(200);
+    expect(await json(first)).toMatchObject({ match: false, free: true });
+    const second = await post(a, '/verify', cookie, body, ip);
+    expect(second.status).toBe(402);
+    expect((await json(second)).error).toMatchObject({
+      code: 'SUPPLEMENT_REQUIRED',
+      supplement: { kind: 'verify', lamports: '10000000' },
+    });
+    // A fresh wallet on the same network does not get another free check.
+    const other = await login(a, keypair());
+    expect(
+      (await post(a, '/verify', other, body, { ...ip, 'x-forwarded-for': '9.9.9.9' })).status,
+    ).toBe(402);
+    // Nor does the same wallet from another network.
+    expect(
+      (await post(a, '/verify', cookie, body, { 'cf-connecting-ip': '198.51.100.9' })).status,
+    ).toBe(402);
+
+    // Pay the supplement on chain; it buys exactly one more verification.
+    const sup = await json(await post(a, '/verify/supplement', cookie));
+    expect(sup).toMatchObject({ lamports: '10000000' });
+    expect(
+      (
+        await post(a, `/supplements/${sup.supplementId}/submitted`, cookie, {
+          txSig: paid(wallet.publicKey, 10_000_000n, 'sup:wrong'),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await post(a, '/verify', cookie, { ...body, supplementId: sup.supplementId }, ip)).status,
+    ).toBe(402);
+    const sig = paid(wallet.publicKey, 10_000_000n, sup.memo);
+    expect(
+      (await post(a, `/supplements/${sup.supplementId}/submitted`, cookie, { txSig: sig })).status,
+    ).toBe(200);
+    const paidCheck = await post(
+      a,
+      '/verify',
+      cookie,
+      { ...body, supplementId: sup.supplementId },
+      ip,
+    );
+    expect(paidCheck.status).toBe(200);
+    expect((await json(paidCheck)).free).toBe(false);
+    expect(
+      (await post(a, '/verify', cookie, { ...body, supplementId: sup.supplementId }, ip)).status,
+    ).toBe(402);
+
+    // Midnight UTC resets the free check.
+    clock = new Date('2026-06-02T00:00:00.000Z');
+    expect((await post(a, '/verify', cookie, body, ip)).status).toBe(200);
   });
 });

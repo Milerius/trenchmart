@@ -13,6 +13,13 @@ import {
 } from '@trenchmart/chain';
 import { createApp, type PriceCacheBox } from './app';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
+// @ts-expect-error the package's .wasm.d.ts types the instance exports; wrangler imports a WebAssembly.Module
+import PNG_WASM from '@jsquash/png/codec/pkg/squoosh_png_bg.wasm';
+import JPEG_WASM from '@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm';
+import WEBP_ENC_WASM from '@jsquash/webp/codec/enc/webp_enc_simd.wasm';
+// @ts-expect-error the package's .wasm.d.ts types the instance exports; wrangler imports a WebAssembly.Module
+import RESIZE_WASM from '@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
+import { createImageOptimizer } from './image-optimize';
 import { readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
@@ -57,6 +64,14 @@ function stringEnv(env: Binding): Record<string, string | undefined> {
   return out;
 }
 
+// Upload-time WebP re-encode (no Cloudflare Images permission needed). Lazily initialized.
+const optimizeImage = createImageOptimizer(() => ({
+  png: PNG_WASM,
+  jpeg: JPEG_WASM,
+  webpEncode: WEBP_ENC_WASM,
+  resize: RESIZE_WASM,
+}));
+
 function depsFor(env: Binding, url: string) {
   const parsed = readEnv(stringEnv(env));
   // One request rarely needs more than a few concurrent queries; keep the socket count low.
@@ -74,6 +89,9 @@ function depsFor(env: Binding, url: string) {
     trenchBalance: parsed.trenchMint
       ? (wallet: string) => tokenBalance(parsed.rpcUrl, wallet, parsed.trenchMint as string)
       : undefined,
+    // Wasm re-encode of a 2560 px PNG exceeds this account's Worker CPU limit (error 1102),
+    // so it is opt-in. Browsers convert to WebP before upload instead (studio page).
+    optimizeImage: parsed.imageOptimize ? optimizeImage : undefined,
     escrowChain: {
       account: (address: string) => accountData(parsed.rpcUrl, address),
       sendAndConfirm: (tx: Uint8Array) => sendAndConfirm(parsed.rpcUrl, tx),

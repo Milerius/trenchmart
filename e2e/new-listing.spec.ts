@@ -196,3 +196,76 @@ test('mobile: Write / Preview tabs and no horizontal overflow', async ({ page })
   await expect(editor(page)).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+// Uploads are re-encoded to WebP by the API (perf: a 354 KB PNG cover made LCP 7.1 s).
+// The media the README points at is served as image/webp and must render in the page.
+const WEBP_1PX = Buffer.from(
+  'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
+  'base64',
+);
+
+test('inserted images are served as WebP and render in the preview', async ({ page }) => {
+  await stub(page);
+  await page.route('**/api/v1/media/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/webp', body: WEBP_1PX }),
+  );
+  await page.goto('/studio/listings/new');
+  await page.locator('#images').setInputFiles([png('one.png')]);
+  await editor(page).fill('Intro\n\n');
+  await editor(page).evaluate((el: HTMLTextAreaElement) =>
+    el.setSelectionRange(el.value.length, el.value.length),
+  );
+  await page.getByRole('button', { name: /Image/ }).click();
+  await page.getByRole('menuitem', { name: 'Insert image 1' }).click();
+  const img = preview(page).locator('img');
+  await expect(img).toHaveCount(1);
+  await expect
+    .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth))
+    .toBe(1);
+});
+
+test('large PNG covers are converted to WebP (max 1600 px) in the browser before upload', async ({
+  page,
+}) => {
+  await stub(page);
+  const uploads: { type: string; size: number }[] = [];
+  await page.route('**/api/v1/studio/listings/new-listing-1/images', async (route) => {
+    const body = route.request().postDataBuffer();
+    uploads.push({
+      type: route.request().headers()['content-type'] ?? '',
+      size: body?.length ?? 0,
+    });
+    const head = body?.subarray(0, 12).toString('latin1') ?? '';
+    expect(head.startsWith('RIFF') && head.endsWith('WEBP')).toBe(true);
+    await route.fulfill({ json: { id: '00000009-aaaa-4bbb-8ccc-dddddddddddd' } });
+  });
+  await page.goto('/studio/listings/new');
+  // A 2400x1200 PNG with detail, made in the page.
+  const dataUrl = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 2400;
+    c.height = 1200;
+    const g = c.getContext('2d')!;
+    for (let x = 0; x < 2400; x += 6)
+      for (let y = 0; y < 1200; y += 6) {
+        g.fillStyle = `rgb(${x % 255},${(x * y) % 255},${y % 255})`;
+        g.fillRect(x, y, 6, 6);
+      }
+    return c.toDataURL('image/png');
+  });
+  const png = Buffer.from(dataUrl.split(',')[1]!, 'base64');
+  await page.fill('#title', 'Trojan Trenches Intel');
+  await page.fill('#summary', 'Labels copycat coins and finds the OG.');
+  await page.fill('#description', 'Userscript for trojan.com.');
+  await page.fill('#terminals', 'Trojan');
+  await page.fill('#price', '0.10');
+  await page
+    .locator('#images')
+    .setInputFiles([{ name: 'cover.png', mimeType: 'image/png', buffer: png }]);
+  await page
+    .locator('form[data-testid="studio"]')
+    .evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect.poll(() => uploads.length).toBe(1);
+  expect(uploads[0]!.type).toBe('image/webp');
+  expect(uploads[0]!.size).toBeLessThan(png.length);
+});

@@ -11,8 +11,11 @@ import {
   type GalleryItem,
 } from '@/components/content-editor';
 import { ListingCard, type Listing } from '@/components/listings';
-import { Button, Label, Panel, Square, StatusTag, Tag } from '@/components/ui';
+import { Button, ButtonLink, Label, Money, Panel, Square, StatusTag, Tag } from '@/components/ui';
+import { solToLamports } from '@trenchmart/shared';
+import { solExact } from '@/lib/money';
 import type { ContentField } from '@/lib/listing-templates';
+import { toWebp } from '@/lib/webp';
 import { api, ApiError } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 
@@ -26,7 +29,12 @@ type StudioImage = {
 };
 type Check = { ruleId: string; result: string; title: string; detail: string };
 type Content = {
-  listing: Listing & { id: string };
+  listing: Listing & {
+    id: string;
+    liveVersionId?: string | null;
+    updatePrice?: string | null;
+    delistedAt?: string | null;
+  };
   status: 'draft' | 'in_review' | 'live' | 'needs_changes' | 'rejected';
   draft: {
     readme: string;
@@ -107,10 +115,11 @@ export default function ContentEditorPage() {
         },
       ]);
       try {
+        const upload = await toWebp(file);
         const saved = await api<StudioImage>(`/studio/listings/${params.id}/images`, {
           method: 'POST',
-          headers: { 'content-type': file.type },
-          body: file,
+          headers: { 'content-type': upload.type },
+          body: upload,
         });
         setImages((list) => list.map((image) => (image.id === temp ? saved : image)));
         setCover((value) => value ?? saved.id);
@@ -310,10 +319,95 @@ export default function ContentEditorPage() {
             </div>
           </div>
         ) : null}
+        {content ? <VersionsPanel listing={content.listing} centsPerSol={centsPerSol} /> : null}
         <Panel tone="info" className="p-4 text-[13px] text-ink-2">
           Only approved content is public. Your live page stays up while a new draft is in review.
         </Panel>
       </aside>
+    </div>
+  );
+}
+
+/** Upload a new version of a live listing, and set the monthly price buyers pay for updates. */
+function VersionsPanel({
+  listing,
+  centsPerSol,
+}: {
+  listing: Content['listing'];
+  centsPerSol: string | null;
+}) {
+  const [price, setPrice] = useState(() => solExact(listing.updatePrice ?? '0'));
+  const [saved, setSaved] = useState(listing.updatePrice ?? '0');
+  const [note, setNote] = useState('');
+  const live = Boolean(listing.liveVersionId) && !listing.delistedAt;
+
+  async function save() {
+    setNote('');
+    let lamports: string;
+    try {
+      lamports = solToLamports(price.trim() || '0').toString();
+    } catch {
+      setNote('Enter an amount in SOL, for example 0.1');
+      return;
+    }
+    await api(`/studio/listings/${listing.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ updatePriceLamports: lamports }),
+    });
+    setSaved(lamports);
+    setNote('Saved.');
+  }
+
+  return (
+    <div data-testid="versions-panel" className="rounded-panel border border-line bg-surface p-5">
+      <Label>Versions and updates</Label>
+      {live ? (
+        <ButtonLink
+          href={`/studio/listings/${listing.id}/versions/new`}
+          data-testid="upload-new-version"
+          variant="secondary"
+          className="mt-3 w-full"
+        >
+          Upload new version
+        </ButtonLink>
+      ) : (
+        <p className="m-0 mt-2 text-[13px] text-muted">
+          New versions can be uploaded once the listing is live.
+        </p>
+      )}
+      <label className="mt-4 block text-sm">
+        <span className="font-medium">Monthly update price (SOL)</span>
+        <input
+          data-testid="update-price"
+          inputMode="decimal"
+          value={price}
+          onChange={(event) => setPrice(event.target.value)}
+          className="mt-1.5 w-full rounded-ctl border border-line-control bg-inset px-3 py-2 font-mono text-sm"
+        />
+      </label>
+      <p className="m-0 mt-1 text-xs text-muted">
+        Buyers get updates free for 30 days, then pay this per month (plus the platform fee). 0
+        means free updates forever. Now:{' '}
+        {BigInt(saved) === 0n ? (
+          'free forever'
+        ) : (
+          <Money lamports={saved} centsPerSol={centsPerSol} />
+        )}
+      </p>
+      <div className="mt-3 flex items-center gap-3">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => void save().catch((err: Error) => setNote(err.message))}
+        >
+          Save price
+        </Button>
+        {note ? (
+          <span role="status" className="text-[13px] text-ink-2">
+            {note}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

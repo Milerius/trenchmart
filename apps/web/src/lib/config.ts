@@ -12,6 +12,14 @@ export type PublicConfig = {
   escrowHours: number;
   verificationFeeLamports: string;
   bondLamportsByCategory: Record<string, string>;
+  updateFreeDays?: number;
+  updatePeriodDays?: number;
+  updatePriceDefaultBps?: number;
+  updateLimitPerListingDay?: number;
+  uploadLimitPerCreatorDay?: number;
+  uploadSupplementLamports?: string;
+  verifyFreePerDay?: number;
+  verifySupplementLamports?: string;
 };
 
 let configCache: Promise<PublicConfig | null> | null = null;
