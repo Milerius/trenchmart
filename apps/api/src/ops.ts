@@ -293,7 +293,12 @@ export async function postNtfy(
   return timed(f, url, { method: 'POST', headers: { ...headers, ...auth }, body });
 }
 
-export type Notice = { title: string; body: string; level: OpsLevel | 'resolved' | 'test' };
+export type Notice = {
+  title: string;
+  body: string;
+  level: OpsLevel | 'resolved' | 'test';
+  code?: string;
+};
 
 /** Sends one notice through every configured channel. Returns the channels that accepted it. */
 export async function notify(deps: Deps, notice: Notice): Promise<string[]> {
@@ -406,6 +411,7 @@ export async function deliverAlerts(deps: Deps, alerts: OpsAlert[]): Promise<Not
           title: `${a.level.toUpperCase()} ${a.code}`,
           body: a.message,
           level: a.level,
+          code: a.code,
         });
     }
     for (const code of known.keys()) {
@@ -418,7 +424,17 @@ export async function deliverAlerts(deps: Deps, alerts: OpsAlert[]): Promise<Not
       });
     }
   }
-  for (const notice of notices) await notify(deps, notice);
+  const anyChannel = Boolean(
+    deps.env.alertNtfyTopic ||
+    (deps.env.telegramBotToken && deps.env.telegramChatId) ||
+    deps.env.alertWebhookUrl,
+  );
+  for (const notice of notices) {
+    const channels = await notify(deps, notice);
+    // Undelivered: clear notified_at so the next tick (5 min) tries again.
+    if (anyChannel && channels.length === 0 && notice.code && !dbDown)
+      await deps.sql`update ops_alerts set notified_at = null where code = ${notice.code}`;
+  }
   return notices;
 }
 

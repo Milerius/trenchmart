@@ -8,6 +8,7 @@ workers_dev = true
 [vars]
 WEB_URL = "https://trenchmart.fun"
 API_URL = "https://api.trenchmart.fun"
+# Mainnet: delete this var and `wrangler secret put RPC_URL` with a dedicated (Helius) URL.
 RPC_URL = "https://solana-devnet.api.onfinality.io/public" # api.devnet.solana.com answers 403 to Workers
 CLUSTER = "devnet"
 

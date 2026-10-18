@@ -23,7 +23,10 @@ function world() {
     if (url.startsWith('https://web.example')) return new Response('', { status: state.web });
     if (url.startsWith('https://api.example'))
       return Response.json({ ok: state.api === 200 }, { status: state.api });
-    if (url.startsWith('https://rpc.example')) return Response.json({ result: state.rpc });
+    if (url.startsWith('https://rpc.example'))
+      return state.rpc === '429'
+        ? new Response('rate limited', { status: 429 })
+        : Response.json({ result: state.rpc });
     if (url.includes('/json?poll=1')) return new Response(state.log.join('\n'));
     if (url === 'https://ntfy.sh/topic') {
       const headers = init?.headers as Record<string, string>;
@@ -39,6 +42,8 @@ function world() {
 describe('external watchdog', () => {
   it('checks web, API and RPC', async () => {
     const { state, f } = world();
+    expect((await runChecks(env, f)).every((c) => c.ok)).toBe(true);
+    state.rpc = '429';
     expect((await runChecks(env, f)).every((c) => c.ok)).toBe(true);
     state.api = 503;
     state.rpc = 'behind';
