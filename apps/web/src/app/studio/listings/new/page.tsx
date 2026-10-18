@@ -166,7 +166,11 @@ export default function NewListingPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Terminals" htmlFor="terminals" hint="Comma separated.">
+            <Field
+              label="Terminals"
+              htmlFor="terminals"
+              hint="Comma separated: Axiom, GMGN, Photon, Terminal, Trojan, or Any."
+            >
               <input id="terminals" name="terminals" placeholder="Axiom, GMGN" className={INPUT} />
             </Field>
           </div>

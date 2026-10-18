@@ -61,7 +61,7 @@ export const DEFAULT_CONFIG_JSON = {
   },
   og_bond_discount_bps: 5000,
   bond_unlock_days: 30,
-  terminals: ['Axiom', 'GMGN', 'Photon', 'BullX', 'Padre', 'Trojan', 'Any'],
+  terminals: ['Axiom', 'GMGN', 'Photon', 'Terminal', 'Trojan', 'Any'],
   max_file_bytes: { default: 5242880, setup: 26214400 },
   blocklist_hosts: [],
   require_allow_hosts: ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'unpkg.com'],

@@ -16,7 +16,7 @@ export const CATEGORIES: CategoryMeta[] = [
     label: 'Userscripts',
     short: '01 / SCRIPTS',
     tag: 'USERSCRIPT',
-    desc: 'Tampermonkey add-ons for Axiom, GMGN, Photon, BullX.',
+    desc: 'Tampermonkey add-ons for Axiom, GMGN, Photon, Terminal, Trojan.',
     color: '#C6F432',
     bg: '#141A10',
   },

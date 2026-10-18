@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { categoryMeta, quote } from '@trenchmart/shared';
+import { categoryMeta, quote, TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared';
 import { Money, Skeleton, EmptyState, Tag } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
 
@@ -29,7 +29,16 @@ export type Pricing = {
   tier?: string;
 };
 
-export function ListingCard({ listing, pricing }: { listing: Listing; pricing: Pricing }) {
+export function ListingCard({
+  listing,
+  pricing,
+  priority = false,
+}: {
+  listing: Listing;
+  pricing: Pricing;
+  /** Above-the-fold cards load their cover eagerly (it is the LCP image). */
+  priority?: boolean;
+}) {
   const meta = categoryMeta(listing.category);
   const connected = pricing.tier !== undefined && pricing.config;
   const total = connected
@@ -46,7 +55,13 @@ export function ListingCard({ listing, pricing }: { listing: Listing; pricing: P
       href={`/l/${listing.slug}`}
       className="motion-card group flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface hover:border-line-strong"
     >
-      <CardCover listing={listing} color={meta.color} bg={meta.bg} tag={meta.tag} />
+      <CardCover
+        listing={listing}
+        color={meta.color}
+        bg={meta.bg}
+        tag={meta.tag}
+        priority={priority}
+      />
       <div
         className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3"
         style={{ background: meta.bg }}
@@ -105,7 +120,9 @@ function CardCover({
   color,
   bg,
   tag,
+  priority = false,
 }: {
+  priority?: boolean;
   listing: Listing;
   color: string;
   bg: string;
@@ -120,7 +137,9 @@ function CardCover({
         <img
           src={listing.cover.url}
           alt={listing.cover.alt}
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
+          decoding="async"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
         />
       ) : (
@@ -165,11 +184,15 @@ export function ListingGrid({
     return (
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
         {[0, 1, 2].map((key) => (
-          <li key={key} className="rounded-card border border-line bg-surface p-4">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="mt-4 h-5 w-3/4" />
-            <Skeleton className="mt-3 h-4 w-full" />
-            <Skeleton className="mt-8 h-5 w-1/3" />
+          <li key={key} className="overflow-hidden rounded-card border border-line bg-surface">
+            {/* Same shape as a real card (16:10 cover + body) so nothing shifts on load. */}
+            <div className="aspect-[16/10] border-b border-line-soft bg-inset" />
+            <div className="p-4">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="mt-4 h-5 w-3/4" />
+              <Skeleton className="mt-3 h-4 w-full" />
+              <Skeleton className="mt-8 h-5 w-1/3" />
+            </div>
           </li>
         ))}
       </ul>
@@ -190,13 +213,17 @@ export function ListingGrid({
   }
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {listings.map((listing) => (
+      {listings.map((listing, index) => (
         <li key={listing.slug}>
-          <ListingCard listing={listing} pricing={{ centsPerSol, config, tier }} />
+          <ListingCard
+            listing={listing}
+            pricing={{ centsPerSol, config, tier }}
+            priority={index < 3}
+          />
         </li>
       ))}
     </ul>
   );
 }
 
-export const TERMINALS = ['All', 'Axiom', 'GMGN', 'Photon', 'BullX', 'Padre'] as const;
+export const TERMINALS = ['All', ...TERMINAL_NAMES] as const;

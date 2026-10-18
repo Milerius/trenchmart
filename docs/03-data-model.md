@@ -279,7 +279,7 @@ create table audit_log (
   },
   "og_bond_discount_bps": 5000,
   "bond_unlock_days": 30,
-  "terminals": ["Axiom", "GMGN", "Photon", "BullX", "Padre", "Trojan", "Any"],
+  "terminals": ["Axiom", "GMGN", "Photon", "Terminal", "Trojan", "Any"],
   "max_file_bytes": { "default": 5242880, "setup": 26214400 }
 }
 ```

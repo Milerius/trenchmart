@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, ApiError } from './api';
-import { ConnectModal } from '@/components/connect-modal';
+import dynamic from 'next/dynamic';
 import {
   detectedIdFor,
   readLastWallet,
@@ -47,6 +47,14 @@ import {
   type Signer,
   type WalletList,
 } from './wallet-detect';
+
+// The wallet picker is code-split: it loads the first time someone opens Connect.
+const ConnectModal = dynamic(
+  () => import('@/components/connect-modal').then((m) => m.ConnectModal),
+  {
+    ssr: false,
+  },
+);
 
 type Session = { id: string; wallet: string; handle: string | null; roles: string[]; tier: string };
 
@@ -370,28 +378,34 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [session, busy, error],
   );
 
+  // Mount (and download) the picker only once it has been opened.
+  const pickerUsed = useRef(false);
+  if (pickerOpen) pickerUsed.current = true;
+
   return (
     <WalletContext.Provider value={value}>
       {children}
-      <ConnectModal
-        open={pickerOpen}
-        busy={busy}
-        error={error}
-        detected={detected}
-        lastUsedId={lastUsedId}
-        walletConnect={walletConnectEnabled}
-        deeplinks={deeplinks}
-        wcUri={wcUri}
-        onClose={() => {
-          if (!busy) {
-            cancelWalletConnect();
-            setPickerOpen(false);
-          }
-        }}
-        onConnect={(id) => void connectId(id)}
-        onWalletConnect={() => void beginWalletConnect()}
-        onLeaveWalletConnect={cancelWalletConnect}
-      />
+      {pickerUsed.current ? (
+        <ConnectModal
+          open={pickerOpen}
+          busy={busy}
+          error={error}
+          detected={detected}
+          lastUsedId={lastUsedId}
+          walletConnect={walletConnectEnabled}
+          deeplinks={deeplinks}
+          wcUri={wcUri}
+          onClose={() => {
+            if (!busy) {
+              cancelWalletConnect();
+              setPickerOpen(false);
+            }
+          }}
+          onConnect={(id) => void connectId(id)}
+          onWalletConnect={() => void beginWalletConnect()}
+          onLeaveWalletConnect={cancelWalletConnect}
+        />
+      ) : null}
     </WalletContext.Provider>
   );
 }

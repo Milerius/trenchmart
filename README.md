@@ -66,7 +66,7 @@ Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission.
 
 ## How buying works
 
-1. **Pick a verified tool.** Filter by terminal (Axiom, GMGN, Photon, BullX, Padre) or category.
+1. **Pick a verified tool.** Filter by terminal (Axiom, GMGN, Photon, Terminal, Trojan) or category.
 2. **See your exact price.** Connect your wallet and your $TRENCH tier is applied to the receipt before anything is signed.
 3. **Pay into escrow.** One transaction. Your SOL is held for 48 hours, and you can dispute at any time in that window.
 4. **Download on release.** When escrow releases, the download unlocks. Check any file against its pinned hash on the Verify page.

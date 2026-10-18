@@ -11,7 +11,7 @@ Four screens are fully designed (`design/*.dc.html`). Others below are specified
 3. **Hero** (2 columns): pill "Solana first · more chains later"; H1 "The verified edge, / for sale."; lead copy; buttons "Browse the market" (primary) + "Sell your tooling". Right: featured listing as a `CodeWindow` showing its header, permission ticks and a filter snippet, footer with title/creator/price → links to listing.
 4. **Trust strip**: Static + sandbox scan · Human review · Hash-pinned versions · Escrowed payouts.
 5. **Categories** (6 cards).
-6. **Trending this week**: terminal filter pills (All, Axiom, GMGN, Photon, BullX, Padre) → filters cards; grid of `ListingCard`. Data: `GET /listings?sort=trending&terminal=`.
+6. **Trending this week**: terminal filter pills (All, Axiom, GMGN, Photon, Terminal, Trojan) → filters cards; grid of `ListingCard`. Data: `GET /listings?sort=trending&terminal=`.
 7. **Bottom split**: "Top verified creators" list (rank, avatar, handle, category · bond, 30d volume) + $TRENCH holder banner (3 tier mini-tiles, CTA → `/token`).
 8. **Footer**: Security policy, Report a listing, Become a verifier, Docs; "Not financial advice. Tools don't guarantee profits."
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CATEGORY_CODES } from './config';
+import { canonicalTerminals } from './terminals';
 
 export const walletSchema = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'invalid wallet');
 
@@ -30,7 +31,11 @@ export const listingBody = z.object({
   summary: z.string().min(3).max(280),
   description: z.string().min(1).max(20_000),
   category: z.enum(CATEGORY_CODES),
-  terminals: z.array(z.string().min(1).max(40)).max(12).default([]),
+  terminals: z
+    .array(z.string().min(1).max(40))
+    .max(12)
+    .default([])
+    .transform((names) => canonicalTerminals(names)),
   priceLamports: z.string().regex(/^\d+$/),
   license: z.enum(['single', 'multi3', 'subscription']).default('single'),
   subPeriodDays: z.number().int().positive().max(3650).optional(),
