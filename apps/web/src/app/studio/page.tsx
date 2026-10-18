@@ -1,9 +1,15 @@
 'use client';
 
-import { DEFAULT_ESCROW_HOURS, escrowWindowLabel } from '@trenchmart/shared';
+import {
+  categoryMeta,
+  DEFAULT_ESCROW_HOURS,
+  escrowWindowLabel,
+  solToLamports,
+} from '@trenchmart/shared';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { solToLamports } from '@trenchmart/shared';
+import { Avatar, VerifiedBadge } from '@/components/profile';
 import {
   Button,
   ButtonLink,
@@ -15,9 +21,22 @@ import {
   Skeleton,
   Square,
   StatusTag,
+  Tag,
   utc,
 } from '@/components/ui';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
+import {
+  actionFor,
+  barShare,
+  bucketOf,
+  sparkPoints,
+  statusNote,
+  statusOf,
+  type Bucket,
+  type Overview,
+  type OverviewListing,
+} from '@/lib/dashboard';
+import { monthYear, shortWallet } from '@/lib/profile-format';
 import { submitPayment } from '@/lib/studio';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
@@ -29,19 +48,6 @@ type Requirements = {
   bondOk: boolean;
   verificationFee: string;
   feeWaived: boolean;
-};
-
-type StudioListing = {
-  id: string;
-  slug: string;
-  title: string;
-  price: string;
-  category: string;
-  sales_7d?: number;
-  rating_avg?: string | null;
-  delisted_at?: string | null;
-  version_status: string | null;
-  semver: string | null;
 };
 
 type Payout = {
@@ -57,26 +63,34 @@ type Payouts = {
   payouts: Payout[];
 };
 
+const TABS: { key: Bucket | 'all'; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'live', label: 'Live' },
+  { key: 'review', label: 'In review' },
+  { key: 'draft', label: 'Drafts' },
+];
+
 export default function StudioPage() {
   const wallet = useWallet();
+  const router = useRouter();
   const centsPerSol = useSolUsd();
   const config = usePublicConfig();
   const [requirements, setRequirements] = useState<Requirements | null>(null);
-  const [listings, setListings] = useState<StudioListing[] | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
   const [payouts, setPayouts] = useState<Payouts | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [handle, setHandle] = useState('');
   const [bond, setBond] = useState('1');
   const [message, setMessage] = useState('');
+  const [tab, setTab] = useState<Bucket | 'all'>('all');
 
   async function load() {
-    const [req, rows, pay] = await Promise.all([
+    const [req, view, pay] = await Promise.all([
       api<Requirements>('/studio/requirements'),
-      api<StudioListing[]>('/studio/listings'),
+      api<Overview>('/studio/overview'),
       api<Payouts>('/studio/payouts'),
     ]);
     setRequirements(req);
-    setListings(rows);
+    setOverview(view);
     setPayouts(pay);
   }
 
@@ -89,33 +103,11 @@ export default function StudioPage() {
     if (wallet.session) reload();
   }, [wallet.session]);
 
-  async function linkX() {
-    // M-04: real X sign-in (OAuth) when the API has an X app; the devnet fallback links the
-    // typed handle as unverified.
-    try {
-      const started = await api<{ url: string }>('/auth/x/start');
-      window.location.assign(started.url);
-      return;
-    } catch (err) {
-      if (!(err instanceof ApiError) || err.code !== 'X_UNCONFIGURED') throw err;
-    }
-    await api('/studio/x', { method: 'POST', body: JSON.stringify({ handle }) });
-    setMessage('X handle linked for devnet (unverified: X sign-in is not configured yet).');
-    await load();
-  }
-
+  // X linking lives on the profile now; older X callbacks still land here, so forward them.
   useEffect(() => {
     const result = new URLSearchParams(window.location.search).get('x');
-    if (!result) return;
-    const text: Record<string, string> = {
-      linked: 'X account verified and linked.',
-      denied: 'X sign-in was cancelled.',
-      taken: 'That X account is already linked to another wallet.',
-      invalid: 'The X sign-in expired. Try again.',
-      failed: 'X sign-in failed. Try again.',
-    };
-    setMessage(text[result] ?? 'X sign-in did not complete.');
-  }, []);
+    if (result) router.replace(`/studio/profile?x=${encodeURIComponent(result)}`);
+  }, [router]);
 
   async function stakeBond() {
     const lamports = solToLamports(bond).toString();
@@ -144,34 +136,66 @@ export default function StudioPage() {
     );
   }
 
+  const session = wallet.session;
+  const creator = overview?.creator;
+  const listings = overview?.listings ?? null;
+  const escrowLabel = escrowWindowLabel(config?.escrowHours ?? DEFAULT_ESCROW_HOURS);
+  const name = creator?.displayName || (session.handle ? `@${session.handle}` : 'Your studio');
+  const publicHref = `/u/${session.handle ?? session.wallet}`;
+  const waiting = (listings ?? []).filter((l) => statusOf(l) === 'needs_creator');
+  const counts = (key: Bucket | 'all') =>
+    key === 'all'
+      ? (listings ?? []).length
+      : (listings ?? []).filter((l) => bucketOf(l) === key).length;
+  const shown = (listings ?? []).filter((l) => tab === 'all' || bucketOf(l) === tab);
   const rows = payouts?.payouts ?? [];
-  const sum = (filter: (p: Payout) => boolean) =>
-    rows.filter(filter).reduce((total, p) => total + BigInt(p.amount.lamports), 0n);
-  const paidOut = sum((p) => p.status === 'sent');
-  const queued = sum((p) => p.status === 'pending' || p.status === 'proposed');
-  const live = (listings ?? []).filter((l) => l.version_status === 'live' && !l.delisted_at);
-  const sales = (listings ?? []).reduce((total, l) => total + (l.sales_7d ?? 0), 0);
+  const subscribed = (listings ?? []).filter((l) => l.subscribers > 0);
 
   return (
-    <section data-testid="studio" className="space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <Label>Creator studio</Label>
-          <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
-            {wallet.session.handle ? `@${wallet.session.handle}` : 'Your studio'}
-          </h1>
-          <p className="m-0 mt-1 text-sm text-ink-2">
-            {TIER_LABEL[wallet.session.tier] ?? wallet.session.tier} · 0% creator commission ·
-            payouts in SOL from the Squads vault
-          </p>
+    <section data-testid="studio" className="min-w-0 max-w-full space-y-6">
+      <header
+        data-testid="studio-header"
+        className="flex flex-wrap items-center justify-between gap-5 rounded-panel border border-line bg-surface p-5 sm:p-6"
+      >
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar
+            image={creator?.avatarUrl ?? null}
+            name={creator?.displayName ?? session.handle}
+            fallback={session.wallet}
+            className="h-16 w-16 text-xl"
+            ring="ring-2 ring-line"
+          />
+          <div className="min-w-0">
+            <Label>Creator studio</Label>
+            <h1 className="m-0 mt-0.5 flex items-center gap-2 truncate text-[26px] font-semibold tracking-[-0.03em]">
+              {name}
+              {creator?.xVerified ? <VerifiedBadge /> : null}
+            </h1>
+            <p className="m-0 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-2">
+              {session.handle && creator?.displayName ? <span>@{session.handle}</span> : null}
+              <span data-testid="studio-x">
+                {creator?.xHandle
+                  ? creator.xVerified
+                    ? `X @${creator.xHandle} · verified`
+                    : `X @${creator.xHandle} · not verified`
+                  : 'X not linked'}
+              </span>
+              <span>{TIER_LABEL[session.tier] ?? session.tier}</span>
+              {creator?.memberSince ? (
+                <span>Member since {monthYear(creator.memberSince)}</span>
+              ) : null}
+              <span className="font-mono text-muted">{shortWallet(session.wallet)}</span>
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <ButtonLink href="/studio/profile" size="lg" variant="secondary">
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href={publicHref} variant="ghost">
+            View public profile
+          </ButtonLink>
+          <ButtonLink href="/studio/profile" variant="secondary">
             Edit profile
           </ButtonLink>
-          <ButtonLink href="/studio/listings/new" size="lg">
-            New listing
-          </ButtonLink>
+          <ButtonLink href="/studio/listings/new">+ New listing</ButtonLink>
         </div>
       </header>
 
@@ -179,287 +203,515 @@ export default function StudioPage() {
         <ErrorState title="Couldn't load the studio" body={loadError} onRetry={reload} />
       ) : null}
 
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line lg:grid-cols-4">
-        <Tile label="Paid out">
-          {payouts ? (
-            <Money lamports={paidOut} centsPerSol={centsPerSol} stacked />
-          ) : (
-            <Skeleton className="h-7 w-24" />
-          )}
-        </Tile>
-        <Tile label="Queued payouts">
-          {payouts ? (
-            <Money lamports={queued} centsPerSol={centsPerSol} stacked />
-          ) : (
-            <Skeleton className="h-7 w-24" />
-          )}
-        </Tile>
-        <Tile label="Live listings">
-          {listings ? (
-            <span className="text-2xl font-semibold">{live.length}</span>
-          ) : (
-            <Skeleton className="h-7 w-10" />
-          )}
-        </Tile>
-        <Tile label="Sales, last 7 days">
-          {listings ? (
-            <span className="text-2xl font-semibold">{sales}</span>
-          ) : (
-            <Skeleton className="h-7 w-10" />
-          )}
-        </Tile>
+      {waiting.map((l) => (
+        <Panel
+          key={l.id}
+          tone="warn"
+          className="flex flex-wrap items-center justify-between gap-3 p-4"
+          data-testid="needs-note"
+        >
+          <div>
+            <p className="m-0 text-sm font-semibold">
+              {l.title} v{l.latest?.semver} needs your note
+            </p>
+            <p className="m-0 mt-0.5 text-[13px] text-ink-2">
+              The review flagged something it wants explained.
+              {l.live ? ` v${l.live.semver} stays live for buyers meanwhile.` : ''}
+            </p>
+          </div>
+          <ButtonLink
+            href={`/studio/listings/${l.id}/versions/${l.latest?.id}`}
+            variant="secondary"
+            size="sm"
+          >
+            Add review note →
+          </ButtonLink>
+        </Panel>
+      ))}
+
+      <Stats overview={overview} centsPerSol={centsPerSol} escrowLabel={escrowLabel} />
+
+      <Checklist
+        requirements={requirements}
+        overview={overview}
+        centsPerSol={centsPerSol}
+        bond={bond}
+        setBond={setBond}
+        onStake={() => void stakeBond().catch((err: Error) => setMessage(err.message))}
+        wallet={session.wallet}
+      />
+
+      {message ? (
+        <p role="status" className="m-0 text-sm text-ink-2">
+          {message}
+        </p>
+      ) : null}
+
+      <div className="relative min-w-0 overflow-hidden rounded-panel border border-line bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <h2 className="m-0 text-base font-semibold">Listings</h2>
+            <div role="tablist" aria-label="Filter listings" className="flex gap-1">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`rounded-ctl px-2.5 py-1 text-[13px] ${tab === t.key ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'}`}
+                >
+                  {t.label}{' '}
+                  <span className="font-mono text-[11px] text-muted">{counts(t.key)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <span className="text-xs text-muted">Newest first</span>
+        </div>
+        {listings && listings.length > 0 ? (
+          <ul className="m-0 p-0 sm:hidden" data-testid="studio-listing-cards">
+            {shown.map((l) => (
+              <ListingCard key={l.id} listing={l} centsPerSol={centsPerSol} />
+            ))}
+            {shown.length === 0 ? (
+              <li className="list-none px-5 py-6 text-center text-sm text-muted">Nothing here.</li>
+            ) : null}
+          </ul>
+        ) : null}
+        {listings && listings.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="No listings yet"
+              body="Upload a file and automated review runs live: static scan, sandbox run and verdict."
+              action={
+                <ButtonLink href="/studio/listings/new">Create your first listing</ButtonLink>
+              }
+            />
+          </div>
+        ) : (
+          <div className="relative hidden overflow-x-auto sm:block">
+            <table
+              data-testid="studio-listings"
+              className="w-full min-w-[860px] border-collapse text-sm"
+            >
+              <thead>
+                <tr className="text-left font-mono text-[11px] uppercase tracking-wide text-muted">
+                  <th scope="col" className="px-5 py-2.5 font-medium">
+                    Listing
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 font-medium">
+                    Version
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                    Price
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                    Sales 7d
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                    Subs
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                    Rating
+                  </th>
+                  <th scope="col" className="px-5 py-2.5 text-right font-medium">
+                    <span className="sr-only">Action</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((l) => (
+                  <ListingRow key={l.id} listing={l} centsPerSol={centsPerSol} />
+                ))}
+                {listings === null
+                  ? [0, 1, 2].map((key) => (
+                      <tr key={key} className="border-t border-line-soft">
+                        <td colSpan={8} className="px-5 py-3">
+                          <Skeleton className="h-8 w-full" />
+                        </td>
+                      </tr>
+                    ))
+                  : null}
+                {listings && listings.length > 0 && shown.length === 0 ? (
+                  <tr className="border-t border-line-soft">
+                    <td colSpan={8} className="px-5 py-6 text-center text-sm text-muted">
+                      Nothing here.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="space-y-6">
-          <div className="overflow-hidden rounded-panel border border-line bg-surface">
-            <div className="flex items-center justify-between border-b border-line-soft px-5 py-3">
-              <h2 className="m-0 text-base font-semibold">Listings</h2>
-              <span className="text-xs text-muted">{listings?.length ?? 0} total</span>
-            </div>
-            {listings && listings.length === 0 ? (
-              <div className="p-5">
-                <EmptyState
-                  title="No listings yet"
-                  body="Upload a file and automated review runs live: static scan, sandbox run and verdict."
-                  action={
-                    <ButtonLink href="/studio/listings/new">Create your first listing</ButtonLink>
-                  }
-                />
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px] border-collapse text-sm">
-                  <thead>
-                    <tr className="text-left font-mono text-[11px] uppercase tracking-wide text-muted">
-                      <th scope="col" className="px-5 py-2.5 font-medium">
-                        Listing
-                      </th>
-                      <th scope="col" className="px-3 py-2.5 font-medium">
-                        Version
-                      </th>
-                      <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                        Price
-                      </th>
-                      <th scope="col" className="px-5 py-2.5 text-right font-medium">
-                        Sales 7d
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(listings ?? []).map((listing) => (
-                      <tr key={listing.id} className="border-t border-line-soft">
-                        <td className="px-5 py-3">
-                          <Link
-                            href={`/l/${listing.slug}`}
-                            className="font-medium hover:text-accent-hover"
-                          >
-                            {listing.title}
-                          </Link>
-                          <Link
-                            href={`/studio/listings/${listing.id}/content`}
-                            className="mt-0.5 block text-xs text-muted hover:text-ink"
-                          >
-                            Edit page: images, README, install guide →
-                          </Link>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="flex items-center gap-2">
-                            <StatusTag
-                              status={
-                                listing.delisted_at
-                                  ? 'delisted'
-                                  : (listing.version_status ?? 'draft')
-                              }
-                            />
-                            {listing.semver ? (
-                              <span className="font-mono text-xs text-muted">
-                                v{listing.semver}
-                              </span>
-                            ) : null}
-                          </span>
-                          {listing.version_status === 'live' && !listing.delisted_at ? (
-                            <Link
-                              href={`/studio/listings/${listing.id}/versions/new`}
-                              data-testid="upload-new-version"
-                              className="mt-1 block text-xs text-accent hover:text-accent-hover"
-                            >
-                              Upload new version →
-                            </Link>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-3 text-right">
-                          <Money lamports={listing.price} centsPerSol={centsPerSol} stacked />
-                        </td>
-                        <td className="tabular px-5 py-3 text-right font-mono">
-                          {listing.sales_7d ?? 0}
-                        </td>
-                      </tr>
-                    ))}
-                    {listings === null
-                      ? [0, 1].map((key) => (
-                          <tr key={key} className="border-t border-line-soft">
-                            <td colSpan={4} className="px-5 py-3">
-                              <Skeleton className="h-5 w-full" />
-                            </td>
-                          </tr>
-                        ))
-                      : null}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        <section
+          data-testid="dashboard"
+          className="overflow-hidden rounded-panel border border-line bg-surface"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line-soft px-5 py-3">
+            <h2 className="m-0 text-base font-semibold">Payouts</h2>
+            <span className="text-sm text-ink-2">
+              Total{' '}
+              {payouts ? (
+                <Money lamports={payouts.total.lamports} usdCents={payouts.total.usdCents} strong />
+              ) : (
+                '—'
+              )}
+            </span>
           </div>
-
-          <section
-            data-testid="dashboard"
-            className="overflow-hidden rounded-panel border border-line bg-surface"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line-soft px-5 py-3">
-              <h2 className="m-0 text-base font-semibold">Payouts</h2>
-              <span className="text-sm text-ink-2">
-                Total{' '}
-                {payouts ? (
-                  <Money
-                    lamports={payouts.total.lamports}
-                    usdCents={payouts.total.usdCents}
-                    strong
-                  />
-                ) : (
-                  '—'
-                )}
-              </span>
-            </div>
-            {rows.length === 0 ? (
-              <p className="m-0 px-5 py-4 text-sm text-muted">
-                No payouts yet. A sale pays out after its{' '}
-                {escrowWindowLabel(config?.escrowHours ?? DEFAULT_ESCROW_HOURS)} escrow releases
-                with no dispute.
-              </p>
-            ) : (
-              <ul className="m-0 p-0">
-                {rows.map((row) => (
-                  <li
-                    key={row.id}
-                    className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-5 py-3 first:border-t-0"
-                  >
-                    <span className="flex items-center gap-3">
-                      <StatusTag status={row.status} kind="payout" />
-                      <span className="text-sm text-ink-2">
-                        {row.bucket === 'creator'
-                          ? 'Sale'
-                          : row.bucket === 'refund'
-                            ? 'Refund'
-                            : row.bucket}
-                        {row.created_at ? (
-                          <span className="text-muted"> · {utc(row.created_at)}</span>
-                        ) : null}
-                      </span>
+          <div className="grid grid-cols-1 gap-px border-b border-line-soft bg-line-soft sm:grid-cols-3">
+            <PayoutCell label="Sent" note="from the Squads vault">
+              {overview ? (
+                <Money lamports={overview.payouts.sent} centsPerSol={centsPerSol} />
+              ) : null}
+            </PayoutCell>
+            <PayoutCell label="In multisig" note="queued or awaiting signatures">
+              {overview ? (
+                <Money
+                  lamports={(
+                    BigInt(overview.payouts.inMultisig) + BigInt(overview.payouts.queued)
+                  ).toString()}
+                  centsPerSol={centsPerSol}
+                />
+              ) : null}
+            </PayoutCell>
+            <PayoutCell
+              label="In escrow"
+              note={
+                overview?.payouts.nextRelease
+                  ? `next release ${utc(overview.payouts.nextRelease)}`
+                  : `releases ${escrowLabel} after a sale, no dispute`
+              }
+            >
+              {overview ? (
+                <Money lamports={overview.payouts.inEscrow} centsPerSol={centsPerSol} />
+              ) : null}
+            </PayoutCell>
+          </div>
+          {rows.length === 0 ? (
+            <p className="m-0 px-5 py-4 text-sm text-muted">
+              No payouts yet. A sale pays out after its {escrowLabel} escrow releases with no
+              dispute.
+            </p>
+          ) : (
+            <ul className="m-0 p-0">
+              {rows.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-5 py-3 first:border-t-0"
+                >
+                  <span className="flex items-center gap-3">
+                    <StatusTag status={row.status} kind="payout" />
+                    <span className="text-sm text-ink-2">
+                      {row.bucket === 'creator'
+                        ? 'Sale or renewal'
+                        : row.bucket === 'refund'
+                          ? 'Refund'
+                          : row.bucket}
+                      {row.created_at ? (
+                        <span className="text-muted"> · {utc(row.created_at)}</span>
+                      ) : null}
                     </span>
-                    <Money lamports={row.amount.lamports} usdCents={row.amount.usdCents} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
+                  </span>
+                  <Money lamports={row.amount.lamports} usdCents={row.amount.usdCents} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <aside className="space-y-4">
-          <div className="rounded-panel border border-line bg-surface p-5">
-            <h2 className="m-0 text-base font-semibold">Ready to sell</h2>
-            {requirements ? (
-              <ul className="m-0 mt-4 space-y-3 p-0 text-sm">
-                <Requirement ok title="Wallet signed in" />
-                <Requirement ok={requirements.xLinked} title="X account linked">
-                  {!requirements.xLinked ? (
-                    <form
-                      className="mt-2 flex gap-2"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void linkX().catch((err: Error) => setMessage(err.message));
-                      }}
-                    >
-                      <input
-                        className="h-9 min-w-0 flex-1 rounded-ctl border border-line-control bg-inset px-3 text-sm"
-                        placeholder="X handle"
-                        aria-label="X handle"
-                        value={handle}
-                        onChange={(event) => setHandle(event.target.value)}
-                      />
-                      <Button type="submit" variant="secondary" size="sm">
-                        Link X
-                      </Button>
-                    </form>
-                  ) : null}
-                </Requirement>
-                <Requirement ok={requirements.bondOk} title="Creator bond">
-                  <span className="mt-1 block text-[13px] text-ink-2">
-                    <Money lamports={requirements.bondActive} centsPerSol={centsPerSol} /> of{' '}
-                    <Money lamports={requirements.bondRequired} centsPerSol={centsPerSol} />{' '}
-                    required
-                  </span>
-                  <form
-                    className="mt-2 flex gap-2"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void stakeBond().catch((err: Error) => setMessage(err.message));
-                    }}
-                  >
-                    <input
-                      className="h-9 w-24 rounded-ctl border border-line-control bg-inset px-3 font-mono text-sm"
-                      value={bond}
-                      inputMode="decimal"
-                      onChange={(event) => setBond(event.target.value)}
-                      aria-label="Bond SOL"
-                    />
-                    <Button type="submit" variant="secondary" size="sm">
-                      Stake bond
-                    </Button>
-                  </form>
-                </Requirement>
-                <Requirement ok title="Verification fee">
-                  <span className="mt-1 block text-[13px] text-ink-2">
-                    {requirements.verificationFee === '0' ? (
-                      'Free right now'
-                    ) : requirements.feeWaived ? (
-                      'Waived for your tier'
-                    ) : (
-                      <>
-                        <Money lamports={requirements.verificationFee} centsPerSol={centsPerSol} />{' '}
-                        per version
-                      </>
-                    )}
-                  </span>
-                </Requirement>
-              </ul>
+          <div
+            data-testid="updates-card"
+            className="rounded-panel border border-line bg-surface p-5"
+          >
+            <Label>Update subscriptions</Label>
+            {overview ? (
+              <>
+                <p className="m-0 mt-2 font-mono text-2xl font-semibold">
+                  <Money lamports={overview.updates.monthly} />
+                  <span className="text-sm font-normal text-muted"> / month</span>
+                </p>
+                <p className="m-0 mt-1 text-[13px] text-ink-2">
+                  {overview.updates.paying} paying · {overview.updates.inFreeMonth} in their free
+                  first month
+                </p>
+                {subscribed.length ? (
+                  <ul className="m-0 mt-3 space-y-1.5 p-0 text-[13px]">
+                    {subscribed.map((l) => (
+                      <li key={l.id} className="flex list-none justify-between gap-3">
+                        <span className="truncate text-ink-2">{l.title}</span>
+                        <span className="font-mono text-ink">{l.subscribers}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
             ) : (
-              <div className="mt-4 space-y-3">
-                <Skeleton className="h-5 w-full" />
-                <Skeleton className="h-5 w-2/3" />
-              </div>
+              <Skeleton className="mt-2 h-8 w-32" />
             )}
           </div>
           <Panel tone="info" className="p-4 text-[13px] text-ink-2">
-            Uploads are reviewed live: static scan, sandbox run, rules verdict. Most finish in
-            seconds, and you watch every step.
+            Uploading a new version keeps the current one live. Buyers switch over once the new file
+            passes review; subscribers get it automatically.
           </Panel>
-          {message ? (
-            <p role="status" className="m-0 text-sm text-ink-2">
-              {message}
-            </p>
-          ) : null}
         </aside>
       </div>
     </section>
   );
 }
 
-function Tile({ label, children }: { label: string; children: ReactNode }) {
+function Stats({
+  overview,
+  centsPerSol,
+  escrowLabel,
+}: {
+  overview: Overview | null;
+  centsPerSol: string | null;
+  escrowLabel: string;
+}) {
+  if (!overview) {
+    return (
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line lg:grid-cols-4">
+        {[0, 1, 2, 3].map((k) => (
+          <div key={k} className="bg-surface p-5">
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const o = overview;
+  const tiles = o.rating ? 5 : 4;
   return (
-    <div className="flex flex-col gap-1 bg-surface p-5">
-      <Label>{label}</Label>
-      <div className="tabular mt-1 flex flex-col font-mono">{children}</div>
+    <div
+      data-testid="studio-stats"
+      className={`grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line ${tiles === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}
+    >
+      <Tile label={`Revenue · ${o.days}d`} testid="stat-revenue" wide>
+        <Money
+          lamports={o.revenue.total}
+          centsPerSol={centsPerSol}
+          stacked
+          strong
+          className="text-2xl"
+        />
+        <Spark values={o.revenue.daily} />
+      </Tile>
+      <Tile label={`Sales · ${o.days}d`} testid="stat-sales">
+        <span className="text-2xl font-semibold">{o.sales.total30d}</span>
+        <span className="text-[12px] text-muted">{o.sales.last7d} in the last 7 days</span>
+        <Spark values={o.sales.daily} />
+      </Tile>
+      <Tile label="Update subscribers" testid="stat-subs">
+        <span className="text-2xl font-semibold">{o.updates.paying}</span>
+        <span className="text-[12px] text-muted">
+          <Money lamports={o.updates.monthly} /> / month recurring
+        </span>
+      </Tile>
+      {o.rating ? (
+        <Tile label="Rating" testid="stat-rating">
+          <span className="text-2xl font-semibold">★ {o.rating.avg.toFixed(1)}</span>
+          <span className="text-[12px] text-muted">
+            {o.rating.count} review{o.rating.count === 1 ? '' : 's'} · {o.disputes.upheld} disputes
+            upheld
+          </span>
+          <ul className="m-0 mt-2 space-y-1 p-0" aria-label="Rating breakdown">
+            {o.rating.distribution.map((n, i) => (
+              <li key={i} className="flex list-none items-center gap-2 text-[11px] text-muted">
+                <span className="w-2">{5 - i}</span>
+                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-inset">
+                  <span
+                    className="block h-full rounded-full bg-accent"
+                    style={{ width: `${barShare(n, o.rating!.distribution)}%` }}
+                  />
+                </span>
+                <span className="w-5 text-right">{n}</span>
+              </li>
+            ))}
+          </ul>
+        </Tile>
+      ) : null}
+      <Tile label="Paid out · all time" testid="stat-paid">
+        <Money
+          lamports={o.payouts.sent}
+          centsPerSol={centsPerSol}
+          stacked
+          strong
+          className="text-2xl"
+        />
+        <span className="text-[12px] text-muted">
+          <Money lamports={o.payouts.inEscrow} /> in {escrowLabel} escrow
+        </span>
+      </Tile>
     </div>
+  );
+}
+
+function Spark({ values }: { values: readonly (string | number)[] }) {
+  const points = sparkPoints(values, 160, 32);
+  if (!points)
+    return <span className="mt-2 block h-8 text-[11px] text-faint">No activity yet</span>;
+  return (
+    <svg
+      viewBox="0 0 160 32"
+      className="mt-2 h-8 w-full"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke="var(--color-accent)"
+        strokeWidth="1.5"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+function Tile({
+  label,
+  testid,
+  wide = false,
+  children,
+}: {
+  label: string;
+  testid: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-testid={testid}
+      className={`flex min-w-0 flex-col gap-1 bg-surface p-4 sm:p-5 ${wide ? 'col-span-2 lg:col-span-1' : ''}`}
+    >
+      <Label>{label}</Label>
+      <div className="tabular mt-1 flex flex-col gap-0.5 font-mono">{children}</div>
+    </div>
+  );
+}
+
+function Checklist({
+  requirements,
+  overview,
+  centsPerSol,
+  bond,
+  setBond,
+  onStake,
+  wallet,
+}: {
+  requirements: Requirements | null;
+  overview: Overview | null;
+  centsPerSol: string | null;
+  bond: string;
+  setBond: (v: string) => void;
+  onStake: () => void;
+  wallet: string;
+}) {
+  const filled = overview?.creator.profileFilled;
+  const needed = requirements ? [true, requirements.xLinked, requirements.bondOk, true] : [];
+  return (
+    <section
+      aria-labelledby="ready-heading"
+      className="rounded-panel border border-line bg-surface p-5"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 id="ready-heading" className="m-0 text-base font-semibold">
+          Ready to sell
+        </h2>
+        {requirements ? (
+          <Tag tone={needed.every(Boolean) ? 'ok' : 'warn'}>
+            {needed.filter(Boolean).length} of {needed.length} required
+          </Tag>
+        ) : null}
+      </div>
+      {requirements ? (
+        <ul className="m-0 mt-4 grid gap-4 p-0 text-sm sm:grid-cols-2 xl:grid-cols-5">
+          <Requirement ok title="Wallet signed in">
+            <span className="mt-1 block font-mono text-[12px] text-ink-2">
+              {shortWallet(wallet)} · payouts land here
+            </span>
+          </Requirement>
+          <Requirement ok={requirements.xLinked} title="X account linked">
+            <Link
+              href="/studio/profile#socials"
+              data-testid="link-x-profile"
+              className="mt-1 block text-[13px] text-accent hover:text-accent-hover"
+            >
+              {requirements.xLinked ? 'Manage in your profile →' : 'Link X in your profile →'}
+            </Link>
+          </Requirement>
+          <Requirement ok={requirements.bondOk} title="Creator bond">
+            <span className="mt-1 block text-[13px] text-ink-2">
+              <Money lamports={requirements.bondActive} centsPerSol={centsPerSol} /> of{' '}
+              <Money lamports={requirements.bondRequired} centsPerSol={centsPerSol} /> required
+            </span>
+            <form
+              className="mt-2 flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onStake();
+              }}
+            >
+              <input
+                className="h-9 w-20 rounded-ctl border border-line-control bg-inset px-3 font-mono text-sm"
+                value={bond}
+                inputMode="decimal"
+                onChange={(event) => setBond(event.target.value)}
+                aria-label="Bond SOL"
+              />
+              <Button type="submit" variant="secondary" size="sm">
+                Stake bond
+              </Button>
+            </form>
+          </Requirement>
+          <Requirement ok title="Verification fee">
+            <span className="mt-1 block text-[13px] text-ink-2">
+              {requirements.verificationFee === '0' ? (
+                'Free right now'
+              ) : requirements.feeWaived ? (
+                'Waived for your tier'
+              ) : (
+                <>
+                  <Money lamports={requirements.verificationFee} centsPerSol={centsPerSol} /> per
+                  version, paid at upload
+                </>
+              )}
+            </span>
+          </Requirement>
+          <li className="flex list-none gap-3 border-line-soft xl:border-l xl:pl-4">
+            <span className="font-mono text-[12px] text-muted">
+              {filled ? `${filled.done}/${filled.of}` : '–'}
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="font-medium">Public profile</span>{' '}
+              <span className="font-mono text-[11px] text-muted">optional</span>
+              <span className="mt-1 block text-[13px] text-ink-2">
+                Name, bio, avatar, banner and X.
+              </span>
+              <Link
+                href="/studio/profile"
+                className="mt-1 block text-[13px] text-accent hover:text-accent-hover"
+              >
+                {filled && filled.done === filled.of ? 'Edit profile →' : 'Finish your profile →'}
+              </Link>
+            </div>
+          </li>
+        </ul>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -479,6 +731,153 @@ function Requirement({
         <span className="font-medium">{title}</span>
         <span className="sr-only">{ok ? ' (done)' : ' (needed)'}</span>
         {children}
+      </div>
+    </li>
+  );
+}
+
+function PayoutCell({
+  label,
+  note,
+  children,
+}: {
+  label: string;
+  note: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="bg-surface px-5 py-4">
+      <Label>{label}</Label>
+      <div className="mt-1 text-lg font-semibold">
+        {children ?? <Skeleton className="h-6 w-20" />}
+      </div>
+      <p className="m-0 mt-0.5 text-[12px] text-muted">{note}</p>
+    </div>
+  );
+}
+
+function ListingRow({
+  listing: l,
+  centsPerSol,
+}: {
+  listing: OverviewListing;
+  centsPerSol: string | null;
+}) {
+  const action = actionFor(l);
+  const meta = categoryMeta(l.category);
+  const status = statusOf(l);
+  return (
+    <tr className="border-t border-line-soft" data-testid="studio-listing-row">
+      <td className="px-5 py-3">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-14 shrink-0 place-items-center overflow-hidden rounded-tag border border-line-soft bg-inset font-mono text-[9px] text-muted">
+            {l.coverUrl ? (
+              <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              meta.tag
+            )}
+          </span>
+          <div className="min-w-0">
+            <Link
+              href={`/l/${l.slug}`}
+              className="block truncate font-medium hover:text-accent-hover"
+            >
+              {l.title}
+            </Link>
+            <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+              <span className="font-mono text-[10px] uppercase tracking-wide">{meta.tag}</span>·
+              <Link href={`/studio/listings/${l.id}/content`} className="hover:text-ink">
+                Edit page
+              </Link>
+            </span>
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-3">
+        <StatusTag status={status} />
+        <span className="mt-1 block text-[11px] text-muted">{statusNote(l)}</span>
+      </td>
+      <td className="px-3 py-3 font-mono text-xs text-ink-2">
+        {l.latest && status !== 'live' && l.latest.semver !== l.live?.semver
+          ? `v${l.latest.semver}`
+          : l.live
+            ? `v${l.live.semver}`
+            : '–'}
+      </td>
+      <td className="px-3 py-3 text-right">
+        <Money lamports={l.price} centsPerSol={centsPerSol} stacked />
+      </td>
+      <td className="tabular px-3 py-3 text-right font-mono">
+        {l.sales7d}
+        <span className="block text-[11px] text-muted">{l.sales} total</span>
+      </td>
+      <td className="tabular px-3 py-3 text-right font-mono">{l.subscribers || '–'}</td>
+      <td className="tabular px-3 py-3 text-right font-mono">
+        {l.rating ? `★ ${l.rating.avg.toFixed(1)}` : '–'}
+      </td>
+      <td className="px-5 py-3 text-right">
+        {action ? (
+          <ButtonLink
+            href={action.href}
+            data-testid={action.testid}
+            size="sm"
+            variant={action.tone === 'primary' ? 'primary' : 'secondary'}
+            className={action.tone === 'warn' ? 'border-warn-line text-warn' : ''}
+          >
+            {action.label}
+          </ButtonLink>
+        ) : null}
+      </td>
+    </tr>
+  );
+}
+
+function ListingCard({
+  listing: l,
+  centsPerSol,
+}: {
+  listing: OverviewListing;
+  centsPerSol: string | null;
+}) {
+  const action = actionFor(l);
+  const meta = categoryMeta(l.category);
+  return (
+    <li className="list-none border-t border-line-soft px-4 py-4 first:border-t-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link href={`/l/${l.slug}`} className="block truncate font-medium">
+            {l.title}
+          </Link>
+          <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-wide text-muted">
+            {meta.tag}
+            {l.live ? <span className="normal-case"> · v{l.live.semver}</span> : null}
+          </span>
+        </div>
+        <Money lamports={l.price} centsPerSol={centsPerSol} className="text-sm" />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <StatusTag status={statusOf(l)} />
+        <span className="text-[11px] text-muted">{statusNote(l)}</span>
+      </div>
+      <p className="m-0 mt-2 font-mono text-[12px] text-ink-2">
+        {l.sales7d} sales 7d · {l.sales} total
+        {l.subscribers ? ` · ${l.subscribers} subs` : ''}
+        {l.rating ? ` · ★ ${l.rating.avg.toFixed(1)}` : ''}
+      </p>
+      <div className="mt-3 flex gap-2">
+        {action ? (
+          <ButtonLink
+            href={action.href}
+            data-testid={`${action.testid}-mobile`}
+            size="sm"
+            variant={action.tone === 'primary' ? 'primary' : 'secondary'}
+          >
+            {action.label}
+          </ButtonLink>
+        ) : null}
+        <ButtonLink href={`/studio/listings/${l.id}/content`} size="sm" variant="ghost">
+          Edit page
+        </ButtonLink>
       </div>
     </li>
   );

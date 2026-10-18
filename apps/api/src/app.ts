@@ -77,6 +77,7 @@ import {
   saveProfile,
   uploadProfileImage,
 } from './profile';
+import { studioOverview } from './studio';
 import {
   activeBond,
   applyPayment,
@@ -1347,6 +1348,11 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         })),
       }),
     );
+  });
+
+  api.get('/studio/overview', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await studioOverview(deps, user)));
   });
 
   api.get('/studio/listings', async (c) => {
