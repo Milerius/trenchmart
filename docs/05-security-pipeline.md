@@ -46,13 +46,13 @@ Pure function: `scan(file: {name, bytes}, category) → { engineVer, checks: Che
 
 ### Rules for data files
 
-| Category      | rule_id          | Check                                                                                                           |
-| ------------- | ---------------- | --------------------------------------------------------------------------------------------------------------- |
-| `wallet_list` | `wl-schema`      | JSON array or CSV with `address` column; each a valid base58 32-byte pubkey; ≤ 5000 rows; dedupe count reported |
-| `wallet_list` | `wl-no-programs` | Warn if addresses are known program IDs or the creator's own wallet                                             |
-| `filter`      | `filter-schema`  | Valid JSON matching `packages/shared/schemas/filter.ts` (per-terminal schema, unknown keys warn)                |
-| any           | `links`          | URLs extracted; warn if not https or on a blocklist (`BLOCKLIST_HOSTS` config)                                  |
-| `strategy`    | `doc-safe`       | `.md` only text; `.pdf` reject JavaScript/embedded files/launch actions (`pdf-lib` inspect)                     |
+| Category      | rule_id          | Check                                                                                                                                                                                                                                                                |
+| ------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `wallet_list` | `wl-schema`      | Wallet-tracker standard export, JSON array, CSV with `address` column, or TXT one per line; each a valid base58 32-byte pubkey; ≤ 5000 rows; fails with no wallets. The unique count is stored on the version as the verified wallet count (`versions.wallet_count`) |
+| `wallet_list` | `wl-no-programs` | Warn if addresses are known program IDs or the creator's own wallet                                                                                                                                                                                                  |
+| `filter`      | `filter-schema`  | Valid JSON matching `packages/shared/schemas/filter.ts` (per-terminal schema, unknown keys warn)                                                                                                                                                                     |
+| any           | `links`          | URLs extracted; warn if not https or on a blocklist (`BLOCKLIST_HOSTS` config)                                                                                                                                                                                       |
+| `strategy`    | `doc-safe`       | `.md` only text; `.pdf` reject JavaScript/embedded files/launch actions (`pdf-lib` inspect)                                                                                                                                                                          |
 
 `summary` = worst of results (`fail > warn > pass`). Store every check as a `scan_checks` row with locations (line/col/snippet ≤ 200 chars). Bump `engineVer` whenever rules change; re-scan live versions in the background and flag regressions to admins.
 

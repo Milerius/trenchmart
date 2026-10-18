@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { categoryMeta } from '@trenchmart/shared/categories';
 import { quote as quoteFor } from '@trenchmart/shared/fee';
-import { specRows } from '@trenchmart/shared/listing-kinds';
+import { specRows, walletCountLabel, type WalletCount } from '@trenchmart/shared/listing-kinds';
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
@@ -68,6 +68,8 @@ export type Listing = {
     declared?: Record<string, string[]>;
     review: { agentId: string; decision: string; signedAt?: string } | null;
   } | null;
+  /** Wallet lists: the live version's wallet count, counted from its file by the scan. */
+  walletCount?: WalletCount | null;
   creator: { handle: string | null; wallet: string; bondLamports: string };
   preview: string | null;
   /** Approved rich content. Drafts never reach the public listing. */
@@ -79,7 +81,14 @@ export type Listing = {
   } | null;
 };
 
-type VersionNote = { semver: string; changelog: string; created_at: string; status: string };
+type VersionNote = {
+  semver: string;
+  changelog: string;
+  created_at: string;
+  status: string;
+  /** Wallet lists: unique Solana addresses the scan counted in this version's file. */
+  walletCount?: number | null;
+};
 
 type Quote = {
   price: string;
@@ -275,6 +284,14 @@ export function ListingView({ initial }: { initial: Listing | null }) {
         <p className="mt-2 text-[17px] text-ink-2">{listing.summary}</p>
         <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
           <CreatorLink creator={listing.creator} />
+          {listing.walletCount ? (
+            <span
+              data-testid="wallet-count"
+              title={`Counted by the security scan from the v${listing.walletCount.semver} file`}
+            >
+              {walletCountLabel(listing.walletCount.count)}
+            </span>
+          ) : null}
           {listing.sales7d ? <span>{listing.sales7d} sold this week</span> : null}
           {rating ? (
             <span>
@@ -373,7 +390,12 @@ export function ListingView({ initial }: { initial: Listing | null }) {
           {tab === 'howto' ? (
             <HowToPanel
               content={listing.content}
-              specs={specRows(listing.kind, listing.specs, listing.terminals)}
+              specs={specRows(
+                listing.kind,
+                listing.specs,
+                listing.terminals,
+                listing.walletCount?.count ?? null,
+              )}
             />
           ) : null}
           {tab === 'changelog' ? <ChangelogPanel versions={versions} /> : null}
@@ -673,6 +695,11 @@ function ChangelogPanel({ versions }: { versions: VersionNote[] }) {
               <span className="font-mono text-sm font-semibold text-ink">v{version.semver}</span>
               {index === 0 ? <Tag tone="ok">LATEST</Tag> : null}
               <span className="font-mono text-[11px] text-muted">{utc(version.created_at)}</span>
+              {typeof version.walletCount === 'number' ? (
+                <span className="font-mono text-[11px] text-muted">
+                  · {walletCountLabel(version.walletCount)}
+                </span>
+              ) : null}
             </p>
             {version.changelog ? (
               <Markdown source={version.changelog} links={false} className="mt-2 text-sm" />
