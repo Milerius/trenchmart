@@ -8,7 +8,7 @@ workers_dev = true
 [vars]
 WEB_URL = "https://trenchmart.fun"
 API_URL = "https://api.trenchmart.fun"
-RPC_URL = "https://api.devnet.solana.com"
+RPC_URL = "https://solana-devnet.api.onfinality.io/public" # api.devnet.solana.com answers 403 to Workers
 CLUSTER = "devnet"
 
 [triggers]
