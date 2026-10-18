@@ -201,6 +201,18 @@ export function WalletMenu() {
             >
               Disconnect
             </button>
+            <button
+              type="button"
+              role="menuitem"
+              data-testid="menu-logout-all"
+              className={itemClass.replace('text-ink', 'text-danger')}
+              onClick={() => {
+                setOpen(false);
+                void wallet.logoutEverywhere();
+              }}
+            >
+              Log out everywhere
+            </button>
           </div>
         </div>
       ) : null}

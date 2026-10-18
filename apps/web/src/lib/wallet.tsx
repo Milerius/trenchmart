@@ -89,6 +89,8 @@ type WalletContextValue = {
   /** Signs in with the connected wallet's current account (one signature). */
   signIn: () => Promise<void>;
   logout: () => Promise<void>;
+  /** Ends every wallet session of this user on the server (all devices), then this one. */
+  logoutEverywhere: () => Promise<void>;
   clearError: () => void;
   signAndSend: (txBase64: string) => Promise<string>;
   /** Signs a plain-text message (free, no transaction); returns the base58 signature. */
@@ -587,6 +589,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     ]);
   }
 
+  /** Revokes every session on the server first, then signs out here. Never throws. */
+  async function logoutEverywhere() {
+    await api('/auth/logout-all', { method: 'POST' }).catch(() => undefined);
+    await logout();
+  }
+
   /** The signed-in wallet's signer, reconnected silently after a reload. */
   async function activeSigner(): Promise<Signer> {
     let signer = signerRef.current;
@@ -656,6 +664,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       connect,
       signIn,
       logout,
+      logoutEverywhere,
       clearError: () => setError(''),
       signAndSend,
       signMessage,

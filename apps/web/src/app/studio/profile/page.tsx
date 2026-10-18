@@ -23,6 +23,7 @@ import {
 import { Button, ButtonLink, ErrorState, Label, Skeleton, Square, Tag } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useWallet } from '@/lib/wallet';
+import { SessionsCard } from '@/components/sessions-card';
 import { xResultMessage, type XResult } from '@/lib/x-result';
 
 type OwnProfile = {
@@ -818,6 +819,7 @@ export default function EditProfilePage() {
               adds a trust badge buyers can see.
             </p>
           </div>
+          <SessionsCard />
         </aside>
       </div>
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line-strong bg-surface-2/95 backdrop-blur">

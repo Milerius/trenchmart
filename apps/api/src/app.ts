@@ -170,6 +170,9 @@ const SESSION_REFRESH_AFTER_S = 24 * 3600;
 type Vars = { user: Record<string, any> | null; apiKey: ApiKeyContext | null };
 /** Expiry (unix seconds) of the session cookie that authenticated each request. */
 const sessionExpiry = new WeakMap<Request, number>();
+/** Server-side session row (sessions.id) behind the request's tm_session cookie. */
+const sessionIds = new WeakMap<Request, string>();
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 type App = Hono<{ Variables: Vars }>;
 
 /** Watchdog push for the status page: exactly its three checks, ok + latency, nothing else. */
@@ -344,17 +347,23 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       c.set('user', authed.user);
       c.set('apiKey', authed.key);
     } else if (token) {
-      const payload = await verifyJwt<{ sub?: string; exp?: number }>(
+      const payload = await verifyJwt<{ sub?: string; exp?: number; sid?: string }>(
         token,
         deps.env.sessionSecret,
         deps.now().getTime(),
       );
-      if (payload?.sub) {
-        const rows = await deps.sql<
-          Record<string, any>[]
-        >`select * from users where id = ${payload.sub}`;
+      // A valid signature is not enough: the session row must exist, be unrevoked and
+      // unexpired. Same single query as before (the user row), joined on the session, so
+      // revocation costs no extra round trip. Tokens without a sid (pre-revocation) fail.
+      if (payload?.sub && typeof payload.sid === 'string' && SESSION_ID.test(payload.sid)) {
+        const rows = await deps.sql<Record<string, any>[]>`
+          select u.* from sessions s join users u on u.id = s.user_id
+          where s.id = ${payload.sid} and s.user_id = ${payload.sub}
+            and s.revoked_at is null and s.expires_at > ${deps.now()}
+        `;
         if (rows[0]) {
           c.set('user', rows[0]);
+          sessionIds.set(c.req.raw, payload.sid);
           if (typeof payload.exp === 'number') sessionExpiry.set(c.req.raw, payload.exp);
         }
       }
@@ -429,9 +438,34 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/files', async (c) => serveFile(c, deps, 'GET'));
   api.put('/files', async (c) => serveFile(c, deps, 'PUT'));
 
-  async function issueSession(c: Parameters<typeof setCookie>[0], userId: string): Promise<number> {
+  /**
+   * New session row + cookie, or (refresh) slide an existing live row forward. A revoked or
+   * expired row is never revived: the update matches nothing and the refresh is refused.
+   */
+  async function issueSession(
+    c: Parameters<typeof setCookie>[0],
+    userId: string,
+    refreshSid?: string,
+  ): Promise<number> {
     const exp = Math.floor(deps.now().getTime() / 1000) + SESSION_TTL_S;
-    const token = await signJwt({ sub: userId, exp }, deps.env.sessionSecret);
+    const expiresAt = new Date(exp * 1000);
+    let sid: string;
+    if (refreshSid) {
+      const rows = await deps.sql<{ id: string }[]>`
+        update sessions set expires_at = ${expiresAt}
+        where id = ${refreshSid} and user_id = ${userId}
+          and revoked_at is null and expires_at > ${deps.now()}
+        returning id
+      `;
+      if (!rows[0]) throw new HttpError(401, 'SESSION_REVOKED', 'sign in again');
+      sid = rows[0].id;
+    } else {
+      const rows = await deps.sql<{ id: string }[]>`
+        insert into sessions (user_id, expires_at) values (${userId}, ${expiresAt}) returning id
+      `;
+      sid = rows[0]!.id;
+    }
+    const token = await signJwt({ sub: userId, exp, sid }, deps.env.sessionSecret);
     setCookie(c, 'tm_session', token, {
       httpOnly: true,
       sameSite: 'Lax',
@@ -506,21 +540,39 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     }
     const user = users[0];
     if (!user) throw new HttpError(500, 'INTERNAL', 'could not create user');
+    // Signing in (another wallet, or again) replaces the session this browser held: revoke it.
+    const replaced = sessionIds.get(c.req.raw);
+    if (replaced) await revokeSessions(deps, { sid: replaced }, 'switch');
     const exp = await issueSession(c, user.id as string);
     return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
   });
 
   // Idempotent: an expired or missing session still gets its cookie cleared, so the
   // browser never stays half signed in because logout answered 401.
-  api.post('/auth/logout', (c) => {
+  // Logout revokes the session row on the server, so a copied token stops working too.
+  api.post('/auth/logout', async (c) => {
+    const sid = sessionIds.get(c.req.raw);
+    if (sid) await revokeSessions(deps, { sid }, 'logout');
     setCookie(c, 'tm_session', '', { httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 0 });
     return c.body(null, 204);
+  });
+
+  // Ends every wallet session of this user (all browsers and devices). API keys are separate
+  // (revoked in the studio / DELETE /agent/keys/{id}); keys cannot call /auth/* at all.
+  api.post('/auth/logout-all', async (c) => {
+    const user = requireUser(c);
+    if (!sessionIds.get(c.req.raw)) throw new HttpError(401, 'UNAUTHORIZED', 'sign in first');
+    const revoked = await revokeSessions(deps, { userId: user.id as string }, 'logout_all');
+    setCookie(c, 'tm_session', '', { httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 0 });
+    return c.json({ ok: true, revoked });
   });
 
   // One signature per session: a live session slides forward without a new wallet prompt.
   api.post('/auth/refresh', async (c) => {
     const user = requireUser(c);
-    const exp = await issueSession(c, user.id as string);
+    const sid = sessionIds.get(c.req.raw);
+    if (!sid) throw new HttpError(401, 'UNAUTHORIZED', 'sign in first');
+    const exp = await issueSession(c, user.id as string, sid);
     return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
   });
 
@@ -2299,4 +2351,23 @@ async function serveFile(c: any, deps: Deps, method: 'GET' | 'PUT') {
   }
   await deps.blob.put(key, bytes);
   return c.json({ ok: true, bytes: bytes.length });
+}
+
+/** Revokes one session, or every live session of a user. Returns how many were revoked. */
+export async function revokeSessions(
+  deps: Deps,
+  target: { sid: string } | { userId: string },
+  reason: 'logout' | 'logout_all' | 'switch' | 'admin',
+): Promise<number> {
+  const rows =
+    'sid' in target
+      ? await deps.sql`
+          update sessions set revoked_at = ${deps.now()}, revoked_reason = ${reason}
+          where id = ${target.sid} and revoked_at is null returning id
+        `
+      : await deps.sql`
+          update sessions set revoked_at = ${deps.now()}, revoked_reason = ${reason}
+          where user_id = ${target.userId} and revoked_at is null returning id
+        `;
+  return rows.length;
 }

@@ -10,7 +10,8 @@ Legend: 🔓 public · 👤 signed in · 🛠 creator · 🔍 verifier · 🛡 a
 | ------ | ------------------ | --- | ------------------------------------------------------------------------------- |
 | POST   | `/auth/nonce`      | 🔓  | `{wallet}` → `{nonce, message}`                                                 |
 | POST   | `/auth/verify`     | 🔓  | `{wallet, signature}` → sets cookie, `{user}`                                   |
-| POST   | `/auth/logout`     | 👤  | → 204                                                                           |
+| POST   | `/auth/logout`     | 👤  | revokes this session on the server → 204                                        |
+| POST   | `/auth/logout-all` | 👤  | revokes every session of this wallet → `{ok, revoked}` (API keys unaffected)    |
 | GET    | `/me`              | 👤  | → `{user, roles, tier, tierDetail:{minBalance, windowHours, nextTier, needed}}` |
 | GET    | `/auth/x/start`    | 👤  | → 302 to X OAuth                                                                |
 | GET    | `/auth/x/callback` | 👤  | → links X, 302 to studio                                                        |
