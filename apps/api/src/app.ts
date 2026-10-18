@@ -79,6 +79,7 @@ import {
 import { studioOverview } from './studio';
 import { registerReviewRoutes } from './reviews';
 import { computeRanks, registerUpvoteRoutes } from './ranking';
+import { paidToCreators, registerLeaderboardRoutes } from './leaderboard';
 import { scanWalletIntel } from './social';
 import {
   activeBond,
@@ -617,6 +618,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   registerReviewRoutes(api, deps);
   // Weighted listing upvotes (ranking.ts).
   registerUpvoteRoutes(api, deps);
+  // Creator leaderboard and the live activity feed (leaderboard.ts); before /creators/:handle.
+  registerLeaderboardRoutes(api, deps);
 
   api.get('/creators/top', async (c) => {
     const rows = await deps.sql<Record<string, any>[]>`
@@ -1517,9 +1520,15 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/stats', async (c) => {
     const stats = await landingStats(deps);
     const price = await solPrice();
+    const paid = await paidToCreators(deps);
     return c.json(
       jsonSafe({
         ...stats,
+        paidToCreators: {
+          ...moneyView(paid.lamports, price.centsPerSol, formatSol(paid.lamports)),
+          last24hLamports: paid.last24h,
+          orders: paid.orders,
+        },
         volume: moneyView(
           BigInt(stats.volumeLamports),
           price.centsPerSol,
