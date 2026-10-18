@@ -33,7 +33,8 @@ const REQ = {
   bondOk: true,
   verificationFee: '0',
   feeWaived: false,
-  bondByCategory: CONFIG.bondLamportsByCategory,
+  bondByCategory: CONFIG.bondLamportsByCategory as Record<string, string>,
+  bondRequiredByCategory: CONFIG.bondLamportsByCategory as Record<string, string>,
 };
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -421,6 +422,59 @@ test('review: an unverified creator (no X) with the bond can submit; X is a gent
       path: `${process.env.X_OPTIONAL_SHOTS}/wizard-submit-no-x.png`,
     });
   }
+});
+
+test('review: the bond shown and enforced is the one creation checks (bondRequiredByCategory)', async ({
+  page,
+}) => {
+  const seed = (key: string) =>
+    page.addInitScript((k) => {
+      localStorage.setItem(
+        k,
+        JSON.stringify({ version: 1, step: 7, kind: 'script', terminals: ['Axiom'] }),
+      );
+    }, key);
+  // A live 5 SOL listing raises the userscript bond above its 1 SOL list price.
+  await stub(page, {
+    req: {
+      bondActive: '1000000000',
+      bondByCategory: { userscript: '1000000000', wallet_list: '2000000000' },
+      bondRequiredByCategory: { userscript: '5000000000', wallet_list: '5000000000' },
+    },
+  });
+  await seed(`tm:new-listing:${SESSION.user.wallet}:bond-draft`);
+  await page.goto('/studio/listings/new?draft=bond-draft');
+  await expect(page.getByTestId('submit-card')).toContainText('5.00 SOL needed');
+  await expect(page.getByTestId('bond-short')).toContainText('needs a 5.00 SOL bond');
+  await page.getByText('The file does what this listing says').click();
+  await expect(page.getByTestId('submit')).toBeDisabled();
+  if (process.env.BOND_SHOTS) {
+    await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
+    await page.getByTestId('submit-card').screenshot({
+      path: `${process.env.BOND_SHOTS}/wizard-bond-short.png`,
+    });
+  }
+});
+
+test('review: with the bond creation checks met, submit is allowed', async ({ page }) => {
+  await stub(page, {
+    req: {
+      bondActive: '1000000000',
+      bondByCategory: { userscript: '1000000000', wallet_list: '2000000000' },
+      bondRequiredByCategory: { userscript: '1000000000', wallet_list: '2000000000' },
+    },
+  });
+  await page.addInitScript((k) => {
+    localStorage.setItem(
+      k,
+      JSON.stringify({ version: 1, step: 7, kind: 'script', terminals: ['Axiom'] }),
+    );
+  }, `tm:new-listing:${SESSION.user.wallet}:bond-ok`);
+  await page.goto('/studio/listings/new?draft=bond-ok');
+  await expect(page.getByTestId('submit-card')).toContainText('1.00 SOL staked');
+  await expect(page.getByTestId('bond-short')).toHaveCount(0);
+  await page.getByText('The file does what this listing says').click();
+  await expect(page.getByTestId('submit')).toBeEnabled();
 });
 
 test('the draft survives a reload on this device', async ({ page }) => {

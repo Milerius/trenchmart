@@ -376,6 +376,58 @@ async function userById(sql: Sql, id: string): Promise<Row> {
   return user;
 }
 
+/**
+ * The one source of truth for creator bonds, used by GET /studio/requirements, listing
+ * creation and the pause-after-slash check. Listing in a category needs the bond of the
+ * creator's live categories plus that category (the highest of them, OG discount applied).
+ */
+export type BondStatus = {
+  active: bigint;
+  /** Bond the live listings need (what a slash below pauses). */
+  live: bigint;
+  /** Per category: the bond needed to create a listing there now. */
+  requiredByCategory: Record<string, bigint>;
+  /** The cheapest category to list in: what "bondRequired" reports. */
+  required: bigint;
+};
+
+export async function bondStatus(
+  deps: Deps,
+  user: { id: string; wallet: string },
+  config?: AppConfig,
+): Promise<BondStatus> {
+  const cfg = config ?? (await loadConfig(deps));
+  const [rows, active, tier] = await Promise.all([
+    deps.sql<{ category: string }[]>`
+      select distinct category from listings
+      where creator_id = ${user.id} and delisted_at is null and live_version_id is not null
+    `,
+    activeBond(deps.sql, user.id),
+    tierForWallet(deps, user.wallet, cfg),
+  ]);
+  const liveCategories = rows.map((row) => row.category);
+  const need = (categories: string[]) =>
+    requiredBondLamports(
+      categories,
+      cfg.bond_lamports_by_category,
+      tier.tier,
+      cfg.og_bond_discount_bps,
+    );
+  const requiredByCategory: Record<string, bigint> = {};
+  for (const category of Object.keys(cfg.bond_lamports_by_category))
+    requiredByCategory[category] = need([...liveCategories, category]);
+  const values = Object.values(requiredByCategory);
+  const live = need(liveCategories);
+  const required = values.length
+    ? values.reduce((min, value) => (value < min ? value : min))
+    : live;
+  return { active, live, requiredByCategory, required };
+}
+
+/** Bond needed to create a listing in `category` (unknown categories need the live bond). */
+export const bondFor = (status: BondStatus, category: string): bigint =>
+  status.requiredByCategory[category] ?? status.live;
+
 export async function activeBond(sql: Sql, userId: string): Promise<bigint> {
   const rows = await sql<{ amount: bigint }[]>`
     select coalesce(sum(amount), 0)::bigint as amount from bonds
@@ -1007,22 +1059,12 @@ async function slash(deps: Deps, userId: string, lamports: bigint, refId: string
     `;
     left -= cut;
   }
-  const config = await loadConfig(deps);
-  const categories = await deps.sql<{ category: string }[]>`
-    select distinct category from listings where creator_id = ${userId} and delisted_at is null and live_version_id is not null
-  `;
-  const tier = await tierForWallet(
-    deps,
-    (await userById(deps.sql, userId)).wallet as string,
-    config,
-  );
-  const required = requiredBondLamports(
-    categories.map((row) => row.category),
-    config.bond_lamports_by_category,
-    tier.tier,
-    config.og_bond_discount_bps,
-  );
-  if ((await activeBond(deps.sql, userId)) < required) {
+  const status = await bondStatus(deps, {
+    id: userId,
+    wallet: (await userById(deps.sql, userId)).wallet as string,
+  });
+  const required = status.live;
+  if (status.active < required) {
     await deps.sql`update listings set paused_at = ${deps.now()} where creator_id = ${userId} and paused_at is null`;
     await audit(deps.sql, null, 'user', userId, 'listings_paused', {
       required: required.toString(),

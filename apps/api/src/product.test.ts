@@ -704,6 +704,106 @@ describe('owner product decisions', () => {
     expect(del.status).toBe(409);
   });
 
+  it('bond: requirements report not-OK for a category exactly when creating a listing there is refused', async () => {
+    const app = await appFor();
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    const json = { cookie, 'content-type': 'application/json' };
+    const SOL = 1_000_000_000n;
+    await sql`
+      update config set value = ${sql.json({ userscript: 2_000_000_000, filter: 1_000_000_000, setup: 5_000_000_000 })}
+      where key = 'bond_lamports_by_category'
+    `;
+    const [user] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
+    type Reqs = {
+      bondRequired: string;
+      bondActive: string;
+      bondOk: boolean;
+      bondRequiredByCategory: Record<string, string>;
+      bondOkByCategory: Record<string, boolean>;
+    };
+    const requirements = async () =>
+      (await (
+        await app.request('/api/v1/studio/requirements', { headers: { cookie } })
+      ).json()) as Reqs;
+    const create = (category: string) =>
+      app.request('/api/v1/studio/listings', {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({
+          title: `Bond ${category}`,
+          summary: 'Bond check.',
+          description: 'Bond check.',
+          category,
+          terminals: category === 'userscript' ? ['Axiom'] : [],
+          priceLamports: '50000000',
+        }),
+      });
+    const setBond = async (lamports: bigint) => {
+      await sql`delete from bonds where user_id = ${user!.id}`;
+      if (lamports > 0n)
+        await sql`
+          insert into bonds (user_id, amount, tx_sig, status)
+          values (${user!.id}, ${lamports}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+        `;
+    };
+    const agree = async (stage: string) => {
+      const reqs = await requirements();
+      // bondOk is "can list somewhere": the cheapest category.
+      expect(reqs.bondOk, stage).toBe(Object.values(reqs.bondOkByCategory).some(Boolean));
+      expect(reqs.bondRequired, stage).toBe(
+        Object.values(reqs.bondRequiredByCategory)
+          .map(BigInt)
+          .reduce((a, b) => (b < a ? b : a))
+          .toString(),
+      );
+      for (const [category, ok] of Object.entries(reqs.bondOkByCategory)) {
+        const res = await create(category);
+        const body = (await res.json()) as { id?: string; error?: { code: string } };
+        expect(res.status, `${stage} ${category}`).toBe(ok ? 200 : 400);
+        if (!ok) expect(body.error?.code).toBe('BOND_REQUIRED');
+        else await sql`update listings set delisted_at = now() where id = ${body.id!}`;
+      }
+      return reqs;
+    };
+
+    // Below every category, at the cheapest one, between two, at the top.
+    for (const bond of [0n, SOL - 1n, SOL, 2n * SOL - 1n, 2n * SOL, 5n * SOL]) {
+      await setBond(bond);
+      await agree(`bond ${bond}`);
+    }
+    await setBond(SOL);
+    expect(await agree('1 SOL')).toMatchObject({
+      bondRequired: '1000000000',
+      bondOk: true,
+      bondOkByCategory: { filter: true, userscript: false, setup: false },
+    });
+
+    // A live 5 SOL listing raises every category to 5 SOL (a slash below would pause it), so
+    // the cheap categories are refused with a smaller bond, and requirements say so.
+    await setBond(5n * SOL);
+    const live = (await (await create('setup')).json()) as { id: string };
+    const [version] = await sql<{ id: string }[]>`
+      insert into versions (listing_id, semver, file_name, file_size, sha256, r2_key, status)
+      values (${live.id}, '1.0.0', 'bot.json', 2, ${'0'.repeat(64)}, 'k', 'live') returning id
+    `;
+    await sql`update listings set live_version_id = ${version!.id} where id = ${live.id}`;
+    await setBond(2n * SOL);
+    expect(await agree('live setup, 2 SOL')).toMatchObject({
+      bondRequired: '5000000000',
+      bondOk: false,
+      bondRequiredByCategory: {
+        filter: '5000000000',
+        userscript: '5000000000',
+        setup: '5000000000',
+      },
+    });
+    await setBond(5n * SOL);
+    expect((await agree('live setup, 5 SOL')).bondOk).toBe(true);
+  });
+
   it('an unverified creator (no X at all, X OAuth on) with the bond lists and publishes; the badge shows only once X is verified', async () => {
     const app = await appFor({ X_CLIENT_ID: 'client-1', X_CLIENT_SECRET: 'secret-1' });
     const creator = keypair();

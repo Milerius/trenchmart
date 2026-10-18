@@ -73,6 +73,8 @@ type Requirements = {
   verificationFee: string;
   feeWaived: boolean;
   bondByCategory?: Record<string, string>;
+  /** What creating a listing in each category checks (live listings and tier included). */
+  bondRequiredByCategory?: Record<string, string>;
 };
 
 type FileInfo = { file: File; sha: string; header: ScriptHeader | null };
@@ -194,7 +196,10 @@ export default function NewListingPage() {
   const updateLamports = draft.updatesOn ? lamportsOf(updateField || '0') : 0n;
   const median = useMemo(() => (peerPrices ? medianLamports(peerPrices) : null), [peerPrices]);
   const fee = req ? (req.feeWaived ? 0n : BigInt(req.verificationFee)) : null;
-  const categoryBond = req && category ? BigInt(req.bondByCategory?.[category] ?? '0') : 0n;
+  const categoryBond =
+    req && category
+      ? BigInt(req.bondRequiredByCategory?.[category] ?? req.bondByCategory?.[category] ?? '0')
+      : 0n;
   const bondShort = req ? BigInt(req.bondActive) < categoryBond : false;
   const freeDays = config?.updateFreeDays ?? 30;
 
@@ -952,7 +957,10 @@ export default function NewListingPage() {
             </p>
           ) : null}
           {bondShort ? (
-            <div className="mt-3 rounded-ctl border border-warn-line bg-warn-bg p-3 text-[12px] text-ink-2">
+            <div
+              data-testid="bond-short"
+              className="mt-3 rounded-ctl border border-warn-line bg-warn-bg p-3 text-[12px] text-ink-2"
+            >
               This category needs a {solText(categoryBond)} bond (OG tier gets a discount).{' '}
               <Link href="/studio" className="text-accent">
                 Stake in the studio →
@@ -977,7 +985,7 @@ export default function NewListingPage() {
             size="lg"
             className="mt-4 w-full"
             data-testid="submit"
-            disabled={!attested || !!busy}
+            disabled={!attested || !!busy || bondShort}
             aria-busy={!!busy || undefined}
             onClick={() =>
               void submit().catch((err: Error) => {
