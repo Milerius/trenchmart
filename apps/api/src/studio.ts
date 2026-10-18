@@ -17,6 +17,22 @@ export function dayIndex(at: Date, now: Date, days = OVERVIEW_DAYS): number {
 }
 
 /** Signed-in creator's dashboard: every number comes from orders, renewals, reviews and payouts. */
+const OVERVIEW_PARALLEL = 3;
+
+/** Runs the tasks with at most `n` in flight; results keep the input order. */
+export async function limited<T>(n: number, tasks: (() => PromiseLike<T> | T)[]): Promise<T[]> {
+  const out = new Array<T>(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const i = next++;
+      out[i] = await tasks[i]!();
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(n, tasks.length) }, worker));
+  return out;
+}
+
 export async function studioOverview(deps: Deps, user: Row) {
   const now = deps.now();
   const since = new Date(now.getTime() - (OVERVIEW_DAYS - 1) * DAY_MS);
@@ -97,7 +113,10 @@ export async function studioOverview(deps: Deps, user: Row) {
     order by l.created_at desc
   `;
 
-  // Independent reads: run them together (they were 12 round trips in a row).
+  // Independent reads, at most OVERVIEW_PARALLEL at a time (they were 12 round trips in a
+  // row). All 11 at once opened every pool connection through Hyperdrive at the same moment
+  // and about 1 request in 6 failed live ("Network connection lost", CONNECTION_CLOSED).
+  // postgres.js queries are lazy, so each one starts only when its slot awaits it.
   const [
     sales,
     renewals,
@@ -110,19 +129,31 @@ export async function studioOverview(deps: Deps, user: Row) {
     listings,
     profile,
     stats,
-  ] = await Promise.all([
-    salesQ,
-    renewalsQ,
-    subsQ,
-    freeQ,
-    ratingsQ,
-    disputesQ,
-    payoutsQ,
-    escrowQ,
-    listingsQ,
-    loadOwnProfile(deps, creatorId),
-    creatorStats(deps, creatorId),
-  ]);
+  ] = (await limited<unknown>(OVERVIEW_PARALLEL, [
+    () => salesQ,
+    () => renewalsQ,
+    () => subsQ,
+    () => freeQ,
+    () => ratingsQ,
+    () => disputesQ,
+    () => payoutsQ,
+    () => escrowQ,
+    () => listingsQ,
+    () => loadOwnProfile(deps, creatorId),
+    () => creatorStats(deps, creatorId),
+  ])) as unknown as [
+    Row[],
+    Row[],
+    Row[],
+    Row[],
+    Row[],
+    Row[],
+    Row[],
+    Row[],
+    Row[],
+    Awaited<ReturnType<typeof loadOwnProfile>>,
+    Awaited<ReturnType<typeof creatorStats>>,
+  ];
   const revenueDaily = Array.from({ length: OVERVIEW_DAYS }, () => 0n);
   const salesDaily = Array.from({ length: OVERVIEW_DAYS }, () => 0);
   let sales7d = 0;

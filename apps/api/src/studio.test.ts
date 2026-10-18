@@ -8,6 +8,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createSql, migrate, pendingMigrations, type Sql } from '@trenchmart/db';
 import { randomKeypair } from '@trenchmart/chain';
 import { createApp } from './app';
+import { limited } from './studio';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
 import type { Deps } from './logic';
@@ -267,5 +268,25 @@ describe('studio overview', () => {
     });
     await migrate(sql);
     expect((await createApp(deps).request('/api/v1/health')).status).toBe(200);
+  });
+});
+
+describe('overview reads are bounded', () => {
+  it('runs at most n tasks at once and keeps the input order', async () => {
+    let running = 0;
+    let peak = 0;
+    const task = (v: number, ms: number) => async () => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, ms));
+      running--;
+      return v;
+    };
+    const out = await limited(
+      3,
+      [5, 1, 4, 2, 3, 0, 6].map((v) => task(v, v * 3)),
+    );
+    expect(out).toEqual([5, 1, 4, 2, 3, 0, 6]);
+    expect(peak).toBe(3);
   });
 });
