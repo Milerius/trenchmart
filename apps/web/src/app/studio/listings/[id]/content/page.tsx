@@ -15,6 +15,7 @@ import { Button, ButtonLink, Label, Money, Panel, Square, StatusTag, Tag } from 
 import { solToLamports } from '@trenchmart/shared';
 import { solExact } from '@/lib/money';
 import type { ContentField } from '@/lib/listing-templates';
+import { toWebp } from '@/lib/webp';
 import { api, ApiError } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 
@@ -114,10 +115,11 @@ export default function ContentEditorPage() {
         },
       ]);
       try {
+        const upload = await toWebp(file);
         const saved = await api<StudioImage>(`/studio/listings/${params.id}/images`, {
           method: 'POST',
-          headers: { 'content-type': file.type },
-          body: file,
+          headers: { 'content-type': upload.type },
+          body: upload,
         });
         setImages((list) => list.map((image) => (image.id === temp ? saved : image)));
         setCover((value) => value ?? saved.id);

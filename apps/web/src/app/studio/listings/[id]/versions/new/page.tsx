@@ -237,8 +237,9 @@ export default function NewVersionPage() {
               <Money lamports={quota.supplementLamports} centsPerSol={centsPerSol} /> supplement
             </p>
             <p className="m-0 mt-1 text-ink-2">
-              {supplementReasonText(quota.reasons)} You pay it on chain with your wallet before the
-              file uploads, or wait until {utc(quota.resetsAt)}.
+              {supplementReasonText(quota.reasons, quota.limits.uploadsPerCreatorPerDay)} You pay it
+              on chain with your wallet before the file uploads, or wait until {utc(quota.resetsAt)}
+              .
             </p>
           </Panel>
         ) : null}

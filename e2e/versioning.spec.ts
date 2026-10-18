@@ -671,3 +671,27 @@ test('listing page states the seller update policy', async ({ page }) => {
     'Free updates for 30 days, then 0.01 SOL/month',
   );
 });
+
+test('studio: the free-upload count in the limit copy comes from config, not a constant', async ({
+  page,
+}) => {
+  const { secret, address } = wallet();
+  await setup(page, address, secret, ({ path }) => {
+    if (path === `/studio/listings/${LISTING_ID}/upload-quota`)
+      return {
+        json: quota({
+          uploadsToday: 7,
+          limits: { updatesPerListingPerDay: 1, uploadsPerCreatorPerDay: 7 },
+          reasons: ['creator_upload_limit'],
+          supplementRequired: true,
+        }),
+      };
+    return undefined;
+  });
+  await page.goto(`/studio/listings/${LISTING_ID}/versions/new`);
+  await expect(page.getByTestId('upload-limits')).toContainText('7 of 7 free uploads');
+  await expect(page.getByTestId('supplement-notice')).toContainText(
+    'You already used your 7 free uploads today (UTC).',
+  );
+  await expect(page.getByTestId('supplement-notice')).not.toContainText('5 free uploads');
+});

@@ -55,6 +55,8 @@ export type Env = {
   /** X OAuth 2.0 app (M-04). Empty: only the devnet-only unverified handle link works. */
   xClientId: string;
   xClientSecret: string;
+  /** Server-side wasm WebP re-encode at upload (CPU heavy; off unless IMAGE_OPTIMIZE=1). */
+  imageOptimize: boolean;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
 
@@ -189,6 +191,7 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     proxySecret: blank(source.PROXY_SECRET),
     xClientId: blank(source.X_CLIENT_ID),
     xClientSecret: blank(source.X_CLIENT_SECRET),
+    imageOptimize: source.IMAGE_OPTIMIZE === '1',
     r2:
       accountId && accessKeyId && secretAccessKey
         ? {
