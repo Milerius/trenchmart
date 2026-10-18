@@ -59,7 +59,66 @@ function blank(value: string | undefined): string {
   return trimmed;
 }
 
+const SECRET_NAMES = [
+  'SESSION_SECRET',
+  'INTERNAL_TOKEN',
+  'HELIUS_WEBHOOK_SECRET',
+  'AI_ATTEST_SECRET',
+] as const;
+const KNOWN_DEFAULTS = new Set([
+  'change-me',
+  'change-me-32-bytes-min',
+  'changeme',
+  'secret',
+  'dev',
+]);
+
+/** True when APP_URL points at a local machine (dev, tests, CI). */
+export function isLocalAppUrl(appUrl: string | undefined): boolean {
+  const value = blank(appUrl);
+  if (!value) return true;
+  try {
+    const host = new URL(value).hostname;
+    return (
+      host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * H-01: names of security secrets that are missing, a known default, or shorter than 32 bytes.
+ * Never returns values.
+ */
+export function weakSecrets(source: Record<string, string | undefined>): string[] {
+  return SECRET_NAMES.filter((name) => {
+    const value = source[name]?.trim() ?? '';
+    return (
+      !value ||
+      KNOWN_DEFAULTS.has(value.toLowerCase()) ||
+      /change-?me/i.test(value) ||
+      value.length < 32
+    );
+  });
+}
+
+export class InsecureConfigError extends Error {
+  constructor(readonly names: string[]) {
+    super(`refusing to start: weak or missing secrets: ${names.join(', ')}`);
+    this.name = 'InsecureConfigError';
+  }
+}
+
+/** Fail closed on any non-local deployment whose secrets are unset or defaults. */
+export function assertProductionSecrets(source: Record<string, string | undefined>): void {
+  if (isLocalAppUrl(source.APP_URL)) return;
+  const weak = weakSecrets(source);
+  if (weak.length) throw new InsecureConfigError(weak);
+}
+
 export function readEnv(source: Record<string, string | undefined> = process.env): Env {
+  assertProductionSecrets(source);
   const cluster = assertTestCluster(source.SOLANA_CLUSTER || 'devnet');
   const helius = blank(source.HELIUS_RPC_URL);
   const explicit = blank(source.SOLANA_RPC_URL);
