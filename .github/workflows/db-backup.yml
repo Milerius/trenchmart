@@ -2,7 +2,9 @@
 # Secrets (repo): TM_DATABASE_URL, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, TM_INTERNAL_TOKEN
 # Alerts go to the owner's chat, not email: the outcome is reported to
 # POST /internal/ops/report (check "db-backup"); the ops check raises BACKUP_FAILED on a
-# failure or when no report came for 26 h. The backup steps continue on error so the
+# failure or when no report came for 50 h (GitHub schedules can be skipped or late; one
+# missed night is tolerated, two are not). It needs psql and age, so it cannot run as a
+# Worker cron. The backup steps continue on error so the
 # scheduled run itself does not fail (a failed scheduled run emails the repo owner).
 # Decrypt locally: age -d -i ~/.config/trenchmart/backup-age.key backup.jsonl.age
 name: db-backup

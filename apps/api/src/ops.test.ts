@@ -8,10 +8,18 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createSql, migrate, type Sql } from '@trenchmart/db';
 import { randomKeypair } from '@trenchmart/chain';
 import { createApp } from './app';
+import { watchdog, type WatchdogEnv } from './watchdog';
 import { filesystemBlob, type BlobStore } from './blob';
 import { readEnv } from './env';
 import type { Deps } from './logic';
-import { deliverAlerts, opsCheck, postNtfy, recordOpsEvent } from './ops';
+import {
+  deliverAlerts,
+  opsCheck,
+  postNtfy,
+  recordHyperdriveReport,
+  recordOpsEvent,
+  recordScheduledReport,
+} from './ops';
 
 const databaseUrl =
   process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/postgres';
@@ -295,7 +303,7 @@ describe('monitoring and alerts', () => {
     expect(Array.isArray(body.open)).toBe(true);
   });
 
-  it('HYPERDRIVE_LIMIT: reported limit above 10, unreadable, or no report for 3 h', async () => {
+  it('HYPERDRIVE_LIMIT: reported limit above 10, unreadable, or no report for 24 h', async () => {
     const { deps } = await setup();
     const app = createApp(deps);
     const report = (body: unknown, token = TOKEN) =>
@@ -326,11 +334,11 @@ describe('monitoring and alerts', () => {
     await sql`delete from ops_events where kind = 'hyperdrive_limit'`;
     await sql`
       insert into ops_events (kind, detail, created_at)
-      values ('hyperdrive_limit', '{"limit":10,"source":"check"}', ${new Date(now.getTime() - 4 * 3_600_000)})
+      values ('hyperdrive_limit', '{"limit":10,"source":"check"}', ${new Date(now.getTime() - 25 * 3_600_000)})
     `;
     const stale = await opsCheck(deps);
     expect(stale.map((a) => [a.level, a.code])).toEqual([['warn', 'HYPERDRIVE_LIMIT']]);
-    expect(stale[0]!.message).toContain('No Hyperdrive limit report for 4 h');
+    expect(stale[0]!.message).toContain('No Hyperdrive limit report for 25 h');
   });
 
   it('scheduled workflows report in: a failure or silence is an alert, never an email', async () => {
@@ -368,12 +376,116 @@ describe('monitoring and alerts', () => {
     await sql`delete from ops_events where kind = 'scheduled_check'`;
     await sql`
       insert into ops_events (kind, detail, created_at)
-      values ('scheduled_check', '{"check":"health-check","ok":true,"detail":""}', ${new Date(now.getTime() - 50 * 60_000)})
+      values ('scheduled_check', '{"check":"health-check","ok":true,"detail":"","source":"watchdog"}', ${new Date(now.getTime() - 50 * 60_000)})
     `;
     const stale = await opsCheck(deps);
     expect(stale.map((a) => [a.level, a.code])).toEqual([['warn', 'HEALTH_CHECK_FAILED']]);
-    expect(stale[0]!.message).toContain('has not reported for 50 min');
+    expect(stale[0]!.message).toContain('has not reported from watchdog for 50 min');
     expect(world.sent).toEqual([]);
+  });
+
+  it('watchdog cron → /internal/ops/report → HEALTH_CHECK_FAILED; GitHub runs never start staleness', async () => {
+    const PUSH = 'push-token-push-token-push-token-0001';
+    const { deps, world } = await setup({ STATUS_PUSH_TOKEN: PUSH });
+    const app = createApp(deps);
+    const wenv: WatchdogEnv = {
+      WEB_URL: 'https://web.example',
+      API_URL: 'https://api.example',
+      RPC_URL: 'https://rpc.example',
+      STATUS_PUSH_TOKEN: PUSH,
+    };
+    let apiDown = false;
+    // The watchdog's fetch: the API goes to the real app (and Postgres), web/RPC are stubs.
+    const wf = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('https://api.example')) {
+        if (apiDown) throw new Error('connect timeout');
+        const path = url.slice('https://api.example'.length);
+        if (path === '/api/v1/health') return Response.json({ ok: true });
+        return app.request(path, init);
+      }
+      if (url.startsWith('https://web.example')) return new Response('', { status: world.web });
+      return Response.json({ result: 'ok' });
+    }) as typeof fetch;
+    const report = (body: unknown, token: string) =>
+      app.request('/api/v1/internal/ops/report', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    // A manual GitHub run alone never arms the staleness clock.
+    await report({ check: 'health-check', ok: true, source: 'github' }, TOKEN);
+    now = new Date(now.getTime() + 3 * 3_600_000);
+    expect(await codes(deps)).toEqual([]);
+
+    expect(await watchdog(wenv, wf)).toEqual([]);
+    expect(await codes(deps)).toEqual([]);
+    const [row] = await sql<{ detail: string }[]>`
+      select detail from ops_events where kind = 'scheduled_check' order by id desc limit 1
+    `;
+    expect(JSON.parse(row!.detail)).toMatchObject({
+      check: 'health-check',
+      ok: true,
+      source: 'watchdog',
+    });
+
+    world.web = 502;
+    await watchdog(wenv, wf);
+    // (The API's own WEB_DOWN probe sees the same outage.)
+    expect(await opsCheck(deps)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ level: 'critical', code: 'HEALTH_CHECK_FAILED' }),
+      ]),
+    );
+    world.web = 200;
+    now = new Date(now.getTime() + 5 * 60_000);
+    await watchdog(wenv, wf);
+    expect(await codes(deps)).toEqual([]);
+
+    // The push token reports health-check only, always as the watchdog.
+    expect((await report({ check: 'db-backup', ok: false }, PUSH)).status).toBe(403);
+    expect(
+      await (await report({ check: 'health-check', ok: true, source: 'github' }, PUSH)).json(),
+    ).toEqual({
+      ok: true,
+      source: 'watchdog',
+    });
+
+    // Cron stops (or the API is unreachable for it): warn after 20 min without a watchdog
+    // report, even if a manual GitHub run reported ok meanwhile.
+    apiDown = true;
+    now = new Date(now.getTime() + 15 * 60_000);
+    await watchdog(wenv, wf);
+    await report({ check: 'health-check', ok: true, source: 'github' }, TOKEN);
+    expect(await codes(deps)).toEqual([]);
+    now = new Date(now.getTime() + 6 * 60_000);
+    const stale = await opsCheck(deps);
+    expect(stale.map((a) => [a.level, a.code])).toEqual([['warn', 'HEALTH_CHECK_FAILED']]);
+    expect(stale[0]!.message).toBe(
+      'health-check has not reported from watchdog for 21 min; its watchdog Worker cron may not be running',
+    );
+    apiDown = false;
+    await watchdog(wenv, wf);
+    expect(await codes(deps)).toEqual([]);
+  });
+
+  it('staleness windows: db-backup 50 h, Hyperdrive limit 24 h', async () => {
+    const { deps } = await setup();
+    await recordScheduledReport(deps, {
+      check: 'db-backup',
+      ok: true,
+      detail: 'uploaded',
+      source: 'github',
+    });
+    await recordHyperdriveReport(deps, { limit: 10, source: 'deploy' });
+    now = new Date(now.getTime() + 23 * 3_600_000);
+    expect(await codes(deps)).toEqual([]);
+    now = new Date(now.getTime() + 2 * 3_600_000);
+    expect(await codes(deps)).toEqual(['HYPERDRIVE_LIMIT']);
+    await recordHyperdriveReport(deps, { limit: 10, source: 'check' });
+    now = new Date(now.getTime() + 26 * 3_600_000);
+    expect(await codes(deps)).toEqual(['BACKUP_FAILED', 'HYPERDRIVE_LIMIT']);
   });
 
   it('ntfy: email only with an account token; refused email falls back to push', async () => {

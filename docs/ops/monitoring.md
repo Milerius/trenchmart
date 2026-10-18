@@ -175,7 +175,7 @@ Critical. 10 or more API 5xx errors in 15 min.
 
 Critical. In the last 15 min, an API request failed with `EMAXCONNSESSION max clients reached in session mode` from the Supabase pooler.
 
-- Hyperdrive (`trenchmart-db`) reaches Supabase through the session pooler, which allows 15 clients in total. Its `origin_connection_limit` must stay well below that. `scripts/deploy-api.sh` sets it to 10 on every deploy, and the hourly `hyperdrive-limit` workflow reports it (see HYPERDRIVE_LIMIT).
+- Hyperdrive (`trenchmart-db`) reaches Supabase through the session pooler, which allows 15 clients in total. Its `origin_connection_limit` must stay well below that. `scripts/deploy-api.sh` sets it to 10 on every deploy, and the hourly (best-effort) `hyperdrive-limit` workflow also reports it (see HYPERDRIVE_LIMIT).
 - Check it with `wrangler hyperdrive get <id>`. Fix it with `wrangler hyperdrive update <id> --origin-connection-limit 10`.
 - If the limit is fine, look for another client holding pooler connections: `select application_name, count(*) from pg_stat_activity group by 1`.
 
@@ -185,21 +185,21 @@ The Worker has no Cloudflare API token, so the Hyperdrive config is read from ou
 
 - Critical: `origin_connection_limit` is above 10. The Supabase session pooler allows 15, and at 20 requests failed with DB_POOL_FULL. Fix it with `wrangler hyperdrive update 067fbd6cc9a949e7a62155bf3fd2fe91 --origin-connection-limit 10`, or redeploy the API.
 - Warn: the limit could not be read or is unset. The message carries the reason, for example missing workflow secrets or a Cloudflare API error.
-- Warn: no report for 3 h, so the workflow is not running or cannot reach the API (check `TM_INTERNAL_TOKEN`).
+- Warn: no report for 24 h. Neither a deploy nor the workflow reported it (GitHub's hourly schedule is unreliable). Redeploy the API or run `hyperdrive-limit` by hand; check `TM_INTERNAL_TOKEN`. A Worker cron can't read the Hyperdrive config without a Cloudflare API token; DB_POOL_FULL is the real-time signal.
 
 The workflow does not fail on drift, because a failed scheduled run emails the owner, and alerts go to the assistant chat through `/internal/ops/alerts`.
 
 ### HEALTH_CHECK_FAILED
 
-Comes from the `health-check` workflow, which runs every 10 min and reports to `POST /internal/ops/report` instead of failing (a failed scheduled run emails the owner).
+Comes from the `trenchmart-watchdog` Worker's Cloudflare cron (every 5 min). It probes web and API and reports to `POST /internal/ops/report` with its `STATUS_PUSH_TOKEN` (which may report only `health-check`, recorded as source `watchdog`). The `health-check` GitHub workflow is now manual/backup only: its failures alert, but staleness follows the watchdog alone.
 
 - Critical: the public API health, the web app, or the internal ops check answered with an error. The message names which one. Open the URL, then check Workers Logs for `trenchmart-web` or `trenchmart-api`.
-- Warn: no report for 40 min. The workflow is not running, `TM_INTERNAL_TOKEN` is wrong, or the API was down while it ran. Look at the workflow's recent runs.
+- Warn: no watchdog report for 20 min. The watchdog cron is not running, its `STATUS_PUSH_TOKEN` does not match the API's, or the API was down. Check `wrangler tail trenchmart-watchdog` for `HEALTH_REPORT` lines.
 - If the API is down entirely, nothing can be reported, and the relay sees `/internal/ops/alerts` unreachable instead.
 
 ### BACKUP_FAILED
 
-Warn. The nightly `db-backup` workflow reported a failure (installing tools, the dump/encrypt/upload step, or missing secrets), or it has not reported for 26 h. Read that run's log, fix the cause, and re-run it with `workflow_dispatch`. Its steps continue on error, so the run itself stays green.
+Warn. The nightly `db-backup` workflow reported a failure (installing tools, the dump/encrypt/upload step, or missing secrets), or it has not reported for 50 h (one missed night of GitHub's schedule is tolerated). Read that run's log, fix the cause, and re-run it with `workflow_dispatch`. Its steps continue on error, so the run itself stays green.
 
 ### DISPUTE_SPIKE
 

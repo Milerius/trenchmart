@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pushStatus, runChecks, watchdog, type WatchdogEnv } from './watchdog';
+import { pushStatus, reportHealth, runChecks, watchdog, type WatchdogEnv } from './watchdog';
 
 const env: WatchdogEnv = {
   WEB_URL: 'https://web.example',
@@ -90,5 +90,52 @@ describe('external watchdog', () => {
       throw new Error('connect timeout');
     }) as typeof fetch;
     expect(await pushStatus(withToken, await runChecks(env, f), down)).toBe(false);
+  });
+
+  it('reports the health check (web + API, not RPC) to /internal/ops/report with the push token', async () => {
+    const { state, f } = world();
+    const posts: { url: string; auth: string; body: Record<string, unknown> }[] = [];
+    const spy = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/api/v1/internal/ops/report')) {
+        posts.push({
+          url,
+          auth: (init?.headers as Record<string, string>).authorization ?? '',
+          body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+        });
+        return Response.json({ ok: true, source: 'watchdog' });
+      }
+      if (url.endsWith('/api/v1/internal/status/external')) return Response.json({ recorded: 3 });
+      return f(input, init);
+    }) as typeof fetch;
+    expect(await reportHealth(env, await runChecks(env, f), spy)).toBe(false);
+    expect(posts).toEqual([]);
+    const withToken = { ...env, STATUS_PUSH_TOKEN: 'push-token-push-token-push-token-0001' };
+    await watchdog(withToken, spy);
+    expect(posts[0]).toEqual({
+      url: 'https://api.example/api/v1/internal/ops/report',
+      auth: 'Bearer push-token-push-token-push-token-0001',
+      body: {
+        check: 'health-check',
+        source: 'watchdog',
+        ok: true,
+        detail: 'web, api ok (watchdog)',
+      },
+    });
+    state.rpc = 'behind';
+    await watchdog(withToken, spy);
+    expect(posts[1]!.body.ok).toBe(true);
+    state.web = 502;
+    await watchdog(withToken, spy);
+    expect(posts[2]!.body).toEqual({
+      check: 'health-check',
+      source: 'watchdog',
+      ok: false,
+      detail: 'web: https://web.example HTTP 502',
+    });
+    const down = (async () => {
+      throw new Error('connect timeout');
+    }) as typeof fetch;
+    expect(await reportHealth(withToken, await runChecks(env, f), down)).toBe(false);
   });
 });
