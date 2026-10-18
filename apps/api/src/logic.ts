@@ -93,6 +93,8 @@ export type Deps = {
   sandboxQueue?: SandboxQueue;
   /** Cloudflare Workers rate-limit binding (M-03). When absent, a Postgres counter is used. */
   rateLimiter?: { limit(input: { key: string }): Promise<{ success: boolean }> };
+  /** Re-encodes PNG/JPEG uploads to a smaller WebP (image-optimize.ts). Optional. */
+  optimizeImage?: import('./image-optimize').ImageOptimizer;
   /** Required when ESCROW_PROGRAM_ID is set. */
   escrowChain?: EscrowChain;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
