@@ -13,7 +13,17 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Avatar, VerifiedBadge } from '@/components/profile';
 import { TerminalMark } from '@/components/terminal-logo';
-import { Button, ButtonLink, Label, Panel, Skeleton, Tag, utc } from '@/components/ui';
+import {
+  Button,
+  ButtonLink,
+  Label,
+  Panel,
+  PillGroup,
+  pillClass,
+  Skeleton,
+  Tag,
+  utc,
+} from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { useWallet } from '@/lib/wallet';
 
@@ -209,22 +219,20 @@ export function ReviewsPanel({
 
       {summary.count ? (
         <div className="flex flex-wrap items-center gap-2">
-          {FILTERS.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={filter === key}
-              onClick={() => setFilter(key)}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-ctl border px-3 text-[13px] ${
-                filter === key
-                  ? 'border-accent-line bg-accent-bg text-accent'
-                  : 'border-line text-ink-2 hover:text-ink'
-              }`}
-            >
-              {label}
-              <span className="font-mono text-[11px] text-muted">{counts[key]}</span>
-            </button>
-          ))}
+          <PillGroup>
+            {FILTERS.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={filter === key}
+                onClick={() => setFilter(key)}
+                className={pillClass(filter === key, 'h-8')}
+              >
+                {label}
+                <span className="font-mono text-[11px] opacity-70">{counts[key]}</span>
+              </button>
+            ))}
+          </PillGroup>
           <label className="ml-auto inline-flex items-center gap-2 text-[13px] text-muted">
             Sort
             <select

@@ -95,3 +95,54 @@ test.describe('phase 2: tokens and corners', () => {
     expect(await receipt.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('22px');
   });
 });
+
+test.describe('phase 3: buttons and pills', () => {
+  test('primary CTA is a StarBorder pill that still navigates', async ({ page }) => {
+    await page.goto('/');
+    const cta = page.getByRole('link', { name: 'Browse the market' });
+    await expect(cta).toBeVisible();
+    expect(parseFloat(await cta.evaluate((el) => getComputedStyle(el).borderTopLeftRadius))).toBe(
+      999,
+    );
+    await expect(cta.locator('canvas[aria-hidden="true"]')).toHaveCount(1);
+    expect(await cta.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+      'rgb(198, 244, 50)',
+    );
+    // Secondary buttons are pills too.
+    const secondary = page.getByRole('link', { name: 'Sell your tooling', exact: true });
+    expect(
+      parseFloat(await secondary.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)),
+    ).toBeGreaterThan(100);
+    await cta.click();
+    await expect(page).toHaveURL(/#market$/);
+  });
+
+  test('terminal filter is a pill track; the pressed pill is solid ink', async ({ page }) => {
+    await page.goto('/');
+    const group = page.getByTestId('terminal-filter');
+    expect(
+      parseFloat(await group.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)),
+    ).toBeGreaterThan(100);
+    const all = group.getByRole('button', { name: 'All' });
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(await all.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+      'rgb(238, 240, 234)',
+    );
+    const axiom = group.getByRole('button', { name: /Axiom/ });
+    await axiom.click();
+    await expect(axiom).toHaveAttribute('aria-pressed', 'true');
+    await expect(all).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('pill track scrolls sideways on a phone instead of wrapping', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const group = page.getByTestId('terminal-filter');
+    const box = await group.boundingBox();
+    expect(box!.height).toBeLessThan(50);
+    expect(box!.width).toBeLessThanOrEqual(390);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
+  });
+});

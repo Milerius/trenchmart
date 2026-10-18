@@ -22,6 +22,8 @@ import {
   StatusTag,
   Tag,
   utc,
+  PillGroup,
+  pillClass,
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import {
@@ -329,7 +331,7 @@ export default function StudioPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3">
           <div className="flex flex-wrap items-center gap-4">
             <h2 className="m-0 text-base font-semibold">Listings</h2>
-            <div role="tablist" aria-label="Filter listings" className="flex gap-1">
+            <PillGroup role="tablist" aria-label="Filter listings">
               {TABS.map((t) => (
                 <button
                   key={t.key}
@@ -337,13 +339,13 @@ export default function StudioPage() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`rounded-ctl px-2.5 py-1 text-[13px] ${tab === t.key ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'}`}
+                  className={pillClass(tab === t.key, 'h-8')}
                 >
                   {t.label}{' '}
-                  <span className="font-mono text-[11px] text-muted">{counts(t.key)}</span>
+                  <span className="font-mono text-[11px] opacity-70">{counts(t.key)}</span>
                 </button>
               ))}
-            </div>
+            </PillGroup>
           </div>
           <span className="text-xs text-muted">Newest first</span>
         </div>

@@ -19,7 +19,17 @@ import {
   profileHref,
 } from '@/components/leaderboard';
 import { XIcon } from '@/components/icons';
-import { Button, EmptyState, Label, Money, Serif, Skeleton, Tag } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  Label,
+  Money,
+  PillGroup,
+  pillClass,
+  Serif,
+  Skeleton,
+  Tag,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
@@ -194,21 +204,19 @@ function Leaderboard() {
           ))}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2 pb-2">
-          <div className="flex rounded-ctl border border-line" role="group" aria-label="Time range">
+          <PillGroup role="group" aria-label="Time range">
             {RANGES.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 aria-pressed={range === option.value}
                 onClick={() => set('range', option.value === '30d' ? null : option.value)}
-                className={`px-2.5 py-1 font-mono text-[12px] ${
-                  range === option.value ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'
-                }`}
+                className={pillClass(range === option.value, 'h-8 font-mono text-[12px]')}
               >
                 {option.label}
               </button>
             ))}
-          </div>
+          </PillGroup>
           <label className="sr-only" htmlFor="lb-category">
             Category
           </label>
