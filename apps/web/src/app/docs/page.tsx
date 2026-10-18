@@ -17,7 +17,7 @@ export default function DocsOverviewPage() {
         <p>
           The numbers on these pages are the seeded defaults in the shared config. A deployed config
           row can override them. Checkout uses the Anchor escrow program{' '}
-          <span className="font-mono text-ink">{protocol.programId}</span> on {protocol.cluster}:
+          <span className="break-all font-mono text-ink">{protocol.programId}</span> on {protocol.cluster}:
           each order is held in its own program account until release. Bonds and verification fees
           go to a Squads multisig vault. Every address, the program hash and the multisig threshold
           are read live on{' '}
