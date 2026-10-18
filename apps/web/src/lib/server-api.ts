@@ -17,6 +17,14 @@ async function once<T>(path: string, init: RequestInit & { next?: { revalidate: 
   return { status: response.status, data: (await response.json()) as T };
 }
 
+/** Timeouts and network failures, as opposed to a fetch-cache error. */
+export function isUnreachable(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name ?? '';
+  if (name === 'TimeoutError' || name === 'AbortError') return true;
+  const text = String(error);
+  return /fetch failed|ECONNREFUSED|ENOTFOUND|network|timed? ?out/i.test(text);
+}
+
 export async function publicApi<T>(
   path: string,
   revalidate = 60,
@@ -24,6 +32,12 @@ export async function publicApi<T>(
   try {
     return await once<T>(path, { next: { revalidate } });
   } catch (error) {
+    // A timeout or an unreachable API will not recover on an immediate retry: answer now
+    // instead of stalling the render for another full timeout (CodeRabbit, PR #29).
+    if (isUnreachable(error)) {
+      console.error('publicApi unreachable', path, String(error));
+      return { status: 0, data: null };
+    }
     // The platform fetch cache can fail on its own; fall back to a plain uncached read.
     console.error('publicApi cached read failed', path, String(error));
   }
