@@ -57,7 +57,10 @@ test('home states a 1h escrow on every order', async ({ page }) => {
     '/prices/sol': { centsPerSol: '18000' },
   });
   await page.goto('/');
-  await expect(page.getByText('1h escrow on every order')).toBeVisible();
+  // Hero stat tile (prototype copy): "1h · escrow window".
+  await expect(
+    page.getByTestId('hero').locator('dl > div').filter({ hasText: 'escrow window' }),
+  ).toContainText('1h');
   await expect(
     page.getByText('Your SOL is held in escrow for 1 hour.', { exact: false }),
   ).toBeVisible();

@@ -91,8 +91,12 @@ test.describe('phase 2: tokens and corners', () => {
       '#9faf86',
       '#6e756d',
     ]);
-    const receipt = page.locator('figure').filter({ hasText: 'Example review receipt' });
-    expect(await receipt.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('22px');
+    // The prototype receipt sits in a 26px BorderGlow panel (a plain 26px panel until it loads).
+    const receipt = page
+      .locator('figure')
+      .filter({ hasText: 'Example review receipt' })
+      .locator(':scope > :first-child');
+    expect(await receipt.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('26px');
   });
 });
 
@@ -223,7 +227,7 @@ test.describe('phase 4: cards', () => {
     await userscripts.scrollIntoViewIfNeeded();
     expect(
       await userscripts.evaluate((el) => getComputedStyle(el.parentElement!).borderRadius),
-    ).toBe('16px');
+    ).toBe('22px');
     await expect(
       page.getByRole('heading', { name: 'Escrow on every order', exact: true }),
     ).toBeAttached();
@@ -342,5 +346,89 @@ test.describe('perf: StarBorder on phones', () => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: /Browse the market/ })).toBeVisible();
     expect(await countFrames(page)).toBeGreaterThan(20);
+  });
+});
+
+test.describe('phase 6: home', () => {
+  // Script chunks for the lazy React Bits effects (dev and prod chunk names both carry the file).
+  const fxChunks = (page: import('@playwright/test').Page) =>
+    page.evaluate(() =>
+      performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((name) => /Aurora|LightRays|BorderGlow|SplitText|LogoLoop/.test(name)),
+    );
+
+  test('desktop loads the hero aurora, CTA rays and glow receipt after idle; names hold', async ({
+    page,
+  }) => {
+    // Automated browsers get the static fallbacks unless they opt in (lib/fx.ts).
+    await page.addInitScript(() => {
+      (window as Window & { __TM_FX__?: boolean }).__TM_FX__ = true;
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await expect(page.locator('[data-fx="aurora"] canvas')).toBeAttached({ timeout: 15_000 });
+    await expect(page.locator('[data-fx="rays"] canvas')).toBeAttached();
+    expect((await fxChunks(page)).length).toBeGreaterThan(0);
+    // The split-letter H1 and the shine keep the accessible name.
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'The verified edge, for sale.' }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Have an edge? Sell it.' })).toBeVisible();
+    // Terminals band: every supported terminal is listed.
+    const band = page.getByTestId('terminal-band');
+    for (const name of ['Axiom', 'GMGN', 'Photon', 'Terminal', 'Trojan'])
+      await expect(band.getByText(name, { exact: true }).first()).toBeAttached();
+  });
+
+  for (const mode of ['phone', 'reduced motion'] as const) {
+    test(`${mode}: no effect chunks or canvases, static fallbacks render`, async ({ page }) => {
+      // Opt in like a real browser, so only the phone / reduced-motion gate keeps effects off.
+      await page.addInitScript(() => {
+        (window as Window & { __TM_FX__?: boolean }).__TM_FX__ = true;
+      });
+      if (mode === 'phone') await page.setViewportSize({ width: 390, height: 844 });
+      else {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+      }
+      await page.goto('/');
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'The verified edge, for sale.' }),
+      ).toBeVisible();
+      await page.waitForLoadState('load');
+      await page.waitForTimeout(2500);
+      await expect(page.locator('[data-fx]')).toHaveCount(0);
+      expect(await fxChunks(page)).toEqual([]);
+      // Static fallbacks: the CSS aurora, the terminal row and the plain receipt panel.
+      await expect(page.locator('.hero-aurora')).toBeAttached();
+      await expect(page.getByTestId('terminal-band').getByRole('listitem')).toHaveCount(5);
+      await expect(page.getByText('REVIEW RECEIPT', { exact: true })).toBeVisible();
+    });
+  }
+
+  test('home follows the prototype section order', async ({ page }) => {
+    // Static fallbacks only: the desktop SplitText adds an sr-only copy that changes textContent.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    const order = await page.evaluate(() =>
+      [...document.querySelectorAll('main h1, main h2, [data-testid="terminal-band"]')].map((el) =>
+        el.matches('[data-testid]') ? 'terminals' : el.textContent?.trim(),
+      ),
+    );
+    const want = [
+      'The verified edge, for sale.',
+      'terminals',
+      'Trending this week',
+      'Find your edge',
+      'Four steps, no surprises.',
+      'Top creators this month',
+      'Hold $TRENCH, pay less.',
+      "Built so you don't have to trust anyone.",
+      'Have an edge? Sell it.',
+    ];
+    const seen = order.filter((entry): entry is string => !!entry && want.includes(entry));
+    expect([...new Set(seen)]).toEqual(want);
   });
 });

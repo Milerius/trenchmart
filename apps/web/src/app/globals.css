@@ -219,6 +219,77 @@ body {
   right: 8%;
 }
 
+/* Home hero: static aurora (the WebGL Aurora fades in over it on desktop after idle). */
+.hero-aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(48% 70% at 6% 18%, rgba(198, 244, 50, 0.5), transparent 70%),
+    radial-gradient(42% 64% at 48% 4%, rgba(59, 130, 255, 0.45), transparent 72%),
+    radial-gradient(46% 72% at 96% 12%, rgba(166, 107, 255, 0.5), transparent 70%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 40%, transparent 92%);
+  opacity: 0.6;
+}
+
+@media (min-width: 640px) {
+  .hero-aurora {
+    opacity: 0.85;
+  }
+}
+
+.fx-in {
+  animation: fx-in 1.2s ease both;
+}
+
+@keyframes fx-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.glass {
+  background: rgba(16, 18, 16, 0.6);
+}
+
+@media (min-width: 768px) {
+  .glass {
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+}
+
+/* Terminals band without JS (phones, reduced motion): wraps by default, marquee when motion is ok. */
+.terminal-track {
+  display: flex;
+  justify-content: center;
+}
+.terminal-track > ul:first-child {
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-right: 0;
+}
+.terminal-copy {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .terminal-marquee {
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  }
+  .terminal-track {
+    width: max-content;
+    justify-content: flex-start;
+    animation: ticker 30s linear infinite;
+  }
+  .terminal-track > ul:first-child {
+    flex-wrap: nowrap;
+    padding-right: 72px;
+  }
+  .terminal-copy {
+    display: flex;
+  }
+}
+
 .ticker-track {
   display: flex;
   width: max-content;

@@ -11,7 +11,8 @@ They are used only as part of the TrenchMart website. We do not sell, sublicense
 Small changes from upstream, all kept within the licence:
 
 - type-safety fixes for this repo's strict TypeScript settings (for example `noUncheckedIndexedAccess`);
-- Prettier formatting.
+- Prettier formatting;
+- Aurora: the effect cleanup no longer force-loses the WebGL context (the canvas is reused on remount).
 
 Full licence text, as published upstream:
 
@@ -49,3 +50,9 @@ Full licence text, as published upstream:
 
 Geist, Geist Mono and Instrument Serif are self-hosted through `next/font/google`.
 All three are licensed under the SIL Open Font License 1.1 (https://openfontlicense.org).
+
+## Lucide icons
+
+Source: https://lucide.dev (the `lucide-react` npm package), used for interface icons in `apps/web`.
+Licensed under the ISC License; the full text ships with the package (`node_modules/lucide-react/LICENSE`).
+Copyright (c) 2026 Lucide Icons and Contributors.
