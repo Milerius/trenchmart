@@ -5,17 +5,20 @@ Everything runs on the existing free tiers: no new service, no new cron, no new 
 
 ## Components
 
-| id        | Shown as                  | Probe (every 5 min, API cron)                                                            | Slow above |
-| --------- | ------------------------- | ---------------------------------------------------------------------------------------- | ---------- |
-| `web`     | Website                   | external watchdog push: `GET https://trenchmart.fun` (5xx or no answer = down)           | 2500 ms    |
-| `api`     | API                       | external watchdog push: `GET https://api.trenchmart.fun/api/v1/health`                   | 1500 ms    |
-| `rpc`     | Solana RPC                | external watchdog push: `getHealth` on the RPC (429 counts as up)                        | 2000 ms    |
-| `escrow`  | Escrow program & resolver | read of the escrow program account from the API Worker                                   | 2000 ms    |
-| `db`      | Database                  | `select 1` through Hyperdrive                                                            | 750 ms     |
-| `uploads` | Uploads & scanning        | file storage write, read back, delete (`status/probe`)                                   | 2500 ms    |
-| `auth`    | Sign-in                   | write and delete an already-expired sign-in nonce (`auth_nonces`, wallet `status-probe`) | 1000 ms    |
+| id        | Shown as                  | Probe (every 5 min, API cron)                                                                                                                   | Slow above |
+| --------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `web`     | Website                   | external watchdog push: `GET https://trenchmart.fun` (5xx or no answer = down)                                                                  | 2500 ms    |
+| `api`     | API                       | external watchdog push: `GET https://api.trenchmart.fun/api/v1/health`                                                                          | 1500 ms    |
+| `rpc`     | Solana RPC                | external watchdog push: `getHealth` on the RPC (429 counts as up)                                                                               | 2000 ms    |
+| `escrow`  | Escrow program & resolver | read of the escrow program account from the API Worker                                                                                          | 2000 ms    |
+| `db`      | Database                  | `select 1` through Hyperdrive, run before `auth` on the same connection pool                                                                    | 750 ms     |
+| `uploads` | Uploads & scanning        | file storage write, read back, delete (`status/probe`)                                                                                          | 2500 ms    |
+| `auth`    | Sign-in                   | timed insert of an already-expired nonce (`auth_nonces`, wallet `status-probe`), the same write as `POST /auth/nonce`; deleted after the timing | 1000 ms    |
 
-A failed probe is **down**; a probe slower than its threshold is **degraded**. The ops alerts of
+A failed probe is **down**; a probe slower than its threshold is **degraded**. `db` and `auth` run
+one after the other, and the nonce cleanup is outside the timing: run side by side with the cleanup
+timed, sign-in read ~1.2 s (degraded) on every cron tick while the real `POST /auth/nonce` answered
+in ~0.4 s. The ops alerts of
 the same tick (`opsCheck`, docs/ops/monitoring.md) can then make a component worse, never better.
 Only the component and the state cross over (`ALERT_COMPONENT` in `apps/api/src/status.ts`):
 
