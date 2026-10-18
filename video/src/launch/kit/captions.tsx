@@ -14,21 +14,47 @@ const HOLD = 16;
 
 const text = (words: CaptionWord[]) => words.map((x) => x.w).join(' ');
 
-/** Cuts a clause into the fewest phrases that fit, of roughly equal length (no orphan words). */
+/** Words that read badly at the end of a phrase. */
+const WEAK = /^(a|an|and|the|or|to|of|on|in|is|until|your)$/i;
+
+/** Every way to cut `k` words into `n` non-empty runs, as the start index of runs 2..n. */
+const breakings = (k: number, n: number, from = 1): number[][] =>
+  n === 1
+    ? [[]]
+    : Array.from({ length: k - from - n + 2 }, (_, i) => from + i).flatMap((b) =>
+        breakings(k, n - 1, b + 1).map((rest) => [b, ...rest]),
+      );
+
+/**
+ * Cuts a clause into the fewest phrases that fit, choosing the cut with the most even lengths
+ * and avoiding phrases that end on a weak word or are a single word.
+ */
 const balance = (words: CaptionWord[], maxChars: number, slack: number): CaptionWord[][] => {
-  const len = text(words).length;
-  if (len <= maxChars + slack) return [words];
-  const target = len / Math.ceil(len / maxChars);
-  const out: CaptionWord[][] = [];
-  let cur: CaptionWord[] = [];
-  for (const word of words) {
-    if (cur.length && text([...cur, word]).length > target + 4) {
-      out.push(cur);
-      cur = [];
+  const limit = maxChars + slack;
+  for (let n = 1; n <= words.length; n++) {
+    let best: CaptionWord[][] | null = null;
+    let bestCost = Infinity;
+    for (const cuts of breakings(words.length, n)) {
+      const edges = [0, ...cuts, words.length];
+      const parts = edges.slice(1).map((end, i) => words.slice(edges[i], end));
+      const lens = parts.map((p) => text(p).length);
+      if (Math.max(...lens) > limit) continue;
+      const mean = lens.reduce((a, b) => a + b, 0) / n;
+      const cost =
+        lens.reduce((a, l) => a + (l - mean) ** 2, 0) +
+        parts.reduce(
+          (a, p, i) =>
+            a + (i < n - 1 && WEAK.test(p[p.length - 1].w) ? 400 : 0) + (p.length === 1 ? 400 : 0),
+          0,
+        );
+      if (cost < bestCost) {
+        best = parts;
+        bestCost = cost;
+      }
     }
-    cur.push(word);
+    if (best) return best;
   }
-  return [...out, cur];
+  return [words];
 };
 
 /**
