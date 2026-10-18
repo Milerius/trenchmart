@@ -8,7 +8,6 @@ import {
   DownloadButton,
   EmptyState,
   ErrorState,
-  Label,
   Money,
   Panel,
   Skeleton,
@@ -18,7 +17,7 @@ import {
 } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { TIER_LABEL } from '@/lib/config';
-import { solText } from '@/lib/money';
+import { solText, usdText } from '@/lib/money';
 import { explorerAddress, explorerTx, shortKey } from '@/lib/protocol-facts';
 import { submitPayment } from '@/lib/studio';
 import { updateBanner, updatesStatus, type OrderUpdates } from '@/lib/updates';
@@ -160,7 +159,7 @@ export default function PurchasesPage() {
   if (!wallet.session) {
     return (
       <section className="mx-auto max-w-lg py-10 text-center">
-        <h1 className="text-[28px] font-semibold tracking-[-0.025em]">Purchases</h1>
+        <h1 className="m-0 text-5xl font-semibold tracking-[-0.045em]">Purchases</h1>
         <p className="mt-3 text-ink-2">Connect a wallet to see purchases.</p>
         <p className="mt-1 text-sm text-muted">
           Every order shows its escrow timer here, and its download once payment is confirmed.
@@ -187,11 +186,11 @@ export default function PurchasesPage() {
       : byTab[tab];
 
   return (
-    <section data-testid="dashboard" className="space-y-8">
+    <section data-testid="dashboard" className="mx-auto max-w-5xl space-y-8 sm:py-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Purchases</h1>
-          <p className="mt-2 max-w-2xl text-ink-2">
+        <div className="flex flex-col gap-2">
+          <h1 className="m-0 text-5xl font-semibold tracking-[-0.045em]">Purchases</h1>
+          <p className="m-0 max-w-xl text-ink-2">
             Download as soon as payment is confirmed in escrow. The creator is paid only when the
             escrow window ends with no dispute.
           </p>
@@ -202,18 +201,20 @@ export default function PurchasesPage() {
       </div>
 
       {orders && orders.length ? (
-        <div className="grid gap-px overflow-hidden rounded-panel border border-line bg-line sm:grid-cols-3">
-          <Tile label="In escrow">
-            <Money lamports={escrowTotal} usdCents={centsPerSol(escrowTotal)} stacked />
-            <span className="text-xs text-muted">
-              {inEscrow.length} order{inEscrow.length === 1 ? '' : 's'}
-            </span>
+        <div data-testid="purchase-stats" className="grid gap-3 sm:grid-cols-3">
+          <Tile
+            label="In escrow"
+            note={`${inEscrow.length} order${inEscrow.length === 1 ? '' : 's'}${
+              centsPerSol(escrowTotal) ? ` · ${usdText(centsPerSol(escrowTotal), escrowTotal)}` : ''
+            }`}
+          >
+            {solText(escrowTotal)}
           </Tile>
-          <Tile label="Ready to download">
-            <span className="text-2xl font-semibold">{ready.length}</span>
+          <Tile label="Ready to download" note="paid or released">
+            {ready.length}
           </Tile>
-          <Tile label="All orders">
-            <span className="text-2xl font-semibold">{orders.length}</span>
+          <Tile label="All orders" note="every status">
+            {orders.length}
           </Tile>
         </div>
       ) : null}
@@ -335,20 +336,21 @@ function escrowCents(orders: Order[]) {
   };
 }
 
-function Tile({ label, children }: { label: string; children: ReactNode }) {
+function Tile({ label, note, children }: { label: string; note: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 bg-surface p-5">
-      <Label>{label}</Label>
-      <div className="tabular mt-1 flex flex-col font-mono">{children}</div>
+    <div className="flex flex-col gap-1 rounded-card border border-line bg-surface p-5">
+      <span className="text-sm text-muted">{label}</span>
+      <span className="tabular text-3xl font-semibold tracking-[-0.04em]">{children}</span>
+      <span className="font-mono text-xs text-faint">{note}</span>
     </div>
   );
 }
 
 function Thumb({ order, size }: { order: Order; size: 'md' | 'sm' }) {
-  const box = size === 'md' ? 'h-[68px] w-[108px]' : 'h-9 w-14';
+  const box = size === 'md' ? 'h-14 w-14 rounded-2xl' : 'h-9 w-14 rounded-ctl';
   return (
     <span
-      className={`${box} block shrink-0 overflow-hidden rounded-ctl border border-line bg-inset`}
+      className={`${box} block shrink-0 overflow-hidden border border-line bg-inset`}
       aria-hidden="true"
     >
       {order.cover ? (
@@ -385,18 +387,16 @@ function OrderCard({
   return (
     <li
       data-testid="order-card"
-      className="list-none rounded-card border border-line bg-surface p-4 sm:p-5"
+      className="list-none rounded-[24px] border border-line bg-surface/70 p-5 sm:p-6"
     >
       <div className="flex gap-4">
-        <span className="hidden sm:block">
-          <Thumb order={order} size="md" />
-        </span>
+        <Thumb order={order} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
             <div className="min-w-0">
               <Link
                 href={`/l/${order.slug}`}
-                className="block text-[17px] font-semibold hover:text-accent-hover"
+                className="block text-lg font-semibold hover:text-accent"
               >
                 {order.title}
               </Link>
@@ -686,7 +686,7 @@ function EscrowTimeline({ order, now }: { order: Order; now: number }) {
   return (
     <div data-testid="escrow-timeline" className="mt-5">
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-surface-2"
+        className="h-2 overflow-hidden rounded-full bg-line"
         role="progressbar"
         aria-label="Escrow progress"
         aria-valuemin={0}
@@ -694,7 +694,7 @@ function EscrowTimeline({ order, now }: { order: Order; now: number }) {
         aria-valuenow={Math.round(progress * 100)}
       >
         <div
-          className={`h-full rounded-full ${order.status === 'disputed' ? 'bg-danger' : 'bg-accent'}`}
+          className={`h-full rounded-full ${order.status === 'disputed' ? 'bg-danger' : 'bg-gradient-to-r from-info via-accent to-accent'}`}
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
