@@ -354,7 +354,7 @@ function Footer() {
 // The mode must match api(): same-origin with credentials ('use-credentials'), or the
 // browser fetches twice. These are hints only; nothing here changes what is cached.
 // Pages that draw their own full-width hero and content column.
-const FULL_BLEED = new Set(['/', '/search', '/creators', '/token', '/verify']);
+const FULL_BLEED = new Set(['/', '/search', '/creators', '/token', '/verify', '/sell']);
 
 const PRELOADED_READS = ['/api/v1/me', '/api/v1/config/public'];
 

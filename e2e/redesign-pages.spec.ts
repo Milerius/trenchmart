@@ -7,6 +7,7 @@ const PAGES: [path: string, title: string][] = [
   ['/creators', 'Creator leaderboard'],
   ['/token', 'Fees fund the token. The token cuts your fees.'],
   ['/verify', "Don't trust. Verify."],
+  ['/sell', 'Sell your tooling. Keep 100% of the price.'],
 ];
 
 test.beforeEach(async ({ page }) => {
@@ -65,4 +66,60 @@ test('/verify: file check and report check side by side on desktop, proof below'
   expect(Math.abs(a!.y - b!.y)).toBeLessThan(4);
   expect(b!.x).toBeGreaterThan(a!.x + a!.width);
   expect(proof!.y).toBeGreaterThan(Math.max(a!.y + a!.height, b!.y + b!.height));
+});
+
+test('/sell: steps list, live creator costs from config, and both studio links', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/config/public', (route) =>
+    route.fulfill({
+      json: {
+        feeBps: 500,
+        tierRebateBps: {},
+        tierThresholds: {},
+        feeSplitBps: {},
+        escrowHours: 1,
+        verificationFeeLamports: '250000000',
+        bondLamportsByCategory: { filter: '1000000000', setup: '5000000000' },
+        uploadLimitPerCreatorDay: 5,
+        uploadSupplementLamports: '50000000',
+      },
+    }),
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/sell');
+  await expect(page.getByTestId('sell-steps').getByRole('listitem')).toHaveCount(4);
+  const fees = page.getByTestId('sell-fees');
+  await expect(fees).toContainText('0.25 SOL');
+  await expect(fees).toContainText('1–5 SOL');
+  await expect(fees).toContainText('5 free / day');
+  await expect(fees).toContainText('then 0.05 SOL each');
+  await expect(fees).toContainText('1 hour');
+  await expect(page.getByRole('link', { name: 'Create a listing' })).toHaveAttribute(
+    'href',
+    '/studio/listings/new',
+  );
+  await expect(page.getByRole('link', { name: 'Open creator studio' })).toHaveAttribute(
+    'href',
+    '/studio',
+  );
+  // Side by side on desktop.
+  const [how, pay] = await Promise.all([
+    page.getByRole('region', { name: 'How it works' }).boundingBox(),
+    page.getByRole('region', { name: 'What you pay' }).boundingBox(),
+  ]);
+  expect(Math.abs(how!.y - pay!.y)).toBeLessThan(4);
+});
+
+test('/sell: the React Bits Stepper loads on desktop when effects are on', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as Window & { __TM_FX__?: boolean }).__TM_FX__ = true;
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/sell');
+  const stepper = page.locator('[data-fx="stepper"]');
+  await expect(stepper).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('sell-steps')).toHaveCount(0);
+  await stepper.getByRole('button', { name: 'Next step' }).click();
+  await expect(stepper).toContainText('Post your creator bond');
 });
