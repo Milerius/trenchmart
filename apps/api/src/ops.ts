@@ -30,6 +30,8 @@ export const ALERT_CODES = [
   'HTTP_5XX_SPIKE',
   'DB_POOL_FULL',
   'HYPERDRIVE_LIMIT',
+  'HEALTH_CHECK_FAILED',
+  'BACKUP_FAILED',
   'DISPUTE_SPIKE',
   'DISPUTES_WAITING',
   'PAYOUTS_WAITING',
@@ -60,6 +62,26 @@ export type OpsEventKind =
  * /internal/ops/hyperdrive. `limit` null means the config could not be read or is unset.
  */
 export type HyperdriveReport = { limit: number | null; source: string; error?: string };
+
+/**
+ * Scheduled GitHub workflows report here instead of failing (a failed scheduled run emails
+ * the owner; alerts belong in the assistant chat via /internal/ops/alerts). Each check has
+ * the alert it raises when it reports a failure, and when it stops reporting. Nothing is
+ * raised before a check's first report (local dev, tests).
+ */
+export const SCHEDULED_CHECKS = {
+  'health-check': { code: 'HEALTH_CHECK_FAILED', level: 'critical', staleMs: 40 * 60_000 },
+  'db-backup': { code: 'BACKUP_FAILED', level: 'warn', staleMs: 26 * 3_600_000 },
+} as const satisfies Record<string, { code: string; level: OpsLevel; staleMs: number }>;
+export type ScheduledCheck = keyof typeof SCHEDULED_CHECKS;
+export type ScheduledReport = { check: ScheduledCheck; ok: boolean; detail: string };
+
+export async function recordScheduledReport(deps: Pick<Deps, 'sql'>, report: ScheduledReport) {
+  await deps.sql`
+    insert into ops_events (kind, detail)
+    values ('scheduled_check', ${JSON.stringify(report).slice(0, 500)})
+  `;
+}
 
 export async function recordHyperdriveReport(deps: Pick<Deps, 'sql'>, report: HyperdriveReport) {
   await deps.sql`
@@ -299,6 +321,30 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
           'warn',
           'HYPERDRIVE_LIMIT',
           `No Hyperdrive limit report for ${Math.round(age / 3_600_000)} h; the hourly hyperdrive-limit workflow may be failing`,
+        );
+    }
+    const reports = await deps.sql<{ detail: string; created_at: Date }[]>`
+      select distinct on (detail::jsonb ->> 'check') detail, created_at from ops_events
+      where kind = 'scheduled_check' and detail like '{%'
+      order by detail::jsonb ->> 'check', created_at desc
+    `;
+    for (const row of reports) {
+      let report: Partial<ScheduledReport> = {};
+      try {
+        report = JSON.parse(row.detail) as ScheduledReport;
+      } catch {
+        continue;
+      }
+      const spec = SCHEDULED_CHECKS[report.check as ScheduledCheck];
+      if (!spec) continue;
+      const age = now.getTime() - new Date(row.created_at).getTime();
+      if (report.ok === false)
+        add(spec.level, spec.code, `${report.check} failed: ${report.detail || 'no detail'}`);
+      else if (age > spec.staleMs)
+        add(
+          'warn',
+          spec.code,
+          `${report.check} has not reported for ${Math.round(age / 60_000)} min; the scheduled workflow may not be running`,
         );
     }
     const errors = await count(deps, '5xx', since);

@@ -1,8 +1,12 @@
+# Every 10 minutes: public API health, the web app, and the internal ops check.
+# Alerts go to the owner's chat, not email: the run reports its result to
+# POST /internal/ops/report (check "health-check"), and the ops check raises
+# HEALTH_CHECK_FAILED (critical on a failed probe, warn when no report came for 40 min),
+# which /internal/ops/alerts serves to the alert relay. The ops check's own alerts are
+# already in that feed. So a failed probe does not fail this run (a failed scheduled run
+# emails the repo owner). If the API itself is down the report cannot land; the relay sees
+# /internal/ops/alerts unreachable, and the staleness warning follows once it is back.
 # Needs repo secret TM_INTERNAL_TOKEN (= API INTERNAL_TOKEN).
-# Sentry-free monitoring: every 10 minutes GitHub checks the public health endpoint and the
-# internal ops check. A failure fails the run, and GitHub emails the repo owner about failed
-# scheduled runs (Settings -> Notifications -> Actions). Add the repository secret
-# TM_INTERNAL_TOKEN (the API's INTERNAL_TOKEN) first.
 name: health-check
 on:
   schedule:
@@ -13,13 +17,35 @@ jobs:
   health:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    env:
+      API: https://api.trenchmart.fun/api/v1
+      TOKEN: ${{ secrets.TM_INTERNAL_TOKEN }}
     steps:
-      - name: public health
-        run: curl -fsS --max-time 20 https://api.trenchmart.fun/api/v1/health
-      - name: web
-        run: curl -fsS --max-time 20 -o /dev/null https://trenchmart.fun/
-      - name: ops check (stuck releases, hot-wallet balances, disputes)
-        env:
-          TOKEN: ${{ secrets.TM_INTERNAL_TOKEN }}
+      - name: probe API, web and ops check; report to the ops alerts feed
         run: |
-          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" https://api.trenchmart.fun/api/v1/internal/ops
+          problems=()
+          probe() { # name, curl args...
+            local name="$1"; shift
+            local code
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$@" 2>/dev/null)" || code="unreachable"
+            echo "$name: $code"
+            [[ "$code" =~ ^2 ]] || problems+=("$name: HTTP $code")
+          }
+          probe api "$API/health"
+          probe web https://trenchmart.fun/
+          if [[ -n "${TOKEN:-}" ]]; then
+            # 503 here means a critical ops alert; it is already in the feed, so only note it.
+            ops="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -H "Authorization: Bearer $TOKEN" "$API/internal/ops" 2>/dev/null)" || ops=unreachable
+            echo "ops check: $ops"
+            [[ "$ops" == 200 || "$ops" == 503 ]] || problems+=("ops check: HTTP $ops")
+          fi
+          if ((${#problems[@]})); then ok=false; detail="$(IFS='; '; echo "${problems[*]}")"; else ok=true; detail="api, web, ops check ok"; fi
+          echo "result: ok=$ok $detail"
+          [[ "$ok" == true ]] || echo "::warning::$detail"
+          if [[ -z "${TOKEN:-}" ]]; then
+            echo "::warning::TM_INTERNAL_TOKEN missing; cannot report to the ops alerts feed"; exit 0
+          fi
+          payload="$(jq -nc --argjson ok "$ok" --arg detail "$detail" '{check: "health-check", ok: $ok, detail: $detail}')"
+          curl -fsS --max-time 20 -o /dev/null -X POST "$API/internal/ops/report" \
+            -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' --data "$payload" &&
+            echo "reported" || echo "::warning::report to the ops alerts feed failed"
