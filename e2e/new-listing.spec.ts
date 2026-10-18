@@ -151,6 +151,44 @@ test('step 1 picks the type; step 2 asks for terminals and what the script touch
   await expect(page.getByTestId('wizard')).toHaveAttribute('data-step', '3');
 });
 
+test("terminal cards show each terminal's own logo, served locally", async ({ page }) => {
+  await stub(page);
+  await page.goto('/studio/listings/new');
+  await page.getByTestId('kind-script').click();
+  await next(page);
+  await expect(
+    page.getByRole('heading', { name: 'Which terminals does it run on?' }),
+  ).toBeVisible();
+  const terms = page.getByTestId('terminals');
+  const logos = {
+    Axiom: '/terminals/axiom.svg',
+    GMGN: '/terminals/gmgn.png',
+    Photon: '/terminals/photon.png',
+    Terminal: '/terminals/terminal.svg',
+    Trojan: '/terminals/trojan.png',
+  };
+  for (const [name, src] of Object.entries(logos)) {
+    const card = terms.getByRole('button', { name: new RegExp(name) });
+    const img = card.getByTestId(`terminal-logo-${name}`);
+    await expect(img).toBeVisible();
+    await expect(img).toHaveAttribute('src', src);
+    // Loaded and decoded, not a broken image.
+    await expect
+      .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+    const box = await img.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(30);
+    // No letter placeholder left in the tile.
+    await expect(card.locator('[aria-hidden="true"]').first()).toHaveText('');
+  }
+  await expect(terms.locator('img')).toHaveCount(5);
+  await expect(page.getByText('TrenchMart is not affiliated with these terminals')).toBeVisible();
+  // The asset itself is served by the app (not hotlinked).
+  const res = await page.request.get('/terminals/axiom.svg');
+  expect(res.ok()).toBe(true);
+  expect(res.headers()['content-type']).toContain('image/svg+xml');
+});
+
 test('wallet lists ask for format, count, cadence and imports', async ({ page }) => {
   await stub(page);
   await page.goto('/studio/listings/new');
