@@ -422,10 +422,11 @@ export function TerminalPicker({
               type="button"
               aria-pressed={on}
               onClick={() => onChange(toggleTerminal(value, t.name))}
-              className={`relative flex items-center gap-3 rounded-card border p-3 text-left sm:flex-col sm:items-start sm:p-4 ${on ? 'border-accent bg-accent-bg' : 'border-line-control/60 bg-inset hover:border-line-strong'}`}
+              title={t.host}
+              className={`relative flex min-w-0 items-center gap-3 rounded-card border p-3 text-left sm:flex-col sm:items-start sm:p-4 ${on ? 'border-accent bg-accent-bg' : 'border-line-control/60 bg-inset hover:border-line-strong'}`}
             >
               <Monogram name={t.name} className="h-9 w-9 text-sm sm:h-11 sm:w-11 sm:text-base" />
-              <span className="min-w-0">
+              <span className="min-w-0 max-w-full">
                 <span className="block text-[15px] font-semibold">{t.name}</span>
                 <span className="block truncate font-mono text-[11px] text-muted">{t.host}</span>
               </span>
