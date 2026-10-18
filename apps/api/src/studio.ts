@@ -17,11 +17,10 @@ export function dayIndex(at: Date, now: Date, days = OVERVIEW_DAYS): number {
 }
 
 /** Signed-in creator's dashboard: every number comes from orders, renewals, reviews and payouts. */
-// One query at a time: Hyperdrive reaches Supabase through the session-mode pooler, which
-// allows 15 clients in total, and each parallel query here holds one of them (live:
-// EMAXCONNSESSION "max clients reached in session mode"). With the Worker placed next to the
-// database the round trips are short, so sequential costs little.
-const OVERVIEW_PARALLEL = 1;
+// Hyperdrive reaches Supabase through the session-mode pooler (15 clients in total). Its
+// origin_connection_limit was 20, so bursts got EMAXCONNSESSION; it is now 12, and Hyperdrive
+// queues instead. Keep this request's share small anyway.
+const OVERVIEW_PARALLEL = 3;
 
 const TRANSIENT_DB =
   /EMAXCONNSESSION|max clients reached|Network connection lost|CONNECTION_CLOSED|CONNECTION_ENDED|CONNECTION_DESTROYED|ECONNRESET/;
