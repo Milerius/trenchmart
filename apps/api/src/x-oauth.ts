@@ -83,6 +83,7 @@ export async function fetchXAccount(input: {
   const token = await input.fetch(X_TOKEN_URL, {
     method: 'POST',
     headers,
+    signal: AbortSignal.timeout(10_000),
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code: input.code,
@@ -94,7 +95,10 @@ export async function fetchXAccount(input: {
   if (!token.ok) throw new Error(`token exchange failed (${token.status})`);
   const { access_token: accessToken } = (await token.json()) as { access_token?: string };
   if (!accessToken) throw new Error('token exchange returned no access token');
-  const me = await input.fetch(X_ME_URL, { headers: { authorization: `Bearer ${accessToken}` } });
+  const me = await input.fetch(X_ME_URL, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!me.ok) throw new Error(`users/me failed (${me.status})`);
   const body = (await me.json()) as { data?: { id?: string; username?: string } };
   const id = body.data?.id;

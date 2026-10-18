@@ -1639,6 +1639,13 @@ describe('owner product decisions', () => {
       body: JSON.stringify({ handle: 'someone' }),
     });
     expect(closed.status).toBe(410);
+    // A handle dev-linked before OAuth was configured does not count as linked: the studio
+    // shows the verify button again and new listings require the verified link.
+    const aliceOnOauth = await login(app, alice);
+    const reqs = (await (
+      await app.request('/api/v1/studio/requirements', { headers: { cookie: aliceOnOauth } })
+    ).json()) as { xLinked: boolean };
+    expect(reqs.xLinked).toBe(false);
     const start = await app.request('/api/v1/auth/x/start', { headers: { cookie: bobCookie } });
     expect(start.status).toBe(200);
     const { url } = (await start.json()) as { url: string };
@@ -1667,6 +1674,7 @@ describe('owner product decisions', () => {
     expect(tokenBody.get('code')).toBe('good-code');
     expect(tokenBody.get('code_verifier')).toHaveLength(64);
     expect((calls[0]!.init.headers as Record<string, string>).authorization).toMatch(/^Basic /);
+    expect(calls.every((c) => c.init.signal instanceof AbortSignal)).toBe(true);
     const rows = await sql<{ wallet: string; x_handle: string | null; x_user_id: string | null }[]>`
       select wallet, x_handle, x_user_id from users where wallet in (${alice.publicKey}, ${bob.publicKey})
     `;

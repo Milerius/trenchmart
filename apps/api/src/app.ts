@@ -906,7 +906,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       jsonSafe({
         creator: ((user.roles as string[] | undefined) ?? []).includes('creator'),
         walletSigned: true,
-        xLinked: Boolean(user.x_handle),
+        // Once X OAuth is configured, only a verified link counts: dev links must re-verify.
+        xLinked: deps.env.xClientId ? xVerified(user) : Boolean(user.x_handle),
         bondRequired: required,
         bondActive: bond,
         bondOk: bond >= required,
@@ -952,7 +953,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.post('/studio/listings', async (c) => {
     const user = requireUser(c);
-    if (!user.x_handle) throw new HttpError(400, 'X_REQUIRED', 'link an X handle first');
+    if (deps.env.xClientId ? !xVerified(user) : !user.x_handle)
+      throw new HttpError(400, 'X_REQUIRED', 'link and verify your X account first');
     const body = await bodyOf(listingBody, await c.req.json());
     // The category bond is the gate (docs/06-payments-escrow.md). Meeting it makes the
     // wallet a creator, so a creator is never blocked by a role it cannot request.
