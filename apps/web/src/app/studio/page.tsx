@@ -229,53 +229,62 @@ export default function StudioPage() {
     <section data-testid="studio" className="min-w-0 max-w-full space-y-6">
       <header
         data-testid="studio-header"
-        className="flex flex-wrap items-center justify-between gap-5 rounded-panel border border-line bg-surface p-5 sm:p-6"
+        className="relative overflow-hidden rounded-[28px] border border-line"
       >
-        <div className="flex min-w-0 items-center gap-4">
-          <Avatar
-            image={creator?.avatarUrl ?? null}
-            name={creator?.displayName ?? session.handle}
-            fallback={session.wallet}
-            className="h-16 w-16 text-xl"
-            ring="ring-2 ring-line"
-          />
-          <div className="min-w-0">
-            <Label>Creator studio</Label>
-            <h1 className="m-0 mt-0.5 flex items-center gap-2 truncate text-[26px] font-semibold tracking-[-0.03em]">
-              {name}
-              {creator?.xVerified ? <VerifiedBadge /> : null}
-            </h1>
-            <p className="m-0 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-2">
-              {session.handle && creator?.displayName ? <span>@{session.handle}</span> : null}
-              <span data-testid="studio-x">
-                {creator?.xHandle
-                  ? creator.xVerified
-                    ? `X @${creator.xHandle} · verified`
-                    : `X @${creator.xHandle} · not verified`
-                  : 'X not linked'}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(120%_90%_at_15%_0%,rgba(198,244,50,0.22),transparent_60%),linear-gradient(135deg,#16200c,#0b0d0b_70%)]"
+        />
+        <div aria-hidden="true" className="grid-fade absolute inset-0" />
+        <div className="relative flex flex-wrap items-end justify-between gap-5 p-5 pt-16 sm:p-7 sm:pt-20">
+          <div className="flex min-w-0 items-end gap-4 sm:gap-5">
+            <Avatar
+              image={creator?.avatarUrl ?? null}
+              name={creator?.displayName ?? session.handle}
+              fallback={session.wallet}
+              className="h-16 w-16 text-xl sm:h-[72px] sm:w-[72px]"
+              ring="ring-2 ring-white/15"
+            />
+            <div className="min-w-0">
+              <span className="font-mono text-xs tracking-[.16em] text-ink-2 uppercase">
+                Creator studio
               </span>
-              <span>{TIER_LABEL[session.tier] ?? session.tier}</span>
-              {creator?.memberSince ? (
-                <span>Member since {monthYear(creator.memberSince)}</span>
-              ) : null}
-              <span className="font-mono text-muted">{shortWallet(session.wallet)}</span>
-            </p>
+              <h1 className="m-0 mt-0.5 flex items-center gap-2 truncate text-[28px] font-semibold tracking-[-0.04em] sm:text-4xl">
+                {name}
+                {creator?.xVerified ? <VerifiedBadge /> : null}
+              </h1>
+              <p className="m-0 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-2">
+                {session.handle && creator?.displayName ? <span>@{session.handle}</span> : null}
+                <span data-testid="studio-x">
+                  {creator?.xHandle
+                    ? creator.xVerified
+                      ? `X @${creator.xHandle} · verified`
+                      : `X @${creator.xHandle} · not verified`
+                    : 'X not linked'}
+                </span>
+                <span>{TIER_LABEL[session.tier] ?? session.tier}</span>
+                {creator?.memberSince ? (
+                  <span>Member since {monthYear(creator.memberSince)}</span>
+                ) : null}
+                <span className="font-mono text-muted">{shortWallet(session.wallet)}</span>
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink href={publicHref} variant="ghost">
-            View public profile
-          </ButtonLink>
-          <ButtonLink href="/studio/profile" variant="secondary">
-            Edit profile
-          </ButtonLink>
-          <ButtonLink href="/studio/featuring" variant="secondary">
-            Feature a listing
-          </ButtonLink>
-          <ButtonLink href="/studio/api-keys" variant="secondary">
-            API keys
-          </ButtonLink>
-          <ButtonLink href="/studio/listings/new">+ New listing</ButtonLink>
+          <div className="flex flex-wrap gap-2">
+            <ButtonLink href={publicHref} variant="ghost">
+              View public profile
+            </ButtonLink>
+            <ButtonLink href="/studio/profile" variant="secondary">
+              Edit profile
+            </ButtonLink>
+            <ButtonLink href="/studio/featuring" variant="secondary">
+              Feature a listing
+            </ButtonLink>
+            <ButtonLink href="/studio/api-keys" variant="secondary">
+              API keys
+            </ButtonLink>
+            <ButtonLink href="/studio/listings/new">+ New listing</ButtonLink>
+          </div>
         </div>
       </header>
 
@@ -287,7 +296,7 @@ export default function StudioPage() {
         <Panel
           key={l.id}
           tone="warn"
-          className="flex flex-wrap items-center justify-between gap-3 p-4"
+          className="flex flex-wrap items-center justify-between gap-3 !rounded-2xl px-5 py-4"
           data-testid="needs-note"
         >
           <div>
@@ -311,202 +320,209 @@ export default function StudioPage() {
 
       <Stats overview={overview} centsPerSol={centsPerSol} escrowLabel={escrowLabel} />
 
-      <Checklist
-        requirements={requirements}
-        overview={overview}
-        centsPerSol={centsPerSol}
-        bond={bond}
-        setBond={setBond}
-        onStake={() => void stakeBond().catch((err: Error) => setMessage(err.message))}
-        wallet={session.wallet}
-      />
-
       {message ? (
         <p role="status" className="m-0 text-sm text-ink-2">
           {message}
         </p>
       ) : null}
 
-      <div className="relative min-w-0 overflow-hidden rounded-panel border border-line bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3">
-          <div className="flex flex-wrap items-center gap-4">
-            <h2 className="m-0 text-base font-semibold">Listings</h2>
-            <PillGroup role="tablist" aria-label="Filter listings">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === t.key}
-                  onClick={() => setTab(t.key)}
-                  className={pillClass(tab === t.key, 'h-8')}
-                >
-                  {t.label}{' '}
-                  <span className="font-mono text-[11px] opacity-70">{counts(t.key)}</span>
-                </button>
-              ))}
-            </PillGroup>
-          </div>
-          <span className="text-xs text-muted">Newest first</span>
-        </div>
-        {listings && listings.length > 0 ? (
-          <ul className="m-0 p-0 sm:hidden" data-testid="studio-listing-cards">
-            {shown.map((l) => (
-              <ListingCard key={l.id} listing={l} centsPerSol={centsPerSol} />
-            ))}
-            {shown.length === 0 ? (
-              <li className="list-none px-5 py-6 text-center text-sm text-muted">Nothing here.</li>
-            ) : null}
-          </ul>
-        ) : null}
-        {listings && listings.length === 0 ? (
-          <div className="p-5">
-            <EmptyState
-              title="No listings yet"
-              body="Upload a file and automated review runs live: static scan, sandbox run and verdict."
-              action={
-                <ButtonLink href="/studio/listings/new">Create your first listing</ButtonLink>
-              }
-            />
-          </div>
-        ) : (
-          <div className="relative hidden overflow-x-auto sm:block">
-            <table
-              data-testid="studio-listings"
-              className="w-full min-w-[860px] border-collapse text-sm"
-            >
-              <thead>
-                <tr className="text-left font-mono text-[11px] uppercase tracking-wide text-muted">
-                  <th scope="col" className="px-5 py-2.5 font-medium">
-                    Listing
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 font-medium">
-                    Status
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 font-medium">
-                    Version
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    Price
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    Sales 7d
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    Subs
-                  </th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-medium">
-                    Rating
-                  </th>
-                  <th scope="col" className="px-5 py-2.5 text-right font-medium">
-                    <span className="sr-only">Action</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
+          <div className="relative min-w-0 overflow-hidden rounded-panel border border-line bg-surface">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-3">
+              <div className="flex flex-wrap items-center gap-4">
+                <h2 className="m-0 text-base font-semibold">Listings</h2>
+                <PillGroup role="tablist" aria-label="Filter listings">
+                  {TABS.map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === t.key}
+                      onClick={() => setTab(t.key)}
+                      className={pillClass(tab === t.key, 'h-8')}
+                    >
+                      {t.label}{' '}
+                      <span className="font-mono text-[11px] opacity-70">{counts(t.key)}</span>
+                    </button>
+                  ))}
+                </PillGroup>
+              </div>
+              <span className="text-xs text-muted">Newest first</span>
+            </div>
+            {listings && listings.length > 0 ? (
+              <ul className="m-0 p-0 sm:hidden" data-testid="studio-listing-cards">
                 {shown.map((l) => (
-                  <ListingRow key={l.id} listing={l} centsPerSol={centsPerSol} />
+                  <ListingCard key={l.id} listing={l} centsPerSol={centsPerSol} />
                 ))}
-                {listings === null
-                  ? [0, 1, 2].map((key) => (
-                      <tr key={key} className="border-t border-line-soft">
-                        <td colSpan={8} className="px-5 py-3">
-                          <Skeleton className="h-8 w-full" />
+                {shown.length === 0 ? (
+                  <li className="list-none px-5 py-6 text-center text-sm text-muted">
+                    Nothing here.
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+            {listings && listings.length === 0 ? (
+              <div className="p-5">
+                <EmptyState
+                  title="No listings yet"
+                  body="Upload a file and automated review runs live: static scan, sandbox run and verdict."
+                  action={
+                    <ButtonLink href="/studio/listings/new">Create your first listing</ButtonLink>
+                  }
+                />
+              </div>
+            ) : (
+              <div className="relative hidden overflow-x-auto sm:block">
+                <table
+                  data-testid="studio-listings"
+                  className="w-full min-w-[720px] border-collapse text-sm"
+                >
+                  <thead>
+                    <tr className="text-left font-mono text-[11px] uppercase tracking-wide text-muted">
+                      <th scope="col" className="px-5 py-2.5 font-medium">
+                        Listing
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 font-medium">
+                        Status
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 font-medium">
+                        Version
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                        Price
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                        Sales 7d
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                        Subs
+                      </th>
+                      <th scope="col" className="px-3 py-2.5 text-right font-medium">
+                        Rating
+                      </th>
+                      <th scope="col" className="px-5 py-2.5 text-right font-medium">
+                        <span className="sr-only">Action</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map((l) => (
+                      <ListingRow key={l.id} listing={l} centsPerSol={centsPerSol} />
+                    ))}
+                    {listings === null
+                      ? [0, 1, 2].map((key) => (
+                          <tr key={key} className="border-t border-line-soft">
+                            <td colSpan={8} className="px-5 py-3">
+                              <Skeleton className="h-8 w-full" />
+                            </td>
+                          </tr>
+                        ))
+                      : null}
+                    {listings && listings.length > 0 && shown.length === 0 ? (
+                      <tr className="border-t border-line-soft">
+                        <td colSpan={8} className="px-5 py-6 text-center text-sm text-muted">
+                          Nothing here.
                         </td>
                       </tr>
-                    ))
-                  : null}
-                {listings && listings.length > 0 && shown.length === 0 ? (
-                  <tr className="border-t border-line-soft">
-                    <td colSpan={8} className="px-5 py-6 text-center text-sm text-muted">
-                      Nothing here.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_340px]">
-        <section
-          data-testid="dashboard"
-          className="overflow-hidden rounded-panel border border-line bg-surface"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line-soft px-5 py-3">
-            <h2 className="m-0 text-base font-semibold">Payouts</h2>
-            <span className="text-sm text-ink-2">
-              Total{' '}
-              {payouts ? (
-                <Money lamports={payouts.total.lamports} usdCents={payouts.total.usdCents} strong />
-              ) : (
-                '—'
-              )}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-px border-b border-line-soft bg-line-soft sm:grid-cols-3">
-            <PayoutCell label="Sent" note="from the Squads vault">
-              {overview ? (
-                <Money lamports={overview.payouts.sent} centsPerSol={centsPerSol} />
-              ) : null}
-            </PayoutCell>
-            <PayoutCell label="In multisig" note="queued or awaiting signatures">
-              {overview ? (
-                <Money
-                  lamports={(
-                    BigInt(overview.payouts.inMultisig) + BigInt(overview.payouts.queued)
-                  ).toString()}
-                  centsPerSol={centsPerSol}
-                />
-              ) : null}
-            </PayoutCell>
-            <PayoutCell
-              label="In escrow"
-              note={
-                overview?.payouts.nextRelease
-                  ? `next release ${utc(overview.payouts.nextRelease)}`
-                  : `releases ${escrowLabel} after a sale, no dispute`
-              }
-            >
-              {overview ? (
-                <Money lamports={overview.payouts.inEscrow} centsPerSol={centsPerSol} />
-              ) : null}
-            </PayoutCell>
-          </div>
-          {rows.length === 0 ? (
-            <p className="m-0 px-5 py-4 text-sm text-muted">
-              No payouts yet. A sale pays out after its {escrowLabel} escrow releases with no
-              dispute.
-            </p>
-          ) : (
-            <ul className="m-0 p-0">
-              {rows.map((row) => (
-                <li
-                  key={row.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-5 py-3 first:border-t-0"
-                >
-                  <span className="flex items-center gap-3">
-                    <StatusTag status={row.status} kind="payout" />
-                    <span className="text-sm text-ink-2">
-                      {row.bucket === 'creator'
-                        ? 'Sale or renewal'
-                        : row.bucket === 'refund'
-                          ? 'Refund'
-                          : row.bucket}
-                      {row.created_at ? (
-                        <span className="text-muted"> · {utc(row.created_at)}</span>
-                      ) : null}
+          <section
+            data-testid="dashboard"
+            className="overflow-hidden rounded-panel border border-line bg-surface"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-line-soft px-5 py-3">
+              <h2 className="m-0 text-base font-semibold">Payouts</h2>
+              <span className="text-sm text-ink-2">
+                Total{' '}
+                {payouts ? (
+                  <Money
+                    lamports={payouts.total.lamports}
+                    usdCents={payouts.total.usdCents}
+                    strong
+                  />
+                ) : (
+                  '—'
+                )}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-px border-b border-line-soft bg-line-soft sm:grid-cols-3">
+              <PayoutCell label="Sent" note="from the Squads vault">
+                {overview ? (
+                  <Money lamports={overview.payouts.sent} centsPerSol={centsPerSol} />
+                ) : null}
+              </PayoutCell>
+              <PayoutCell label="In multisig" note="queued or awaiting signatures">
+                {overview ? (
+                  <Money
+                    lamports={(
+                      BigInt(overview.payouts.inMultisig) + BigInt(overview.payouts.queued)
+                    ).toString()}
+                    centsPerSol={centsPerSol}
+                  />
+                ) : null}
+              </PayoutCell>
+              <PayoutCell
+                label="In escrow"
+                note={
+                  overview?.payouts.nextRelease
+                    ? `next release ${utc(overview.payouts.nextRelease)}`
+                    : `releases ${escrowLabel} after a sale, no dispute`
+                }
+              >
+                {overview ? (
+                  <Money lamports={overview.payouts.inEscrow} centsPerSol={centsPerSol} />
+                ) : null}
+              </PayoutCell>
+            </div>
+            {rows.length === 0 ? (
+              <p className="m-0 px-5 py-4 text-sm text-muted">
+                No payouts yet. A sale pays out after its {escrowLabel} escrow releases with no
+                dispute.
+              </p>
+            ) : (
+              <ul className="m-0 p-0">
+                {rows.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft px-5 py-3 first:border-t-0"
+                  >
+                    <span className="flex items-center gap-3">
+                      <StatusTag status={row.status} kind="payout" />
+                      <span className="text-sm text-ink-2">
+                        {row.bucket === 'creator'
+                          ? 'Sale or renewal'
+                          : row.bucket === 'refund'
+                            ? 'Refund'
+                            : row.bucket}
+                        {row.created_at ? (
+                          <span className="text-muted"> · {utc(row.created_at)}</span>
+                        ) : null}
+                      </span>
                     </span>
-                  </span>
-                  <Money lamports={row.amount.lamports} usdCents={row.amount.usdCents} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                    <Money lamports={row.amount.lamports} usdCents={row.amount.usdCents} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
 
         <aside className="space-y-4">
+          <Checklist
+            requirements={requirements}
+            overview={overview}
+            centsPerSol={centsPerSol}
+            bond={bond}
+            setBond={setBond}
+            onStake={() => void stakeBond().catch((err: Error) => setMessage(err.message))}
+            wallet={session.wallet}
+          />
           <div
             data-testid="updates-card"
             className="rounded-panel border border-line bg-surface p-5"
@@ -558,9 +574,9 @@ function Stats({
 }) {
   if (!overview) {
     return (
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((k) => (
-          <div key={k} className="bg-surface p-5">
+          <div key={k} className="rounded-card border border-line bg-surface p-5">
             <Skeleton className="h-16 w-full" />
           </div>
         ))}
@@ -572,7 +588,7 @@ function Stats({
   return (
     <div
       data-testid="studio-stats"
-      className={`grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line ${tiles === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}
+      className={`grid grid-cols-2 gap-3 sm:gap-4 ${tiles === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}
     >
       <Tile label={`Revenue · ${o.days}d`} testid="stat-revenue" wide>
         <Money
@@ -670,9 +686,9 @@ function Tile({
   return (
     <div
       data-testid={testid}
-      className={`flex min-w-0 flex-col gap-1 bg-surface p-4 sm:p-5 ${wide ? 'col-span-2 lg:col-span-1' : ''}`}
+      className={`flex min-w-0 flex-col gap-1 rounded-card border border-line bg-surface p-4 sm:p-5 ${wide ? 'col-span-2 lg:col-span-1' : ''}`}
     >
-      <Label>{label}</Label>
+      <span className="text-sm text-muted">{label}</span>
       <div className="tabular mt-1 flex flex-col gap-0.5 font-mono">{children}</div>
     </div>
   );
@@ -713,7 +729,7 @@ function Checklist({
         ) : null}
       </div>
       {requirements ? (
-        <ul className="m-0 mt-4 grid gap-4 p-0 text-sm sm:grid-cols-2 xl:grid-cols-5">
+        <ul className="m-0 mt-4 grid gap-4 p-0 text-sm sm:grid-cols-2 lg:grid-cols-1">
           <Requirement ok title="Wallet signed in">
             <span className="mt-1 block font-mono text-[12px] text-ink-2">
               {shortWallet(wallet)} · payouts land here
@@ -772,7 +788,7 @@ function Checklist({
               )}
             </span>
           </Requirement>
-          <li className="flex list-none gap-3 border-line-soft xl:border-l xl:pl-4">
+          <li className="flex list-none gap-3">
             <span className="font-mono text-[12px] text-muted">
               {filled ? `${filled.done}/${filled.of}` : '–'}
             </span>
@@ -859,9 +875,9 @@ function ListingRow({
   const status = statusOf(l);
   return (
     <tr className="border-t border-line-soft" data-testid="studio-listing-row">
-      <td className="px-5 py-3">
+      <td className="max-w-[220px] px-5 py-3">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-14 shrink-0 place-items-center overflow-hidden rounded-tag border border-line-soft bg-inset font-mono text-[9px] text-muted">
+          <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-line-soft bg-inset font-mono text-[8px] text-muted">
             {l.coverUrl ? (
               <img
                 src={l.coverUrl}
@@ -892,7 +908,7 @@ function ListingRow({
       </td>
       <td className="px-3 py-3">
         <StatusTag status={status} />
-        <span className="mt-1 block text-[11px] text-muted">{statusNote(l)}</span>
+        <span className="mt-1 block max-w-[160px] text-[11px] text-muted">{statusNote(l)}</span>
       </td>
       <td className="px-3 py-3 font-mono text-xs text-ink-2">
         {l.latest && status !== 'live' && l.latest.semver !== l.live?.semver
@@ -912,7 +928,7 @@ function ListingRow({
       <td className="tabular px-3 py-3 text-right font-mono">
         {l.rating ? `★ ${l.rating.avg.toFixed(1)}` : '–'}
       </td>
-      <td className="px-5 py-3 text-right">
+      <td className="py-3 pr-4 pl-2 text-right">
         {action ? (
           <ButtonLink
             href={action.href}

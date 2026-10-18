@@ -172,9 +172,26 @@ test('dashboard: real stats, needs-note banner, one action per listing and filte
 
   if (process.env.STUDIO_SHOTS) {
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
-    await page.setViewportSize({ width: 1400, height: 900 });
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({ path: `${process.env.STUDIO_SHOTS}/dashboard.png`, fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: `${process.env.STUDIO_SHOTS}/dashboard-mobile.png`,
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
   }
+  // Prototype layout: the listings table fits beside the "Ready to sell" column on desktop.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const table = page.getByTestId('studio-listings');
+  expect(
+    await table.evaluate((t) => t.parentElement!.scrollWidth - t.parentElement!.clientWidth),
+  ).toBeLessThanOrEqual(1);
+  const [tableBox, readyBox] = await Promise.all([
+    table.boundingBox(),
+    page.getByRole('region', { name: 'Ready to sell' }).boundingBox(),
+  ]);
+  expect(readyBox!.x).toBeGreaterThan(tableBox!.x + tableBox!.width);
   await page.getByRole('tab', { name: /In review/ }).click();
   await expect(rows).toHaveCount(2);
   await page.getByRole('tab', { name: /Drafts/ }).click();
