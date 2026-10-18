@@ -25,14 +25,14 @@
     },
     {
       "id": "t04-trencher",
-      "at": 396,
+      "at": 420,
       "maxSec": 3.0,
       "text": "1M makes you a Trencher: 60% off.",
       "say": "One million makes you a Trencher: sixty percent off."
     },
     {
       "id": "t05-og",
-      "at": 492,
+      "at": 510,
       "maxSec": 2.8,
       "text": "10M is OG. No fee at all.",
       "say": "Ten million is O G. No fee at all."

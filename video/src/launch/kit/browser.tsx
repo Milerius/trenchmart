@@ -79,7 +79,7 @@ export const BrowserShot: React.FC<{
             gap: 8,
             padding: '0 12px',
             fontFamily: MONO,
-            fontSize: 15,
+            fontSize: 17,
             color: C.text2,
             whiteSpace: 'nowrap',
             overflow: 'hidden',

@@ -46,7 +46,7 @@ const CodeBackdrop: React.FC<{ dur: number }> = ({ dur }) => {
         alignItems: 'center',
         justifyContent: 'center',
         paddingBottom: tall ? 260 : 40,
-        opacity: fade * 0.5,
+        opacity: fade * 0.35,
         maskImage: 'radial-gradient(ellipse 60% 60% at 50% 50%, #000 30%, transparent 85%)',
       }}
     >
@@ -100,8 +100,8 @@ const UploadCard: React.FC = () => {
   return (
     <Card style={{ width: 820, padding: 30 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Label style={{ fontSize: 15 }}>Studio · new version</Label>
-        <Tag size={14}>v1.2.0</Tag>
+        <Label style={{ fontSize: 18 }}>Studio · new version</Label>
+        <Tag size={17}>v1.2.0</Tag>
       </div>
       <div
         style={{
@@ -124,7 +124,7 @@ const UploadCard: React.FC = () => {
             gap: 12,
             color: C.muted,
             fontFamily: SANS,
-            fontSize: 20,
+            fontSize: 22,
             opacity: 1 - ease(frame, UPLOAD.fly[1] - 6, UPLOAD.fly[1]),
           }}
         >
@@ -149,8 +149,8 @@ const UploadCard: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <FileCode size={30} color={C.accent} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: MONO, fontSize: 20, color: C.text }}>{FILE}</div>
-              <div style={{ fontFamily: MONO, fontSize: 15, color: C.muted, marginTop: 4 }}>
+              <div style={{ fontFamily: MONO, fontSize: 22, color: C.text }}>{FILE}</div>
+              <div style={{ fontFamily: MONO, fontSize: 18, color: C.muted, marginTop: 4 }}>
                 {progress < 1 ? `uploading · ${(38.4 * progress).toFixed(1)} KB` : 'uploaded · 38.4 KB'}
               </div>
             </div>
@@ -170,14 +170,14 @@ const UploadCard: React.FC = () => {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Label style={{ fontSize: 14 }}>SHA-256</Label>
+          <Label style={{ fontSize: 17 }}>SHA-256</Label>
           <span style={{ opacity: pinned, transform: `scale(${0.8 + 0.2 * pinned})` }}>
-            <Tag tone="ok" size={14}>
+            <Tag tone="ok" size={17}>
               <Lock size={14} color={C.accent} /> pinned
             </Tag>
           </span>
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 17, color: C.text, marginTop: 10, wordBreak: 'break-all', minHeight: 48, lineHeight: 1.4 }}>
+        <div style={{ fontFamily: MONO, fontSize: 20, color: C.text, marginTop: 10, wordBreak: 'break-all', minHeight: 48, lineHeight: 1.4 }}>
           {typed(frame, SHA, UPLOAD.sha[0], UPLOAD.sha[1])}
         </div>
       </div>
@@ -191,10 +191,10 @@ const UploadCard: React.FC = () => {
           transform: `translateY(${(1 - scanning) * 8}px)`,
         }}
       >
-        <Tag tone="info" size={15}>
+        <Tag tone="info" size={18}>
           <Spinner size={14} frame={frame} color={C.info} /> scanning
         </Tag>
-        <span style={{ fontFamily: SANS, fontSize: 18, color: C.text2 }}>
+        <span style={{ fontFamily: SANS, fontSize: 21, color: C.text2 }}>
           Review starts the moment it lands
         </span>
       </div>
@@ -212,7 +212,7 @@ const UploadScene: React.FC<SceneProps> = ({ dur }) => (
       sub: 'Every version is stored under its SHA-256.',
     }}
     card={<UploadCard />}
-    scale={{ wide: 1.02, tall: 1.12 }}
+    scale={{ wide: 1.1, tall: 1.18 }}
   />
 );
 
@@ -269,7 +269,7 @@ const ReviewStep: React.FC<{
         {running ? <Spinner size={20} frame={frame} color={C.info} /> : done ? '✓' : n}
       </Square>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: SANS, fontSize: 20, fontWeight: 600, color: C.text }}>
+        <div style={{ fontFamily: SANS, fontSize: 22, fontWeight: 600, color: C.text }}>
           {title}
           {state.status !== 'queued' ? (
             <span style={{ fontWeight: 400, color: C.text2 }}>
@@ -279,12 +279,12 @@ const ReviewStep: React.FC<{
             </span>
           ) : null}
         </div>
-        <div style={{ fontFamily: SANS, fontSize: 16, color: C.muted, marginTop: 4, lineHeight: 1.35 }}>
+        <div style={{ fontFamily: SANS, fontSize: 19, color: C.muted, marginTop: 4, lineHeight: 1.35 }}>
           {done ? doneText : desc}
         </div>
         {extra}
       </div>
-      <span style={{ fontFamily: MONO, fontSize: 17, color: C.text2 }}>
+      <span style={{ fontFamily: MONO, fontSize: 20, color: C.text2 }}>
         {running ? 'running…' : done ? timing : ''}
       </span>
     </div>
@@ -316,7 +316,7 @@ const ReviewCard: React.FC = () => {
           Live review
         </div>
         <div style={{ textAlign: 'right' }}>
-          <Label style={{ fontSize: 13 }}>{ai.status === 'done' ? 'Review time' : 'Elapsed'}</Label>
+          <Label style={{ fontSize: 16 }}>{ai.status === 'done' ? 'Review time' : 'Elapsed'}</Label>
           <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 600, color: C.text }}>{elapsed.toFixed(1)}s</div>
         </div>
       </div>
@@ -331,7 +331,7 @@ const ReviewCard: React.FC = () => {
           border: `1px solid ${C.border}`,
           background: C.surface2,
           fontFamily: MONO,
-          fontSize: 15,
+          fontSize: 18,
         }}
       >
         <span style={{ color: C.text }}>{FILE}</span>
@@ -339,11 +339,11 @@ const ReviewCard: React.FC = () => {
         <span style={{ color: C.muted }}>sha256 {SHA.slice(0, 10)}…</span>
         <span style={{ marginLeft: 'auto' }}>
           {live ? (
-            <Tag tone="ok" size={13}>
+            <Tag tone="ok" size={16}>
               ✓ live
             </Tag>
           ) : (
-            <Tag tone="info" size={13}>
+            <Tag tone="info" size={16}>
               scanning
             </Tag>
           )}
@@ -361,7 +361,7 @@ const ReviewCard: React.FC = () => {
           frame={frame}
           extra={
             st.status === 'running' ? (
-              <div style={{ fontFamily: MONO, fontSize: 14, color: C.info, marginTop: 6 }}>
+              <div style={{ fontFamily: MONO, fontSize: 17, color: C.info, marginTop: 6 }}>
                 ✓ {CHECKS[checkIdx]}
               </div>
             ) : null
@@ -401,16 +401,16 @@ const ReviewCard: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px', borderBottom: `1px solid ${C.borderSoft}` }}>
-            <Label style={{ fontSize: 13 }}>Sandbox log</Label>
-            <Tag tone="warn" size={12}>
+            <Label style={{ fontSize: 16 }}>Sandbox log</Label>
+            <Tag tone="warn" size={15}>
               egress blocked
             </Tag>
-            <Tag tone="ok" size={12}>
+            <Tag tone="ok" size={15}>
               0 wallet calls
             </Tag>
-            <Tag size={12}>0 hosts</Tag>
+            <Tag size={15}>0 hosts</Tag>
           </div>
-          <div style={{ padding: '8px 14px', fontFamily: MONO, fontSize: 14, lineHeight: 1.5, color: C.text2 }}>
+          <div style={{ padding: '8px 14px', fontFamily: MONO, fontSize: 17, lineHeight: 1.5, color: C.text2 }}>
             {LOG.slice(0, logLines).join('  ·  ')}
           </div>
         </div>
@@ -432,7 +432,7 @@ const ReviewCard: React.FC = () => {
           </Square>
           <div>
             <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>Approved and live</div>
-            <div style={{ fontFamily: SANS, fontSize: 17, color: C.accentBody, marginTop: 4 }}>
+            <div style={{ fontFamily: SANS, fontSize: 20, color: C.accentBody, marginTop: 4 }}>
               Buyers see the checks and the pinned hash on your listing.
             </div>
           </div>
@@ -452,7 +452,7 @@ const ReviewScene: React.FC<SceneProps> = ({ dur }) => (
       sub: 'Streamed step by step while you watch.',
     }}
     card={<ReviewCard />}
-    scale={{ wide: 0.97, tall: 1.08 }}
+    scale={{ wide: 1.06, tall: 1.16 }}
     tallCardTop={600}
   />
 );
@@ -493,8 +493,8 @@ const VerdictCard: React.FC = () => {
         transform: `translateY(${(1 - enter) * 30}px)`,
       }}
     >
-      <Label style={{ fontSize: 14 }}>{who}</Label>
-      <div style={{ fontFamily: MONO, fontSize: 15, color: C.muted, marginTop: 6 }}>{engine}</div>
+      <Label style={{ fontSize: 17 }}>{who}</Label>
+      <div style={{ fontFamily: MONO, fontSize: 18, color: C.muted, marginTop: 6 }}>{engine}</div>
       <div style={{ marginTop: 20, height: 46, display: 'flex', alignItems: 'center' }}>
         {pending ? (
           <Thinking frame={frame} />
@@ -502,7 +502,7 @@ const VerdictCard: React.FC = () => {
           <span style={{ opacity: p, transform: `scale(${0.85 + 0.15 * p})`, display: 'inline-block' }}>{verdict}</span>
         )}
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 17, color: C.text2, marginTop: 12, lineHeight: 1.35, opacity: p, minHeight: 46 }}>
+      <div style={{ fontFamily: SANS, fontSize: 20, color: C.text2, marginTop: 12, lineHeight: 1.35, opacity: p, minHeight: 46 }}>
         {why}
       </div>
     </Card>
@@ -559,7 +559,7 @@ const VerdictCard: React.FC = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <Label style={{ fontSize: 14, color: C.warn }}>Final verdict · stricter wins</Label>
+            <Label style={{ fontSize: 17, color: C.warn }}>Final verdict · stricter wins</Label>
             <div style={{ fontFamily: SANS, fontSize: 34, fontWeight: 700, color: C.text, marginTop: 6, letterSpacing: '-0.02em' }}>
               Changes requested
             </div>
@@ -579,7 +579,7 @@ const VerdictCard: React.FC = () => {
                 top: 24,
                 transform: `translateX(${i === 0 ? 0 : i === 2 ? -100 : -50}%)`,
                 fontFamily: MONO,
-                fontSize: 15,
+                fontSize: 18,
                 color: i === 1 ? C.warn : C.muted,
                 whiteSpace: 'nowrap',
               }}
@@ -606,7 +606,7 @@ const VerdictCard: React.FC = () => {
         style={{
           marginTop: 16,
           fontFamily: SANS,
-          fontSize: 19,
+          fontSize: 22,
           color: C.text2,
           textAlign: 'center',
           opacity: note,
@@ -628,7 +628,7 @@ const VerdictScene: React.FC<SceneProps> = ({ dur }) => (
       sub: 'Rules engine and LLM, combined.',
     }}
     card={<VerdictCard />}
-    scale={{ wide: 0.98, tall: 1.08 }}
+    scale={{ wide: 1.06, tall: 1.16 }}
     tallCardTop={610}
   />
 );
@@ -661,20 +661,20 @@ const ReportCard: React.FC = () => {
           right: tall ? 40 : 60,
           top: 0,
           padding: '24px 28px',
-          opacity: 1 - 0.65 * browser,
+          opacity: 1 - browser,
           transform: `translateY(${-30 * browser}px) scale(${1 - 0.08 * browser})`,
           filter: browser > 0.01 ? `blur(${browser * 3}px)` : undefined,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Label style={{ fontSize: 14 }}>scan-report.json · Trojan Trenches Intel v1.4.1</Label>
+          <Label style={{ fontSize: 17 }}>scan-report.json · Trojan Trenches Intel v1.4.1</Label>
           <span style={{ opacity: sign, transform: `scale(${1.4 - 0.4 * sign}) rotate(${(1 - sign) * -8}deg)`, display: 'inline-block' }}>
-            <Tag tone="ok" size={14}>
+            <Tag tone="ok" size={17}>
               ✓ signed · ed25519
             </Tag>
           </span>
         </div>
-        <div style={{ marginTop: 16, fontFamily: MONO, fontSize: 18, lineHeight: 1.65 }}>
+        <div style={{ marginTop: 16, fontFamily: MONO, fontSize: 21, lineHeight: 1.65 }}>
           {JSON_LINES.slice(0, shown).map((l) => (
             <div key={l.k} style={{ whiteSpace: 'nowrap' }}>
               <span style={{ color: C.info }}>{l.k}</span>
@@ -701,9 +701,9 @@ const ReportCard: React.FC = () => {
           height={bh}
           crops={[
             { at: REPORT.zoom[0], x: 560, y: 0, w: 1760 },
-            { at: REPORT.zoom[1], x: 610, y: 930, w: 1660 },
+            { at: REPORT.zoom[1], x: 600, y: tall ? 960 : 1000, w: 1250 },
           ]}
-          highlights={[{ x: 670, y: 1424, w: 1536, h: 110, from: REPORT.valid }]}
+          highlights={[{ x: 670, y: 1424, w: 1150, h: 110, from: REPORT.valid }]}
         />
       </div>
     </div>
@@ -720,7 +720,7 @@ const ReportScene: React.FC<SceneProps> = ({ dur }) => (
       sub: 'The check runs in your browser.',
     }}
     card={<ReportCard />}
-    scale={{ wide: 0.9, tall: 1.04 }}
+    scale={{ wide: 0.98, tall: 1.1 }}
     tallCardTop={600}
   />
 );
