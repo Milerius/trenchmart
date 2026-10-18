@@ -261,6 +261,38 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
   return alerts;
 }
 
+/**
+ * Posts to ntfy. Email forwarding needs an ntfy account token (ntfy.sh refuses anonymous
+ * email, code 40053): without ALERT_NTFY_TOKEN, or if the email is refused, the alert is
+ * sent as push only so it is never lost.
+ */
+export async function postNtfy(
+  f: typeof fetch,
+  env: {
+    alertNtfyServer: string;
+    alertNtfyTopic: string;
+    alertEmail: string;
+    alertNtfyToken: string;
+  },
+  headers: Record<string, string>,
+  body: string,
+): Promise<Response> {
+  const url = `${env.alertNtfyServer}/${env.alertNtfyTopic}`;
+  const auth: Record<string, string> = env.alertNtfyToken
+    ? { Authorization: `Bearer ${env.alertNtfyToken}` }
+    : {};
+  if (env.alertEmail && env.alertNtfyToken) {
+    const res = await timed(f, url, {
+      method: 'POST',
+      headers: { ...headers, ...auth, Email: env.alertEmail },
+      body,
+    });
+    if (res.ok) return res;
+    console.error('ALERT_DELIVERY', 'ntfy email refused', res.status);
+  }
+  return timed(f, url, { method: 'POST', headers: { ...headers, ...auth }, body });
+}
+
 export type Notice = { title: string; body: string; level: OpsLevel | 'resolved' | 'test' };
 
 /** Sends one notice through every configured channel. Returns the channels that accepted it. */
@@ -292,14 +324,7 @@ export async function notify(deps: Deps, notice: Notice): Promise<string[]> {
             ? 'test_tube'
             : 'rotating_light',
     };
-    if (env.alertEmail) headers.Email = env.alertEmail;
-    await attempt('ntfy', () =>
-      timed(f, `${env.alertNtfyServer}/${env.alertNtfyTopic}`, {
-        method: 'POST',
-        headers,
-        body: text,
-      }),
-    );
+    await attempt('ntfy', () => postNtfy(f, env, headers, text));
   }
   if (env.telegramBotToken && env.telegramChatId) {
     await attempt('telegram', () =>
@@ -417,7 +442,7 @@ export async function opsStatus(deps: Deps) {
     events24h: events,
     channels: {
       ntfy: Boolean(env.alertNtfyTopic),
-      email: Boolean(env.alertNtfyTopic && env.alertEmail),
+      email: Boolean(env.alertNtfyTopic && env.alertEmail && env.alertNtfyToken),
       telegram: Boolean(env.telegramBotToken && env.telegramChatId),
       webhook: Boolean(env.alertWebhookUrl),
     },

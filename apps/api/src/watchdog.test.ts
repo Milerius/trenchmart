@@ -7,6 +7,7 @@ const env: WatchdogEnv = {
   RPC_URL: 'https://rpc.example',
   ALERT_NTFY_TOPIC: 'topic',
   ALERT_EMAIL: 'owner@example.com',
+  ALERT_NTFY_TOKEN: 'tk',
 };
 
 function world() {
