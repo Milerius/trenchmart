@@ -36,15 +36,12 @@ import {
   type SessionUser,
 } from './wallet-session';
 import { clearStudioCache } from './studio-cache';
-import {
-  createWalletConnectProvider,
-  signWalletConnectMessage,
-  signWalletConnectTransaction,
-  startWalletConnect,
-  walletConnectProjectId,
-  type WalletConnectSession,
-  type WcProviderLike,
-} from './walletconnect';
+import type { WalletConnectSession, WcProviderLike } from './walletconnect';
+import { walletConnectProjectId } from './walletconnect-id';
+
+/** Pairing and signing code: loaded when the picker opens, not with every page. */
+const loadWalletConnect = () => import('./walletconnect');
+type WalletConnectModule = Awaited<ReturnType<typeof loadWalletConnect>>;
 import {
   isUsableSolanaWallet,
   mobileBrowseUrl,
@@ -476,6 +473,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [session, detected]);
 
   function signerFromWalletConnect(
+    { signWalletConnectMessage, signWalletConnectTransaction }: WalletConnectModule,
     provider: WcProviderLike,
     session: WalletConnectSession,
   ): Signer {
@@ -501,15 +499,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setError('');
     let signing = false;
     try {
-      const provider = await createWalletConnectProvider(projectId);
+      const wc = await loadWalletConnect();
+      const provider = await wc.createWalletConnectProvider(projectId);
       if (generation !== wcGen.current) return;
-      const started = startWalletConnect(provider);
+      const started = wc.startWalletConnect(provider);
       const uri = await started.uri;
       if (generation !== wcGen.current) return;
       setWcUri(uri);
       const session = await started.session;
       if (generation !== wcGen.current) return;
-      const signer = signerFromWalletConnect(provider, session);
+      const signer = signerFromWalletConnect(wc, provider, session);
       signing = true;
       await signInWith(signer, 'walletconnect', 'WalletConnect');
       setPickerOpen(false);
@@ -525,7 +524,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   function openPicker() {
     setError('');
     setLastUsedId(readLastWallet(safeLocalStorage(window)));
-    setWalletConnectEnabled(Boolean(walletConnectProjectId()));
+    const wcEnabled = Boolean(walletConnectProjectId());
+    setWalletConnectEnabled(wcEnabled);
+    if (wcEnabled) void loadWalletConnect().catch(() => undefined);
     setWcUri(null);
     wcGen.current += 1;
     setPickerOpen(true);
