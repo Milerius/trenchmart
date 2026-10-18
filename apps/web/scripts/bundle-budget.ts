@@ -18,6 +18,7 @@ export const BUDGETS: Record<string, number> = {
   '/verify': 190,
   '/creators': 175,
   '/sell': 175,
+  '/c/userscript': 175,
 };
 
 function htmlFor(route: string): string | null {

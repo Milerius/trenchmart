@@ -1573,9 +1573,12 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   api.get('/stats', async (c) => {
-    const stats = await landingStats(deps);
-    const price = await solPrice();
-    const paid = await paidToCreators(deps);
+    // Independent reads: run them together instead of three round trips in a row.
+    const [stats, price, paid] = await Promise.all([
+      landingStats(deps),
+      solPrice(),
+      paidToCreators(deps),
+    ]);
     return c.json(
       jsonSafe({
         ...stats,

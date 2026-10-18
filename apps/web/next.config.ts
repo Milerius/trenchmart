@@ -43,6 +43,8 @@ export default function config(phase: string): NextConfig {
         // Older or guessed listing URL shapes all land on the canonical /l/<slug>.
         { source: '/listing/:slug', destination: '/l/:slug', permanent: true },
         { source: '/listings/:slug', destination: '/l/:slug', permanent: true },
+        // The browse page is /search; /listings was a 404 for anyone guessing the URL.
+        { source: '/listings', destination: '/search', permanent: true },
       ];
     },
     // /api/v1/* is proxied by app/api/v1/[...path]/route.ts (not a rewrite) so the API can

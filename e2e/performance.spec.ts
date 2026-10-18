@@ -56,6 +56,76 @@ test('entrance animations are unchanged (rise and route fade still run)', async 
     .toBe('1');
 });
 
+test('/listings (a guessed URL that used to 404) lands on the browse page', async ({ page }) => {
+  const res = await page.goto('/listings');
+  expect(res?.status()).toBe(200);
+  await expect(page).toHaveURL(/\/search$/);
+  await expect(page.getByTestId('nav')).toBeVisible();
+});
+
+const IMG = (n: number) => `00000000-0000-4000-8000-00000000010${n}`;
+const PERF_LISTING = {
+  id: IMG(9),
+  slug: 'perf-pack',
+  title: 'Perf Pack',
+  summary: 'Flags bundled launches.',
+  category: 'userscript',
+  terminals: ['Axiom'],
+  price: '1000000000',
+  handle: 'rugradar',
+  sales7d: 3,
+  ratingAvg: '4.90',
+  ratingCount: 1,
+  cover: { url: `/api/v1/media/${IMG(1)}`, alt: 'Perf Pack cover' },
+  imageCount: 3,
+  description: 'Overlay.',
+  license: 'single',
+  holderOnly: false,
+  creator: {
+    handle: 'rugradar',
+    wallet: 'H4kHTS2dSvuJX6NL4KxYRsPBZvHNc79rTpmnWm2ecdbZ',
+    bondLamports: '1000000000',
+  },
+  preview: '// ==UserScript==',
+  security: null,
+  content: {
+    readme: '# Perf Pack',
+    howto: '1. Install',
+    requirements: 'Chrome 120+',
+    gallery: [1, 2, 3].map((n) => ({
+      id: IMG(n),
+      url: `/api/v1/media/${IMG(n)}`,
+      alt: `Screenshot ${n}`,
+      width: 32,
+      height: 32,
+    })),
+  },
+};
+
+test('listing page renders; the hero image is high priority and thumbnails are lazy', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname.replace('/api/v1', '');
+    if (path.startsWith('/media/'))
+      return route.fulfill({ status: 200, contentType: 'image/webp', body: Buffer.alloc(0) });
+    if (path === '/me')
+      return route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } });
+    if (path === '/listings') return route.fulfill({ json: [PERF_LISTING] });
+    if (path === '/listings/perf-pack') return route.fulfill({ json: PERF_LISTING });
+    if (path === '/listings/perf-pack/versions' || path === '/listings/perf-pack/reviews')
+      return route.fulfill({ json: [] });
+    return route.fallback();
+  });
+  await page.goto('/l/perf-pack');
+  await expect(page.getByRole('heading', { name: 'Perf Pack', level: 1 })).toBeVisible();
+  const hero = page.getByTestId('gallery-hero').locator('img');
+  await expect(hero).toHaveAttribute('fetchpriority', 'high');
+  const thumbs = page.getByTestId('gallery-thumbs').locator('img');
+  await expect(thumbs).toHaveCount(3);
+  for (const thumb of await thumbs.all()) await expect(thumb).toHaveAttribute('loading', 'lazy');
+});
+
 test.describe('live caching privacy', () => {
   const live = process.env.TM_LIVE_URL;
   const api = process.env.TM_LIVE_API_URL ?? 'https://api.trenchmart.fun';
@@ -108,6 +178,12 @@ test.describe('live caching privacy', () => {
     expect(html).toContain('data-testid="creator-profile"');
     expect(html).not.toContain('Edit profile');
     expect(html).not.toContain('"isOwner":true');
+  });
+
+  test('live /listings redirects to /search', async ({ request }) => {
+    const res = await request.get(`${live}/listings`, { maxRedirects: 0 });
+    expect([301, 308]).toContain(res.status());
+    expect(res.headers()['location']).toMatch(/\/search$/);
   });
 
   for (const path of ['/', '/search', '/studio', '/me/purchases', '/verify', '/creators']) {

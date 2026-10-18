@@ -7,7 +7,7 @@ import { ListingView, type Listing } from './listing-view';
 type Props = { params: Promise<{ slug: string }> };
 
 // ISR: a listing page is rendered on its first visit, then served from the incremental
-// cache (Workers KV, see open-next.config.ts) and re-rendered in the background at most
+// cache (Workers Cache API, see open-next.config.ts) and re-rendered in the background at most
 // once a minute. The render only reads the public, cookie-less API, so nothing
 // viewer-specific is ever in the cached HTML; ownership and wallet state load client-side.
 export const revalidate = 60;
