@@ -43,6 +43,7 @@ import {
   compilePayoutBatch,
   compileUnsignedTransferMemo,
   fromBase64,
+  parseLegacyTx,
   toBase64,
   TRANSFER_BUDGET,
   type ChainTx,
@@ -97,6 +98,8 @@ export type Deps = {
   optimizeImage?: import('./image-optimize').ImageOptimizer;
   /** Required when ESCROW_PROGRAM_ID is set. */
   escrowChain?: EscrowChain;
+  /** Relays a signed transaction (agent broadcast). Defaults to sendRaw on env.rpcUrl. */
+  sendTx?: (tx: Uint8Array) => Promise<string>;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
   llmFetch?: typeof fetch;
   /** Fetch used for X OAuth (M-04). Defaults to the global fetch. */
@@ -268,6 +271,26 @@ function unsignedTx(input: {
  * would fail is refused here with the real reason instead. An unreachable RPC does not
  * block: the wallet and the broadcast preflight still check it.
  */
+/** How long an issued unsigned transaction can be relayed by /agent/tx/broadcast. */
+export const ISSUED_TX_TTL_MS = 3 * 60_000;
+
+/**
+ * Records the SHA-256 of an unsigned transaction message the API built for a wallet. The
+ * agent broadcast endpoint relays only byte-identical messages found here, so a relayed
+ * transaction can never carry a program, account or amount the API did not choose.
+ */
+export async function recordIssuedTx(deps: Deps, txBase64: string, kind: string): Promise<void> {
+  const parsed = parseLegacyTx(fromBase64(txBase64));
+  const hash = await sha256Hex(parsed.message);
+  const wallet = parsed.accountKeys[0] as string;
+  const expires = new Date(deps.now().getTime() + ISSUED_TX_TTL_MS);
+  await deps.sql`
+    insert into issued_txs (message_hash, wallet, kind, created_at, expires_at)
+    values (${hash}, ${wallet}, ${kind}, ${deps.now()}, ${expires})
+    on conflict (message_hash) do update set expires_at = excluded.expires_at
+  `;
+}
+
 export async function preflightTx(deps: Deps, txBase64: string): Promise<void> {
   if (!deps.simulate) return;
   let result: Simulation;
@@ -319,6 +342,7 @@ export async function buildVaultTx(
     recentBlockhash: latest.blockhash,
   });
   await preflightTx(deps, txBase64);
+  await recordIssuedTx(deps, txBase64, 'vault');
   return {
     txBase64,
     blockhash: latest.blockhash,
@@ -430,6 +454,7 @@ export async function createOrder(deps: Deps, userId: string, listingId: string)
       version: deps.env.escrowProgramVersion,
     });
     await preflightTx(deps, built.txBase64);
+    await recordIssuedTx(deps, built.txBase64, 'order');
     await deps.sql`
       insert into orders (
         id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total,
@@ -694,14 +719,20 @@ export async function expireOrders(deps: Deps): Promise<number> {
   return rows.length;
 }
 
-export async function releaseOrders(deps: Deps): Promise<string[]> {
+/** Releases due orders (all of them, or one when `orderId` is given, for the agent API). */
+export async function releaseOrders(
+  deps: Deps,
+  opts: { orderId?: string } = {},
+): Promise<string[]> {
   const config = await loadConfig(deps);
+  const only = opts.orderId ?? null;
   const rows = await deps.sql<Row[]>`
     select o.*, u.wallet as creator_wallet, u.id as creator_user
     from orders o
     join listings l on l.id = o.listing_id
     join users u on u.id = l.creator_id
     where o.status = 'paid' and o.escrow_until <= ${deps.now()}
+      and (${only}::uuid is null or o.id = ${only}::uuid)
       and not exists (select 1 from disputes d where d.order_id = o.id and d.status = 'open')
   `;
   const released: string[] = [];
@@ -1216,6 +1247,7 @@ export async function openDispute(
         recentBlockhash: latest.blockhash,
         version: deps.env.escrowProgramVersion,
       });
+      await recordIssuedTx(deps, txBase64, 'dispute');
     }
   }
   return { id: inserted[0]?.id, txBase64, onChain };
@@ -1242,6 +1274,7 @@ export async function disputeTx(deps: Deps, orderId: string, userId: string) {
     version: deps.env.escrowProgramVersion,
   });
   await preflightTx(deps, txBase64);
+  await recordIssuedTx(deps, txBase64, 'dispute');
   return { onChain: false, txBase64 };
 }
 

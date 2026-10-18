@@ -4,7 +4,10 @@ import {
   compilePayoutBatch,
   compileUnsignedTransferMemo,
   decodeTransfersAndMemos,
+  MEMO_PROGRAM,
+  parseLegacyTx,
   randomKeypair,
+  verifyTxSignatures,
   signLegacyTransaction,
   signatureOf,
 } from './tx';
@@ -103,5 +106,35 @@ describe('compute budget', () => {
     expect([...price!.data]).toEqual([3, 0xe8, 0x03, 0, 0, 0, 0, 0, 0]);
     expect([...loaded!.data]).toEqual([4, 0x00, 0x00, 0x08, 0x00]);
     expect(ESCROW_BUDGET.units).toBeGreaterThan(36_868 * 2);
+  });
+});
+
+describe('parseLegacyTx', () => {
+  const blockhash = bs58.encode(new Uint8Array(32).fill(1));
+  const from = randomKeypair();
+  const to = randomKeypair();
+  const unsigned = () =>
+    compileUnsignedTransferMemo({ from: from.publicKey, to: to.publicKey, lamports: 42n, memo: 'tm:abc', recentBlockhash: blockhash });
+
+  it('parses keys, blockhash and instructions and verifies signatures', () => {
+    const parsed = parseLegacyTx(unsigned());
+    expect(parsed.accountKeys[0]).toBe(from.publicKey);
+    expect(parsed.recentBlockhash).toBe(blockhash);
+    expect(parsed.numRequiredSignatures).toBe(1);
+    expect(parsed.instructions.map((ix) => ix.programId)).toContain(MEMO_PROGRAM);
+    expect(verifyTxSignatures(parsed)).toBe(false);
+    expect(verifyTxSignatures(parseLegacyTx(signLegacyTransaction(unsigned(), from.secretKey)))).toBe(true);
+  });
+
+  it('rejects versioned messages, trailing bytes, truncation and oversize', () => {
+    const v0 = unsigned();
+    v0[65] = 0x80;
+    expect(() => parseLegacyTx(v0)).toThrow(/versioned/);
+    expect(() => parseLegacyTx(new Uint8Array([...unsigned(), 0]))).toThrow(/trailing/);
+    expect(() => parseLegacyTx(unsigned().slice(0, 100))).toThrow();
+    expect(() => parseLegacyTx(new Uint8Array(1300))).toThrow(/packet/);
+    const badCount = unsigned();
+    badCount[0] = 2;
+    expect(() => parseLegacyTx(badCount)).toThrow();
   });
 });

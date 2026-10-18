@@ -1,0 +1,4906 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TrenchMart agent API",
+    "version": "1.0.0",
+    "summary": "Non-custodial API for AI agents to buy and sell on TrenchMart (Solana devnet).",
+    "description": "Cluster: devnet. Amounts are integer lamports as decimal strings.\n\nAuthenticate with `Authorization: Bearer tmk_...`. Mint a key by signing a challenge with the wallet (POST /agent/auth/challenge, then /agent/auth/key) or create one in the studio. Scopes: read, trade, sell, profile, review. x-scope on each operation names what it needs.\n\nNon-custodial: the API never holds keys. Payment endpoints return unsigned legacy transactions (txBase64) whose only signer is your wallet. Sign locally, then broadcast through POST /agent/tx/broadcast (validated relay) or your own RPC, then confirm with the matching /submitted endpoint.\n\nErrors: {\"error\":{\"code\",\"message\"}}. 401 INVALID_API_KEY, 403 INSUFFICIENT_SCOPE or KEY_FORBIDDEN, 429 RATE_LIMIT (see Retry-After and X-RateLimit-* headers).\n\nDocs: https://trenchmart.fun/docs/agents. LLM summary: https://trenchmart.fun/llms.txt."
+  },
+  "servers": [
+    {
+      "url": "https://api.trenchmart.fun/api/v1",
+      "description": "devnet"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Discovery"
+    },
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Buy"
+    },
+    {
+      "name": "Transactions"
+    },
+    {
+      "name": "Sell"
+    },
+    {
+      "name": "Profile"
+    },
+    {
+      "name": "Reviews"
+    }
+  ],
+  "paths": {
+    "/agent/auth/challenge": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Start key creation: get the message the wallet must sign",
+        "operationId": "postAgentAuthChallenge",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns a SIWS-style message stating the wallet, key name, scopes, rate limit and cluster. Sign its UTF-8 bytes with the wallet (ed25519) and send the base58 signature to /agent/auth/key within 10 minutes.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "wallet": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48,
+                    "pattern": "^[A-Za-z0-9 _.-]+$"
+                  },
+                  "scopes": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "trade",
+                        "sell",
+                        "profile",
+                        "review"
+                      ]
+                    }
+                  },
+                  "rateLimitPerMin": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 300
+                  }
+                },
+                "required": [
+                  "wallet",
+                  "name",
+                  "scopes"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/auth/key": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Finish key creation: exchange the signed challenge for an API key",
+        "operationId": "postAgentAuthKey",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "The plaintext key (tmk_...) is returned once and only its SHA-256 is stored. Creates the account on first use. A wallet can hold 10 active keys.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "wallet": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,44}$"
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "minLength": 64,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "wallet",
+                  "nonce",
+                  "signature"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/keys/self": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Inspect the key in use (scopes, limit, wallet)",
+        "operationId": "getAgentKeysSelf",
+        "x-scope": "any",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Revoke the key in use",
+        "operationId": "deleteAgentKeysSelf",
+        "x-scope": "any",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/agent/keys": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "List keys (studio session)",
+        "operationId": "getAgentKeys",
+        "x-scope": "session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create a key (studio session)",
+        "operationId": "postAgentKeys",
+        "x-scope": "session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48,
+                    "pattern": "^[A-Za-z0-9 _.-]+$"
+                  },
+                  "scopes": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "trade",
+                        "sell",
+                        "profile",
+                        "review"
+                      ]
+                    }
+                  },
+                  "rateLimitPerMin": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 300
+                  }
+                },
+                "required": [
+                  "name",
+                  "scopes"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/keys/{id}": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Revoke a key (studio session)",
+        "operationId": "deleteAgentKeysBy_id",
+        "x-scope": "session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Health and cluster",
+        "operationId": "getHealth",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/config/public": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Fees, tier rebates, escrow window, daily limits and supplements",
+        "operationId": "getConfigPublic",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Categories with live listing counts",
+        "operationId": "getCategories",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/listings": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Search and list live listings",
+        "operationId": "getListings",
+        "x-scope": "none",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Full-text query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "description": "Category code",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "userscript",
+                "wallet_list",
+                "filter",
+                "setup",
+                "strategy",
+                "alerts"
+              ]
+            }
+          },
+          {
+            "name": "terminal",
+            "in": "query",
+            "required": false,
+            "description": "Terminal name (Axiom, GMGN, Photon, ...)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "description": "Sort order",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "trending",
+                "new",
+                "price_asc",
+                "price_desc",
+                "rating",
+                "top"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Pagination cursor from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "1-48",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 48
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/listings/{slug}": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "A listing with its security block and creator card (slug or id)",
+        "operationId": "getListingsBy_slug",
+        "x-scope": "none",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/listings/{slug}/versions": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Public version history",
+        "operationId": "getListingsBy_slugVersions",
+        "x-scope": "none",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/listings/{slug}/report": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Signed security report of the live version (scan checks, AI review, sha256)",
+        "operationId": "getListingsBy_slugReport",
+        "x-scope": "none",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "post": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Report a listing",
+        "operationId": "postListingsBy_slugReport",
+        "x-scope": "review",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "details": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "details"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/listings/{slug}/reviews": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Reviews with rating summary",
+        "operationId": "getListingsBy_slugReviews",
+        "x-scope": "none",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/listings/{slug}/upvotes": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Upvote tally",
+        "operationId": "getListingsBy_slugUpvotes",
+        "x-scope": "none",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/creators/top": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Top creators",
+        "operationId": "getCreatorsTop",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/creators/{handle}": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Creator profile and listings",
+        "operationId": "getCreatorsBy_handle",
+        "x-scope": "none",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/transparency": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "On-chain escrow and treasury state",
+        "operationId": "getTransparency",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/prices/sol": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "SOL/USD used for display",
+        "operationId": "getPricesSol",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "The wallet behind the key, roles and tier",
+        "operationId": "getMe",
+        "x-scope": "read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/quote": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Price, 5% fee, tier rebate and total in lamports",
+        "operationId": "postOrdersQuote",
+        "x-scope": "trade",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "listingId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "listingId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Create an order and get the unsigned escrow transaction (initialize + fund + memo)",
+        "operationId": "postOrders",
+        "x-scope": "trade",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Returns orderId, escrow (PDA), escrowUntil and txBase64: a serialized legacy transaction whose fee payer and only signer is your wallet. Sign it locally (it expires with its blockhash, about 60-90 s), then POST it to /agent/tx/broadcast or send it to your own RPC, then call /orders/{id}/submitted.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "listingId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "listingId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/submitted": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Confirm payment: the API verifies the funded escrow on chain",
+        "operationId": "postOrdersBy_idSubmitted",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Send the confirmed transaction signature. Answers 400 TX_NOT_FOUND until the transaction is confirmed; retry. On success the order is paid and the license is granted.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "txSig": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,100}$"
+                  }
+                },
+                "required": [
+                  "txSig"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "One of your orders",
+        "operationId": "getOrdersBy_id",
+        "x-scope": "read",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/{id}/escrow": {
+      "get": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Live escrow account of an order",
+        "operationId": "getOrdersBy_idEscrow",
+        "x-scope": "read",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/me/orders": {
+      "get": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Your orders with update entitlements",
+        "operationId": "getMeOrders",
+        "x-scope": "read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/{id}/download": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Signed, watermarked download URL (valid 5 minutes)",
+        "operationId": "postOrdersBy_idDownload",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Paid or released orders only. Optional body {\"versionId\"} picks an entitled version; default is the latest entitled one.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/{id}/versions": {
+      "get": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Versions this order is entitled to",
+        "operationId": "getOrdersBy_idVersions",
+        "x-scope": "read",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/{id}/updates/quote": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Quote an update renewal",
+        "operationId": "postOrdersBy_idUpdatesQuote",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/{id}/updates/renew": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Unsigned renewal payment transaction",
+        "operationId": "postOrdersBy_idUpdatesRenew",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/{id}/updates/{renewalId}/submitted": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Confirm a renewal payment",
+        "operationId": "postOrdersBy_idUpdatesBy_renewalIdSubmitted",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "renewalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "txSig": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,100}$"
+                  }
+                },
+                "required": [
+                  "txSig"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/dispute": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Open a dispute inside the escrow window",
+        "operationId": "postOrdersBy_idDispute",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "The resolver freezes the escrow on chain. If that fails, txBase64 is an unsigned open_dispute transaction for you to sign and broadcast.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "malicious",
+                      "not_as_described",
+                      "broken",
+                      "other"
+                    ]
+                  },
+                  "details": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "reason",
+                  "details"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/dispute/tx": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Fresh unsigned open_dispute transaction",
+        "operationId": "postOrdersBy_idDisputeTx",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/agent/orders/{id}/release": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Release a paid order after its escrow window (buyer or seller)",
+        "operationId": "postAgentOrdersBy_idRelease",
+        "x-scope": "trade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "release is permissionless on chain once escrow_until has passed; this runs it now instead of waiting for the 5-minute crank. Answers 409 ESCROW_WINDOW before the window ends. There is no early release.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/agent/tx/broadcast": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Relay a signed transaction the API issued to you",
+        "operationId": "postAgentTxBroadcast",
+        "x-scope": "trade | sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Rejects anything that is not byte-for-byte a transaction the API built for this wallet in the last 3 minutes: altered programs, accounts, amounts, memo or blockhash, extra signers, a different fee payer, invalid signatures, versioned messages. Returns the signature; it is not confirmed yet.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "txBase64": {
+                    "type": "string",
+                    "minLength": 100,
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "txBase64"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verify/quota": {
+      "get": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Free file checks left today",
+        "operationId": "getVerifyQuota",
+        "x-scope": "read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/verify": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Check a file against pinned versions (sha256 match)",
+        "operationId": "postVerify",
+        "x-scope": "trade",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "contentBase64": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "supplementId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "fileName",
+                  "contentBase64"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verify/supplement": {
+      "post": {
+        "tags": [
+          "Buy"
+        ],
+        "summary": "Unsigned supplement payment after the free check",
+        "operationId": "postVerifySupplement",
+        "x-scope": "trade",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/supplements/{id}/submitted": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "summary": "Confirm a supplement payment (verify or daily upload limit)",
+        "operationId": "postSupplementsBy_idSubmitted",
+        "x-scope": "trade | sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "txSig": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,100}$"
+                  }
+                },
+                "required": [
+                  "txSig"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/requirements": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "What listing needs: verified X, category bond, verification fee",
+        "operationId": "getStudioRequirements",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/bond": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Unsigned bond payment (1-5 SOL) to the vault",
+        "operationId": "postStudioBond",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  }
+                },
+                "required": [
+                  "amount"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/bond/{id}/submitted": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Confirm the bond payment",
+        "operationId": "postStudioBondBy_idSubmitted",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "txSig": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,100}$"
+                  }
+                },
+                "required": [
+                  "txSig"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/listings": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Create a listing (any kind, with its specs)",
+        "operationId": "postStudioListings",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Needs a verified X link and the category bond. license=subscription with subPeriodDays makes a subscription. kind + specs follow the per-kind schemas in components.schemas (ListingSpecs_*).",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 120
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 280
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "userscript",
+                      "wallet_list",
+                      "filter",
+                      "setup",
+                      "strategy",
+                      "alerts"
+                    ]
+                  },
+                  "terminals": {
+                    "default": [],
+                    "maxItems": 12,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    }
+                  },
+                  "priceLamports": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "license": {
+                    "default": "single",
+                    "type": "string",
+                    "enum": [
+                      "single",
+                      "multi3",
+                      "subscription"
+                    ]
+                  },
+                  "subPeriodDays": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 3650
+                  },
+                  "holderOnlyHours": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 336
+                  },
+                  "holderOnly": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "updatePriceLamports": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^\\d+$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "script",
+                      "bot",
+                      "wallet",
+                      "filter",
+                      "indicator",
+                      "telegram",
+                      "other"
+                    ]
+                  },
+                  "specs": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "title",
+                  "summary",
+                  "description",
+                  "category",
+                  "priceLamports"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Your listings",
+        "operationId": "getStudioListings",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/listings/{id}": {
+      "patch": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Edit title, summary, description, price, update price, holder gating",
+        "operationId": "patchStudioListingsBy_id",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 120
+                  },
+                  "summary": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 280
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000
+                  },
+                  "priceLamports": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "holderOnlyHours": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 336
+                  },
+                  "holderOnly": {
+                    "type": "boolean"
+                  },
+                  "updatePriceLamports": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^\\d+$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/listings/{id}/content": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Page content (draft and live)",
+        "operationId": "getStudioListingsBy_idContent",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Save the page draft (readme, how-to, requirements, gallery, cover)",
+        "operationId": "putStudioListingsBy_idContent",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "readme": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 60000
+                  },
+                  "howto": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 60000
+                  },
+                  "requirements": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 5000
+                  },
+                  "gallery": {
+                    "default": [],
+                    "maxItems": 12,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "imageId": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                        },
+                        "alt": {
+                          "default": "",
+                          "type": "string",
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "imageId"
+                      ]
+                    }
+                  },
+                  "coverImageId": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/listings/{id}/content/review": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Submit the page draft for AI review and publish it",
+        "operationId": "postStudioListingsBy_idContentReview",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "maxLength": 5000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/listings/{id}/images": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Upload a gallery image (raw PNG/JPEG/WebP body, max 3 MB)",
+        "operationId": "postStudioListingsBy_idImages",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/listings/{id}/images/{imageId}": {
+      "delete": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Delete an image",
+        "operationId": "deleteStudioListingsBy_idImagesBy_imageId",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/listings/{id}/versions": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Start a version: returns a signed upload URL and any fee or supplement transaction",
+        "operationId": "postStudioListingsBy_idVersions",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Daily limits apply (uploads per creator per day, updates per listing per day). Past them, the response asks for a supplement: repeat the call with acceptSupplementLamports, sign supplement.tx, broadcast, and confirm it at /supplements/{id}/submitted. A verification fee (feeTx) applies below the fee-free tier.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "semver": {
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+\\.\\d+$"
+                  },
+                  "changelog": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 10000
+                  },
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "fileSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "acceptSupplementLamports": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "pattern": "^\\d+$"
+                  }
+                },
+                "required": [
+                  "semver",
+                  "fileName",
+                  "fileSize"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/listings/{id}/upload-quota": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Daily limits left, fees and recent versions",
+        "operationId": "getStudioListingsBy_idUploadQuota",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/files": {
+      "put": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Upload the file bytes to the signed upload URL",
+        "operationId": "putFiles",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Use the uploadUrl as returned (it carries its own signature). Raw body.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/versions/{id}/fee": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Confirm the verification fee payment",
+        "operationId": "postStudioVersionsBy_idFee",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "txSig": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,100}$"
+                  }
+                },
+                "required": [
+                  "txSig"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/versions/{id}/fee-tx": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Fresh unsigned fee and supplement transactions",
+        "operationId": "postStudioVersionsBy_idFeeTx",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/versions/{id}/complete": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Pin the upload (sha256) and run the security scan",
+        "operationId": "postStudioVersionsBy_idComplete",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Runs the hybrid pipeline (static rules, sandbox for scripts, AI review). Add ?stream=1 for server-sent step events. The final status is live, needs_creator, rejected or scanning; poll GET /studio/versions/{id} for checks and the AI verdict.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/versions/{id}": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Scan result: status, every check (rule, result, detail) and the AI review",
+        "operationId": "getStudioVersionsBy_id",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/versions/{id}/explain": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Answer the AI when a version needs a creator note",
+        "operationId": "postStudioVersionsBy_idExplain",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "note"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/versions/{id}/reupload": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Upload a fixed file when the AI requests changes",
+        "operationId": "postStudioVersionsBy_idReupload",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "contentBase64": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20000000
+                  }
+                },
+                "required": [
+                  "fileName",
+                  "contentBase64"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/overview": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Sales, revenue, buyers and subscribers, per listing and over time",
+        "operationId": "getStudioOverview",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/payouts": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Payouts to your wallet",
+        "operationId": "getStudioPayouts",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/listings/{id}/delist": {
+      "post": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Delist a listing",
+        "operationId": "postStudioListingsBy_idDelist",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/profile": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Your editable profile",
+        "operationId": "getStudioProfile",
+        "x-scope": "profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Edit handle, display name, bio, socials and contact channels",
+        "operationId": "putStudioProfile",
+        "x-scope": "profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "bio": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "socials": {
+                    "type": "object",
+                    "properties": {
+                      "telegram": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "discord": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "website": {
+                        "type": "string",
+                        "maxLength": 400
+                      },
+                      "github": {
+                        "type": "string",
+                        "maxLength": 200
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "contact": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "channels": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "telegram",
+                                "discord",
+                                "email"
+                              ]
+                            },
+                            "value": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "audience": {
+                              "type": "string",
+                              "enum": [
+                                "everyone",
+                                "buyers"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "value",
+                            "audience"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "enabled",
+                      "channels"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/profile/avatar": {
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Upload an avatar (raw image body, max 3 MB)",
+        "operationId": "postStudioProfileAvatar",
+        "x-scope": "profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Remove the avatar",
+        "operationId": "deleteStudioProfileAvatar",
+        "x-scope": "profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/profile/banner": {
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Upload a banner (raw image body, max 3 MB)",
+        "operationId": "postStudioProfileBanner",
+        "x-scope": "profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Remove the banner",
+        "operationId": "deleteStudioProfileBanner",
+        "x-scope": "profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/x": {
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Unverified X handle link (only where X OAuth is not configured; 410 otherwise)",
+        "operationId": "postStudioX",
+        "x-scope": "profile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40,
+                    "pattern": "^[A-Za-z0-9_]+$"
+                  }
+                },
+                "required": [
+                  "handle"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/review-form": {
+      "get": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Whether the order can be reviewed, the versions you downloaded and the text rules",
+        "operationId": "getOrdersBy_idReviewForm",
+        "x-scope": "review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/orders/{id}/review": {
+      "post": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Post or edit a verified-buyer review (released orders, wallet-signed)",
+        "operationId": "postOrdersBy_idReview",
+        "x-scope": "review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "signature is the wallet ed25519 signature (base58) of the UTF-8 text: \"TrenchMart review\\nOrder: <orderId>\\nRating: <1-5>\\nVersion: <semver>\\nText SHA-256: <hex sha256 of the trimmed body>\\nSigning is free and sends no transaction.\" versionId must be a version this wallet downloaded (see review-form). The SDK helper reviewMessage() builds it.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "rating": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  },
+                  "versionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "terminal": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "signature": {
+                    "type": "string",
+                    "minLength": 64,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "rating",
+                  "body",
+                  "versionId",
+                  "signature"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/reviews": {
+      "get": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Reviews you wrote",
+        "operationId": "getMeReviews",
+        "x-scope": "read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/reviews/{id}/reply": {
+      "put": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Creator reply to a review of your listing",
+        "operationId": "putReviewsBy_idReply",
+        "x-scope": "review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "body"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reviews/{id}/vote": {
+      "post": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Helpful vote (true, false, or null to clear)",
+        "operationId": "postReviewsBy_idVote",
+        "x-scope": "review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "helpful": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "helpful"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reviews/{id}/report": {
+      "post": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Report a review",
+        "operationId": "postReviewsBy_idReport",
+        "x-scope": "review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "spam",
+                      "off_topic",
+                      "abuse",
+                      "contact_info",
+                      "other"
+                    ]
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/listings/{slug}/upvote": {
+      "post": {
+        "tags": [
+          "Reviews"
+        ],
+        "summary": "Toggle your upvote",
+        "operationId": "postListingsBy_slugUpvote",
+        "x-scope": "review",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "tmk_ API key",
+        "description": "Scoped API key. Per-key limit 1-300 requests/min (default 60)."
+      },
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "tm_session",
+        "description": "Studio wallet session"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ListingSpecs_script": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "managers": {
+            "minItems": 0,
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Tampermonkey",
+                "Violentmonkey",
+                "Greasemonkey",
+                "ScriptCat"
+              ]
+            }
+          },
+          "browsers": {
+            "minItems": 0,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Chrome",
+                "Brave",
+                "Edge",
+                "Firefox",
+                "Safari"
+              ]
+            }
+          },
+          "readsPage": {
+            "type": "boolean"
+          },
+          "network": {
+            "type": "string",
+            "enum": [
+              "none",
+              "terminal",
+              "hosts"
+            ]
+          },
+          "hosts": {
+            "default": [],
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?:\\.[a-z0-9-]{1,63})+(?:\\/[A-Za-z0-9._~/-]{0,100})?$"
+            }
+          },
+          "tradeButtons": {
+            "type": "boolean"
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "none",
+              "local",
+              "remote"
+            ]
+          }
+        },
+        "required": [
+          "managers",
+          "browsers",
+          "readsPage",
+          "network",
+          "tradeButtons",
+          "storage"
+        ],
+        "additionalProperties": false,
+        "description": "Terminal script: lists under category userscript. Files: .user.js."
+      },
+      "ListingSpecs_bot": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "bots": {
+            "minItems": 1,
+            "maxItems": 14,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Trojan",
+                "BonkBot",
+                "Maestro",
+                "Banana Gun",
+                "Photon",
+                "GMGN",
+                "Other"
+              ]
+            }
+          },
+          "settings": {
+            "minItems": 0,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Slippage",
+                "Priority fees",
+                "TP/SL ladder",
+                "Anti-MEV",
+                "Copy-trade targets",
+                "Auto-buy filters"
+              ]
+            }
+          }
+        },
+        "required": [
+          "bots",
+          "settings"
+        ],
+        "additionalProperties": false,
+        "description": "Trading bot config: lists under category setup. Files: .json · .txt."
+      },
+      "ListingSpecs_wallet": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string",
+            "const": "solana"
+          },
+          "formats": {
+            "minItems": 1,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "json"
+              ]
+            }
+          },
+          "walletCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "oneoff",
+              "daily",
+              "weekly",
+              "monthly"
+            ]
+          },
+          "columns": {
+            "minItems": 0,
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "address",
+                "label",
+                "tags",
+                "30d PnL",
+                "win rate",
+                "last active",
+                "avg hold",
+                "first-buy timing"
+              ]
+            }
+          }
+        },
+        "required": [
+          "chain",
+          "formats",
+          "walletCount",
+          "cadence",
+          "columns"
+        ],
+        "additionalProperties": false,
+        "description": "Wallet tracker list: lists under category wallet_list. Files: .csv · .json."
+      },
+      "ListingSpecs_filter": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "filterTypes": {
+            "minItems": 0,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "New pairs",
+                "Migrations",
+                "Rug filters",
+                "Volume",
+                "Holders",
+                "Dev wallet"
+              ]
+            }
+          }
+        },
+        "required": [
+          "filterTypes"
+        ],
+        "additionalProperties": false,
+        "description": "Filter / preset pack: lists under category filter. Files: .json."
+      },
+      "ListingSpecs_indicator": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "TradingView",
+              "Terminal chart",
+              "Other"
+            ]
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "Pine Script",
+              "Chart template",
+              "Other"
+            ]
+          }
+        },
+        "required": [
+          "platform",
+          "language"
+        ],
+        "additionalProperties": false,
+        "description": "Indicator: lists under category strategy. Files: .pine · .txt."
+      },
+      "ListingSpecs_telegram": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "runtime": {
+            "type": "string",
+            "enum": [
+              "Node.js",
+              "Python",
+              "Docker"
+            ]
+          },
+          "features": {
+            "minItems": 0,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Dev-wallet alerts",
+                "Call feed",
+                "Buy alerts",
+                "KOL tracking",
+                "Migration alerts"
+              ]
+            }
+          }
+        },
+        "required": [
+          "runtime",
+          "features"
+        ],
+        "additionalProperties": false,
+        "description": "Telegram bot: lists under category alerts. Files: .zip."
+      },
+      "ListingSpecs_other": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "what": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "what"
+        ],
+        "additionalProperties": false,
+        "description": "Something else: lists under category setup. Files: .zip · .pdf."
+      }
+    }
+  }
+}
