@@ -1159,6 +1159,12 @@ describe('owner product decisions', () => {
     txs.set(sig2, { memos: ['tm:deadbeef'], err: null });
     accounts.set(order.escrow, encodeEscrowForTest(fundedAccount()));
     expect((await submit(order.orderId, sig2)).status).toBe(400);
+    // Nor is one whose memo merely contains this order's memo.
+    const sigSuper = bs58.encode(nacl.randomBytes(64));
+    txs.set(sigSuper, { memos: [`x ${order.memo} y`], err: null });
+    const superset = await submit(order.orderId, sigSuper);
+    expect(superset.status).toBe(400);
+    expect(((await superset.json()) as { error: { code: string } }).error.code).toBe('WRONG_MEMO');
     // The real funded escrow settles the order.
     const ok = await submit(order.orderId, sig1);
     expect(ok.status).toBe(200);
@@ -1181,17 +1187,50 @@ describe('owner product decisions', () => {
     expect(sent).toHaveLength(0);
     clock = new Date(row.escrow_until.getTime() + 1000);
     effect = 'released';
+    // Rotating a bucket wallet or the fee split mid-window must not rewrite history: the ledger
+    // records what the program paid, i.e. the recipients and split stored in the escrow.
+    const realBuckets = env.buckets;
+    await sql`
+      insert into config (key, value)
+      values ('fee_split_bps', ${sql.json({ buyback: 10_000, ai_verification: 0, ops: 0, safety: 0 })})
+      on conflict (key) do update set value = excluded.value
+    `;
+    env.buckets = {
+      buyback: randomKeypair().publicKey,
+      ai_verification: randomKeypair().publicKey,
+      ops: randomKeypair().publicKey,
+      safety: randomKeypair().publicKey,
+    };
     expect(await releaseOrders(deps)).toEqual([order.orderId]);
+    env.buckets = realBuckets;
+    await sql`delete from config where key = 'fee_split_bps'`;
     expect(sent).toHaveLength(1);
     const released = await sql<
       Record<string, any>[]
     >`select * from orders where id = ${order.orderId}`;
     expect(released[0]?.status).toBe('released');
     expect(released[0]?.release_sig).toBeTruthy();
-    const payouts = await sql<{ status: string; tx_sig: string; bucket: string }[]>`
-      select status, tx_sig, bucket from payouts where order_id = ${order.orderId}
+    const payouts = await sql<
+      { status: string; tx_sig: string; bucket: string; recipient: string }[]
+    >`
+      select status, tx_sig, bucket, recipient from payouts where order_id = ${order.orderId}
     `;
     expect(payouts.length).toBe(5);
+    expect(Object.fromEntries(payouts.map((p) => [p.bucket, p.recipient]))).toEqual({
+      creator: seller.publicKey,
+      buyback: buckets[0],
+      ai_verification: buckets[1],
+      ops: buckets[2],
+      safety: buckets[3],
+    });
+    // Amounts follow the split stored on chain (40/25/20/15), not the edited config.
+    const amounts = await sql<{ bucket: string; amount: bigint }[]>`
+      select bucket, amount from payouts where order_id = ${order.orderId} and bucket <> 'creator'
+    `;
+    const net = (row.fee as bigint) - (row.rebate as bigint);
+    const byBucket = Object.fromEntries(amounts.map((a) => [a.bucket, a.amount]));
+    expect(byBucket.buyback).toBe((net * 4000n) / 10_000n);
+    expect(byBucket.safety).toBe((net * 1500n) / 10_000n);
     expect(payouts.every((p) => p.status === 'sent' && p.tx_sig === released[0]?.release_sig)).toBe(
       true,
     );

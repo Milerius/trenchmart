@@ -1,4 +1,11 @@
 //! Integer fee math. Matches `packages/shared/src/fee.ts`: floor division, dust to ops.
+//!
+//! Invariants (unit- and property-tested below):
+//! - `fee = floor(price * fee_bps / 10_000)` and `rebate = floor(fee * rebate_bps / 10_000)`,
+//!   computed in `u128`, so the multiply cannot overflow.
+//! - `rebate <= fee`, so `net_fee = fee - rebate` and `total = price + net_fee` never underflow;
+//!   the only reachable overflow is `price + fee > u64::MAX`, reported as `Overflow`.
+//! - The four split parts always add up to exactly `net_fee`; rounding dust goes to ops.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FeeQuote {
@@ -24,6 +31,7 @@ pub enum FeeError {
     Split,
 }
 
+/// Buyer-facing price breakdown. Rejects bps above 100% and totals that overflow `u64`.
 pub fn quote(price: u64, fee_bps: u16, rebate_bps: u16) -> Result<FeeQuote, FeeError> {
     if fee_bps > 10_000 || rebate_bps > 10_000 {
         return Err(FeeError::Bps);
@@ -68,6 +76,7 @@ pub fn split_fee(net_fee: u64, bps: [u16; 4]) -> Result<FeeSplit, FeeError> {
     })
 }
 
+/// `floor(amount * bps / 10_000)` in `u128`. With `bps <= 10_000` the result fits in `u64`.
 fn mul_div(amount: u64, bps: u64) -> Result<u64, FeeError> {
     let product = u128::from(amount)
         .checked_mul(u128::from(bps))
@@ -122,6 +131,69 @@ mod tests {
         assert_eq!(split_fee(10, [1, 1, 1, 1]), Err(FeeError::Split));
     }
 
+    #[test]
+    fn rejects_rebate_bps_above_100_percent() {
+        assert_eq!(quote(1, 0, 10_001), Err(FeeError::Bps));
+        assert_eq!(quote(1, 10_000, 10_000).map(|q| q.total), Ok(1));
+    }
+
+    #[test]
+    fn overflow_only_when_price_plus_fee_exceeds_u64() {
+        assert_eq!(quote(u64::MAX, 1, 0), Err(FeeError::Overflow));
+        assert_eq!(quote(u64::MAX, 10_000, 0), Err(FeeError::Overflow));
+        // A full rebate still overflows: fee is added before the rebate is taken off.
+        assert_eq!(quote(u64::MAX, 10_000, 10_000), Err(FeeError::Overflow));
+        // Fee rounds to zero, so the largest price passes untouched.
+        assert_eq!(quote(u64::MAX, 0, 0).map(|q| q.total), Ok(u64::MAX));
+        assert_eq!(quote(9_999, 1, 0).map(|q| q.fee), Ok(0));
+        let max = u64::MAX / 10_500 * 10_000;
+        assert!(quote(max, 500, 0).is_ok());
+    }
+
+    #[test]
+    fn fee_and_rebate_round_down() {
+        // 19_999 * 1 / 10_000 = 1.9999 -> 1
+        assert_eq!(quote(19_999, 1, 0).map(|q| q.fee), Ok(1));
+        // fee 3, rebate 3 * 6_000 / 10_000 = 1.8 -> 1, so the buyer pays 2 of the fee.
+        let q = quote(600, 500, 6_000).unwrap();
+        assert_eq!((q.fee, q.rebate, q.net_fee, q.total), (30, 18, 12, 612));
+        let q = quote(60, 500, 6_000).unwrap();
+        assert_eq!((q.fee, q.rebate, q.net_fee, q.total), (3, 1, 2, 62));
+    }
+
+    #[test]
+    fn split_dust_goes_to_ops() {
+        let split = split_fee(7, [2_500, 2_500, 2_500, 2_500]).unwrap();
+        assert_eq!(
+            (
+                split.buyback,
+                split.ai_verification,
+                split.ops,
+                split.safety
+            ),
+            (1, 1, 4, 1)
+        );
+        let split = split_fee(u64::MAX, [3_333, 3_333, 3_333, 1]).unwrap();
+        let sum = u128::from(split.buyback)
+            + u128::from(split.ai_verification)
+            + u128::from(split.ops)
+            + u128::from(split.safety);
+        assert_eq!(sum, u128::from(u64::MAX));
+        assert_eq!(split_fee(1, [10_000, 0, 0, 0]).unwrap().buyback, 1);
+        assert_eq!(split_fee(1, [0, 0, 0, 10_000]).unwrap().safety, 1);
+    }
+
+    #[test]
+    fn split_rejects_sums_other_than_10_000() {
+        assert_eq!(split_fee(10, [10_000, 0, 0, 1]), Err(FeeError::Split));
+        assert_eq!(split_fee(10, [9_999, 0, 0, 0]), Err(FeeError::Split));
+        // Summed in u64: values that would wrap in u16 are still rejected.
+        assert_eq!(
+            split_fee(10, [u16::MAX, 10_001, 0, 0]),
+            Err(FeeError::Split)
+        );
+    }
+
     fn bps_that_sum_to_10_000() -> impl Strategy<Value = [u16; 4]> {
         (0u32..=10_000).prop_flat_map(|buyback| {
             (0u32..=10_000 - buyback).prop_flat_map(move |ai| {
@@ -147,6 +219,42 @@ mod tests {
                 + u128::from(split.ops)
                 + u128::from(split.safety);
             prop_assert_eq!(sum, u128::from(net));
+        }
+
+        #[test]
+        fn quote_matches_exact_arithmetic(
+            price in any::<u64>(),
+            fee_bps in 0u16..=10_000,
+            rebate_bps in 0u16..=10_000,
+        ) {
+            let fee = u128::from(price) * u128::from(fee_bps) / 10_000;
+            let rebate = fee * u128::from(rebate_bps) / 10_000;
+            let with_fee = u128::from(price) + fee;
+            match quote(price, fee_bps, rebate_bps) {
+                Ok(q) => {
+                    prop_assert!(with_fee <= u128::from(u64::MAX));
+                    prop_assert_eq!(u128::from(q.fee), fee);
+                    prop_assert_eq!(u128::from(q.rebate), rebate);
+                    prop_assert!(q.rebate <= q.fee);
+                    prop_assert_eq!(q.net_fee, q.fee - q.rebate);
+                    prop_assert_eq!(u128::from(q.total), u128::from(price) + fee - rebate);
+                    prop_assert_eq!(q.total, q.price + q.net_fee);
+                }
+                Err(e) => {
+                    prop_assert_eq!(e, FeeError::Overflow);
+                    prop_assert!(with_fee > u128::from(u64::MAX));
+                }
+            }
+        }
+
+        #[test]
+        fn quote_rejects_any_bps_over_100_percent(
+            price in any::<u64>(),
+            fee_bps in 10_001u16..,
+            rebate_bps in any::<u16>(),
+        ) {
+            prop_assert_eq!(quote(price, fee_bps, rebate_bps), Err(FeeError::Bps));
+            prop_assert_eq!(quote(price, rebate_bps % 10_001, fee_bps), Err(FeeError::Bps));
         }
     }
 }

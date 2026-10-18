@@ -1,4 +1,8 @@
 //! Order transitions. Same edges as `packages/shared/src/state.ts`.
+//!
+//! Security-relevant shape: `Refunded` and `Expired` are terminal (no edge out), so funds can
+//! leave an escrow at most once. `Disputed -> Released` exists only so `reject_dispute` can
+//! restore a dispute opened after release; `release` itself additionally requires `Paid`.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -51,6 +55,31 @@ mod tests {
         ];
         for (from, to) in valid {
             assert!(can_transition(from, to), "{from:?} -> {to:?}");
+        }
+    }
+
+    /// The complete 6x6 table, written out by hand so a new edge cannot slip in unnoticed.
+    #[test]
+    fn transition_table_is_exactly_the_documented_one() {
+        use Status::*;
+        let allowed: [[bool; 6]; 6] = [
+            // to: Pending Paid  Released Refunded Disputed Expired
+            [false, true, false, false, false, true], // from Pending
+            [false, false, true, false, true, false], // from Paid
+            [false, false, false, false, true, false], // from Released
+            [false, false, false, false, false, false], // from Refunded
+            [false, true, true, true, false, false],  // from Disputed
+            [false, false, false, false, false, false], // from Expired
+        ];
+        let order = [Pending, Paid, Released, Refunded, Disputed, Expired];
+        for (i, from) in order.iter().enumerate() {
+            for (j, to) in order.iter().enumerate() {
+                assert_eq!(
+                    can_transition(*from, *to),
+                    allowed[i][j],
+                    "{from:?} -> {to:?}"
+                );
+            }
         }
     }
 
