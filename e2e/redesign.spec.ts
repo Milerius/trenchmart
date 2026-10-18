@@ -199,6 +199,23 @@ test.describe('phase 4: cards', () => {
     await expect(page).toHaveURL(/\/l\/bundle-detector-overlay$/);
   });
 
+  test('a card far from the pointer stays dark; reduced motion still lights the hovered card', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const card = page.getByTestId('listing-card').first();
+    await expect(card).toBeVisible();
+    const light = card.locator('xpath=..').locator(':scope > span').first();
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(400);
+    expect(Number(await light.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await card.hover();
+    await expect
+      .poll(async () => Number(await light.evaluate((el) => getComputedStyle(el).opacity)))
+      .toBeGreaterThan(0.05);
+  });
+
   test('category and trust cards keep their names and links', async ({ page }) => {
     await page.goto('/');
     const categories = page.getByRole('region', { name: 'Find your edge' });

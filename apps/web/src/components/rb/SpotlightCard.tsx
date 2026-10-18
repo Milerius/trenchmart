@@ -146,7 +146,9 @@ const SpotlightCard = ({
     const edge = edgeRef.current;
     if (!root || !light || !noise || !edge) return undefined;
 
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    // TrenchMart: follow live changes to the reduced-motion preference (see onMotionPref below).
+    const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let reduce = motionQuery?.matches ?? false;
     const state = {
       x: 0,
       y: 0,
@@ -255,14 +257,31 @@ const SpotlightCard = ({
     };
     wakeRef.current = wake;
 
+    const near = (event: PointerEvent) => {
+      const rect = root.getBoundingClientRect();
+      const reach = settingsRef.current.proximity;
+      return (
+        event.clientX > rect.left - reach &&
+        event.clientX < rect.right + reach &&
+        event.clientY > rect.top - reach &&
+        event.clientY < rect.bottom + reach
+      );
+    };
+    const onMotionPref = (event: MediaQueryListEvent) => {
+      reduce = event.matches;
+      wake();
+    };
+    motionQuery?.addEventListener?.('change', onMotionPref);
     const onMove = (event: PointerEvent) => {
       pointer.x = event.clientX;
       pointer.y = event.clientY;
       pointer.active = true;
+      // TrenchMart: only wake when this card can light up (pointer inside or within proximity of a
+      // visible card), so a grid of cards does no per-frame work for a pointer far away.
       if (
         state.presence > 0 ||
-        settingsRef.current.proximity > 0 ||
-        root.contains(event.target as Node | null)
+        root.contains(event.target as Node | null) ||
+        (state.visible && settingsRef.current.proximity > 0 && near(event))
       )
         wake();
     };
@@ -317,6 +336,7 @@ const SpotlightCard = ({
       alive = false;
       cancelAnimationFrame(raf);
       observer.disconnect();
+      motionQuery?.removeEventListener?.('change', onMotionPref);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
