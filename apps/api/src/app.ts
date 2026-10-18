@@ -66,7 +66,7 @@ import {
 } from './content';
 import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
 import { EscrowError } from './escrow';
-import { checkXState, fetchXAccount, startXAuth, X_COOKIE, xVerified } from './x-oauth';
+import { checkXState, fetchXAccount, startXAuth, X_COOKIE, XAuthError, xVerified } from './x-oauth';
 import {
   findCreator,
   loadOwnProfile,
@@ -413,33 +413,55 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   api.get('/auth/x/callback', async (c) => {
-    const user = requireUser(c);
-    const done = (result: string) => c.redirect(`${deps.env.appUrl}/studio?x=${result}`, 302);
-    setCookie(c, X_COOKIE, '', { path: '/api/v1/auth/x', maxAge: 0 });
+    // Every outcome lands on the profile editor, whose X card says what happened and why.
+    const done = (result: string, reason?: string) =>
+      c.redirect(
+        `${deps.env.appUrl}/studio/profile?x=${result}${reason ? `&reason=${reason}` : ''}`,
+        302,
+      );
+    setCookie(c, X_COOKIE, '', {
+      httpOnly: true,
+      secure: deps.env.appUrl.startsWith('https://'),
+      sameSite: 'Lax',
+      path: '/api/v1/auth/x',
+      maxAge: 0,
+    });
+    // A top-level redirect from X: answer with a page the creator can read, not a JSON 401.
+    const user = c.get('user');
+    if (!user) {
+      console.error('x oauth failed', 'signed_out', 'no session cookie on the callback');
+      return done('failed', 'signed_out');
+    }
     if (!deps.env.xClientId) return done('unconfigured');
     if (c.req.query('error')) return done('denied');
-    const verifier = checkXState({
+    const checked = checkXState({
       cookie: getCookie(c, X_COOKIE),
       state: c.req.query('state'),
       userId: user.id as string,
       secret: deps.env.sessionSecret,
       now: deps.now(),
     });
+    if (!checked.ok) {
+      console.error('x oauth failed', checked.reason);
+      return done('invalid', checked.reason);
+    }
     const code = c.req.query('code');
-    if (!verifier || !code) return done('invalid');
+    if (!code) return done('invalid', 'no_code');
     let account: { id: string; username: string };
     try {
       account = await fetchXAccount({
-        fetch: deps.xFetch ?? fetch,
+        fetch: deps.xFetch,
+        apiUrl: deps.env.xApiUrl,
         clientId: deps.env.xClientId,
         clientSecret: deps.env.xClientSecret,
         redirectUri: xRedirectUri(),
         code,
-        verifier,
+        verifier: checked.verifier,
       });
     } catch (err) {
-      console.error('x oauth failed', (err as Error).message);
-      return done('failed');
+      const reason = err instanceof XAuthError ? err.reason : 'unexpected';
+      console.error('x oauth failed', reason, (err as Error).message);
+      return done('failed', reason);
     }
     const taken = await deps.sql`
       select 1 from users where x_user_id = ${account.id} and id <> ${user.id}
@@ -455,6 +477,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       xUserId: account.id,
       handle: account.username,
     });
+    console.log('x oauth linked', user.id, account.username);
     return done('linked');
   });
 

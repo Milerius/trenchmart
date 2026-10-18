@@ -23,6 +23,7 @@ import {
 import { Button, ButtonLink, ErrorState, Label, Skeleton, Square, Tag } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useWallet } from '@/lib/wallet';
+import { xResultMessage, type XResult } from '@/lib/x-result';
 
 type OwnProfile = {
   handle: string | null;
@@ -57,15 +58,6 @@ type Form = {
 const CONTACT_KINDS: ContactChannel['kind'][] = ['telegram', 'email', 'discord'];
 const INPUT =
   'mt-1.5 w-full rounded-ctl border border-line-control bg-inset px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-accent-line focus:outline-none';
-
-const X_RESULT: Record<string, string> = {
-  linked: 'X account verified and linked.',
-  denied: 'X sign-in was cancelled.',
-  taken: 'That X account is already linked to another wallet.',
-  invalid: 'The X sign-in expired. Try again.',
-  failed: 'X sign-in failed. Try again.',
-  unconfigured: 'X sign-in is not configured on this deployment yet.',
-};
 
 function formOf(p: OwnProfile): Form {
   const socials = Object.fromEntries(
@@ -180,6 +172,8 @@ export default function EditProfilePage() {
   // Read once from GET /studio/profile; PUT responses do not carry it.
   const [xOAuth, setXOAuth] = useState<boolean | null>(null);
   const [xError, setXError] = useState('');
+  // Outcome of the X sign-in redirect (?x=<result>&reason=<why>), shown on the X card.
+  const [xResult, setXResult] = useState<XResult | null>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
 
@@ -197,9 +191,20 @@ export default function EditProfilePage() {
   }, [wallet.session]);
 
   useEffect(() => {
-    const result = new URLSearchParams(window.location.search).get('x');
-    if (result) setMessage(X_RESULT[result] ?? 'X sign-in did not complete.');
+    const params = new URLSearchParams(window.location.search);
+    const result = xResultMessage(params.get('x'), params.get('reason'));
+    if (!result) return;
+    setXResult(result);
+    // Drop the query so a reload does not replay an old result.
+    window.history.replaceState(window.history.state, '', window.location.pathname);
   }, []);
+
+  // The X card sits below the fold: bring the result into view once the profile has loaded.
+  const loaded = saved !== null;
+  useEffect(() => {
+    if (xResult && loaded)
+      document.querySelector('[data-testid="x-card"]')?.scrollIntoView({ block: 'center' });
+  }, [xResult, loaded]);
 
   if (!wallet.session) {
     return (
@@ -302,6 +307,7 @@ export default function EditProfilePage() {
 
   async function connectX() {
     setXError('');
+    setXResult(null);
     setBusy('x-start');
     try {
       const started = await api<{ url: string }>('/auth/x/start');
@@ -604,6 +610,17 @@ export default function EditProfilePage() {
                         : 'Connect X'}
                 </Button>
               )}
+              {xResult ? (
+                <div
+                  role="status"
+                  data-testid="x-result"
+                  data-ok={xResult.ok ? 'true' : 'false'}
+                  className={`m-0 w-full rounded-ctl border px-3 py-2 text-[13px] ${xResult.ok ? 'border-accent-line bg-surface-2 text-ink' : 'border-danger-line bg-danger-bg text-danger'}`}
+                >
+                  <p className="m-0 font-semibold">{xResult.title}</p>
+                  {xResult.detail ? <p className="m-0 mt-0.5">{xResult.detail}</p> : null}
+                </div>
+              ) : null}
               {xError ? (
                 <p
                   role="alert"

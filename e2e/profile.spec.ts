@@ -315,10 +315,18 @@ test('edit profile: with an X app, Verify with X redirects to X authorize (PKCE)
   );
   expect(calls.some((c) => c.path === '/studio/x')).toBe(false);
 
+  // The callback's result (and why it failed) is shown on the X card itself.
   await page.goto('/studio/profile?x=taken');
-  await expect(page.getByRole('status')).toHaveText(
+  await expect(card.getByTestId('x-result')).toContainText(
     'That X account is already linked to another wallet.',
   );
+  await page.goto('/studio/profile?x=failed&reason=token_rejected');
+  await expect(card.getByTestId('x-result')).toContainText('X sign-in failed.');
+  await expect(card.getByTestId('x-result')).toContainText(
+    "X rejected TrenchMart's app credentials (HTTP 401)",
+  );
+  // The query is dropped so a reload does not replay it.
+  await expect(page).toHaveURL(/\/studio\/profile$/);
 });
 
 test('edit profile: an X sign-in error is shown on the X card, not lost off-screen', async ({

@@ -5,8 +5,9 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
  * the X account before its handle is shown on listings. Active once X_CLIENT_ID is set.
  */
 export const X_AUTHORIZE_URL = 'https://x.com/i/oauth2/authorize';
-export const X_TOKEN_URL = 'https://api.x.com/2/oauth2/token';
-export const X_ME_URL = 'https://api.x.com/2/users/me';
+export const X_API_URL = 'https://api.x.com';
+export const X_TOKEN_PATH = '/2/oauth2/token';
+export const X_ME_PATH = '/2/users/me';
 export const X_SCOPES = 'users.read tweet.read';
 export const X_COOKIE = 'tm_x_oauth';
 const TTL_MS = 10 * 60_000;
@@ -48,42 +49,112 @@ export function startXAuth(input: {
   return { url: url.toString(), cookie: `${payload}.${sign(payload, input.secret)}` };
 }
 
-/** Checks the callback's state against the signed cookie; returns the PKCE verifier. */
+export type XStateFailure = 'state_missing' | 'state_mismatch' | 'state_expired';
+
+/**
+ * Checks the callback's state against the signed cookie. Returns the PKCE verifier, or why
+ * the check failed: `state_missing` means the cookie never came back (lost on the way through
+ * a proxy, another browser, or cookies blocked), the others a forged or stale sign-in.
+ */
 export function checkXState(input: {
   cookie: string | undefined;
   state: string | undefined;
   userId: string;
   secret: string;
   now: Date;
-}): string | null {
+}): { ok: true; verifier: string } | { ok: false; reason: XStateFailure } {
   const parts = (input.cookie ?? '').split('.');
-  if (parts.length !== 5 || !input.state) return null;
+  if (!input.cookie) return { ok: false, reason: 'state_missing' };
+  if (parts.length !== 5 || !input.state) return { ok: false, reason: 'state_mismatch' };
   const [state, verifier, userId, expires, mac] = parts as [string, string, string, string, string];
   const expected = Buffer.from(sign(parts.slice(0, 4).join('.'), input.secret));
   const given = Buffer.from(mac);
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
-  if (state !== input.state || userId !== input.userId) return null;
-  if (Number(expires) < input.now.getTime()) return null;
-  return verifier;
+  if (expected.length !== given.length || !timingSafeEqual(expected, given))
+    return { ok: false, reason: 'state_mismatch' };
+  if (state !== input.state || userId !== input.userId)
+    return { ok: false, reason: 'state_mismatch' };
+  if (Number(expires) < input.now.getTime()) return { ok: false, reason: 'state_expired' };
+  return { ok: true, verifier };
 }
 
-/** Exchanges the code and reads the account. Throws with a short reason on any failure. */
+/**
+ * Why the exchange with X failed. The profile card shows a sentence for each, so the
+ * creator can tell "try again" (code_rejected, unreachable) from "the site must fix its X
+ * app" (token_rejected = bad client id/secret, users_me_forbidden = X plan or scopes).
+ */
+export type XFailure =
+  | 'token_rejected'
+  | 'code_rejected'
+  | 'token_failed'
+  | 'users_me_forbidden'
+  | 'users_me_failed'
+  | 'bad_account'
+  | 'unreachable'
+  | 'unexpected';
+
+export class XAuthError extends Error {
+  constructor(
+    public reason: XFailure,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/** X's error body, shortened for the log. It never echoes the client secret. */
+async function xErrorText(response: Response): Promise<string> {
+  const text = (await response.text().catch(() => '')).slice(0, 500);
+  try {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    return [body.error, body.error_description, body.title, body.detail]
+      .filter((v) => typeof v === 'string')
+      .join(': ')
+      .slice(0, 200);
+  } catch {
+    return text.replace(/\s+/g, ' ').slice(0, 200);
+  }
+}
+
+/** Exchanges the code and reads the account. Throws an XAuthError with a reason on failure. */
 export async function fetchXAccount(input: {
-  fetch: typeof fetch;
+  /** Test seam. Defaults to the global fetch, called unbound (see below). */
+  fetch?: typeof fetch;
+  /** X API origin; tests point it at a mock server. */
+  apiUrl?: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
   code: string;
   verifier: string;
 }): Promise<{ id: string; username: string }> {
+  // Never call `input.fetch(...)`: on Workers, invoking the global fetch as a method of
+  // another object throws "Illegal invocation", which made every real callback fail
+  // before X was even contacted. A plain local function call has no `this`.
+  const call: typeof fetch = input.fetch ?? ((url, init) => fetch(url, init));
+  const api = (input.apiUrl ?? X_API_URL).replace(/\/+$/, '');
+  const send = async (step: 'token' | 'users/me', url: string, init: RequestInit) => {
+    try {
+      return await call(url, { ...init, signal: AbortSignal.timeout(10_000) });
+    } catch (err) {
+      const { name = '', message = '' } = (err ?? {}) as Error;
+      // Only a network failure or timeout is "X did not answer"; anything else is our bug.
+      const network =
+        name === 'TimeoutError' ||
+        name === 'AbortError' ||
+        /fetch failed|network|ECONN|ENOTFOUND|EAI_AGAIN|timed? ?out/i.test(message);
+      throw new XAuthError(
+        network ? 'unreachable' : 'unexpected',
+        `${step} request failed: ${message}`,
+      );
+    }
+  };
   const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded' };
   // Confidential clients authenticate with Basic auth; public clients send client_id only.
   if (input.clientSecret)
     headers.authorization = `Basic ${Buffer.from(`${input.clientId}:${input.clientSecret}`).toString('base64')}`;
-  const token = await input.fetch(X_TOKEN_URL, {
+  const token = await send('token', `${api}${X_TOKEN_PATH}`, {
     method: 'POST',
     headers,
-    signal: AbortSignal.timeout(10_000),
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code: input.code,
@@ -92,18 +163,33 @@ export async function fetchXAccount(input: {
       client_id: input.clientId,
     }).toString(),
   });
-  if (!token.ok) throw new Error(`token exchange failed (${token.status})`);
-  const { access_token: accessToken } = (await token.json()) as { access_token?: string };
-  if (!accessToken) throw new Error('token exchange returned no access token');
-  const me = await input.fetch(X_ME_URL, {
+  if (!token.ok) {
+    const detail = await xErrorText(token);
+    // 401 (or an explicit client error) = X does not accept the client id/secret.
+    const rejected = token.status === 401 || /invalid_client|unauthorized_client/.test(detail);
+    throw new XAuthError(
+      rejected ? 'token_rejected' : token.status === 400 ? 'code_rejected' : 'token_failed',
+      `token exchange failed (${token.status}) ${detail}`.trim(),
+    );
+  }
+  const { access_token: accessToken } = (await token.json().catch(() => ({}))) as {
+    access_token?: string;
+  };
+  if (!accessToken) throw new XAuthError('token_failed', 'token exchange returned no access token');
+  const me = await send('users/me', `${api}${X_ME_PATH}`, {
     headers: { authorization: `Bearer ${accessToken}` },
-    signal: AbortSignal.timeout(10_000),
   });
-  if (!me.ok) throw new Error(`users/me failed (${me.status})`);
-  const body = (await me.json()) as { data?: { id?: string; username?: string } };
+  if (!me.ok) {
+    const detail = await xErrorText(me);
+    throw new XAuthError(
+      me.status === 403 ? 'users_me_forbidden' : 'users_me_failed',
+      `users/me failed (${me.status}) ${detail}`.trim(),
+    );
+  }
+  const body = (await me.json().catch(() => ({}))) as { data?: { id?: string; username?: string } };
   const id = body.data?.id;
   const username = body.data?.username;
   if (!id || !/^\d+$/.test(id) || !username || !/^[A-Za-z0-9_]{1,15}$/.test(username))
-    throw new Error('users/me returned an unexpected account');
+    throw new XAuthError('bad_account', 'users/me returned an unexpected account');
   return { id, username };
 }
