@@ -13,6 +13,8 @@ import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
 import { VerifiedBadge } from '@/components/profile';
 import { ReviewsPanel } from '@/components/reviews';
+import { CheckoutElectric, DecryptHash } from '@/components/listing-fx';
+import { ListingCard, type Listing as CardListing } from '@/components/listings';
 import { TerminalNames } from '@/components/terminal-logo';
 import { RankPanel, UpvoteChip, UpvotePanel, useUpvotes } from '@/components/upvotes';
 import {
@@ -22,11 +24,9 @@ import {
   EmptyState,
   ErrorState,
   Label,
-  LockIcon,
   Money,
   Panel,
   PreviewNotice,
-  ShieldIcon,
   Skeleton,
   Square,
   StatusTag,
@@ -35,10 +35,21 @@ import {
 } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
-import { solText } from '@/lib/money';
+import { solText, usdFor, usdText } from '@/lib/money';
 import { updatePolicyText } from '@/lib/updates';
 import { useWallet } from '@/lib/wallet';
 import { ESCROW_PROGRAM_ID, explorerAddress, shortKey } from '@/lib/protocol-facts';
+import {
+  Check,
+  Clock,
+  Download,
+  Link2,
+  Lock,
+  RefreshCw,
+  ShieldCheck,
+  Star,
+  Wallet as WalletIcon,
+} from 'lucide-react';
 
 export type Listing = {
   id: string;
@@ -133,6 +144,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   const [step, setStep] = useState<Step>('idle');
   const [message, setMessage] = useState('');
   const [orderId, setOrderId] = useState('');
+  const [related, setRelated] = useState<CardListing[]>([]);
 
   function load() {
     setLoadError(null);
@@ -148,6 +160,22 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   }
 
   useEffect(load, [params.slug]);
+
+  // "More from <category>": other live listings in the same category (real data only).
+  const relatedCategory = listing?.category;
+  useEffect(() => {
+    if (!relatedCategory) return;
+    let stop = false;
+    void api<CardListing[]>(`/listings?category=${encodeURIComponent(relatedCategory)}`)
+      .then((rows) => {
+        if (!stop && Array.isArray(rows))
+          setRelated(rows.filter((row) => row.slug !== params.slug).slice(0, 4));
+      })
+      .catch(() => !stop && setRelated([]));
+    return () => {
+      stop = true;
+    };
+  }, [relatedCategory, params.slug]);
 
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   useEffect(() => {
@@ -254,306 +282,369 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   }
 
   return (
-    <article className="grid items-start gap-10 pb-24 lg:grid-cols-[1fr_400px] lg:pb-0">
-      <div className="min-w-0">
-        <nav aria-label="Breadcrumb" className="text-sm text-muted">
-          <Link href="/" className="hover:text-ink">
-            Explore
-          </Link>{' '}
-          /{' '}
-          <Link href={`/c/${listing.category}`} className="hover:text-ink">
-            {meta.label}
-          </Link>
-        </nav>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span
-            className="rounded-tag border border-line px-2 py-0.5 font-mono text-[11px] font-semibold"
-            style={{ color: meta.color, background: meta.bg }}
-          >
-            {meta.tag}
-          </span>
-          {verified ? <StatusTag status="live" /> : <Tag tone="warn">NOT VERIFIED</Tag>}
-          {listing.holderOnly ? <Tag tone="info">HOLDER-ONLY</Tag> : null}
-          {upvotes.state?.rank?.category && upvotes.state.rank.category <= 10 ? (
-            <Tag tone="info">
-              #{upvotes.state.rank.category} in {meta.label}
-            </Tag>
-          ) : null}
-        </div>
-        <div className="mt-3 flex items-start justify-between gap-4">
-          <h1 className="m-0 text-[34px] font-semibold leading-tight tracking-[-0.03em]">
-            {listing.title}
-          </h1>
-          <span className="mt-1.5 shrink-0">
-            <UpvoteChip upvotes={upvotes} />
-          </span>
-        </div>
-        <p className="mt-2 text-[17px] text-ink-2">{listing.summary}</p>
-        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-          <CreatorLink creator={listing.creator} />
-          {listing.walletCount ? (
-            <span
-              data-testid="wallet-count"
-              title={`Counted by the security scan from the v${listing.walletCount.semver} file`}
-            >
-              {walletCountLabel(listing.walletCount.count)}
-            </span>
-          ) : null}
-          {listing.sales7d ? <span>{listing.sales7d} sold this week</span> : null}
-          {rating ? (
-            <span>
-              <span aria-hidden="true">★</span> {rating.toFixed(1)}
-              <span className="sr-only"> out of 5</span>
-              {listing.ratingCount ? (
-                <button
-                  type="button"
-                  className="hover:text-ink hover:underline"
-                  onClick={() => {
-                    setTab('reviews');
-                    document.getElementById('tab-reviews')?.scrollIntoView({ block: 'center' });
-                  }}
-                >
-                  {` · ${listing.ratingCount} review${listing.ratingCount === 1 ? '' : 's'}`}
-                </button>
-              ) : (
-                ''
-              )}
-            </span>
-          ) : null}
-          {listing.terminals.length ? (
-            <span data-testid="listing-terminals">
-              <TerminalNames names={listing.terminals} logoClassName="h-3.5 w-3.5" />
-            </span>
-          ) : null}
-        </p>
-
-        {listing.content?.gallery.length ? (
-          <Gallery images={listing.content.gallery} title={listing.title} />
-        ) : null}
-
-        {security ? (
-          <Panel
-            tone={verified ? 'ok' : 'warn'}
-            className="mt-6 flex flex-wrap items-center gap-4 p-4"
-          >
-            <ShieldIcon className={verified ? 'text-accent' : 'text-warn'} />
-            <div className="min-w-0 flex-1">
-              <p className="m-0 font-semibold">
-                {verified ? 'Passed automated review' : 'Review pending'} · v{security.semver}
-              </p>
-              <p className="m-0 text-[13px] text-accent-body">
-                {security.passed ?? security.checks.filter((c) => c.result === 'pass').length} of{' '}
-                {security.total ?? security.checks.length} checks passed
-                {security.review?.signedAt ? ` · signed ${utc(security.review.signedAt)}` : ''}
-                {security.review ? ` · ${security.review.agentId}` : ''}
-              </p>
-            </div>
-            <span className="font-mono text-xs text-accent-label" title={security.sha256}>
-              SHA-256 {security.sha256.slice(0, 8)}…{security.sha256.slice(-6)}
-            </span>
-          </Panel>
-        ) : null}
-
+    <>
+      <article className="relative grid items-start gap-10 pb-24 lg:grid-cols-[minmax(0,1fr)_400px] lg:pb-0">
         <div
-          role="tablist"
-          aria-label="Listing details"
-          className="mt-8 flex gap-1 overflow-x-auto border-b border-line"
-        >
-          {TABS.map((name) => (
-            <button
-              key={name}
-              id={`tab-${name}`}
-              role="tab"
-              type="button"
-              aria-selected={tab === name}
-              aria-controls={`panel-${name}`}
-              tabIndex={tab === name ? 0 : -1}
-              onKeyDown={onTabKey}
-              className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm transition-colors ${
-                tab === name
-                  ? 'border-accent text-ink'
-                  : 'border-transparent text-muted hover:text-ink'
-              }`}
-              onClick={() => setTab(name)}
-            >
-              {TAB_LABEL[name]}
-              {name === 'reviews' && (reviewCount ?? listing.ratingCount)
-                ? ` (${reviewCount ?? listing.ratingCount})`
-                : ''}
-            </button>
-          ))}
-        </div>
-        <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} className="pt-5">
-          {tab === 'security' ? <SecurityPanel listing={listing} /> : null}
-          {tab === 'overview' ? (
-            listing.content?.readme ? (
-              <Markdown source={listing.content.readme} className="max-w-3xl" />
-            ) : (
-              <p className="m-0 max-w-2xl whitespace-pre-wrap leading-relaxed text-ink-2">
-                {listing.description}
-              </p>
-            )
-          ) : null}
-          {tab === 'howto' ? (
-            <HowToPanel
-              content={listing.content}
-              specs={specRows(
-                listing.kind,
-                listing.specs,
-                listing.terminals,
-                listing.walletCount?.count ?? null,
-              )}
-            />
-          ) : null}
-          {tab === 'changelog' ? <ChangelogPanel versions={versions} /> : null}
-          {tab === 'reviews' ? <ReviewsPanel slug={listing.slug} onCount={setReviewCount} /> : null}
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <aside
-          id="checkout"
-          data-testid="checkout"
-          aria-label="Checkout"
-          className="rounded-panel border border-line bg-surface"
-        >
-          <div className="border-b border-line-soft p-5">
-            <Label>Price</Label>
-            <div className="mt-1 text-2xl font-semibold">
-              <Money lamports={listing.price} centsPerSol={centsPerSol} strong />
+          aria-hidden="true"
+          className="pointer-events-none absolute top-[-2rem] left-1/2 -z-10 h-[520px] w-screen -translate-x-1/2"
+          style={{
+            background: `radial-gradient(60% 100% at 30% 0%, ${meta.color}1f, transparent 70%)`,
+          }}
+        />
+        <div className="flex min-w-0 flex-col gap-7">
+          <nav aria-label="Breadcrumb" className="flex gap-2 text-sm text-muted">
+            <Link href="/" className="hover:text-ink">
+              Explore
+            </Link>
+            <span aria-hidden="true">/</span>
+            <Link href={`/c/${listing.category}`} className="hover:text-ink">
+              {meta.label}
+            </Link>
+          </nav>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="inline-flex items-center rounded-md px-2 py-1 font-mono text-[11px] font-semibold tracking-wider"
+                style={{
+                  color: meta.color,
+                  background: meta.bg,
+                  boxShadow: `inset 0 0 0 1px ${meta.color}33`,
+                }}
+              >
+                {meta.tag}
+              </span>
+              {verified ? <StatusTag status="live" /> : <Tag tone="warn">NOT VERIFIED</Tag>}
+              {listing.holderOnly ? <Tag tone="info">HOLDER-ONLY</Tag> : null}
+              {upvotes.state?.rank?.category && upvotes.state.rank.category <= 10 ? (
+                <Tag tone="info">
+                  #{upvotes.state.rank.category} in {meta.label}
+                </Tag>
+              ) : null}
             </div>
-            {tier ? (
-              <p className="mt-1 text-[13px] text-ink-2">
-                Your tier: <span className="text-accent">{TIER_LABEL[tier] ?? tier}</span>
-              </p>
-            ) : null}
-          </div>
-          <div className="space-y-4 p-5">
-            {!wallet.session ? <PreviewNotice compact /> : null}
-            <FeeBreakdown
-              price={listing.price}
-              config={config}
-              tier={tier}
-              centsPerSol={centsPerSol}
-              quoted={quote}
-            />
-            {quote ? (
-              <p data-testid="tier-pill" className="m-0 text-xs text-muted">
-                Quote locked for tier {TIER_LABEL[quote.tier] ?? quote.tier}
-              </p>
-            ) : null}
-            {step !== 'idle' ? <CheckoutProgress step={step} /> : null}
-            {step === 'done' ? (
-              <div
-                data-testid="escrow-success"
-                className="escrow-success rounded-ctl border border-accent-line bg-accent-bg p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="escrow-check grid h-9 w-9 place-items-center rounded-full bg-accent font-mono text-sm font-bold text-onaccent"
-                  >
-                    ✓
-                  </span>
-                  <div>
-                    <p className="m-0 font-semibold text-ink">Paid · in escrow</p>
-                    <p role="status" className="m-0 mt-1 text-sm text-ink-2">
-                      {message ||
-                        `Your SOL is in escrow for ${escrowWindowLabel(escrowHours)}. Your download is ready in Purchases now.`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-            {step === 'done' ? (
-              <ButtonLink href="/me/purchases" variant="secondary" className="w-full">
-                View order {orderId.slice(0, 8)} in Purchases
-              </ButtonLink>
-            ) : (
-              <Button
-                data-testid="buy"
-                size="lg"
-                className="w-full"
-                disabled={busy || wallet.busy}
-                aria-busy={busy || undefined}
-                onClick={() => void buy()}
-              >
-                {buyLabel(step, !!wallet.session, wallet.busy)}
-              </Button>
-            )}
-            {message && step === 'failed' ? (
-              <p role="alert" data-testid="toast" className="toast m-0 text-sm text-danger">
-                {message}
-              </p>
-            ) : null}
-            <ul className="m-0 space-y-2 p-0 text-[13px] text-ink-2">
-              <li className="flex list-none gap-2">
-                <ShieldIcon className="h-4 w-4 shrink-0 text-accent" />
-                Held in escrow for {escrowWindowLabel(escrowHours)}. Dispute any time in that
-                window.
-              </li>
-              <li className="flex list-none gap-2">
-                <span className="shrink-0 text-muted">
-                  <LockIcon />
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <h1 className="m-0 text-[clamp(34px,4.5vw,56px)] font-semibold leading-[1.02] tracking-[-0.045em]">
+                {listing.title}
+              </h1>
+              <span className="mt-1.5 shrink-0">
+                <UpvoteChip upvotes={upvotes} />
+              </span>
+            </div>
+            <p className="m-0 max-w-2xl text-lg text-ink-2">{listing.summary}</p>
+            <p className="m-0 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted">
+              <CreatorLink creator={listing.creator} />
+              {listing.walletCount ? (
+                <span
+                  data-testid="wallet-count"
+                  title={`Counted by the security scan from the v${listing.walletCount.semver} file`}
+                >
+                  {walletCountLabel(listing.walletCount.count)}
                 </span>
-                Download once payment is confirmed in escrow. Watermarked to your wallet.
-              </li>
-              <li data-testid="update-policy" className="flex list-none gap-2">
-                <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
-                  ↻
+              ) : null}
+              {listing.sales7d ? <span>{listing.sales7d} sold this week</span> : null}
+              {rating ? (
+                <span className="inline-flex items-center gap-1">
+                  <Star size={14} className="fill-accent text-accent" aria-hidden="true" />{' '}
+                  {rating.toFixed(1)}
+                  <span className="sr-only"> out of 5</span>
+                  {listing.ratingCount ? (
+                    <button
+                      type="button"
+                      className="hover:text-ink hover:underline"
+                      onClick={() => {
+                        setTab('reviews');
+                        document.getElementById('tab-reviews')?.scrollIntoView({ block: 'center' });
+                      }}
+                    >
+                      {` · ${listing.ratingCount} review${listing.ratingCount === 1 ? '' : 's'}`}
+                    </button>
+                  ) : (
+                    ''
+                  )}
                 </span>
-                <span>
-                  {updatePolicyText(listing.updatePrice, config?.updateFreeDays ?? 30)}. Every
-                  version you were entitled to stays downloadable.
+              ) : null}
+              {listing.terminals.length ? (
+                <span data-testid="listing-terminals">
+                  <TerminalNames names={listing.terminals} logoClassName="h-5 w-5 rounded" />
                 </span>
-              </li>
-              <li data-testid="escrow-program" className="flex list-none gap-2">
-                <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
-                  ⛓
-                </span>
-                <span>
-                  Escrow program{' '}
-                  <a
-                    href={explorerAddress(ESCROW_PROGRAM_ID)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-ink-2 underline decoration-line-control underline-offset-2 hover:text-ink"
-                  >
-                    {shortKey(ESCROW_PROGRAM_ID)} ↗
-                  </a>{' '}
-                  on devnet. Your receipt shows the escrow account and its on-chain release time.
-                </span>
-              </li>
-              <li data-testid="devnet-hint" className="flex list-none gap-2">
-                <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
-                  ◎
-                </span>
-                Devnet only. Switch your wallet to Solana Devnet before paying (Phantom: Settings →
-                Developer Settings → Testnet Mode).
-              </li>
-            </ul>
-            <p className="m-0 border-t border-line-soft pt-3 text-xs text-muted">
-              License: {listing.license} · creator bond {solText(listing.creator.bondLamports)}
+              ) : null}
             </p>
           </div>
-        </aside>
-        <UpvotePanel upvotes={upvotes} />
-        <RankPanel upvotes={upvotes} />
-      </div>
 
-      <div
-        hidden={checkoutVisible}
-        className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-surface px-4 py-3 lg:hidden"
-      >
-        <div className="flex min-w-0 flex-col">
-          <Label>{tier ? 'You pay' : 'You pay before discount'}</Label>
-          <Money lamports={youPay} centsPerSol={centsPerSol} strong className="text-sm" />
+          {listing.content?.gallery.length ? (
+            <Gallery images={listing.content.gallery} title={listing.title} />
+          ) : null}
+
+          {security ? (
+            <div
+              data-testid="security-summary"
+              className={`flex flex-wrap items-center gap-4 rounded-[22px] border px-5 py-4 ${verified ? 'border-accent-line bg-accent-bg' : 'border-warn-line bg-warn-bg'}`}
+            >
+              <span
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-onaccent ${verified ? 'bg-accent' : 'bg-warn'}`}
+              >
+                <ShieldCheck size={22} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="m-0 font-semibold">
+                  {verified ? 'Passed automated review' : 'Review pending'} · v{security.semver}
+                </p>
+                <p className="m-0 font-mono text-xs text-muted">
+                  {security.passed ?? security.checks.filter((c) => c.result === 'pass').length} of{' '}
+                  {security.total ?? security.checks.length} checks passed
+                  {security.review?.signedAt ? ` · signed ${utc(security.review.signedAt)}` : ''}
+                  {security.review ? ` · ${security.review.agentId}` : ''}
+                </p>
+              </div>
+              <span className="font-mono text-xs text-ink-2" title={security.sha256}>
+                SHA-256{' '}
+                <DecryptHash text={`${security.sha256.slice(0, 8)}…${security.sha256.slice(-6)}`} />
+              </span>
+            </div>
+          ) : null}
+
+          <div>
+            <div
+              role="tablist"
+              aria-label="Listing details"
+              className="flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none]"
+            >
+              {TABS.map((name) => (
+                <button
+                  key={name}
+                  id={`tab-${name}`}
+                  role="tab"
+                  type="button"
+                  aria-selected={tab === name}
+                  aria-controls={`panel-${name}`}
+                  tabIndex={tab === name ? 0 : -1}
+                  onKeyDown={onTabKey}
+                  className={`relative min-h-11 shrink-0 whitespace-nowrap px-4 text-sm font-medium transition-colors ${
+                    tab === name ? 'text-ink' : 'text-muted hover:text-ink'
+                  }`}
+                  onClick={() => setTab(name)}
+                >
+                  {TAB_LABEL[name]}
+                  {name === 'reviews' && (reviewCount ?? listing.ratingCount) ? (
+                    <span className="ml-1.5 font-mono text-xs text-faint">
+                      {reviewCount ?? listing.ratingCount}
+                    </span>
+                  ) : null}
+                  {tab === name ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-accent"
+                    />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+            <div
+              id={`panel-${tab}`}
+              role="tabpanel"
+              aria-labelledby={`tab-${tab}`}
+              className="pt-7"
+            >
+              {tab === 'security' ? <SecurityPanel listing={listing} /> : null}
+              {tab === 'overview' ? (
+                listing.content?.readme ? (
+                  <Markdown source={listing.content.readme} className="max-w-3xl" />
+                ) : (
+                  <p className="m-0 max-w-2xl whitespace-pre-wrap leading-relaxed text-ink-2">
+                    {listing.description}
+                  </p>
+                )
+              ) : null}
+              {tab === 'howto' ? (
+                <HowToPanel
+                  content={listing.content}
+                  specs={specRows(
+                    listing.kind,
+                    listing.specs,
+                    listing.terminals,
+                    listing.walletCount?.count ?? null,
+                  )}
+                />
+              ) : null}
+              {tab === 'changelog' ? <ChangelogPanel versions={versions} /> : null}
+              {tab === 'reviews' ? (
+                <ReviewsPanel slug={listing.slug} onCount={setReviewCount} />
+              ) : null}
+            </div>
+          </div>
         </div>
-        <a href="#checkout" className={buttonClass('primary', 'md')}>
-          Review and buy
-        </a>
-      </div>
-    </article>
+
+        <div className="flex flex-col gap-4 lg:sticky lg:top-24">
+          <aside
+            id="checkout"
+            data-testid="checkout"
+            aria-label="Checkout"
+            className="relative rounded-[26px] border border-accent/25 bg-[#0d0f0d]/95 shadow-[0_0_40px_-12px_rgba(198,244,50,0.35)]"
+          >
+            <CheckoutElectric />
+            <div className="flex items-end justify-between gap-3 px-6 pt-6">
+              <div>
+                <div className="text-sm text-muted">Price</div>
+                <div className="text-4xl font-semibold tracking-[-0.04em]">
+                  {solText(listing.price).replace(/ SOL$/, '')}{' '}
+                  <span className="text-xl text-muted">SOL</span>
+                </div>
+                {usdFor(listing.price, centsPerSol) ? (
+                  <div data-testid="usd-amount" className="font-mono text-xs text-faint">
+                    {usdText(usdFor(listing.price, centsPerSol), listing.price)}
+                  </div>
+                ) : null}
+              </div>
+              {tier ? (
+                <p className="m-0 text-right text-xs text-muted">
+                  Your tier
+                  <span className="block text-sm text-accent">{TIER_LABEL[tier] ?? tier}</span>
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-5 p-6">
+              {!wallet.session ? <PreviewNotice compact /> : null}
+              <div className="rounded-2xl border border-line bg-inset p-4 font-mono text-[13px]">
+                <FeeBreakdown
+                  price={listing.price}
+                  config={config}
+                  tier={tier}
+                  centsPerSol={centsPerSol}
+                  quoted={quote}
+                />
+              </div>
+              {quote ? (
+                <p data-testid="tier-pill" className="m-0 text-xs text-muted">
+                  Quote locked for tier {TIER_LABEL[quote.tier] ?? quote.tier}
+                </p>
+              ) : null}
+              <CheckoutProgress step={step} />
+              {step === 'done' ? (
+                <div
+                  data-testid="escrow-success"
+                  className="escrow-success rounded-ctl border border-accent-line bg-accent-bg p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="escrow-check grid h-9 w-9 place-items-center rounded-full bg-accent font-mono text-sm font-bold text-onaccent"
+                    >
+                      ✓
+                    </span>
+                    <div>
+                      <p className="m-0 font-semibold text-ink">Paid · in escrow</p>
+                      <p role="status" className="m-0 mt-1 text-sm text-ink-2">
+                        {message ||
+                          `Your SOL is in escrow for ${escrowWindowLabel(escrowHours)}. Your download is ready in Purchases now.`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {step === 'done' ? (
+                <ButtonLink href="/me/purchases" variant="secondary" className="w-full">
+                  View order {orderId.slice(0, 8)} in Purchases
+                </ButtonLink>
+              ) : (
+                <Button
+                  data-testid="buy"
+                  size="lg"
+                  className="min-h-13 w-full gap-2 !rounded-full py-4 text-[16px] shadow-[0_10px_40px_-10px_rgba(198,244,50,.7)]"
+                  disabled={busy || wallet.busy}
+                  aria-busy={busy || undefined}
+                  onClick={() => void buy()}
+                >
+                  {wallet.session ? (
+                    <Lock size={17} aria-hidden="true" />
+                  ) : (
+                    <WalletIcon size={17} aria-hidden="true" />
+                  )}
+                  {buyLabel(step, !!wallet.session, wallet.busy)}
+                </Button>
+              )}
+              {message && step === 'failed' ? (
+                <p role="alert" data-testid="toast" className="toast m-0 text-sm text-danger">
+                  {message}
+                </p>
+              ) : null}
+              <ul className="m-0 flex flex-col gap-2.5 p-0 text-sm text-ink-2">
+                <li className="flex list-none gap-2.5">
+                  <Clock size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                  Held in escrow for {escrowWindowLabel(escrowHours)}. Dispute any time in that
+                  window.
+                </li>
+                <li className="flex list-none gap-2.5">
+                  <Download size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                  Download once payment is confirmed in escrow. Watermarked to your wallet.
+                </li>
+                <li data-testid="update-policy" className="flex list-none gap-2.5">
+                  <RefreshCw size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                  <span>
+                    {updatePolicyText(listing.updatePrice, config?.updateFreeDays ?? 30)}. Every
+                    version you were entitled to stays downloadable.
+                  </span>
+                </li>
+                <li data-testid="escrow-program" className="flex list-none gap-2.5">
+                  <ShieldCheck
+                    size={16}
+                    className="mt-0.5 shrink-0 text-accent"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    Escrow program{' '}
+                    <a
+                      href={explorerAddress(ESCROW_PROGRAM_ID)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-ink-2 underline decoration-line-control underline-offset-2 hover:text-ink"
+                    >
+                      {shortKey(ESCROW_PROGRAM_ID)} ↗
+                    </a>{' '}
+                    on devnet. Your receipt shows the escrow account and its on-chain release time.
+                  </span>
+                </li>
+                <li data-testid="devnet-hint" className="flex list-none gap-2.5">
+                  <Link2 size={16} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                  Devnet only. Switch your wallet to Solana Devnet before paying (Phantom: Settings
+                  → Developer Settings → Testnet Mode).
+                </li>
+              </ul>
+              <p className="m-0 border-t border-line pt-3 font-mono text-[11px] text-faint">
+                License: {listing.license} · creator bond {solText(listing.creator.bondLamports)}
+              </p>
+            </div>
+          </aside>
+          <UpvotePanel upvotes={upvotes} />
+          <RankPanel upvotes={upvotes} />
+        </div>
+
+        <div
+          hidden={checkoutVisible}
+          className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-3 border-t border-line bg-surface px-4 py-3 lg:hidden"
+        >
+          <div className="flex min-w-0 flex-col">
+            <Label>{tier ? 'You pay' : 'You pay before discount'}</Label>
+            <Money lamports={youPay} centsPerSol={centsPerSol} strong className="text-sm" />
+          </div>
+          <a href="#checkout" className={buttonClass('primary', 'md')}>
+            Review and buy
+          </a>
+        </div>
+      </article>
+      {related.length ? (
+        <section aria-labelledby="related-heading" className="mt-16 flex flex-col gap-6">
+          <h2 id="related-heading" className="m-0 text-2xl font-semibold tracking-tight">
+            More from {meta.label.toLowerCase()}
+          </h2>
+          <ul className="m-0 grid gap-5 p-0 sm:grid-cols-2 lg:grid-cols-4">
+            {related.map((item) => (
+              <li key={item.slug} className="list-none">
+                <ListingCard listing={item} pricing={{ centsPerSol, config, tier }} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -577,19 +668,23 @@ const PROGRESS: [Exclude<Step, 'idle' | 'failed'>, string][] = [
 function CheckoutProgress({ step }: { step: Step }) {
   const current = PROGRESS.findIndex(([key]) => key === step);
   return (
-    <ol
-      aria-label="Checkout progress"
-      className="m-0 space-y-2 rounded-ctl border border-line-soft bg-inset p-3"
-    >
+    <ol aria-label="Checkout progress" className="m-0 grid grid-cols-4 gap-2 p-0">
       {PROGRESS.map(([key, label], index) => {
-        const done = step === 'done' || index < current;
-        const active = index === current && step !== 'done';
+        const done = step === 'done' || (current >= 0 && index <= current);
         return (
-          <li key={key} className="flex list-none items-center gap-2.5 text-[13px]">
-            <Square tone={done ? 'ok' : active ? 'info' : 'neutral'}>
-              {done ? '✓' : active ? '◑' : index + 1}
-            </Square>
-            <span className={done || active ? 'text-ink' : 'text-muted'}>{label}</span>
+          <li
+            key={key}
+            aria-current={index === current && step !== 'done' ? 'step' : undefined}
+            className="flex list-none flex-col gap-1.5"
+          >
+            <span
+              aria-hidden="true"
+              className={`h-1 rounded-full transition-colors duration-500 ${done ? 'bg-accent' : 'bg-line'}`}
+            />
+            <span className={`text-[11px] leading-tight ${done ? 'text-ink' : 'text-faint'}`}>
+              {done ? <Check size={10} className="mr-0.5 inline" aria-hidden="true" /> : null}
+              {label}
+            </span>
           </li>
         );
       })}

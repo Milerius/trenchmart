@@ -459,3 +459,94 @@ test.describe('phase 6b: home cards', () => {
     await expect(cards.last()).toContainText('0% creator commission');
   });
 });
+
+test.describe('phase 7: listing', () => {
+  const LISTING = {
+    id: 'listing-7',
+    slug: 'phase-seven-pack',
+    title: 'Phase Seven Pack',
+    summary: 'Checks the prototype listing layout.',
+    description: 'Checks the prototype listing layout.',
+    category: 'userscript',
+    terminals: ['Axiom'],
+    price: '1800000000',
+    license: 'single',
+    holderOnly: false,
+    creator: {
+      handle: 'maker',
+      wallet: 'H4kHTS2dSvuJX6NL4KxYRsPBZvHNc79rTpmnWm2ecdbZ',
+      bondLamports: '5000000000',
+    },
+    preview: null,
+    security: {
+      semver: '1.2.0',
+      sha256: '9f2c4be1aa00bb11cc22dd33ee44ff5566778899aabbccddeeff00112233e41a',
+      summary: 'ok',
+      passed: 5,
+      total: 5,
+      checks: [],
+      review: { agentId: 'trenchmart-review-v1', decision: 'approve' },
+    },
+  };
+  const OTHER = {
+    slug: 'other-pack',
+    title: 'Other Pack',
+    summary: 'Another userscript.',
+    category: 'userscript',
+    terminals: ['GMGN'],
+    price: '500000000',
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/v1/**', async (route) => {
+      const url = new URL(route.request().url());
+      const path = url.pathname.replace('/api/v1', '');
+      if (path === `/listings/${LISTING.slug}`)
+        return route.fulfill({ status: 200, json: LISTING });
+      if (path === '/listings' && url.searchParams.get('category') === 'userscript')
+        return route.fulfill({ status: 200, json: [LISTING, OTHER] });
+      return route.fulfill({ status: 404, json: { error: { code: 'NOT_FOUND', message: 'x' } } });
+    });
+  });
+
+  test('desktop: ElectricBorder checkout after idle, prototype header, steps and related', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/l/${LISTING.slug}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Phase Seven Pack' })).toBeVisible();
+    await expect(page.locator('[data-fx="electric"] canvas')).toBeAttached({ timeout: 15_000 });
+    const checkout = page.getByTestId('checkout');
+    expect(await checkout.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('26px');
+    await expect(
+      checkout.getByRole('list', { name: 'Checkout progress' }).getByRole('listitem'),
+    ).toHaveCount(4);
+    await expect(checkout.getByTestId('buy')).toBeEnabled();
+    // The decrypting hash keeps its readable text for assistive tech.
+    await expect(page.getByTestId('security-summary')).toContainText('9f2c4be1…33e41a');
+    const related = page.getByRole('region', { name: 'More from userscripts' });
+    await expect(related.getByTestId('listing-card')).toHaveCount(1);
+    await expect(related).toContainText('Other Pack');
+  });
+
+  test('phone: no effect chunks; the buy bar and checkout still work', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/l/${LISTING.slug}`);
+    await expect(page.getByTestId('checkout')).toBeAttached();
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(2500);
+    await expect(page.locator('[data-fx]')).toHaveCount(0);
+    const chunks = await page.evaluate(() =>
+      performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((name) => /ElectricBorder|DecryptedText/.test(name)),
+    );
+    expect(chunks).toEqual([]);
+    await expect(page.getByRole('link', { name: 'Review and buy' })).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+    );
+    expect(overflow).toBe(true);
+  });
+});

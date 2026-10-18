@@ -339,11 +339,13 @@ export function Shell({ children }: { children: ReactNode }) {
       <NetworkBanner />
       <Ticker />
       <Nav />
-      <main
-        id="content"
-        className={fullBleed ? 'overflow-x-clip' : 'mx-auto max-w-7xl px-4 py-8 sm:px-6'}
-      >
-        {children}
+      {/* overflow-x-clip lets a page paint full-width glows without a horizontal scrollbar. */}
+      <main id="content" className="overflow-x-clip">
+        {fullBleed ? (
+          children
+        ) : (
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</div>
+        )}
       </main>
       <Footer />
     </WalletProvider>
