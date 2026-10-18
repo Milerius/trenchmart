@@ -180,6 +180,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Performance guard: gzip JS per prerendered page must stay under budget.
       - run: pnpm --filter @trenchmart/web build
+        env:
+          # Bundle sizes do not depend on the API origin; build against the local default.
+          ALLOW_LOCAL_API: '1'
       - run: pnpm --filter @trenchmart/web budget
 
   audit:
