@@ -1,0 +1,34 @@
+# Hourly: the Hyperdrive config must open fewer origin connections than the Supabase session
+# pooler accepts (pool_size 15). At 20, bursts failed with EMAXCONNSESSION and CI migrations
+# could not connect (2026-10-18). scripts/deploy-api.sh sets 10 on every deploy; this catches
+# a change made anywhere else. A failure fails the run, and GitHub emails the repo owner.
+# Secrets (repo): CLOUDFLARE_API_TOKEN (Hyperdrive read), CLOUDFLARE_ACCOUNT_ID.
+name: hyperdrive-limit
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      HYPERDRIVE_ID: 067fbd6cc9a949e7a62155bf3fd2fe91
+      MAX_LIMIT: 10
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: origin_connection_limit <= MAX_LIMIT
+        run: |
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+            echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets missing" >&2; exit 1
+          fi
+          body="$(curl -fsS --max-time 20 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HYPERDRIVE_ID")"
+          limit="$(echo "$body" | jq -r '.result.origin_connection_limit // "unset"')"
+          echo "origin_connection_limit: $limit (max $MAX_LIMIT)"
+          if [[ "$limit" == "unset" || "$limit" -gt "$MAX_LIMIT" ]]; then
+            echo "::error::Hyperdrive origin_connection_limit is $limit; the Supabase session pooler allows 15. Run: wrangler hyperdrive update $HYPERDRIVE_ID --origin-connection-limit $MAX_LIMIT"
+            exit 1
+          fi

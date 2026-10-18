@@ -201,8 +201,14 @@ describe('monitoring and alerts', () => {
     await recordOpsEvent(d, 'webhook_error', 'hooks: boom');
     await recordOpsEvent(d, 'scan_error', 'complete: boom');
     for (let i = 0; i < 10; i += 1) await recordOpsEvent(d, '5xx', 'x');
+    await recordOpsEvent(
+      d,
+      '5xx',
+      '/api/v1/studio/overview: (EMAXCONNSESSION) max clients reached in session mode',
+    );
     expect(await codes(d)).toEqual([
       'CRON_FAILED',
+      'DB_POOL_FULL',
       'HTTP_5XX_SPIKE',
       'SCAN_ERRORS',
       'WEBHOOK_FAILED',
