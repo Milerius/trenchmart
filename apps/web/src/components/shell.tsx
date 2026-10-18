@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { preload } from 'react-dom';
 import { NetworkBanner } from '@/components/ui';
 import { type ActivityEvent, activityText, type SponsoredChip } from '@/components/activity';
 import { api } from '@/lib/api';
@@ -254,7 +255,15 @@ function Footer() {
   );
 }
 
+// Reads every page makes on mount (session, ticker titles, fee config). Preloading them in the
+// HTML starts the requests in parallel with the JS download instead of after hydration.
+// The mode must match api(): same-origin with credentials ('use-credentials'), or the
+// browser fetches twice. These are hints only; nothing here changes what is cached.
+const PRELOADED_READS = ['/api/v1/me', '/api/v1/listings', '/api/v1/config/public'];
+
 export function Shell({ children }: { children: ReactNode }) {
+  for (const href of PRELOADED_READS)
+    preload(href, { as: 'fetch', crossOrigin: 'use-credentials' });
   return (
     <WalletProvider>
       <a

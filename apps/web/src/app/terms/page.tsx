@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
-import { formatTrench } from '@trenchmart/shared';
+import { formatTrench } from '@trenchmart/shared/tier';
 import { CONTACT_LABEL, CONTACT_URL, bonds, protocol } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Terms of Service · TrenchMart' };

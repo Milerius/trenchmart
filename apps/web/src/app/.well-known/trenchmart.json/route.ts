@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG_JSON } from '@trenchmart/shared';
+import { DEFAULT_CONFIG_JSON } from '@trenchmart/shared/config';
 import {
   AI_AGENT_ID,
   DEVNET_ADDRESSES,

@@ -12,7 +12,7 @@ import {
 } from '@/components/content-editor';
 import { ListingCard, type Listing } from '@/components/listings';
 import { Button, ButtonLink, Label, Money, Panel, Square, StatusTag, Tag } from '@/components/ui';
-import { solToLamports } from '@trenchmart/shared';
+import { solToLamports } from '@trenchmart/shared/money';
 import { solExact } from '@/lib/money';
 import type { ContentField } from '@/lib/listing-templates';
 import { toWebp } from '@/lib/webp';

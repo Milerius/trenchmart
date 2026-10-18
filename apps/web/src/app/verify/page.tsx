@@ -3,8 +3,9 @@
 import bs58 from 'bs58';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { preload } from 'react-dom';
 import nacl from 'tweetnacl';
-import { reportMessage } from '@trenchmart/shared';
+import { reportMessage } from '@trenchmart/shared/report';
 import { Button, Card, Label, Panel, StatusTag, Tag, type Tone, utc } from '@/components/ui';
 import { solText } from '@/lib/money';
 import { ApiError, api } from '@/lib/api';
@@ -22,6 +23,8 @@ type Quota = {
 };
 
 export default function VerifyPage() {
+  // The on-chain proof panel's read starts with the HTML instead of after hydration.
+  preload('/api/v1/transparency', { as: 'fetch', crossOrigin: 'use-credentials' });
   const wallet = useWallet();
   const [result, setResult] = useState<{ match: boolean; message: string } | null>(null);
   const [error, setError] = useState('');

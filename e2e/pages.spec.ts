@@ -7,6 +7,16 @@ for (const path of pages) {
   test(`${path} renders and has no serious axe violations`, async ({ page }) => {
     await page.goto(path);
     await expect(page.getByTestId('nav')).toBeVisible();
+    // Let the one-shot entrance animations (rise, route fade) settle so axe measures the
+    // final colours rather than a half-faded frame. Infinite loops (ticker, glow) are skipped.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+    );
     const results = await new AxeBuilder({ page }).analyze();
     const blocking = results.violations.filter(
       (violation) => violation.impact === 'serious' || violation.impact === 'critical',

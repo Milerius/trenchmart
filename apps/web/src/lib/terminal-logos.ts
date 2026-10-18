@@ -1,4 +1,4 @@
-import { canonicalTerminal, TERMINALS } from '@trenchmart/shared';
+import { canonicalTerminal, TERMINALS } from '@trenchmart/shared/terminals';
 
 /**
  * Each terminal's own logo, taken from its site's favicon and served from apps/web/public

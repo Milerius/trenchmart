@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
-import { MARKDOWN_MAX_CHARS } from '@trenchmart/shared';
+import { MARKDOWN_MAX_CHARS } from '@trenchmart/shared/markdown';
 import { Markdown, MediaPreviewContext } from '@/components/markdown';
 import { Button, Label, Tag } from '@/components/ui';
 import type { ContentField } from '@/lib/listing-templates';

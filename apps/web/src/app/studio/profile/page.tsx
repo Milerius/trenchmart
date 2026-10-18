@@ -8,7 +8,7 @@ import {
   type ContactChannel,
   type SocialKind,
   type Socials,
-} from '@trenchmart/shared';
+} from '@trenchmart/shared/profile';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CheckIcon, EyeIcon, UploadIcon, XIcon } from '@/components/icons';

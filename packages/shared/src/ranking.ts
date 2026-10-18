@@ -1,4 +1,4 @@
-import { clampInt } from './social';
+import { clampInt } from './num';
 
 /**
  * Ranking (listings and creators). Pure scoring so the API job, the web "how it's computed"
