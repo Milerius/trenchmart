@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# PR branches: a new push cancels the older run. main: every commit gets its own group (the
+# sha), so a run is never cancelled or replaced by the next merge; each merge gets a verdict.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   typecheck:
