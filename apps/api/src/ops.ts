@@ -28,6 +28,7 @@ export const ALERT_CODES = [
   'SCAN_ERRORS',
   'SCAN_STUCK',
   'HTTP_5XX_SPIKE',
+  'DB_POOL_FULL',
   'DISPUTE_SPIKE',
   'DISPUTES_WAITING',
   'PAYOUTS_WAITING',
@@ -235,6 +236,19 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
     `;
     if ((scanning?.n ?? 0) > 0)
       add('warn', 'SCAN_STUCK', `${scanning!.n} version(s) stuck in scanning for more than 30 min`);
+    // The Supabase session pooler refused a connection: Hyperdrive's origin_connection_limit
+    // is above the pooler's pool_size (it drifted to 20 once; scripts/deploy-api.sh sets 10).
+    const [poolFull] = await deps.sql<{ n: number }[]>`
+      select count(*)::int as n from ops_events
+      where kind = '5xx' and created_at >= ${since}
+        and (detail like '%EMAXCONNSESSION%' or detail like '%max clients reached%')
+    `;
+    if ((poolFull?.n ?? 0) > 0)
+      add(
+        'critical',
+        'DB_POOL_FULL',
+        `${poolFull!.n} request(s) in the last 15 min failed with "max clients reached" from the Supabase pooler; check the Hyperdrive origin_connection_limit (<= 10)`,
+      );
     const errors = await count(deps, '5xx', since);
     if (errors >= t.http5xxPerWindow)
       add('critical', 'HTTP_5XX_SPIKE', `${errors} API 5xx responses in the last 15 min`);

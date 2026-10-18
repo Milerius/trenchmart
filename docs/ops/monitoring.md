@@ -169,6 +169,14 @@ Critical. 10 or more API 5xx errors in 15 min.
 - Search Workers Logs for the stack traces. Use `ops_events.detail` for the paths.
 - If a recent deploy caused it, roll back with `wrangler rollback`.
 
+### DB_POOL_FULL
+
+Critical. In the last 15 min, an API request failed with `EMAXCONNSESSION max clients reached in session mode` from the Supabase pooler.
+
+- Hyperdrive (`trenchmart-db`) reaches Supabase through the session pooler, which allows 15 clients in total. Its `origin_connection_limit` must stay well below that. `scripts/deploy-api.sh` sets it to 10 on every deploy, and the hourly `hyperdrive-limit` workflow fails when it is higher.
+- Check it with `wrangler hyperdrive get <id>`. Fix it with `wrangler hyperdrive update <id> --origin-connection-limit 10`.
+- If the limit is fine, look for another client holding pooler connections: `select application_name, count(*) from pg_stat_activity group by 1`.
+
 ### DISPUTE_SPIKE
 
 Critical. 5 or more disputes in 1 hour. This may be a malicious listing or a broken release.

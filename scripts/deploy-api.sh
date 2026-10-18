@@ -39,6 +39,24 @@ pnpm --silent db:pending
 echo "== deploy $(basename "$config")"
 (cd "$root/apps/api" && $wrangler deploy -c "$config")
 
+# Hyperdrive must open fewer origin connections than the Supabase session pooler accepts
+# (pool_size 15). It was 20: bursts failed with EMAXCONNSESSION and CI migrations could not
+# connect. Keep it at HYPERDRIVE_ORIGIN_LIMIT (default 10, leaving room for CI and tools).
+hd_limit="${HYPERDRIVE_ORIGIN_LIMIT:-10}"
+hd_id="$(sed -n '/\[\[hyperdrive\]\]/,/^\[/s/^id *= *"\(.*\)"/\1/p' "$config" | head -1)"
+if [ -n "$hd_id" ]; then
+  echo "== hyperdrive origin_connection_limit (want <= $hd_limit)"
+  current="$(cd "$root/apps/api" && $wrangler hyperdrive get "$hd_id" 2>/dev/null |
+    node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s.slice(s.indexOf("{")));console.log(j.origin_connection_limit ?? "unset")})')" || current=unknown
+  echo "current: $current"
+  if [ "$current" = "unknown" ]; then
+    echo "warning: could not read the Hyperdrive config; check its origin_connection_limit" >&2
+  elif [ "$current" = "unset" ] || [ "$current" -gt "$hd_limit" ]; then
+    (cd "$root/apps/api" && $wrangler hyperdrive update "$hd_id" --origin-connection-limit "$hd_limit" >/dev/null)
+    echo "set to $hd_limit"
+  fi
+fi
+
 echo "== health"
 for i in 1 2 3 4 5 6; do
   if curl -fsS --max-time 20 "$api_url"; then echo; exit 0; fi
