@@ -130,7 +130,7 @@ Approved files are pinned by SHA-256. Buyers only ever receive that exact file, 
 
 **Creator bonds.** Creators post a bond for their category (1 SOL for scripts, filters and indicators, 2 SOL for wallet lists, 5 SOL for bot setups and alert bots). It backs refunds when a dispute is upheld.
 
-**Verified X accounts.** Profiles link X through X sign-in (OAuth 2.0 PKCE). Until the production X app is configured, devnet links a typed handle and labels it **unverified** everywhere.
+**Verified X badge (optional).** Creators can verify X through X sign-in (OAuth 2.0 PKCE) for a verified badge on their profile and listings. It is never required to list, publish or sell: the bond and the security scan are the gates. Creators without it show their pseudonym or wallet, and typed handles are labelled **unverified**.
 
 ## For creators
 

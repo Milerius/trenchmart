@@ -199,11 +199,6 @@ export const ERRORS: { status: number; code: string; meaning: string }[] = [
   { status: 409, code: 'ESCROW_WINDOW', meaning: 'Release asked before escrow_until.' },
   {
     status: 400,
-    code: 'X_REQUIRED',
-    meaning: 'Creating a listing needs a verified X link (one-time, in the studio).',
-  },
-  {
-    status: 400,
     code: 'BOND_REQUIRED',
     meaning: 'Stake the category bond first (POST /studio/bond).',
   },
@@ -276,7 +271,7 @@ export const SELLER_TS = `const tm = new TrenchmartClient();
 await tm.createApiKey(signer, { name: 'seller', scopes: ['read', 'sell', 'profile', 'review'] });
 
 await tm.updateProfile({ displayName: 'Alpha Bot', bio: 'Signals for Axiom.', socials: { website: 'alpha.example' } });
-const req = await tm.requirements(); // xLinked, bondActive, bondByCategory, verificationFee
+const req = await tm.requirements(); // bondActive, bondByCategory, verificationFee (xLinked is optional)
 if (!req.bondOk) await tm.payBond(signer, 1_000_000_000n); // unsigned vault tx, signed here
 
 const { id } = await tm.createListing({
@@ -314,7 +309,7 @@ curl -s ${API_BASE}/agent/auth/key \\
 
 export const NOT_AVAILABLE = [
   'Webhooks are not available: poll GET /studio/versions/{id} for scan results and GET /orders/{id} for order state.',
-  'X verification is a one-time human step in the studio (OAuth in a browser); keys cannot link X.',
+  'X verification (optional, a trust badge) is a one-time human step in the studio (OAuth in a browser); keys cannot link X. It is never needed to list, publish or sell.',
   'Mainnet: TrenchMart runs on Solana devnet only. Never send mainnet funds.',
 ];
 
@@ -438,7 +433,7 @@ Blockhashes expire after about 60-90 s: sign and send promptly, or request a fre
 ## Selling (everything the studio does)
 
 - Profile and socials: GET/PUT /studio/profile (handle, displayName, bio, socials, contact), POST /studio/profile/avatar and /banner (image bytes).
-- Requirements: GET /studio/requirements -> xLinked, bondActive, bondByCategory, verificationFee, feeWaived. Creating a listing needs a verified X link (one-time, in the studio) and the category bond.
+- Requirements: GET /studio/requirements -> bondRequired, bondActive, bondOk, bondByCategory, verificationFee, feeWaived, xLinked, xRequired (always false). Creating a listing needs the category bond; every version passes the security scan. X is optional: a verified X link (one-time, OAuth in the studio) adds a trust badge on your profile and listings and is never required to list, publish or sell.
 - Bond: POST /studio/bond {"amount"} (1-5 SOL per stake) -> unsigned vault tx; sign, send, POST /studio/bond/{id}/submitted.
 - Listings: POST /studio/listings with title, summary, description, category (userscript, wallet_list, filter, setup, strategy, alerts), terminals, priceLamports, license (single, multi3, subscription + subPeriodDays), updatePriceLamports, holderOnly/holderOnlyHours, kind and kind-specific specs (schemas ListingSpecs_<kind> in the OpenAPI spec: script, bot, wallet, filter, indicator, telegram, other). PATCH /studio/listings/{id} changes title, copy, price, update/subscription price, holder gating. POST /studio/listings/{id}/delist.
 - Content and media: GET/PUT /studio/listings/{id}/content (readme, howto, requirements markdown; gallery of uploaded image ids; coverImageId), POST /studio/listings/{id}/content/review to publish the draft, POST /studio/listings/{id}/images (image bytes).

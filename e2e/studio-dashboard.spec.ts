@@ -182,7 +182,7 @@ test('dashboard: real stats, needs-note banner, one action per listing and filte
   await expect(rows.first()).toContainText('KOL Tracker List');
 
   const ready = page.getByRole('region', { name: 'Ready to sell' });
-  await expect(ready).toContainText('4 of 4 required');
+  await expect(ready).toContainText('3 of 3 required');
   await expect(ready).toContainText('0.25 SOL per version');
   await expect(ready).toContainText('4/5');
   await expect(page.getByTestId('updates-card')).toContainText(
@@ -209,8 +209,9 @@ test('dashboard: a new creator sees zeros and no rating, never sample numbers', 
   await expect(page.getByTestId('needs-note')).toHaveCount(0);
   await expect(page.getByText('No listings yet')).toBeVisible();
   const ready = page.getByRole('region', { name: 'Ready to sell' });
-  await expect(ready).toContainText('2 of 4 required');
-  await expect(page.getByTestId('link-x-profile')).toHaveText('Link X in your profile →');
+  await expect(ready).toContainText('2 of 3 required');
+  await expect(ready).toContainText('X badge (optional)');
+  await expect(page.getByTestId('link-x-profile')).toHaveText('Verify with X for a trust badge →');
   if (process.env.STUDIO_SHOTS) {
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
     await page.setViewportSize({ width: 1400, height: 900 });

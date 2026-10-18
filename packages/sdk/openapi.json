@@ -2203,7 +2203,7 @@
         "tags": [
           "Sell"
         ],
-        "summary": "What listing needs: verified X, category bond, verification fee",
+        "summary": "What listing needs: category bond, verification fee (X is optional)",
         "operationId": "getStudioRequirements",
         "x-scope": "sell",
         "parameters": [],
@@ -2401,7 +2401,7 @@
             }
           }
         },
-        "description": "Needs a verified X link and the category bond. license=subscription with subPeriodDays makes a subscription. kind + specs follow the per-kind schemas in components.schemas (ListingSpecs_*).",
+        "description": "Needs the category bond (X is optional). license=subscription with subPeriodDays makes a subscription. kind + specs follow the per-kind schemas in components.schemas (ListingSpecs_*).",
         "security": [
           {
             "apiKey": []

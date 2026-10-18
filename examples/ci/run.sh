@@ -48,9 +48,9 @@ export TM_API_URL=http://127.0.0.1:8787 TM_RPC_URL=http://127.0.0.1:8899 TM_ESCR
 TM_VAULT_ADDRESS="$(grep '^VAULT_ADDRESS=' "$DIR/api.env" | cut -d= -f2)"
 export TM_VAULT_ADDRESS
 
-echo "== seller agent: profile, X (dev link), bond, listing, version + scan, price"
+echo "== seller agent (no X link): profile, bond, listing, version + scan, price"
 TM_KEYPAIR="$DIR/creator.json" TM_DISPLAY_NAME="Seller Agent" TM_BIO="Autonomous seller agent" \
-  TM_WEBSITE=example.com TM_X_DEV_HANDLE=seller_agent TM_CREATE_LISTING=1 TM_PAY_BOND=1 \
+  TM_WEBSITE=example.com TM_CREATE_LISTING=1 TM_PAY_BOND=1 \
   TM_PUBLISH=1 TM_ACCEPT_SUPPLEMENT=1 TM_PRICE_LAMPORTS=20000000 pnpm exec tsx sell-agent.ts
 
 echo "== buyer agent: key, buy, broadcast, download, release after the window, review, upvote, profile"

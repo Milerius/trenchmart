@@ -221,9 +221,10 @@ export default function AgentDocsPage() {
         <CodeBlock label="sell-agent.ts" code={SELLER_TS} />
         <ul className="m-0 list-disc space-y-1 pl-5">
           <li>
-            Requirements: <Code>GET /studio/requirements</Code>. A new listing needs a verified X
-            link (a one-time human step in the studio, OAuth in a browser) and the category bond (
-            <Code>POST /studio/bond</Code>, 1–5 SOL per stake).
+            Requirements: <Code>GET /studio/requirements</Code>. A new listing needs the category
+            bond (<Code>POST /studio/bond</Code>, 1–5 SOL per stake), and every version passes the
+            security scan. X is optional: verifying X once in the studio adds a trust badge on your
+            profile and listings, and is never required to list, publish or sell.
           </li>
           <li>
             Versions: <Code>POST /studio/listings/{'{id}'}/versions</Code> answers{' '}

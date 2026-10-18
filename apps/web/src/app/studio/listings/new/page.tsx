@@ -907,16 +907,12 @@ export default function NewListingPage() {
             />
           </dl>
           {req && !req.xLinked ? (
-            <div
-              className="mt-3 rounded-ctl border border-warn-line bg-warn-bg p-3 text-[12px] text-ink-2"
-              data-testid="x-required"
-            >
-              <span className="font-semibold text-warn">Profile: link X</span> (required to
-              publish).{' '}
+            <p className="m-0 mt-3 text-[12px] text-muted" data-testid="x-optional">
+              Optional: verify with X for a trust badge on your listings.{' '}
               <Link href="/studio/profile#socials" className="text-accent">
-                Edit profile →
+                Verify with X →
               </Link>
-            </div>
+            </p>
           ) : null}
           {bondShort ? (
             <div className="mt-3 rounded-ctl border border-warn-line bg-warn-bg p-3 text-[12px] text-ink-2">
@@ -944,7 +940,7 @@ export default function NewListingPage() {
             size="lg"
             className="mt-4 w-full"
             data-testid="submit"
-            disabled={!attested || !!busy || !req?.xLinked}
+            disabled={!attested || !!busy}
             aria-busy={!!busy || undefined}
             onClick={() =>
               void submit().catch((err: Error) => {

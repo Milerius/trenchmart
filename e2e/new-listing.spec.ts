@@ -395,7 +395,7 @@ test('submit: creates the listing with kind and specs, uploads images, file and 
   ).toEqual([]);
 });
 
-test('review: without a linked X the submit waits on the profile, and the real fee is shown', async ({
+test('review: an unverified creator (no X) with the bond can submit; X is a gentle optional nudge', async ({
   page,
 }) => {
   await stub(page, { req: { xLinked: false, verificationFee: '250000000' } });
@@ -406,13 +406,21 @@ test('review: without a linked X the submit waits on the profile, and the real f
     );
   }, `tm:new-listing:${SESSION.user.wallet}`);
   await page.goto('/studio/listings/new');
-  await expect(page.getByTestId('x-required')).toContainText('Profile: link X');
+  await expect(page.getByTestId('x-required')).toHaveCount(0);
+  await expect(page.getByTestId('x-optional')).toContainText('Optional: verify with X');
   await expect(
-    page.getByTestId('x-required').getByRole('link', { name: 'Edit profile →' }),
+    page.getByTestId('x-optional').getByRole('link', { name: 'Verify with X →' }),
   ).toHaveAttribute('href', '/studio/profile#socials');
   await expect(page.getByTestId('submit-card')).toContainText('0.25 SOL');
-  await page.getByText('The file does what this listing says').click();
   await expect(page.getByTestId('submit')).toBeDisabled();
+  await page.getByText('The file does what this listing says').click();
+  await expect(page.getByTestId('submit')).toBeEnabled();
+  if (process.env.X_OPTIONAL_SHOTS) {
+    await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
+    await page.getByTestId('submit-card').screenshot({
+      path: `${process.env.X_OPTIONAL_SHOTS}/wizard-submit-no-x.png`,
+    });
+  }
 });
 
 test('the draft survives a reload on this device', async ({ page }) => {

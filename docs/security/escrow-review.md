@@ -101,7 +101,7 @@ Each item below is covered by `programs/trench_escrow/tests/escrow.rs`.
 
 ### M-04 X handle linking is unverified
 
-- **Location:** `apps/api/src/app.ts`: `GET /auth/x/start` returns 501, and `POST /studio/x` stores any `handle` as `x_handle` with `x_user_id = 'dev:<handle>'`. Listings require `x_handle` (`X_REQUIRED`), and creator pages display it.
+- **Location:** `apps/api/src/app.ts`: `GET /auth/x/start` returns 501, and `POST /studio/x` stores any `handle` as `x_handle` with `x_user_id = 'dev:<handle>'`. Listings required `x_handle` (`X_REQUIRED`) at the time, and creator pages display it. (Since then X is optional: it never gates selling, and only a handle verified through X sign-in earns the badge.)
 - **Impact:** any creator can claim any X account, for example a known trader's. That defeats the reason a linked X account is required.
 - **Recommendation:** implement X OAuth 2.0 PKCE (`X_CLIENT_ID`/`X_CLIENT_SECRET` are already in `.env.example`) and store the X user id. Remove `/studio/x`, or restrict it to localnet.
 - **Status:** open.
