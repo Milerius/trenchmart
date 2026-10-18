@@ -63,3 +63,35 @@ test.describe('phase 1: fonts', () => {
     expect(external).toEqual([]);
   });
 });
+
+test.describe('phase 2: tokens and corners', () => {
+  test('darker canvas and surface, rounder cards and panels', async ({ page }) => {
+    await page.goto('/');
+    const css = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const read = (name: string) => root.getPropertyValue(name).trim();
+      return {
+        body: getComputedStyle(document.body).backgroundColor,
+        surface: read('--color-surface'),
+        line: read('--color-line'),
+        card: read('--radius-card'),
+        panel: read('--radius-panel'),
+        // Contrast tokens stay (>= 4.5:1 text, >= 3:1 control boundaries).
+        lineControl: read('--color-line-control'),
+        accentLabel: read('--color-accent-label'),
+        decor: read('--color-decor'),
+      };
+    });
+    expect(css.body).toBe('rgb(7, 8, 7)');
+    expect(css.surface).toBe('#101210');
+    expect(css.line).toBe('#232823');
+    expect([css.card, css.panel]).toEqual(['16px', '22px']);
+    expect([css.lineControl, css.accentLabel, css.decor]).toEqual([
+      '#646c63',
+      '#9faf86',
+      '#6e756d',
+    ]);
+    const receipt = page.locator('figure').filter({ hasText: 'Example review receipt' });
+    expect(await receipt.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('22px');
+  });
+});

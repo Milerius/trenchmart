@@ -152,6 +152,6 @@ theme: { extend: {
     sky: '#7CC4FF', violet: '#C9A2FF', teal: '#6EE7C8',
   },
   fontFamily: { sans: ['Geist', 'system-ui'], mono: ['Geist Mono', 'ui-monospace', 'monospace'] },
-  borderRadius: { tag: '6px', ctl: '10px', card: '14px', panel: '16px', sheet: '20px' },
+  borderRadius: { tag: '6px', ctl: '10px', card: '16px', panel: '22px', sheet: '26px', hero: '36px' },
 }}
 ```
