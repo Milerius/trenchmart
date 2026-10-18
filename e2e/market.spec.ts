@@ -109,3 +109,126 @@ test('creator profile: an X handle verified through X sign-in has no unverified 
   await expect(page.getByText(/X @realtrader/)).toBeVisible();
   await expect(page.getByTestId('x-unverified')).toHaveCount(0);
 });
+
+test.describe('market pages follow the prototype', () => {
+  const rows = [
+    {
+      ...row('cheap-filter', 'Cheap Filter', 'filter'),
+      terminals: ['GMGN'],
+      price: '50000000',
+      sales7d: 1,
+      ratingAvg: '4.9',
+    },
+    {
+      ...row('hot-script', 'Hot Script'),
+      terminals: ['Axiom'],
+      price: '300000000',
+      sales7d: 9,
+      ratingAvg: '4.1',
+    },
+    {
+      ...row('wallet-pack', 'Wallet Pack', 'wallet_list'),
+      terminals: ['Photon'],
+      price: '200000000',
+      sales7d: 4,
+      ratingAvg: null,
+    },
+  ];
+  const titles = (page: Page) => page.locator('main ul h3').allInnerTexts();
+
+  test('search: full-width hero, category and terminal filters, sort', async ({ page }) => {
+    await stub(page, (path) => (path === '/listings' ? rows : undefined));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/search');
+    const h1 = page.getByRole('heading', { level: 1, name: 'All live listings' });
+    await expect(h1).toBeVisible();
+    // Full bleed: the hero spans the viewport, the content column stays 1280 px.
+    const hero = page.locator('main section').first();
+    expect((await hero.boundingBox())!.width).toBeGreaterThan(1400);
+    await expect(page.getByText('3 reviewed listings')).toBeVisible();
+    // Trending: most sales this week first.
+    expect(await titles(page)).toEqual(['Hot Script', 'Wallet Pack', 'Cheap Filter']);
+
+    const filters = page.getByTestId('market-filters');
+    await filters.getByRole('button', { name: 'Filters', exact: true }).click();
+    await expect(filters.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByText('1 reviewed listing', { exact: true })).toBeVisible();
+    await filters.getByRole('button', { name: 'All', exact: true }).click();
+
+    await filters.getByRole('button', { name: 'Photon' }).click();
+    await expect(page.getByText('1 reviewed listing', { exact: true })).toBeVisible();
+    expect(await titles(page)).toEqual(['Wallet Pack']);
+    await filters.getByRole('button', { name: 'GMGN' }).click();
+    await expect(page.getByText('2 reviewed listings')).toBeVisible();
+    await filters.getByRole('button', { name: 'GMGN' }).click();
+    await filters.getByRole('button', { name: 'Photon' }).click();
+
+    await page.getByTestId('market-sort').selectOption('price');
+    expect(await titles(page)).toEqual(['Cheap Filter', 'Wallet Pack', 'Hot Script']);
+    await page.getByTestId('market-sort').selectOption('rating');
+    expect(await titles(page)).toEqual(['Cheap Filter', 'Hot Script', 'Wallet Pack']);
+  });
+
+  test('filters that match nothing say so', async ({ page }) => {
+    await stub(page, (path) => (path === '/listings' ? rows : undefined));
+    await page.goto('/search');
+    await page
+      .getByTestId('market-filters')
+      .getByRole('button', { name: 'Alerts', exact: true })
+      .click();
+    await expect(page.getByText('Nothing matches these filters')).toBeVisible();
+  });
+
+  test('category: hero with bond, escrow and other categories; no category pills', async ({
+    page,
+  }) => {
+    await stub(page, (path) =>
+      path === '/listings'
+        ? [rows[1]]
+        : path === '/config/public'
+          ? { bondLamportsByCategory: { userscript: '5000000000' }, escrowHours: 1 }
+          : undefined,
+    );
+    await page.goto('/c/userscript');
+    const hero = page.getByTestId('category-hero');
+    await expect(hero.getByRole('heading', { level: 1, name: 'Userscripts' })).toBeVisible();
+    await expect(hero.getByText('01 / SCRIPTS')).toBeVisible();
+    await expect(hero.getByText('Creator bond 5 SOL')).toBeVisible();
+    await expect(hero.getByText('0% creator commission')).toBeVisible();
+    const others = hero.getByRole('navigation', { name: 'Other categories' }).getByRole('link');
+    await expect(others).toHaveCount(5);
+    await expect(others.first()).toHaveAttribute('href', '/c/wallet_list');
+    await expect(
+      page.getByTestId('market-filters').getByRole('group', { name: 'Category' }),
+    ).toHaveCount(0);
+    await expect(page.getByText('1 reviewed listing', { exact: true })).toBeVisible();
+  });
+
+  test('category title stays a static gradient on phones and in automation', async ({ page }) => {
+    await stub(page, (path) => (path === '/listings' ? [] : undefined));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/c/filter');
+    const h1 = page.getByRole('heading', { level: 1, name: 'Terminal filters' });
+    await expect(h1).toBeVisible();
+    await expect(page.locator('[data-fx="gradient-text"]')).toHaveCount(0);
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(390);
+  });
+
+  test('desktop with effects on: the category title uses React Bits GradientText', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      (window as Window & { __TM_FX__?: boolean }).__TM_FX__ = true;
+    });
+    await stub(page, (path) => (path === '/listings' ? [] : undefined));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/c/userscript');
+    const fx = page.locator('[data-fx="gradient-text"]');
+    await expect(fx).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Userscripts' })).toBeVisible();
+  });
+});
