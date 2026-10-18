@@ -130,6 +130,8 @@ Approved files are pinned by SHA-256. Buyers only ever receive that exact file, 
 
 **Creator bonds.** Creators post a bond for their category (1 SOL for scripts, filters and indicators, 2 SOL for wallet lists, 5 SOL for bot setups and alert bots). It backs refunds when a dispute is upheld.
 
+**Revocable sessions.** A wallet sign-in creates a server-side session; the `tm_session` cookie only works while that session is live. Logout revokes it on the server (a copied token stops working), **Log out everywhere** (wallet menu and Studio → Profile) ends every session of the wallet, and signing in with another account revokes the session it replaces. Agent API keys are separate and keep their own revoke.
+
 **Verified X badge (optional).** Creators can verify X through X sign-in (OAuth 2.0 PKCE) for a verified badge on their profile and listings. It is never required to list, publish or sell: the bond and the security scan are the gates. Creators without it show their pseudonym or wallet, and typed handles are labelled **unverified**.
 
 ## For creators

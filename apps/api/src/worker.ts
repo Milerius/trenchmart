@@ -185,6 +185,11 @@ export default {
         await step('escrow-housekeeping', () => escrowHousekeeping(deps));
         await step('wallet-intel', () => scanWalletIntel(deps));
         await step('ranking', () => computeRanks(deps));
+        // Expired sessions are useless; revoked rows stay (audit) until a week after expiry.
+        await step(
+          'sessions',
+          () => deps.sql`delete from sessions where expires_at < now() - interval '7 days'`,
+        );
         let alerts: OpsAlert[] = [];
         await step('ops', async () => {
           alerts = await opsCheck(deps);

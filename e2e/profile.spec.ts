@@ -378,3 +378,34 @@ test('edit profile: avatar upload sends the file and shows it', async ({ page })
   );
   expect(calls.some((c) => c.method === 'POST' && c.path === '/studio/profile/avatar')).toBe(true);
 });
+
+test('studio: log out everywhere asks to confirm, revokes on the server and signs out here', async ({
+  page,
+}) => {
+  let revoked = false;
+  const { calls } = await stub(
+    page,
+    ({ method, path }) => {
+      if (path === '/studio/profile') return { json: OWN };
+      if (method === 'POST' && path === '/auth/logout-all') {
+        revoked = true;
+        return { json: { ok: true, revoked: 3 } };
+      }
+      if (method === 'POST' && path === '/auth/logout') return { status: 200, json: {} };
+      if (path === '/me' && revoked)
+        return { status: 401, json: { error: { code: 'UNAUTHORIZED', message: 'sign in' } } };
+      return undefined;
+    },
+    true,
+  );
+  await page.goto('/studio/profile');
+  const card = page.getByTestId('sessions-card');
+  await expect(card).toContainText('Agent API keys keep working');
+  if (process.env.SESSION_SHOTS)
+    await card.screenshot({ path: `${process.env.SESSION_SHOTS}/studio-sessions-card.png` });
+  await card.getByTestId('logout-all').click();
+  expect(calls.some((c) => c.path === '/auth/logout-all')).toBe(false);
+  await card.getByTestId('logout-all-confirm').click();
+  await expect(page.getByTestId('connect')).toHaveAttribute('data-auth', 'signed-out');
+  expect(calls.filter((c) => c.path === '/auth/logout-all')).toHaveLength(1);
+});
