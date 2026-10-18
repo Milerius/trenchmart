@@ -1,7 +1,7 @@
 # Verified (reproducible) build — trench_escrow
 
 Program id (devnet): `Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw`  
-Anchor: `1.2.1` · Agave/solana CLI metadata: `4.3.2` (`[workspace.metadata.cli]` in root `Cargo.toml`)  
+Anchor: `1.2.1` · Agave/solana CLI metadata: `4.3.0` (Docker image tag; CI Solana CLI install stays 4.3.2) (`[workspace.metadata.cli]` in root `Cargo.toml`)  
 Upgrade authority: Squads vault PDA `47RLqPda5YLW7rFHkoJ2K5yACWu4qc7j2yYU2so64bz7` (2-of-3 multisig `CaatcAQa…`)
 
 ## CI job
@@ -40,7 +40,8 @@ When the program is on mainnet and the upgrade authority can sign:
 
 ```bash
 # 1) Build the same commit in Docker (or download the CI artifact and confirm the hash).
-solana-verify build --library-name trench_escrow
+solana-verify build --library-name trench_escrow \
+  --base-image solanafoundation/solana-verifiable-build:4.3.0
 
 # 2) Upload the verify PDA (signer = upgrade authority, or a Squads verify flow).
 solana-verify verify-from-repo \
@@ -67,7 +68,8 @@ transaction for co-signers). Until mainnet launch, skip OtterSec and rely on the
 
 ```bash
 cargo install solana-verify --locked   # or curl the release binary used in CI
-solana-verify build --library-name trench_escrow
+solana-verify build --library-name trench_escrow \
+  --base-image solanafoundation/solana-verifiable-build:4.3.0
 solana-verify get-executable-hash target/deploy/trench_escrow.so
 solana-verify get-executable-hash <(solana program dump Dbrq2s… -u <devnet-rpc> /dev/stdout)
 ```

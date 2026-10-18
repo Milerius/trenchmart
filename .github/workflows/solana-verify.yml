@@ -34,7 +34,7 @@ env:
   LIBRARY_NAME: trench_escrow
   # Onfinality public devnet (api.devnet.solana.com is flaky from Actions).
   DEVNET_RPC: https://solana-devnet.api.onfinality.io/public
-  # Pin solana-verify CLI; Docker base image comes from [workspace.metadata.cli] solana = "4.3.2".
+  # Pin solana-verify CLI; Docker base image pinned to 4.3.0 (no 4.3.2 image published yet).
   SOLANA_VERIFY_VERSION: 0.4.15
 
 jobs:
@@ -66,7 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           # Anchor 1.2.1 workspace; library name matches programs/trench_escrow.
-          solana-verify build --library-name "$LIBRARY_NAME"
+          solana-verify build --library-name "$LIBRARY_NAME" --base-image solanafoundation/solana-verifiable-build:4.3.0
           test -f "target/deploy/${LIBRARY_NAME}.so"
 
       - name: Hash + compare to on-chain devnet
