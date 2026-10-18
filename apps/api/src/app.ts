@@ -997,18 +997,21 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.get('/studio/requirements', async (c) => {
     const user = requireUser(c);
-    const config = await loadConfig(deps);
+    const configQ = loadConfig(deps);
+    const [config, categories, bond] = await Promise.all([
+      configQ,
+      deps.sql<{ category: string }[]>`
+        select distinct category from listings where creator_id = ${user.id} and delisted_at is null and live_version_id is not null
+      `,
+      activeBond(deps.sql, user.id as string),
+    ]);
     const tier = await tierForWallet(deps, user.wallet as string, config);
-    const categories = await deps.sql<{ category: string }[]>`
-      select distinct category from listings where creator_id = ${user.id} and delisted_at is null and live_version_id is not null
-    `;
     const required = bondToList(
       categories.map((row) => row.category),
       config.bond_lamports_by_category,
       tier.tier,
       config.og_bond_discount_bps,
     );
-    const bond = await activeBond(deps.sql, user.id as string);
     return c.json(
       jsonSafe({
         creator: ((user.roles as string[] | undefined) ?? []).includes('creator'),

@@ -4,13 +4,25 @@
  * Only GETs without a session cookie or Authorization header on an allow-listed path
  * are cached, and only 200 responses without Set-Cookie. Everything else is marked
  * `private, no-store` so no user or authed data is ever stored by a shared cache.
+ *
+ * Exception: rules marked `shared` are reads whose handler never looks at the viewer
+ * (fee config, SOL price, stats, activity, featured, leaderboard). Signed-in visitors get
+ * the same shared copy instead of a fresh database read on every page; the key never
+ * includes the cookie. Keep `shared` off any route that reads c.get('user').
  */
 type CacheLike = {
   match(request: Request): Promise<Response | undefined>;
   put(request: Request, response: Response): Promise<void>;
 };
 
-type Rule = { pattern: RegExp; fresh: number; stale: number; immutable?: boolean };
+type Rule = {
+  pattern: RegExp;
+  fresh: number;
+  stale: number;
+  immutable?: boolean;
+  /** Viewer-independent: also served to (and filled by) signed-in requests. */
+  shared?: boolean;
+};
 
 const DAY = 86_400;
 
@@ -18,14 +30,15 @@ export const EDGE_RULES: Rule[] = [
   // Seller images are stored under a fresh UUID per upload, so the bytes never change.
   { pattern: /^\/api\/v1\/media\/[0-9a-f-]{36}$/i, fresh: 30 * DAY, stale: DAY, immutable: true },
   // On-chain proof for /verify: chain reads are cached about a minute.
-  { pattern: /^\/api\/v1\/transparency$/, fresh: 60, stale: 300 },
+  { pattern: /^\/api\/v1\/transparency$/, fresh: 60, stale: 300, shared: true },
   // Aggregates (home stats, categories, top creators) change slowly and are the reads that
   // went cold (stats MISS 0.8 s after 10 min idle): keep a stale copy a day so the first
   // visitor after a quiet spell gets it at once while the refresh runs in the background.
-  { pattern: /^\/api\/v1\/(categories|stats|creators\/top)$/, fresh: 60, stale: DAY },
-  { pattern: /^\/api\/v1\/(config\/public|prices\/sol)$/, fresh: 60, stale: 600 },
-  { pattern: /^\/api\/v1\/activity$/, fresh: 30, stale: 120 },
-  { pattern: /^\/api\/v1\/(featured|featuring\/config)$/, fresh: 60, stale: 300 },
+  { pattern: /^\/api\/v1\/(categories|stats|creators\/top)$/, fresh: 60, stale: DAY, shared: true },
+  { pattern: /^\/api\/v1\/(config\/public|prices\/sol)$/, fresh: 60, stale: 600, shared: true },
+  { pattern: /^\/api\/v1\/activity$/, fresh: 30, stale: 120, shared: true },
+  { pattern: /^\/api\/v1\/(featured|featuring\/config)$/, fresh: 60, stale: 300, shared: true },
+  { pattern: /^\/api\/v1\/creators\/leaderboard$/, fresh: 60, stale: 600, shared: true },
   { pattern: /^\/api\/v1\/creators\/[^/]+$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/listings$/, fresh: 30, stale: 300 },
   {
@@ -37,11 +50,12 @@ export const EDGE_RULES: Rule[] = [
 
 export function ruleFor(request: Request): Rule | null {
   if (request.method !== 'GET') return null;
-  if (request.headers.has('authorization')) return null;
-  const cookie = request.headers.get('cookie') ?? '';
-  if (/(^|;\s*)tm_session=/.test(cookie)) return null;
   const { pathname } = new URL(request.url);
-  return EDGE_RULES.find((rule) => rule.pattern.test(pathname)) ?? null;
+  const rule = EDGE_RULES.find((r) => r.pattern.test(pathname)) ?? null;
+  if (!rule) return null;
+  const cookie = request.headers.get('cookie') ?? '';
+  const authed = request.headers.has('authorization') || /(^|;\s*)tm_session=/.test(cookie);
+  return authed && !rule.shared ? null : rule;
 }
 
 function publicHeaders(rule: Rule): string {

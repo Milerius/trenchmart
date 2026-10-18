@@ -68,4 +68,18 @@ describe('$TRENCH holder tiers read from chain', () => {
     expect(rows.length).toBe(0);
     expect((await tierForWallet(deps(), wallet, config)).tier).toBe('none');
   });
+
+  it('an unchanged balance is read from chain at most every 5 minutes, not on every request', async () => {
+    let reads = 0;
+    const counting = () =>
+      ({ ...deps(), trenchBalance: async () => (reads++, 150_000n * WHOLE) }) as unknown as Deps;
+    onChain = 150_000n * WHOLE;
+    await ensureSnapshot(deps(), wallet);
+    clock = new Date(clock.getTime() + 10 * BALANCE_RECONCILE_MS);
+    for (let i = 0; i < 5; i++) await tierForWallet(counting(), wallet, config);
+    expect(reads).toBe(1);
+    clock = new Date(clock.getTime() + BALANCE_RECONCILE_MS + 1);
+    await tierForWallet(counting(), wallet, config);
+    expect(reads).toBe(2);
+  });
 });

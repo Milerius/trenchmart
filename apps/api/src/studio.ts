@@ -23,75 +23,57 @@ export async function studioOverview(deps: Deps, user: Row) {
   since.setUTCHours(0, 0, 0, 0);
   const creatorId = user.id as string;
 
-  const sales = await deps.sql<Row[]>`
+  const salesQ = deps.sql<Row[]>`
     select o.price, o.paid_at from orders o join listings l on l.id = o.listing_id
     where l.creator_id = ${creatorId} and o.status in ('paid', 'released')
       and o.paid_at >= ${since}
   `;
-  const renewals = await deps.sql<Row[]>`
+  const renewalsQ = deps.sql<Row[]>`
     select r.price, r.paid_at from update_renewals r
     join orders o on o.id = r.order_id join listings l on l.id = o.listing_id
     where l.creator_id = ${creatorId} and r.status = 'paid' and r.paid_at >= ${since}
   `;
-  const revenueDaily = Array.from({ length: OVERVIEW_DAYS }, () => 0n);
-  const salesDaily = Array.from({ length: OVERVIEW_DAYS }, () => 0);
-  let sales7d = 0;
-  for (const row of sales) {
-    const i = dayIndex(row.paid_at as Date, now);
-    if (i < 0) continue;
-    revenueDaily[i]! += row.price as bigint;
-    salesDaily[i]! += 1;
-    if (i >= OVERVIEW_DAYS - 7) sales7d += 1;
-  }
-  for (const row of renewals) {
-    const i = dayIndex(row.paid_at as Date, now);
-    if (i >= 0) revenueDaily[i]! += row.price as bigint;
-  }
-
   // Updates: paying renewers now, and buyers inside their free first month.
-  const [subs] = await deps.sql<Row[]>`
+  const subsQ = deps.sql<Row[]>`
     select
       count(distinct r.order_id) filter (where r.ends_at > ${now})::int as paying,
       coalesce(sum(l.update_price) filter (where r.ends_at > ${now}), 0)::bigint as monthly
     from update_renewals r join orders o on o.id = r.order_id join listings l on l.id = o.listing_id
     where l.creator_id = ${creatorId} and r.status = 'paid'
   `;
-  const [free] = await deps.sql<Row[]>`
+  const freeQ = deps.sql<Row[]>`
     select count(*)::int as free from orders o join listings l on l.id = o.listing_id
     where l.creator_id = ${creatorId} and o.status in ('paid', 'released')
       and o.updates_until > ${now} and not o.updates_forever
       and not exists (select 1 from update_renewals r where r.order_id = o.id and r.status = 'paid')
   `;
 
-  const ratings = await deps.sql<Row[]>`
+  const ratingsQ = deps.sql<Row[]>`
     select r.rating, count(*)::int as n from listing_reviews r join listings l on l.id = r.listing_id
     where l.creator_id = ${creatorId} and r.hidden_at is null group by r.rating
   `;
-  const distribution = [5, 4, 3, 2, 1].map(
-    (stars) => ratings.find((r) => r.rating === stars)?.n ?? 0,
-  );
 
-  const [disputes] = await deps.sql<Row[]>`
+  const disputesQ = deps.sql<Row[]>`
     select count(*) filter (where d.status = 'open')::int as open,
       count(*) filter (where d.status = 'upheld')::int as upheld
     from disputes d join orders o on o.id = d.order_id join listings l on l.id = o.listing_id
     where l.creator_id = ${creatorId}
   `;
 
-  const [payouts] = await deps.sql<Row[]>`
+  const payoutsQ = deps.sql<Row[]>`
     select
       coalesce(sum(amount) filter (where status = 'sent'), 0)::bigint as sent,
       coalesce(sum(amount) filter (where status = 'proposed'), 0)::bigint as proposed,
       coalesce(sum(amount) filter (where status = 'pending'), 0)::bigint as pending
     from payouts where recipient = ${user.wallet} and bucket = 'creator'
   `;
-  const [escrow] = await deps.sql<Row[]>`
+  const escrowQ = deps.sql<Row[]>`
     select coalesce(sum(o.price), 0)::bigint as held, min(o.escrow_until) as next_release
     from orders o join listings l on l.id = o.listing_id
     where l.creator_id = ${creatorId} and o.status = 'paid' and o.released_at is null
   `;
 
-  const listings = await deps.sql<Row[]>`
+  const listingsQ = deps.sql<Row[]>`
     select l.id, l.slug, l.title, l.category, l.price, l.update_price, l.delisted_at, l.paused_at,
       l.live_version_id, lv.semver as live_semver, lv.status as live_status,
       latest.id as latest_id, latest.semver as latest_semver, latest.status as latest_status,
@@ -115,8 +97,51 @@ export async function studioOverview(deps: Deps, user: Row) {
     order by l.created_at desc
   `;
 
-  const profile = await loadOwnProfile(deps, creatorId);
-  const stats = await creatorStats(deps, creatorId);
+  // Independent reads: run them together (they were 12 round trips in a row).
+  const [
+    sales,
+    renewals,
+    [subs],
+    [free],
+    ratings,
+    [disputes],
+    [payouts],
+    [escrow],
+    listings,
+    profile,
+    stats,
+  ] = await Promise.all([
+    salesQ,
+    renewalsQ,
+    subsQ,
+    freeQ,
+    ratingsQ,
+    disputesQ,
+    payoutsQ,
+    escrowQ,
+    listingsQ,
+    loadOwnProfile(deps, creatorId),
+    creatorStats(deps, creatorId),
+  ]);
+  const revenueDaily = Array.from({ length: OVERVIEW_DAYS }, () => 0n);
+  const salesDaily = Array.from({ length: OVERVIEW_DAYS }, () => 0);
+  let sales7d = 0;
+  for (const row of sales) {
+    const i = dayIndex(row.paid_at as Date, now);
+    if (i < 0) continue;
+    revenueDaily[i]! += row.price as bigint;
+    salesDaily[i]! += 1;
+    if (i >= OVERVIEW_DAYS - 7) sales7d += 1;
+  }
+  for (const row of renewals) {
+    const i = dayIndex(row.paid_at as Date, now);
+    if (i >= 0) revenueDaily[i]! += row.price as bigint;
+  }
+
+  const distribution = [5, 4, 3, 2, 1].map(
+    (stars) => ratings.find((r) => r.rating === stars)?.n ?? 0,
+  );
+
   const sum = (values: bigint[]) => values.reduce((a, b) => a + b, 0n);
 
   return {

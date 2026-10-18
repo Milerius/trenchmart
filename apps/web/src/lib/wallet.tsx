@@ -23,6 +23,7 @@ import {
   type DetectedWalletInfo,
 } from './wallet-catalog';
 import { commitAfterSignIn, sessionAfterVerify } from './wallet-session';
+import { clearStudioCache } from './studio-cache';
 import {
   createWalletConnectProvider,
   signWalletConnectMessage,
@@ -59,6 +60,8 @@ type Session = { id: string; wallet: string; handle: string | null; roles: strin
 
 type WalletContextValue = {
   session: Session | null;
+  /** False until the first /me answer: a null session before that means "not known yet". */
+  checked: boolean;
   busy: boolean;
   error: string;
   connect: () => Promise<void>;
@@ -116,6 +119,7 @@ function standardWallets(): WalletList {
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -193,13 +197,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setSession({ ...me.user, tier: me.tier });
     } catch (err) {
       setSession(null);
+      clearStudioCache();
       if (requireSuccess) throw err;
+    } finally {
+      setChecked(true);
     }
   }
 
   async function rollbackSignIn() {
     signerRef.current = null;
     setSession(null);
+    clearStudioCache();
     await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
   }
 
@@ -352,6 +360,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     await api('/auth/logout', { method: 'POST' });
     signerRef.current = null;
     setSession(null);
+    clearStudioCache();
   }
 
   /** The signed-in wallet's signer, reconnected silently after a reload. */
@@ -402,8 +411,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ session, busy, error, connect, logout, signAndSend, signMessage, refresh }),
-    [session, busy, error],
+    () => ({ session, checked, busy, error, connect, logout, signAndSend, signMessage, refresh }),
+    [session, checked, busy, error],
   );
 
   // Mount (and download) the picker only once it has been opened.

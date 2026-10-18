@@ -6,7 +6,8 @@ import { escrowWindowLabel } from '@trenchmart/shared/escrow';
 import { solToLamports } from '@trenchmart/shared/money';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { preload } from 'react-dom';
 import { Avatar, VerifiedBadge } from '@/components/profile';
 import {
   Button,
@@ -36,6 +37,7 @@ import {
 } from '@/lib/dashboard';
 import { monthYear, shortWallet } from '@/lib/profile-format';
 import { submitPayment } from '@/lib/studio';
+import { readStudioCache, writeStudioCache } from '@/lib/studio-cache';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
 
@@ -68,28 +70,52 @@ const TABS: { key: Bucket | 'all'; label: string }[] = [
   { key: 'draft', label: 'Drafts' },
 ];
 
+// The dashboard reads start with the HTML (same URL and credentials mode as api(), so the
+// browser hands the preloaded responses to the fetches below instead of asking again).
+const STUDIO_READS = ['/studio/requirements', '/studio/overview', '/studio/payouts'] as const;
+
+type CachedSession = { wallet: string; handle: string | null; tier: string };
+
 export default function StudioPage() {
+  for (const path of STUDIO_READS)
+    preload(`/api/v1${path}`, { as: 'fetch', crossOrigin: 'use-credentials' });
   const wallet = useWallet();
   const router = useRouter();
   const centsPerSol = useSolUsd();
   const config = usePublicConfig();
-  const [requirements, setRequirements] = useState<Requirements | null>(null);
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [payouts, setPayouts] = useState<Payouts | null>(null);
+  // Last data from this tab: shown at once on a repeat visit, refreshed in the background.
+  const [cached] = useState(() =>
+    readStudioCache<Requirements, Overview, Payouts>(wallet.session?.wallet ?? null),
+  );
+  const [requirements, setRequirements] = useState<Requirements | null>(
+    cached?.requirements ?? null,
+  );
+  const [overview, setOverview] = useState<Overview | null>(cached?.overview ?? null);
+  const [payouts, setPayouts] = useState<Payouts | null>(cached?.payouts ?? null);
   const [loadError, setLoadError] = useState('');
   const [bond, setBond] = useState('1');
   const [message, setMessage] = useState('');
   const [tab, setTab] = useState<Bucket | 'all'>('all');
+  const inflight = useRef(false);
+  const sessionWallet = wallet.session?.wallet ?? null;
+  const sessionRef = useRef(sessionWallet);
+  sessionRef.current = sessionWallet;
 
   async function load() {
-    const [req, view, pay] = await Promise.all([
-      api<Requirements>('/studio/requirements'),
-      api<Overview>('/studio/overview'),
-      api<Payouts>('/studio/payouts'),
-    ]);
-    setRequirements(req);
-    setOverview(view);
-    setPayouts(pay);
+    inflight.current = true;
+    try {
+      const [req, view, pay] = await Promise.all([
+        api<Requirements>('/studio/requirements'),
+        api<Overview>('/studio/overview'),
+        api<Payouts>('/studio/payouts'),
+      ]);
+      setRequirements(req);
+      setOverview(view);
+      setPayouts(pay);
+      writeStudioCache(view.creator.wallet, { requirements: req, overview: view, payouts: pay });
+    } finally {
+      inflight.current = false;
+    }
   }
 
   function reload() {
@@ -97,9 +123,26 @@ export default function StudioPage() {
     void load().catch((err: Error) => setLoadError(err.message));
   }
 
+  // Start the reads on mount, in parallel with the session check (the cookie decides who is
+  // asking), instead of waiting for /me first. Signed out, they are 401s and are ignored.
   useEffect(() => {
-    if (wallet.session) reload();
-  }, [wallet.session]);
+    void load().catch((err: Error) => {
+      if (sessionRef.current) setLoadError(err.message);
+    });
+  }, []);
+
+  // Once the session is known: keep data that belongs to it, otherwise (another wallet, or
+  // the early read failed) read again.
+  useEffect(() => {
+    if (!sessionWallet || inflight.current) return;
+    if (overview?.creator.wallet === sessionWallet) return;
+    if (overview) {
+      setOverview(null);
+      setRequirements(null);
+      setPayouts(null);
+    }
+    reload();
+  }, [sessionWallet, overview]);
 
   // X linking lives on the profile now; older X callbacks still land here, so forward them.
   useEffect(() => {
@@ -124,7 +167,18 @@ export default function StudioPage() {
     await load();
   }
 
-  if (!wallet.session) {
+  // Session not known yet: render the studio straight away (from this tab's last data, or
+  // skeletons) rather than a "Connect wallet" screen that flips a moment later.
+  const pendingSession: CachedSession | null =
+    !wallet.session && !wallet.checked
+      ? {
+          wallet: overview?.creator.wallet ?? '',
+          handle: overview?.creator.handle ?? null,
+          tier: '',
+        }
+      : null;
+
+  if (!wallet.session && !pendingSession) {
     return (
       <section className="mx-auto max-w-lg py-10 text-center">
         <h1 className="text-[28px] font-semibold tracking-[-0.025em]">Creator studio</h1>
@@ -139,7 +193,7 @@ export default function StudioPage() {
     );
   }
 
-  const session = wallet.session;
+  const session = wallet.session ?? pendingSession!;
   const creator = overview?.creator;
   const listings = overview?.listings ?? null;
   const escrowLabel = escrowWindowLabel(config?.escrowHours ?? DEFAULT_ESCROW_HOURS);
