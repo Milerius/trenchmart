@@ -56,6 +56,8 @@ export async function runChecks(env: WatchdogEnv, f: typeof fetch = fetch): Prom
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
       });
+      // Shared public endpoints rate-limit Cloudflare's egress IPs: 429 means reachable.
+      if (res.status === 429) return null;
       const body = (await res.json().catch(() => ({}))) as { result?: string };
       return body.result === 'ok'
         ? null

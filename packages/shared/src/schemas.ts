@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CATEGORY_CODES } from './config';
 import { canonicalTerminals } from './terminals';
+import { categoryForKind, LISTING_KIND_CODES, parseSpecs } from './listing-kinds';
 
 export const walletSchema = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'invalid wallet');
 
@@ -26,29 +27,57 @@ export const disputeBody = z.object({
   details: z.string().min(10).max(5000),
 });
 
-export const listingBody = z.object({
-  title: z.string().min(3).max(120),
-  summary: z.string().min(3).max(280),
-  description: z.string().min(1).max(20_000),
-  category: z.enum(CATEGORY_CODES),
-  terminals: z
-    .array(z.string().min(1).max(40))
-    .max(12)
-    .default([])
-    .transform((names) => canonicalTerminals(names)),
-  priceLamports: z.string().regex(/^\d+$/),
-  license: z.enum(['single', 'multi3', 'subscription']).default('single'),
-  subPeriodDays: z.number().int().positive().max(3650).optional(),
-  holderOnlyHours: z
-    .number()
-    .int()
-    .min(0)
-    .max(24 * 14)
-    .default(0),
-  holderOnly: z.boolean().default(false),
-  /** Monthly price for updates after the free month. 0 means free updates forever. */
-  updatePriceLamports: z.string().regex(/^\d+$/).max(20).optional(),
-});
+export const listingBody = z
+  .object({
+    title: z.string().min(3).max(120),
+    summary: z.string().min(3).max(280),
+    description: z.string().min(1).max(20_000),
+    category: z.enum(CATEGORY_CODES),
+    terminals: z
+      .array(z.string().min(1).max(40))
+      .max(12)
+      .default([])
+      .transform((names) => canonicalTerminals(names)),
+    priceLamports: z.string().regex(/^\d+$/),
+    license: z.enum(['single', 'multi3', 'subscription']).default('single'),
+    subPeriodDays: z.number().int().positive().max(3650).optional(),
+    holderOnlyHours: z
+      .number()
+      .int()
+      .min(0)
+      .max(24 * 14)
+      .default(0),
+    holderOnly: z.boolean().default(false),
+    /** Monthly price for updates after the free month. 0 means free updates forever. */
+    updatePriceLamports: z.string().regex(/^\d+$/).max(20).optional(),
+    /** Wizard step 1. With a kind, specs are required and validated for it. */
+    kind: z.enum(LISTING_KIND_CODES).optional(),
+    specs: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (!body.kind) {
+      if (body.specs)
+        ctx.addIssue({ code: 'custom', path: ['specs'], message: 'specs need a kind' });
+      return;
+    }
+    if (categoryForKind(body.kind) !== body.category)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['category'],
+        message: `a ${body.kind} lists under ${categoryForKind(body.kind)}`,
+      });
+    const parsed = parseSpecs(body.kind, body.specs ?? {});
+    if (!parsed.ok) ctx.addIssue({ code: 'custom', path: ['specs'], message: parsed.error });
+  })
+  .transform((body) =>
+    body.kind
+      ? {
+          ...body,
+          specs: (parseSpecs(body.kind, body.specs ?? {}) as { specs: Record<string, unknown> })
+            .specs,
+        }
+      : body,
+  );
 
 // Explicit, without the create defaults: a partial of listingBody would fill holderOnly=false
 // and holderOnlyHours=0 into every PATCH and silently reset them.
