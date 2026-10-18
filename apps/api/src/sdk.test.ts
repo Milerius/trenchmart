@@ -293,7 +293,6 @@ describe('SDK against the API', () => {
         specs: {
           chain: 'solana',
           formats: ['csv'],
-          walletCount: 120,
           cadence: 'weekly',
           columns: [],
         },
@@ -313,7 +312,6 @@ describe('SDK against the API', () => {
           specs: {
             chain: 'solana',
             formats: ['csv'],
-            walletCount: 120,
             cadence: 'weekly',
             columns: [],
           },

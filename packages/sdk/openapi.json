@@ -5283,11 +5283,6 @@
               ]
             }
           },
-          "walletCount": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100000
-          },
           "cadence": {
             "type": "string",
             "enum": [
@@ -5319,12 +5314,11 @@
         "required": [
           "chain",
           "formats",
-          "walletCount",
           "cadence",
           "columns"
         ],
         "additionalProperties": false,
-        "description": "Wallet tracker list: lists under category wallet_list. Files: .csv · .json."
+        "description": "Wallet tracker list: lists under category wallet_list. Files: .txt · .json · .csv."
       },
       "ListingSpecs_filter": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
