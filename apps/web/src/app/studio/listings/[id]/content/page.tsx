@@ -15,7 +15,7 @@ import { Button, ButtonLink, Label, Money, Panel, Square, StatusTag, Tag } from 
 import { solToLamports } from '@trenchmart/shared/money';
 import { solExact } from '@/lib/money';
 import type { ContentField } from '@/lib/listing-templates';
-import { toWebp } from '@/lib/webp';
+import { toWebp, uploadCopies } from '@/lib/webp';
 import { api, ApiError } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 
@@ -123,6 +123,8 @@ export default function ContentEditorPage() {
         });
         setImages((list) => list.map((image) => (image.id === temp ? saved : image)));
         setCover((value) => value ?? saved.id);
+        // Phone and card sized copies, made here because the API cannot re-encode.
+        void uploadCopies(api, params.id, saved.id, upload);
       } catch (err) {
         setImages((list) => list.filter((image) => image.id !== temp));
         setMessage(err instanceof Error ? err.message : 'upload failed');

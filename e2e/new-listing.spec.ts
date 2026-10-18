@@ -462,6 +462,21 @@ test('large PNG covers are converted to WebP (max 1600 px) in the browser before
     expect(head.startsWith('RIFF') && head.endsWith('WEBP')).toBe(true);
     await route.fulfill({ json: { id: '00000009-aaaa-4bbb-8ccc-dddddddddddd' } });
   });
+  // Then the phone/card/high-DPI copies, made in the browser (the API cannot re-encode).
+  const copies: { width: string; type: string; size: number; head: string }[] = [];
+  await page.route(
+    '**/api/v1/studio/listings/new-listing-1/images/00000009-aaaa-4bbb-8ccc-dddddddddddd/w/*',
+    async (route) => {
+      const body = route.request().postDataBuffer();
+      copies.push({
+        width: route.request().url().split('/').pop()!,
+        type: route.request().headers()['content-type'] ?? '',
+        size: body?.length ?? 0,
+        head: body?.subarray(0, 12).toString('latin1') ?? '',
+      });
+      await route.fulfill({ json: { stored: true } });
+    },
+  );
   await pickScript(page);
   await fillDetails(page);
   const dataUrl = await page.evaluate(() => {
@@ -494,4 +509,13 @@ test('large PNG covers are converted to WebP (max 1600 px) in the browser before
   await expect.poll(() => uploads.length).toBe(1);
   expect(uploads[0]!.type).toBe('image/webp');
   expect(uploads[0]!.size).toBeLessThan(big.length);
+  // Each width narrower than the upload, skipping any copy that would not be smaller (this
+  // noisy test art barely compresses; a real photo gets all three).
+  await expect.poll(() => copies[0]?.width).toBe('480');
+  expect(copies.map((c) => c.width).every((w) => ['480', '960', '1200'].includes(w))).toBe(true);
+  for (const copy of copies) {
+    expect(copy.type).toBe('image/webp');
+    expect(copy.head.startsWith('RIFF') && copy.head.endsWith('WEBP')).toBe(true);
+    expect(copy.size).toBeLessThan(uploads[0]!.size);
+  }
 });

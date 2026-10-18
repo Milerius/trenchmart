@@ -5,7 +5,9 @@ const URL = '/api/v1/media/a3f1c2d4-1111-4222-8333-444455556666';
 
 describe('responsive listing images', () => {
   it('offers phone, tablet and full widths for listing media', () => {
-    expect(mediaSrcSet(URL)).toBe(`${URL}?w=480 480w, ${URL}?w=960 960w, ${URL} 1600w`);
+    expect(mediaSrcSet(URL)).toBe(
+      `${URL}?w=480 480w, ${URL}?w=960 960w, ${URL}?w=1200 1200w, ${URL} 1600w`,
+    );
     expect(mediaThumb(URL)).toBe(`${URL}?w=480`);
   });
   it('leaves other images alone', () => {

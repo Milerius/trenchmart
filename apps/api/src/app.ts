@@ -63,6 +63,8 @@ import {
   saveDraft,
   studioContent,
   uploadImage,
+  uploadImageVariant,
+  VARIANT_MAX_BYTES,
   optimizeStoredImages,
 } from './content';
 import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
@@ -1243,6 +1245,24 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     // Chunked uploads carry no content-length, so the limit is enforced while reading too.
     const bytes = await readCapped(c.req.raw.body, IMAGE_MAX_BYTES);
     return c.json(await uploadImage(deps, listing.id as string, user.id as string, bytes));
+  });
+
+  // Browser-made narrower copies of an uploaded image (content.ts uploadImageVariant).
+  api.put('/studio/listings/:id/images/:imageId/w/:width', async (c) => {
+    const user = requireUser(c);
+    const listing = await ownListingParam(deps, c.req.param('id'), user.id as string);
+    const imageId = c.req.param('imageId');
+    if (!isUuid(imageId)) throw new HttpError(404, 'NOT_FOUND', 'image not found');
+    const bytes = await readCapped(c.req.raw.body, VARIANT_MAX_BYTES);
+    return c.json(
+      await uploadImageVariant(
+        deps,
+        listing.id as string,
+        imageId,
+        Number(c.req.param('width')),
+        bytes,
+      ),
+    );
   });
 
   api.delete('/studio/listings/:id/images/:imageId', async (c) => {

@@ -43,7 +43,7 @@ import { templateFor } from '@/lib/listing-templates';
 import { solExact, solText } from '@/lib/money';
 import { payVerificationFee, type UnsignedTx } from '@/lib/studio';
 import { useWallet } from '@/lib/wallet';
-import { toWebp } from '@/lib/webp';
+import { toWebp, uploadCopies } from '@/lib/webp';
 import {
   bytesLabel,
   draftKey,
@@ -235,6 +235,7 @@ export default function NewListingPage() {
       });
       ids.set(image.id, saved.id);
       gallery.push({ imageId: saved.id, alt: image.alt });
+      await uploadCopies(api, listingId, saved.id, upload);
     }
     const swap = (value: string) =>
       [...ids].reduce(
