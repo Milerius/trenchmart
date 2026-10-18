@@ -50,6 +50,8 @@ export type Env = {
   escrowCrankSecret: string;
   /** Kill switch: when true, POST /orders returns 503 (mainnet readiness #18). */
   checkoutPaused: boolean;
+  /** Shared secret the web proxy sends with the real client IP (M-03). */
+  proxySecret: string;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
 
@@ -181,6 +183,7 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     escrowProgramVersion: source.ESCROW_PROGRAM_VERSION === '2' ? 2 : 1,
     escrowCrankSecret: blank(source.ESCROW_CRANK_SECRET),
     checkoutPaused: /^(1|true|yes)$/i.test(source.CHECKOUT_PAUSED ?? ''),
+    proxySecret: blank(source.PROXY_SECRET),
     r2:
       accountId && accessKeyId && secretAccessKey
         ? {

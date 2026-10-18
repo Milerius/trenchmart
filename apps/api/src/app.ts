@@ -86,6 +86,7 @@ import {
   disputeTx,
   proposePayouts,
   quoteListing,
+  recordChainBalance,
   releaseOrders,
   resolveDispute,
   reviewVersion,
@@ -156,6 +157,16 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     console.error(err);
     return c.json({ error: { code: 'INTERNAL', message: 'Internal error' } }, 500);
   });
+  // Security headers on every API response (mainnet readiness #11).
+  app.use('*', async (c, next) => {
+    await next();
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    // Served files carry their own stricter policy (default-src 'none'; sandbox).
+    if (!c.res.headers.get('content-security-policy'))
+      c.header('Content-Security-Policy', "frame-ancestors 'none'");
+    c.header('Referrer-Policy', 'no-referrer');
+  });
   app.use(
     '*',
     cors({
@@ -184,10 +195,18 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const path = c.req.path;
     const write = c.req.method !== 'GET' && c.req.method !== 'OPTIONS' && !path.endsWith('/health');
     if (write) {
+      // M-03: keyed on the edge-provided client IP, never on X-Forwarded-For.
+      const ip = clientIp(c, deps.env);
+      const key = `${ip}:${c.req.method}`;
+      if (deps.rateLimiter) {
+        const { success } = await deps.rateLimiter.limit({ key });
+        if (!success)
+          return c.json({ error: { code: 'RATE_LIMIT', message: 'too many requests' } }, 429);
+        await next();
+        return;
+      }
       const now = deps.now();
       const windowStart = new Date(Math.floor(now.getTime() / 60_000) * 60_000);
-      const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
-      const key = `${ip}:${c.req.method}`;
       const hits = await deps.sql<{ hits: number }[]>`
         insert into rate_buckets (key, window_start, hits) values (${key}, ${windowStart}, 1)
         on conflict (key, window_start) do update set hits = rate_buckets.hits + 1
@@ -590,7 +609,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const exp = Math.floor(deps.now().getTime() / 1000) + 300;
     await deps.sql`
       insert into downloads (order_id, version_id, ip_hash)
-      values (${order.id}, ${version.id}, ${ipHash(c.req.header('x-forwarded-for') || 'local', deps.env.sessionSecret)})
+      values (${order.id}, ${version.id}, ${ipHash(clientIp(c, deps.env), deps.env.sessionSecret)})
     `;
     return c.json({
       url: deps.blob.signedGet(key, exp),
@@ -1120,8 +1139,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   api.post('/hooks/helius', async (c) => {
-    const header = c.req.header('authorization') ?? '';
-    if (header !== deps.env.webhookSecret && header !== `Bearer ${deps.env.webhookSecret}`) {
+    const header = (c.req.header('authorization') ?? '').replace(/^Bearer\s+/i, '');
+    if (!safeEqual(header, deps.env.webhookSecret)) {
       throw new HttpError(401, 'UNAUTHORIZED', 'webhook secret required');
     }
     const payload = await c.req.json();
@@ -1136,28 +1155,27 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         results.push({ signature, duplicate: true });
         continue;
       }
+      // I-06: the body only tells us which wallets to look at. Amounts come from chain.
       if (Array.isArray(event.tokenBalances)) {
-        for (const row of event.tokenBalances as {
-          wallet?: string;
-          amount?: string;
-          mint?: string;
-        }[]) {
-          if (!row.wallet || row.amount === undefined) continue;
+        const wallets = new Set<string>();
+        for (const row of event.tokenBalances as { wallet?: unknown; mint?: unknown }[]) {
+          if (typeof row.wallet !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(row.wallet))
+            continue;
           if (deps.env.trenchMint && row.mint && row.mint !== deps.env.trenchMint) continue;
-          await deps.sql`
-            insert into token_balances (wallet, amount, ts, source, tx_sig)
-            values (${row.wallet}, ${row.amount}, ${deps.now()}, 'webhook', ${signature})
-          `;
+          wallets.add(row.wallet);
         }
+        for (const wallet of [...wallets].slice(0, 20))
+          await recordChainBalance(deps, wallet, signature);
       }
-      const pending = await deps.sql<{ id: string; memo: string }[]>`
-        select id, memo from orders where status = 'pending'
-        union all
-        select id, '' as memo from bonds where false
-      `;
+      // The memo is read from the confirmed transaction only, and must match exactly.
       const tx = await deps.getTx(signature);
-      const memo = tx?.memos[0] ?? String(event.memo ?? '');
-      const order = pending.find((row) => row.memo && memo.includes(row.memo));
+      const memo = tx?.memos[0] ?? '';
+      const pending = memo
+        ? await deps.sql<{ id: string }[]>`
+            select id from orders where status = 'pending' and memo = ${memo} limit 1
+          `
+        : [];
+      const order = pending[0];
       if (order) {
         const result = await applyPayment(deps, {
           kind: 'order',
@@ -1212,6 +1230,18 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json({ ok: true });
   });
 
+  // Ops check for M-03: which client IP the API derives for this request (internal only).
+  api.get('/internal/whoami', (c) => {
+    assertInternal(c, deps.env);
+    return c.json({
+      ip: clientIp(c, deps.env),
+      viaProxy: Boolean(
+        deps.env.proxySecret && safeEqual(c.req.header('x-tm-proxy') ?? '', deps.env.proxySecret),
+      ),
+      cfConnectingIp: c.req.header('cf-connecting-ip') ?? null,
+    });
+  });
+
   api.post('/internal/cron/:job', async (c) => {
     assertInternal(c, deps.env);
     const job = c.req.param('job');
@@ -1233,8 +1263,34 @@ function assertInternal(
 ): void {
   const header = c.req.header('authorization') ?? '';
   const token = header.replace(/^Bearer\s+/i, '');
-  if (token !== env.internalToken)
+  if (!safeEqual(token, env.internalToken))
     throw new HttpError(401, 'UNAUTHORIZED', 'internal token required');
+}
+
+/**
+ * M-03: the client IP for rate limiting and download logs. Cloudflare sets
+ * `CF-Connecting-IP` and clients cannot override it. Requests proxied by the web Worker
+ * arrive from Cloudflare's own address, so the web middleware forwards the browser's IP in
+ * `x-tm-client-ip`, trusted only with the shared `x-tm-proxy` secret.
+ */
+export function clientIp(
+  c: { req: { header: (name: string) => string | undefined } },
+  env: Env,
+): string {
+  const proxied = c.req.header('x-tm-client-ip');
+  if (proxied && env.proxySecret && safeEqual(c.req.header('x-tm-proxy') ?? '', env.proxySecret))
+    return proxied.trim();
+  return c.req.header('cf-connecting-ip')?.trim() || 'local';
+}
+
+/** Constant-time string comparison for shared secrets (I-06). */
+export function safeEqual(a: string, b: string): boolean {
+  const left = new TextEncoder().encode(a);
+  const right = new TextEncoder().encode(b);
+  if (!b || left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i += 1) diff |= left[i]! ^ right[i]!;
+  return diff === 0;
 }
 
 function publicUser(user: Record<string, any>) {
