@@ -164,9 +164,12 @@ export const OutroScene: React.FC<{ dur: number; tagline: Word[]; note?: string 
             style={{
               marginTop: tall ? 30 : 22,
               fontFamily: MONO,
-              fontSize: tall ? 22 : 18,
-              letterSpacing: '0.08em',
-              color: C.faint,
+              fontSize: tall ? 24 : 21,
+              letterSpacing: '0.06em',
+              color: C.muted,
+              textAlign: 'center',
+              maxWidth: tall ? 900 : 1400,
+              lineHeight: 1.5,
               opacity: ease(frame, 80, 94),
               textTransform: 'uppercase',
             }}
