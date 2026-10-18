@@ -13,6 +13,7 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "db:migrate": "pnpm --filter @trenchmart/db migrate",
+    "db:pending": "pnpm --filter @trenchmart/db pending",
     "db:seed": "pnpm --filter @trenchmart/db seed",
     "format": "prettier --write .",
     "verify:escrow": "tsx scripts/verify-escrow.ts",

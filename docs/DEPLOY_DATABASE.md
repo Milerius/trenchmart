@@ -35,3 +35,24 @@ The Worker opens one postgres.js client per `fetch` or `scheduled` invocation an
 ## Row level security
 
 Supabase serves the `public` schema over PostgREST, so the anon key could read and write any table that has RLS turned off. The API connects as the table owner, which bypasses RLS. `migrate()` therefore ends by enabling RLS, with no policies, on every `public` table that lacks it. Tables added by later migrations get covered the next time `pnpm db:migrate` runs. Only add a policy if the browser really needs direct Supabase access, and none does today.
+
+## Migrations before every API deploy
+
+Deploy the API with `scripts/deploy-api.sh` (default config `apps/api/wrangler.deploy.toml`). It
+runs `pnpm db:migrate`, then `pnpm db:pending` as a hard gate, then `wrangler deploy`, then checks
+`/api/v1/health`. On 2026-10-18 the Worker for #54/#57 was deployed without `0020_reviews.sql`
+and `0021_upvotes_ranking.sql`, and `/studio` answered 500 for every creator.
+
+- `pnpm db:pending` lists repo migrations missing from `schema_migrations` and exits 1 if any.
+  With `DATABASE_URL` it connects directly; without it, `SUPABASE_ACCESS_TOKEN` +
+  `SUPABASE_PROJECT_REF` go through the Supabase Management API (one query per file, file and
+  its `schema_migrations` row together).
+- The Worker carries the list (`MIGRATIONS` in `packages/db/src/migrations-list.ts`, checked
+  against the directory in CI). `/api/v1/health` answers `503 SCHEMA_BEHIND` and the ops check
+  raises `SCHEMA_BEHIND` while production is behind; a query on a missing column answers
+  `503 SCHEMA_BEHIND` instead of a bare 500.
+- CI job `migrations applied live` runs `pnpm db:pending` against production after every merge
+  to main.
+- Every migration has its own 4-digit number (CI test). A file renamed after it was applied goes
+  in `RENAMED_MIGRATIONS`; `migrate()` rewrites the old `schema_migrations` row instead of
+  running the file again (`0011_profiles.sql` became `0013_profiles.sql`).

@@ -84,7 +84,7 @@ jobs:
           node-version: 26.12.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @trenchmart/api exec vitest run src/product.test.ts src/social.test.ts src/x-oauth.test.ts
+      - run: pnpm --filter @trenchmart/api exec vitest run src/product.test.ts src/social.test.ts src/x-oauth.test.ts src/studio.test.ts
 
   e2e:
     name: e2e
@@ -140,6 +140,31 @@ jobs:
           name: x-oauth-flow
           path: test-results/
           retention-days: 7
+
+  # Release vs production schema: after a merge to main, fail if main has migrations that
+  # production has not applied (the 2026-10-18 /studio outage). Deploy with
+  # scripts/deploy-api.sh, which migrates first. Read-only; skips without TM_DATABASE_URL.
+  migrations-live:
+    name: migrations applied live
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm db:pending (production)
+        env:
+          DATABASE_URL: ${{ secrets.TM_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "TM_DATABASE_URL secret missing; skip." >&2
+            exit 0
+          fi
+          pnpm db:pending
 
   audit:
     name: audit

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/cli.ts migrate",
     "seed": "tsx src/cli.ts seed",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "pending": "tsx src/cli.ts pending"
   },
   "dependencies": {
     "@trenchmart/ai-verifier": "workspace:*",

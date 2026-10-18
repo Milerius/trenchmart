@@ -5,6 +5,7 @@
 // Telegram/webhook) are disabled: the owner's assistant polls every 10 min and relays in chat.
 import bs58 from 'bs58';
 import { parseSecretKey, publicKeyOf } from '@trenchmart/chain';
+import { pendingMigrations } from '@trenchmart/db';
 import type { Deps } from './logic';
 import { resolverOf } from './escrow';
 
@@ -14,6 +15,7 @@ export type OpsAlert = { level: OpsLevel; code: string; message: string };
 /** Every alert code with its runbook anchor in docs/ops/monitoring.md. */
 export const ALERT_CODES = [
   'DB_ERROR',
+  'SCHEMA_BEHIND',
   'R2_ERROR',
   'RPC_DOWN',
   'WEB_DOWN',
@@ -188,6 +190,14 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
 
   // Database-backed business and safety checks. A failing query is itself an alert.
   try {
+    // A release deployed ahead of its migrations 500s on every query that needs them.
+    const pending = await pendingMigrations(deps.sql);
+    if (pending.length > 0)
+      add(
+        'critical',
+        'SCHEMA_BEHIND',
+        `database is missing migration(s) ${pending.join(', ')}; run pnpm db:migrate against production`,
+      );
     const since = new Date(now.getTime() - t.errorWindowMs);
     const [stuck] = await deps.sql<{ n: number }[]>`
       select count(*)::int as n from orders o
