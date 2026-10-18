@@ -47,7 +47,7 @@ describe('migrations', () => {
   it('remote: pending is what the database lacks, counting a renamed file under its old id', async () => {
     const live = MIGRATIONS.filter((id) => !id.startsWith('002') && id !== '0013_profiles.sql');
     const { query } = fakeQuery([...live, '0011_profiles.sql']);
-    expect(await pendingRemote(query)).toEqual(['0020_reviews.sql', '0021_upvotes_ranking.sql']);
+    expect(await pendingRemote(query)).toEqual(MIGRATIONS.filter((id) => id.startsWith('002')));
   });
 
   it('remote: migrate runs each pending file with its schema_migrations row in one query', async () => {
@@ -56,7 +56,7 @@ describe('migrations', () => {
     const { query, seen } = fakeQuery(applied);
     // 0011_profiles.sql is carried over to 0013_profiles.sql, not run again.
     const ran = await migrateRemote(query);
-    expect(ran).toEqual(['0020_reviews.sql', '0021_upvotes_ranking.sql']);
+    expect(ran).toEqual(MIGRATIONS.filter((id) => id.startsWith('002')));
     expect(applied).toContain('0013_profiles.sql');
     expect(applied).not.toContain('0011_profiles.sql');
     expect(
