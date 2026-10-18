@@ -362,6 +362,10 @@ test.describe('phase 6: home', () => {
   test('desktop loads the hero aurora, CTA rays and glow receipt after idle; names hold', async ({
     page,
   }) => {
+    // Automated browsers get the static fallbacks unless they opt in (lib/fx.ts).
+    await page.addInitScript(() => {
+      (window as Window & { __TM_FX__?: boolean }).__TM_FX__ = true;
+    });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
     await expect(page.locator('[data-fx="aurora"] canvas')).toBeAttached({ timeout: 15_000 });
@@ -380,6 +384,10 @@ test.describe('phase 6: home', () => {
 
   for (const mode of ['phone', 'reduced motion'] as const) {
     test(`${mode}: no effect chunks or canvases, static fallbacks render`, async ({ page }) => {
+      // Opt in like a real browser, so only the phone / reduced-motion gate keeps effects off.
+      await page.addInitScript(() => {
+        (window as Window & { __TM_FX__?: boolean }).__TM_FX__ = true;
+      });
       if (mode === 'phone') await page.setViewportSize({ width: 390, height: 844 });
       else {
         await page.setViewportSize({ width: 1440, height: 900 });

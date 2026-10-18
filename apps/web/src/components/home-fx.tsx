@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { TERMINALS } from '@trenchmart/shared/terminals';
 import { TerminalMark } from '@/components/terminal-logo';
 import { useFxModule } from '@/lib/fx';
@@ -119,12 +119,29 @@ export function TerminalBand() {
   );
 }
 
-/** A stat that renders its final value at once; desktop rolls it up once the chunk is in. */
+/**
+ * A stat that renders its final value at once. On desktop it rolls up with React Bits CountUp, but
+ * only from the moment it scrolls into view, so it never shows 0 while off screen.
+ */
 export function StatCount({ value }: { value: number }) {
   const CountUp = useFxModule(loadCountUp);
+  const ref = useRef<HTMLSpanElement>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!CountUp || seen || !el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) {
+        setSeen(true);
+        observer.disconnect();
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [CountUp, seen]);
   return (
-    <span data-testid="count-up" data-value={value}>
-      {CountUp ? (
+    <span ref={ref} data-testid="count-up" data-value={value}>
+      {CountUp && seen ? (
         <CountUp to={value} separator="," duration={1.6} />
       ) : (
         value.toLocaleString('en-US')

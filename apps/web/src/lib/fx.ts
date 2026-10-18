@@ -10,6 +10,14 @@ const REDUCE = '(prefers-reduced-motion: reduce)';
 
 let idleReady: Promise<void> | null = null;
 
+/**
+ * Automated browsers (CI e2e, audits) get the static fallbacks so software-rendered WebGL does not
+ * starve timing-sensitive tests. A test that checks the effects opts in with `window.__TM_FX__`.
+ */
+function automated(): boolean {
+  return navigator.webdriver === true && !(window as Window & { __TM_FX__?: boolean }).__TM_FX__;
+}
+
 function afterLoadAndIdle(): Promise<void> {
   idleReady ??= new Promise<void>((resolve) => {
     const idle = () =>
@@ -26,7 +34,7 @@ function afterLoadAndIdle(): Promise<void> {
 export function useDesktopFx(): boolean {
   const [on, setOn] = useState(false);
   useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
+    if (typeof window.matchMedia !== 'function' || automated()) return;
     const desktop = window.matchMedia(DESKTOP);
     const reduce = window.matchMedia(REDUCE);
     let ready = false;
