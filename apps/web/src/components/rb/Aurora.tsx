@@ -549,7 +549,8 @@ const Aurora = ({
       gl.deleteProgram(program.program);
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vao);
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      // TrenchMart: no WEBGL_lose_context here. React reuses this canvas on remount (StrictMode),
+      // and a force-lost context would leave the aurora blank.
     };
   }, []);
 

@@ -11,7 +11,8 @@ They are used only as part of the TrenchMart website. We do not sell, sublicense
 Small changes from upstream, all kept within the licence:
 
 - type-safety fixes for this repo's strict TypeScript settings (for example `noUncheckedIndexedAccess`);
-- Prettier formatting.
+- Prettier formatting;
+- Aurora: the effect cleanup no longer force-loses the WebGL context (the canvas is reused on remount).
 
 Full licence text, as published upstream:
 

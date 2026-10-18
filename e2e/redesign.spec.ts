@@ -401,6 +401,8 @@ test.describe('phase 6: home', () => {
   }
 
   test('home follows the prototype section order', async ({ page }) => {
+    // Static fallbacks only: the desktop SplitText adds an sr-only copy that changes textContent.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     const order = await page.evaluate(() =>
       [...document.querySelectorAll('main h1, main h2, [data-testid="terminal-band"]')].map((el) =>
