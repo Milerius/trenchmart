@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectTerminalLogo } from './terminal-logo-helpers';
 
 // New-listing wizard: type picker, type-specific step, details with the template editor,
 // media, pricing (real median only), file pre-check, review and submit. The CI e2e job runs
@@ -183,6 +184,13 @@ test("terminal cards show each terminal's own logo, served locally", async ({ pa
   }
   await expect(terms.locator('img')).toHaveCount(5);
   await expect(page.getByText('TrenchMart is not affiliated with these terminals')).toBeVisible();
+  // The live card preview in the studio shows the picked terminals with their logos too.
+  await terms.getByRole('button', { name: /Photon/ }).click();
+  await terms.getByRole('button', { name: /Trojan/ }).click();
+  const previewLine = page.getByTestId('card-preview').getByTestId('card-terminals');
+  await expect(previewLine).toHaveText('Photon · Trojan');
+  await expectTerminalLogo(previewLine, 'Photon', 14);
+  await expectTerminalLogo(previewLine, 'Trojan', 14);
   // The asset itself is served by the app (not hotlinked).
   const res = await page.request.get('/terminals/axiom.svg');
   expect(res.ok()).toBe(true);

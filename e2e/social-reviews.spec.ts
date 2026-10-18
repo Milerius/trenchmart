@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
+import { expectTerminalLogo } from './terminal-logo-helpers';
 
 // Verified-buyer reviews: the listing Reviews tab, helpful votes, creator replies, and the
 // sign-to-post dialog on Purchases. The CI e2e job runs without the API, so /api/v1 is stubbed.
@@ -275,6 +276,23 @@ test('listing reviews: summary, verified buyers, creator reply, filters and weig
   await expect.poll(() => calls.some((c) => c.search.includes('sort=newest'))).toBe(true);
 });
 
+test('listing page: terminal badges and "used on" tags carry the terminal logos', async ({
+  page,
+}) => {
+  await stub(page, 'anon');
+  await page.goto(`/l/${SLUG}`);
+  const badges = page.getByTestId('listing-terminals');
+  await expect(badges).toHaveText('Axiom · GMGN');
+  await expectTerminalLogo(badges, 'Axiom', 16);
+  await expectTerminalLogo(badges, 'GMGN', 16);
+  await page.getByRole('tab', { name: /Reviews/ }).click();
+  const first = page.getByTestId('review').nth(0);
+  await expect(first).toContainText('used on Axiom');
+  await expectTerminalLogo(first, 'Axiom', 14);
+  // No terminal on the second review, so no logo.
+  await expect(page.getByTestId('review').nth(1).locator('img[data-terminal-logo]')).toHaveCount(0);
+});
+
 test('listing reviews: an honest empty state, never sample reviews', async ({ page }) => {
   await stub(page, 'anon', { empty: true });
   await page.goto(`/l/${SLUG}`);
@@ -315,6 +333,8 @@ test('purchases: sign and post a review of a released order (free, no transactio
   const text =
     'Caught two bundled launches on day one. Hover shows the funding wallet, which is the part I use.';
   await dialog.getByTestId('review-text').fill(text);
+  await expectTerminalLogo(dialog.getByRole('button', { name: /Axiom/ }), 'Axiom', 16);
+  await expectTerminalLogo(dialog.getByRole('button', { name: /GMGN/ }), 'GMGN', 16);
   await dialog.getByRole('button', { name: /Axiom/ }).click();
   await dialog.getByTestId('post-review').click();
   await expect(page.getByTestId('toast')).toContainText('Review posted');

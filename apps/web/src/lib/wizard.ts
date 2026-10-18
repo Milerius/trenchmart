@@ -6,6 +6,7 @@ import {
   type ListingKind,
   type ListingSpecs,
 } from '@trenchmart/shared';
+import { TERMINAL_LOGOS } from './terminal-logos';
 import { templateFor, type ContentField } from './listing-templates';
 
 /** The seven wizard steps. Step 2's title depends on the kind. */
@@ -20,13 +21,13 @@ export const STEPS = [
 ] as const;
 export const STEP_COUNT = STEPS.length;
 
-/** Each terminal's own logo, taken from its site's favicon and served from /public (never hotlinked). */
+/** Each terminal's own logo comes from TERMINAL_LOGOS (bundled under /public, never hotlinked). */
 export const TERMINAL_TILES = [
-  { name: 'Axiom', host: 'axiom.trade', logo: '/terminals/axiom.svg' },
-  { name: 'GMGN', host: 'gmgn.ai', logo: '/terminals/gmgn.png' },
-  { name: 'Photon', host: 'photon-sol.tinyastro.io', logo: '/terminals/photon.png' },
-  { name: 'Terminal', host: 'trade.padre.gg', logo: '/terminals/terminal.svg' },
-  { name: 'Trojan', host: 'trojan.com', logo: '/terminals/trojan.png' },
+  { name: 'Axiom', host: 'axiom.trade', logo: TERMINAL_LOGOS.Axiom },
+  { name: 'GMGN', host: 'gmgn.ai', logo: TERMINAL_LOGOS.GMGN },
+  { name: 'Photon', host: 'photon-sol.tinyastro.io', logo: TERMINAL_LOGOS.Photon },
+  { name: 'Terminal', host: 'trade.padre.gg', logo: TERMINAL_LOGOS.Terminal },
+  { name: 'Trojan', host: 'trojan.com', logo: TERMINAL_LOGOS.Trojan },
 ] as const;
 
 export const DEFAULT_SPECS: ListingSpecs = {

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { categoryMeta, quote, rankBadge, TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared';
+import { TerminalNames } from '@/components/terminal-logo';
 import { Money, Skeleton, EmptyState, Tag } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
 
@@ -93,7 +94,9 @@ export function ListingCard({
         </h3>
         <p className="m-0 line-clamp-2 text-sm text-ink-2">{listing.summary}</p>
         {listing.terminals.length ? (
-          <p className="m-0 font-mono text-[11px] text-muted">{listing.terminals.join(' · ')}</p>
+          <p className="m-0 font-mono text-[11px] text-muted" data-testid="card-terminals">
+            <TerminalNames names={listing.terminals} />
+          </p>
         ) : null}
         <div className="mt-auto flex items-center gap-3 pt-2 text-[13px] text-muted">
           {listing.handle ? <span className="text-ink-2">@{listing.handle}</span> : null}

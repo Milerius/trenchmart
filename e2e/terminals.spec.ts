@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectTerminalLogo } from './terminal-logo-helpers';
 
 // Supported terminals (unit-tested in packages/shared/src/terminals.test.ts): Axiom, GMGN, Photon, Terminal (formerly Padre) and Trojan. BullX is gone.
 // Also guards the performance work on the market grid: first covers load eagerly, the rest lazily.
@@ -79,6 +80,26 @@ test('home terminal pills list the supported terminals and filter the market', a
   await expect.poll(() => queries.some((q) => q.includes('terminal=Terminal'))).toBe(true);
   await expect(page.getByRole('heading', { name: 'Listing terminal-tools' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Listing trojan-trenches-intel' })).toHaveCount(0);
+});
+
+test("terminal pills and market cards show each terminal's logo next to its name", async ({
+  page,
+}) => {
+  await stub(page);
+  await page.goto('/');
+  const filter = page.getByTestId('terminal-filter');
+  for (const name of ['Axiom', 'GMGN', 'Photon', 'Terminal', 'Trojan']) {
+    await expectTerminalLogo(filter.getByRole('button', { name }), name);
+  }
+  // "All" has no logo; pill names and accessible names are unchanged.
+  await expect(filter.getByRole('button', { name: 'All' }).locator('img')).toHaveCount(0);
+  await expect(filter.locator('img')).toHaveCount(5);
+
+  const card = page.getByRole('link', { name: /Listing terminal-tools/ });
+  const line = card.getByTestId('card-terminals');
+  await expect(line).toHaveText('Terminal · Axiom');
+  await expectTerminalLogo(line, 'Terminal', 14);
+  await expectTerminalLogo(line, 'Axiom', 14);
 });
 
 test('market grid: first three covers load eagerly with high priority, the rest lazily', async ({

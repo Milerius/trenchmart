@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Avatar, VerifiedBadge } from '@/components/profile';
+import { TerminalMark } from '@/components/terminal-logo';
 import { Button, ButtonLink, Label, Panel, Skeleton, Tag, utc } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { useWallet } from '@/lib/wallet';
@@ -407,7 +408,12 @@ function ReviewCard({ review, onChanged }: { review: ReviewItem; onChanged: () =
         {review.body}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px]">
-        {review.terminal ? <Tag>used on {review.terminal}</Tag> : null}
+        {review.terminal ? (
+          <Tag>
+            used on <TerminalMark name={review.terminal} />
+            {review.terminal}
+          </Tag>
+        ) : null}
         {review.editedAt ? <span className="text-muted">edited {ago(review.editedAt)}</span> : null}
         {viewer?.mine ? (
           <>
@@ -859,6 +865,7 @@ export function ReviewDialog({
                   }`}
                 >
                   {terminal === t ? '✓ ' : '+ '}
+                  <TerminalMark name={t} className="mr-1 h-3.5 w-3.5" />
                   {t}
                 </button>
               ))}
