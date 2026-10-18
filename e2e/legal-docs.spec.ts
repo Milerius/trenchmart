@@ -119,3 +119,18 @@ test.describe('docs on a phone', () => {
     });
   }
 });
+
+test('docs overview follows the prototype: serif title, numbered purchase flow first', async ({
+  page,
+}) => {
+  await page.goto('/docs');
+  const h1 = page.getByRole('heading', { level: 1, name: 'How TrenchMart works' });
+  await expect(h1.locator('em')).toHaveText('works');
+  const flow = page.getByTestId('diagram-purchase');
+  await expect(flow.getByRole('listitem')).toHaveCount(5);
+  await expect(flow.getByRole('listitem').first()).toContainText('Buyer opens a live listing');
+  const headings = await page.getByRole('heading', { level: 2 }).allTextContents();
+  expect(headings.slice(0, 2)).toEqual(['The purchase flow', 'Where the figures come from']);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});

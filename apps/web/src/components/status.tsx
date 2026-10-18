@@ -8,6 +8,7 @@ import {
   ErrorState,
   Label,
   Panel,
+  Serif,
   Skeleton,
   Tag,
   utc,
@@ -98,7 +99,7 @@ function duration(minutes: number): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
-function Dot({ state }: { state: State }) {
+function Dot({ state, size = 'sm' }: { state: State; size?: 'sm' | 'lg' }) {
   const bg =
     state === 'operational'
       ? 'bg-accent'
@@ -110,7 +111,11 @@ function Dot({ state }: { state: State }) {
   return (
     <span
       aria-hidden="true"
-      className={`${state === 'unknown' ? '' : 'live-dot'} block h-2 w-2 shrink-0 rounded-full ${bg}`}
+      className={`${state === 'unknown' ? '' : 'live-dot'} block shrink-0 rounded-full ${bg} ${
+        size === 'lg'
+          ? `h-3 w-3 ${state === 'operational' ? 'shadow-[0_0_16px_var(--color-accent)]' : ''}`
+          : 'h-2 w-2'
+      }`}
     />
   );
 }
@@ -210,14 +215,24 @@ function Overall({ status }: { status: PublicStatus }) {
         ? 'Every component answered its last check normally.'
         : 'Everything else answered its last check normally. Funds in escrow are safe either way: a buyer can always refund on chain after the timeout.';
   return (
-    <Panel tone={tone} className="mt-6 flex items-start gap-3 p-5" data-testid="status-overall">
-      <span className="mt-2">
-        <Dot state={status.overall} />
+    <Panel
+      tone={tone}
+      className="relative mt-8 flex items-start gap-3 overflow-hidden !rounded-[26px] p-6 sm:p-7"
+      data-testid="status-overall"
+    >
+      {tone === 'ok' ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-20 -right-10 h-60 w-60 rounded-full bg-accent/20 blur-3xl"
+        />
+      ) : null}
+      <span className="relative mt-3">
+        <Dot state={status.overall} size="lg" />
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="m-0 text-lg font-semibold">{title}</p>
-        <p className="m-0 mt-1 text-sm text-ink-2">{body}</p>
-        <p className="m-0 mt-2 font-mono text-[12px] text-muted" data-testid="status-checked">
+      <div className="relative min-w-0 flex-1">
+        <p className="m-0 text-2xl font-semibold tracking-[-0.02em]">{title}</p>
+        <p className="m-0 mt-2 text-ink-2">{body}</p>
+        <p className="m-0 mt-3 font-mono text-xs text-faint" data-testid="status-checked">
           {status.checkedAt ? `last check ${utc(status.checkedAt)}` : 'no checks yet'} · every{' '}
           {status.intervalMinutes} min · {status.cluster}
         </p>
@@ -331,10 +346,14 @@ export function StatusBoard() {
     status.components.some((c) => c.days.slice(0, 1).every((d) => d.state === 'none'));
 
   return (
-    <article className="mx-auto max-w-4xl">
+    <article className="mx-auto max-w-5xl sm:py-4">
       <DocHeader
         kicker="Status"
-        title="System status"
+        title={
+          <>
+            System <Serif>status</Serif>
+          </>
+        }
         lede="Health and speed of the TrenchMart website, API, Solana devnet RPC, escrow, database, uploads and sign-in. Checked every 5 minutes, the website, API and RPC from outside our own infrastructure. Every time is UTC."
       />
       {error && !status ? (
