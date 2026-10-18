@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { CountUp, HeroField, Reveal } from '@/components/motion';
 import { api } from '@/lib/api';
+import { recentRead, rememberRead } from '@/lib/recent';
 import { usePublicConfig } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
 
@@ -56,32 +57,46 @@ export default function HomePage() {
   const wallet = useWallet();
   const config = usePublicConfig();
   const [terminal, setTerminal] = useState('All');
-  const [listings, setListings] = useState<Listing[] | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
+  // A return visit paints the last answers at once (this tab only) and refreshes them.
+  const viewer = wallet.session?.wallet ?? '';
+  const [listings, setListings] = useState<Listing[] | null>(
+    () => recentRead<Listing[]>(`home-listings|All|${viewer}`) ?? null,
+  );
+  const [stats, setStats] = useState<Stats | null>(() => recentRead<Stats>('stats') ?? null);
   const [statsFailed, setStatsFailed] = useState(false);
   const [creatorTab, setCreatorTab] = useState<BoardTab>('earners');
-  const [board, setBoard] = useState<Board | null | 'error'>(null);
+  const [board, setBoard] = useState<Board | null | 'error'>(
+    () => recentRead<Board>('home-board|earners') ?? null,
+  );
   const activity = useActivity(24);
   const featured = useFeatured('home');
 
   useEffect(() => {
     const query =
       terminal === 'All' ? '' : `?terminal=${encodeURIComponent(terminal)}&sort=trending`;
+    const key = `home-listings|${terminal}|${viewer}`;
+    const recent = recentRead<Listing[]>(key);
+    if (recent) setListings(recent);
     void api<Listing[]>(`/listings${query}`)
-      .then(setListings)
-      .catch(() => setListings([]));
-  }, [terminal, wallet.session?.wallet]);
+      .then((body) => setListings(rememberRead(key, body)))
+      .catch(() => setListings((prev) => prev ?? []));
+  }, [terminal, viewer]);
 
   useEffect(() => {
     void api<Stats>('/stats')
-      .then(setStats)
+      .then((body) => setStats(rememberRead('stats', body)))
       .catch(() => setStatsFailed(true));
   }, []);
 
   useEffect(() => {
     let stop = false;
+    const key = `home-board|${creatorTab}`;
+    const recent = recentRead<Board>(key);
+    if (recent) setBoard(recent);
     void api<Board>(`/creators/leaderboard?tab=${creatorTab}&range=30d&limit=6`)
-      .then((body) => !stop && setBoard(Array.isArray(body?.rows) ? body : 'error'))
+      .then(
+        (body) => !stop && setBoard(Array.isArray(body?.rows) ? rememberRead(key, body) : 'error'),
+      )
       .catch(() => !stop && setBoard('error'));
     return () => {
       stop = true;

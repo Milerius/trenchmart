@@ -5,22 +5,27 @@ import { useEffect, useState } from 'react';
 import { ListingCard, type Listing } from '@/components/listings';
 import { Label } from '@/components/ui';
 import { api } from '@/lib/api';
+import { recentRead, rememberRead } from '@/lib/recent';
 import type { PublicConfig } from '@/lib/config';
 
 /** Today's paid "Featured · Sponsored" listings for a placement (hourly rotation, server side). */
 export function useFeatured(placement: 'home' | 'category', category?: string) {
-  const [items, setItems] = useState<Listing[]>([]);
+  const key = `featured|${placement}|${category ?? ''}`;
+  const [items, setItems] = useState<Listing[]>(() => recentRead<Listing[]>(key) ?? []);
   useEffect(() => {
     let stop = false;
     const query = new URLSearchParams({ placement });
     if (category) query.set('category', category);
     void api<{ items: Listing[] }>(`/featured?${query}`)
-      .then((body) => !stop && setItems(Array.isArray(body?.items) ? body.items : []))
+      .then(
+        (body) =>
+          !stop && setItems(rememberRead(key, Array.isArray(body?.items) ? body.items : [])),
+      )
       .catch(() => !stop && setItems([]));
     return () => {
       stop = true;
     };
-  }, [placement, category]);
+  }, [key, placement, category]);
   return items;
 }
 

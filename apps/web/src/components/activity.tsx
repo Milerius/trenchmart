@@ -5,6 +5,7 @@ import type { PublicIdentity } from '@trenchmart/shared/social';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { recentRead, rememberRead } from '@/lib/recent';
 import { solText } from '@/lib/money';
 
 /** Live marketplace events (sales, reviews, new listings, updates). Real rows only. */
@@ -59,7 +60,8 @@ function ago(iso: string): string {
 }
 
 export function useActivity(limit = 24) {
-  const [events, setEvents] = useState<Activity | null>(null);
+  const key = `activity|${limit}`;
+  const [events, setEvents] = useState<Activity | null>(() => recentRead<Activity>(key) ?? null);
   useEffect(() => {
     let stop = false;
     const load = () =>
@@ -67,10 +69,12 @@ export function useActivity(limit = 24) {
         .then(
           (body) =>
             !stop &&
-            setEvents({
-              events: Array.isArray(body?.events) ? body.events : [],
-              sponsored: Array.isArray(body?.sponsored) ? body.sponsored : [],
-            }),
+            setEvents(
+              rememberRead(key, {
+                events: Array.isArray(body?.events) ? body.events : [],
+                sponsored: Array.isArray(body?.sponsored) ? body.sponsored : [],
+              }),
+            ),
         )
         .catch(() => !stop && setEvents((prev) => prev ?? { events: [], sponsored: [] }));
     load();
@@ -79,7 +83,7 @@ export function useActivity(limit = 24) {
       stop = true;
       window.clearInterval(timer);
     };
-  }, [limit]);
+  }, [key, limit]);
   return events;
 }
 
