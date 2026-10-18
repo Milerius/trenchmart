@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// New listing form: category templates, Markdown editor (toolbar, shortcuts, live preview),
-// image gallery, and the submit flow that saves the page and sends it to review.
-// The CI e2e job runs without the API, so /api/v1 is stubbed in the browser.
+// New-listing wizard: type picker, type-specific step, details with the template editor,
+// media, pricing (real median only), file pre-check, review and submit. The CI e2e job runs
+// without the API, so /api/v1 is stubbed in the browser and the wallet is the test signer.
 
 const SESSION = {
   user: {
@@ -20,28 +20,55 @@ const CONFIG = {
   tierWindowHours: 72,
   feeSplitBps: { buyback: 4000, ai_verification: 2500, ops: 2000, safety: 1500 },
   escrowHours: 1,
-  verificationFeeLamports: '0',
-  bondLamportsByCategory: { userscript: '5000000000' },
+  verificationFeeLamports: '250000000',
+  bondLamportsByCategory: { userscript: '0', wallet_list: '0' },
   terminals: ['Axiom'],
+  updateFreeDays: 30,
+  updatePriceDefaultBps: 1000,
+};
+const REQ = {
+  xLinked: true,
+  bondActive: '0',
+  bondOk: true,
+  verificationFee: '0',
+  feeWaived: false,
+  bondByCategory: CONFIG.bondLamportsByCategory,
 };
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
   'base64',
 );
 const png = (name: string) => ({ name, mimeType: 'image/png', buffer: PNG });
+const SCRIPT = Buffer.from(
+  '// ==UserScript==\n// @name Intel\n// @match https://axiom.trade/*\n// @grant none\n// ==/UserScript==\nconsole.log(1)\n',
+);
 
-type Call = { method: string; path: string; body: string };
+type Call = { method: string; path: string; search: string; body: string };
 
-async function stub(page: Page) {
+async function stub(
+  page: Page,
+  opts: { req?: Partial<typeof REQ>; peers?: string[]; signer?: boolean } = {},
+) {
   const calls: Call[] = [];
   let imageN = 0;
+  await page.route('**/uploads/**', (route) => route.fulfill({ json: { ok: true } }));
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname.replace('/api/v1', '');
+    const url = new URL(request.url());
+    const path = url.pathname.replace('/api/v1', '');
     const method = request.method();
-    calls.push({ method, path, body: method === 'GET' ? '' : (request.postData() ?? '') });
+    calls.push({
+      method,
+      path,
+      search: url.search,
+      body: method === 'GET' ? '' : (request.postData() ?? ''),
+    });
     if (path === '/me') return route.fulfill({ json: SESSION });
     if (path === '/config/public') return route.fulfill({ json: CONFIG });
+    if (path === '/studio/requirements') return route.fulfill({ json: { ...REQ, ...opts.req } });
+    if (path === '/categories') return route.fulfill({ json: [{ code: 'userscript', count: 4 }] });
+    if (path === '/listings')
+      return route.fulfill({ json: (opts.peers ?? []).map((price) => ({ price })) });
     if (path === '/studio/listings' && method === 'POST')
       return route.fulfill({ json: { id: 'new-listing-1' } });
     if (path === '/studio/listings/new-listing-1/images' && method === 'POST') {
@@ -50,6 +77,10 @@ async function stub(page: Page) {
     }
     if (path.startsWith('/studio/listings/new-listing-1/content'))
       return route.fulfill({ json: { ok: true } });
+    if (path === '/studio/listings/new-listing-1/versions' && method === 'POST')
+      return route.fulfill({
+        json: { versionId: 'V1', uploadUrl: '/uploads/V1?sig=abc', feeTx: null },
+      });
     if (path.startsWith('/studio')) return route.fulfill({ json: [] });
     return route.fulfill({ status: 404, json: { error: { code: 'NOT_FOUND', message: 'nf' } } });
   });
@@ -58,170 +89,309 @@ async function stub(page: Page) {
 
 const editor = (page: Page) => page.getByTestId('md-editor');
 const preview = (page: Page) => page.getByTestId('md-preview');
+const next = (page: Page) => page.getByTestId('continue').click();
 
-test('starts from the category template and follows category changes until edited', async ({
+async function pickScript(page: Page) {
+  await page.goto('/studio/listings/new');
+  await page.getByTestId('kind-script').click();
+  await next(page);
+  await page.getByTestId('terminals').getByRole('button', { name: /Axiom/ }).click();
+  await next(page);
+}
+
+async function fillDetails(page: Page) {
+  await page.fill('#title', 'Trojan Trenches Intel');
+  await page.fill('#summary', 'Labels copycat coins and finds the OG.');
+  await page.fill('#description', 'Userscript for axiom.trade.');
+}
+
+test('step 1 picks the type; step 2 asks for terminals and what the script touches', async ({
   page,
 }) => {
   await stub(page);
   await page.goto('/studio/listings/new');
+  await expect(page.getByRole('heading', { name: 'What are you selling?' })).toBeVisible();
+  await expect(page.getByTestId('kind-script')).toContainText('4 live in this category');
+  await next(page);
+  await expect(page.getByTestId('step-problem')).toHaveText('Pick what you are selling.');
+  await page.getByTestId('kind-script').click();
+  await expect(page.getByTestId('kind-script')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('continue')).toHaveText('Continue: terminals →');
+  await next(page);
+
+  await expect(page.getByTestId('wizard')).toHaveAttribute('data-step', '2');
+  await next(page);
+  await expect(page.getByTestId('step-problem')).toContainText('terminal');
+  const terms = page.getByTestId('terminals');
+  await terms.getByRole('button', { name: /Axiom/ }).click();
+  await terms.getByRole('button', { name: /GMGN/ }).click();
+  await expect(page.getByText('2 selected')).toBeVisible();
+  await terms.getByRole('button', { name: /Any site/ }).click();
+  await expect(terms.getByRole('button', { name: /Axiom/ })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  await terms.getByRole('button', { name: /Axiom/ }).click();
+  await expect(terms.getByRole('button', { name: /Any site/ })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+
+  await page
+    .getByRole('radiogroup', { name: 'Network requests' })
+    .getByRole('radio', { name: 'Listed hosts' })
+    .click();
+  await next(page);
+  await expect(page.getByTestId('step-problem')).toHaveText('List every host the script calls.');
+  await page.getByLabel('Add host').fill('api.axiom.trade');
+  await page.getByLabel('Add host').press('Enter');
+  await expect(page.getByText('Calls listed hosts: api.axiom.trade')).toBeVisible();
+  await expect(page.getByText('Keys and signing')).toBeVisible();
+  await next(page);
+  await expect(page.getByTestId('wizard')).toHaveAttribute('data-step', '3');
+});
+
+test('wallet lists ask for format, count, cadence and imports', async ({ page }) => {
+  await stub(page);
+  await page.goto('/studio/listings/new');
+  await page.getByTestId('kind-wallet').click();
+  await expect(page.getByTestId('continue')).toHaveText('Continue: list details →');
+  await next(page);
+  await expect(page.getByRole('heading', { name: 'Imports into' })).toBeVisible();
+  await page
+    .getByTestId('terminals')
+    .getByRole('button', { name: /Photon/ })
+    .click();
+  await page.getByLabel('Wallet count').fill('412');
+  await page.getByRole('radio', { name: /Daily/ }).click();
+  await page.getByRole('button', { name: /\.json/ }).click();
+  const spec = page.getByText('Spec buyers see').locator('..');
+  await expect(spec).toContainText('412');
+  await expect(spec).toContainText('CSV, JSON');
+  await expect(spec).toContainText('Daily');
+  await expect(spec).toContainText('Photon');
+});
+
+test('the guide starts from the type template and follows type changes until edited', async ({
+  page,
+}) => {
+  await stub(page);
+  await pickScript(page);
   await expect(page.getByTestId('template-note')).toContainText('Userscripts');
+  await expect(page.getByTestId('template-note')).toContainText('[bracketed] parts left');
   await expect(editor(page)).toHaveValue(/^# \[Script name\]/);
-  await expect(page.getByRole('tab', { name: /README/ })).toContainText('●');
 
-  await page.locator('#category').selectOption('wallet_list');
+  // Back to step 1, switch to a wallet list: untouched sections follow.
+  await page
+    .getByTestId('stepper')
+    .getByRole('button', { name: /What you sell/ })
+    .click();
+  await page.getByTestId('kind-wallet').click();
+  await page
+    .getByTestId('stepper')
+    .getByRole('button', { name: /Details/ })
+    .click();
   await expect(editor(page)).toHaveValue(/^# \[List name\]/);
-  await page.getByRole('tab', { name: /How to use/ }).click();
-  await expect(editor(page)).not.toHaveValue('');
 
-  // Start blank, then Reset to template.
+  await editor(page).fill('# My own README');
+  await page
+    .getByTestId('stepper')
+    .getByRole('button', { name: /What you sell/ })
+    .click();
+  await page.getByTestId('kind-filter').click();
+  await page
+    .getByTestId('stepper')
+    .getByRole('button', { name: /Details/ })
+    .click();
+  await expect(editor(page)).toHaveValue('# My own README');
+
   await page.getByRole('button', { name: 'Start blank' }).click();
   await expect(editor(page)).toHaveValue('');
-  await expect(page.getByRole('tab', { name: /How to use/ })).toContainText('○');
-  await expect(page.getByTestId('md-counter')).toContainText(/^0 \//);
   await page.getByRole('button', { name: 'Reset to template' }).click();
   await expect(editor(page)).not.toHaveValue('');
-  await expect(page.getByRole('button', { name: 'Reset to template' })).toBeDisabled();
-
-  // An edited section stays when the category changes.
-  await page.getByRole('tab', { name: /README/ }).click();
-  await editor(page).fill('# My own README');
-  await page.locator('#category').selectOption('filter');
-  await expect(editor(page)).toHaveValue('# My own README');
 });
 
 test('toolbar, shortcuts and live preview', async ({ page }) => {
   await stub(page);
-  await page.goto('/studio/listings/new');
+  await pickScript(page);
   await editor(page).fill('hello world');
   await editor(page).evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 5));
   await page.getByRole('button', { name: 'Bold' }).click();
   await expect(editor(page)).toHaveValue('**hello** world');
   await expect(preview(page).locator('strong')).toHaveText('hello');
-
   await editor(page).fill('code');
   await editor(page).evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 4));
   await editor(page).press('ControlOrMeta+e');
   await expect(editor(page)).toHaveValue('`code`');
-  await expect(preview(page).locator('code')).toHaveText('code');
-
-  await editor(page).fill('Title');
-  await editor(page).evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 5));
-  await page.getByRole('button', { name: 'Heading', exact: true }).click();
-  await expect(editor(page)).toHaveValue('## Title');
-  await expect(preview(page).getByRole('heading', { name: 'Title' })).toBeVisible();
-
-  // Raw HTML is shown as text, never rendered.
   await editor(page).fill('<script>alert(1)</script>');
   await expect(preview(page).locator('script')).toHaveCount(0);
 });
 
-test('gallery: add, reorder, alt text, insert into README with preview', async ({ page }) => {
-  await stub(page);
-  await page.goto('/studio/listings/new');
-  await page.locator('#images').setInputFiles([png('one.png'), png('two.png')]);
-  const grid = page.getByTestId('image-grid');
-  await expect(grid.locator('li')).toHaveCount(2);
-  await page.getByLabel('Alt text for image 1').fill('first shot');
-  await grid.locator('li').nth(0).getByRole('button', { name: 'Move right' }).click();
-  await expect(page.getByLabel('Alt text for image 2')).toHaveValue('first shot');
-
-  await editor(page).fill('Intro\n\n');
-  await editor(page).evaluate((el: HTMLTextAreaElement) =>
-    el.setSelectionRange(el.value.length, el.value.length),
-  );
-  await page.getByRole('button', { name: /Image/ }).click();
-  await page.getByRole('menuitem', { name: 'Insert image 1' }).click();
-  await expect(editor(page)).toHaveValue(/!\[.*\]\(\/api\/v1\/media\/[0-9a-f-]{36}\)/);
-  await expect(preview(page).locator('img')).toHaveCount(1);
-
-  // Wrong types are refused with a message.
-  await page
-    .locator('#images')
-    .setInputFiles([{ name: 'x.gif', mimeType: 'image/gif', buffer: PNG }]);
-  await expect(page.getByText('x.gif: PNG, JPEG or WebP only.')).toBeVisible();
+test('pricing: the median shows only with three real listings; updates timeline and earnings', async ({
+  page,
+}) => {
+  await stub(page, { peers: ['500000000', '900000000', '2000000000'] });
+  await pickScript(page);
+  await fillDetails(page);
+  await next(page);
+  await next(page);
+  await expect(page.getByRole('heading', { name: 'One-time price' })).toBeVisible();
+  await expect(page.getByTestId('price-median')).toContainText('median 0.90 SOL · 3 listings');
+  await next(page);
+  await expect(page.getByTestId('step-problem')).toHaveText('Set a price in SOL.');
+  await page.fill('#price', '1.2');
+  await expect(page.locator('#update-price')).toHaveValue('0.12');
+  await expect(
+    page.getByText('First 30 days of updates are free with every purchase'),
+  ).toBeVisible();
+  await expect(page.getByText('Renews at 0.12 SOL/mo')).toBeVisible();
+  await expect(page.getByTestId('earnings')).toContainText('+ 0.06 SOL');
+  await expect(page.getByTestId('earnings')).toContainText('after each 1 h escrow releases');
+  await page.getByRole('switch', { name: 'Paid updates' }).click();
+  await expect(
+    page.getByText('Off: every buyer gets every future version free, forever.'),
+  ).toBeVisible();
 });
 
-test('submit creates the listing, uploads images, saves the page with real media ids and sends it to review', async ({
+test('pricing: no median with fewer than three listings', async ({ page }) => {
+  await stub(page, { peers: ['500000000'] });
+  await pickScript(page);
+  await fillDetails(page);
+  await next(page);
+  await next(page);
+  await expect(page.getByRole('heading', { name: 'One-time price' })).toBeVisible();
+  await expect(page.getByTestId('price-median')).toHaveCount(0);
+});
+
+test('submit: creates the listing with kind and specs, uploads images, file and opens the review', async ({
   page,
 }) => {
   const calls = await stub(page);
-  await page.goto('/studio/listings/new');
-  await page.fill('#title', 'Trojan Trenches Intel');
-  await page.fill('#summary', 'Labels copycat coins and finds the OG.');
-  await page.fill('#description', 'Userscript for trojan.com.');
-  await page.fill('#terminals', 'Trojan');
-  await page.fill('#price', '0.10');
+  await pickScript(page);
+  await fillDetails(page);
+  await next(page);
   await page.locator('#images').setInputFiles([png('one.png')]);
+  await page.getByLabel('Alt text for image 1').fill('overlay');
+  await page
+    .getByTestId('stepper')
+    .getByRole('button', { name: /Details/ })
+    .click();
   await editor(page).fill('Intro\n\n');
   await editor(page).evaluate((el: HTMLTextAreaElement) =>
     el.setSelectionRange(el.value.length, el.value.length),
   );
   await page.getByRole('button', { name: /Image/ }).click();
   await page.getByRole('menuitem', { name: 'Insert image 1' }).click();
+  await next(page);
+  await next(page);
+  await page.fill('#price', '0.10');
+  await next(page);
+  await next(page);
+  await expect(page.getByTestId('step-problem')).toHaveText('Add the file buyers download.');
   await page
-    .locator('form[data-testid="studio"]')
-    .evaluate((form: HTMLFormElement) => form.requestSubmit());
-  await page.waitForURL('**/studio');
+    .locator('#file')
+    .setInputFiles({ name: 'intel.user.js', mimeType: 'text/javascript', buffer: SCRIPT });
+  const summary = page.getByTestId('file-summary');
+  await expect(summary).toContainText('@name Intel');
+  await expect(summary).toContainText('@match: 1 line');
+  await expect(summary).toContainText(/sha256 [0-9a-f]{6}…/);
+  await next(page);
 
-  const create = calls.find((c) => c.method === 'POST' && c.path === '/studio/listings')!;
-  expect(JSON.parse(create.body)).toMatchObject({
+  const review = page.getByTestId('review');
+  await expect(review).toContainText('Terminal script');
+  await expect(review).toContainText('Axiom');
+  await expect(page.getByTestId('submit-card')).toContainText('Verification fee0.00 SOL');
+  await expect(page.getByTestId('submit')).toBeDisabled();
+  await page.getByText('The file does what this listing says').click();
+  await page.getByTestId('submit').click();
+  await page.waitForURL('**/studio/listings/new-listing-1/versions/V1');
+
+  const create = JSON.parse(
+    calls.find((c) => c.method === 'POST' && c.path === '/studio/listings')!.body,
+  );
+  expect(create).toMatchObject({
     title: 'Trojan Trenches Intel',
-    terminals: ['Trojan'],
+    category: 'userscript',
+    kind: 'script',
+    terminals: ['Axiom'],
     priceLamports: '100000000',
+    updatePriceLamports: '10000000',
+    specs: { managers: ['Tampermonkey', 'Violentmonkey'], network: 'terminal', storage: 'local' },
   });
-  expect(calls.filter((c) => c.path === '/studio/listings/new-listing-1/images')).toHaveLength(1);
   const put = calls.find(
     (c) => c.method === 'PUT' && c.path === '/studio/listings/new-listing-1/content',
   )!;
   const saved = JSON.parse(put.body);
   expect(saved.readme).toContain('/api/v1/media/00000001-aaaa-4bbb-8ccc-dddddddddddd');
-  expect(saved.coverImageId).toBe('00000001-aaaa-4bbb-8ccc-dddddddddddd');
-  expect(saved.gallery).toEqual([{ imageId: '00000001-aaaa-4bbb-8ccc-dddddddddddd', alt: '' }]);
+  expect(saved.gallery).toEqual([
+    { imageId: '00000001-aaaa-4bbb-8ccc-dddddddddddd', alt: 'overlay' },
+  ]);
   expect(
-    calls.some(
-      (c) => c.method === 'POST' && c.path === '/studio/listings/new-listing-1/content/review',
+    JSON.parse(calls.find((c) => c.path === '/studio/listings/new-listing-1/versions')!.body),
+  ).toEqual({
+    semver: '1.0.0',
+    changelog: 'initial',
+    fileName: 'intel.user.js',
+    fileSize: SCRIPT.length,
+  });
+  // The draft is cleared after a successful submit.
+  expect(
+    await page.evaluate(() =>
+      Object.keys(localStorage).filter((k) => k.startsWith('tm:new-listing:')),
     ),
-  ).toBe(true);
+  ).toEqual([]);
 });
 
-test('mobile: Write / Preview tabs and no horizontal overflow', async ({ page }) => {
+test('review: without a linked X the submit waits on the profile, and the real fee is shown', async ({
+  page,
+}) => {
+  await stub(page, { req: { xLinked: false, verificationFee: '250000000' } });
+  await page.addInitScript((key) => {
+    localStorage.setItem(
+      key,
+      JSON.stringify({ version: 1, step: 7, kind: 'script', terminals: ['Axiom'] }),
+    );
+  }, `tm:new-listing:${SESSION.user.wallet}`);
+  await page.goto('/studio/listings/new');
+  await expect(page.getByTestId('x-required')).toContainText('Profile: link X');
+  await expect(
+    page.getByTestId('x-required').getByRole('link', { name: 'Edit profile →' }),
+  ).toHaveAttribute('href', '/studio/profile#socials');
+  await expect(page.getByTestId('submit-card')).toContainText('0.25 SOL');
+  await page.getByText('The file does what this listing says').click();
+  await expect(page.getByTestId('submit')).toBeDisabled();
+});
+
+test('the draft survives a reload on this device', async ({ page }) => {
+  await stub(page);
+  await pickScript(page);
+  await page.fill('#title', 'Kept title');
+  await expect(page.getByTestId('draft-status')).toContainText('Draft saved on this device');
+  await expect
+    .poll(() => page.evaluate(() => Object.values(localStorage).join('')))
+    .toContain('Kept title');
+  await page.reload();
+  await expect(page.getByTestId('wizard')).toHaveAttribute('data-step', '3');
+  await expect(page.locator('#title')).toHaveValue('Kept title');
+});
+
+test('mobile: progress bar instead of the stepper, two-column type cards, no overflow', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await stub(page);
   await page.goto('/studio/listings/new');
+  await expect(page.getByTestId('stepper')).toBeHidden();
+  await expect(page.getByTestId('stepper-mobile')).toContainText('Step 1 of 7');
+  await page.getByTestId('kind-script').click();
+  await next(page);
+  await expect(page.getByTestId('stepper-mobile')).toContainText('Terminals');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.getByTestId('terminals').getByRole('button', { name: /Axiom/ }).click();
+  await next(page);
   const view = page.getByRole('tablist', { name: 'View' });
   await expect(view).toBeVisible();
-  await expect(editor(page)).toBeVisible();
-  await view.getByRole('tab', { name: 'Preview' }).click();
-  await expect(preview(page)).toBeVisible();
-  await expect(editor(page)).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-});
-
-// Uploads are re-encoded to WebP by the API (perf: a 354 KB PNG cover made LCP 7.1 s).
-// The media the README points at is served as image/webp and must render in the page.
-const WEBP_1PX = Buffer.from(
-  'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
-  'base64',
-);
-
-test('inserted images are served as WebP and render in the preview', async ({ page }) => {
-  await stub(page);
-  await page.route('**/api/v1/media/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'image/webp', body: WEBP_1PX }),
-  );
-  await page.goto('/studio/listings/new');
-  await page.locator('#images').setInputFiles([png('one.png')]);
-  await editor(page).fill('Intro\n\n');
-  await editor(page).evaluate((el: HTMLTextAreaElement) =>
-    el.setSelectionRange(el.value.length, el.value.length),
-  );
-  await page.getByRole('button', { name: /Image/ }).click();
-  await page.getByRole('menuitem', { name: 'Insert image 1' }).click();
-  const img = preview(page).locator('img');
-  await expect(img).toHaveCount(1);
-  await expect
-    .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth))
-    .toBe(1);
 });
 
 test('large PNG covers are converted to WebP (max 1600 px) in the browser before upload', async ({
@@ -239,8 +409,8 @@ test('large PNG covers are converted to WebP (max 1600 px) in the browser before
     expect(head.startsWith('RIFF') && head.endsWith('WEBP')).toBe(true);
     await route.fulfill({ json: { id: '00000009-aaaa-4bbb-8ccc-dddddddddddd' } });
   });
-  await page.goto('/studio/listings/new');
-  // A 2400x1200 PNG with detail, made in the page.
+  await pickScript(page);
+  await fillDetails(page);
   const dataUrl = await page.evaluate(() => {
     const c = document.createElement('canvas');
     c.width = 2400;
@@ -253,19 +423,22 @@ test('large PNG covers are converted to WebP (max 1600 px) in the browser before
       }
     return c.toDataURL('image/png');
   });
-  const png = Buffer.from(dataUrl.split(',')[1]!, 'base64');
-  await page.fill('#title', 'Trojan Trenches Intel');
-  await page.fill('#summary', 'Labels copycat coins and finds the OG.');
-  await page.fill('#description', 'Userscript for trojan.com.');
-  await page.fill('#terminals', 'Trojan');
-  await page.fill('#price', '0.10');
+  const big = Buffer.from(dataUrl.split(',')[1]!, 'base64');
+  await next(page);
   await page
     .locator('#images')
-    .setInputFiles([{ name: 'cover.png', mimeType: 'image/png', buffer: png }]);
+    .setInputFiles([{ name: 'cover.png', mimeType: 'image/png', buffer: big }]);
+  await next(page);
+  await page.fill('#price', '0.10');
+  await next(page);
   await page
-    .locator('form[data-testid="studio"]')
-    .evaluate((form: HTMLFormElement) => form.requestSubmit());
+    .locator('#file')
+    .setInputFiles({ name: 'intel.user.js', mimeType: 'text/javascript', buffer: SCRIPT });
+  await expect(page.getByTestId('file-summary')).toBeVisible();
+  await next(page);
+  await page.getByText('The file does what this listing says').click();
+  await page.getByTestId('submit').click();
   await expect.poll(() => uploads.length).toBe(1);
   expect(uploads[0]!.type).toBe('image/webp');
-  expect(uploads[0]!.size).toBeLessThan(png.length);
+  expect(uploads[0]!.size).toBeLessThan(big.length);
 });

@@ -2508,3 +2508,89 @@ describe('creator profiles', () => {
     expect((await view('makerx')).body).toMatchObject({ handle: 'maker', xVerified: true });
   });
 });
+
+describe('listing wizard: kind and specs', () => {
+  beforeEach(async () => {
+    sql = createSql(databaseUrl);
+    await migrate(sql);
+    await reset();
+  });
+
+  afterAll(async () => {
+    await sql?.end();
+  });
+
+  it('stores the kind with validated specs, refuses mismatches, and shows specs to buyers', async () => {
+    const app = await appFor();
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    const [user] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
+    await sql`update users set x_handle = 'maker', x_user_id = 'dev:maker' where id = ${user!.id}`;
+    await sql`
+      insert into bonds (user_id, amount, tx_sig, status)
+      values (${user!.id}, ${100_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+    `;
+    const create = (body: unknown) =>
+      app.request('/api/v1/studio/listings', {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    const base = {
+      title: 'Smart Wallets',
+      summary: 'Weekly smart-money list',
+      description: 'CSV and JSON of labelled wallets.',
+      priceLamports: '500000000',
+      terminals: ['axiom', 'GMGN'],
+    };
+    const specs = {
+      chain: 'solana',
+      formats: ['csv', 'json'],
+      walletCount: 412,
+      cadence: 'weekly',
+      columns: ['address', 'label'],
+    };
+    expect((await create({ ...base, category: 'userscript', kind: 'wallet', specs })).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await create({
+          ...base,
+          category: 'wallet_list',
+          kind: 'wallet',
+          specs: { ...specs, walletCount: 0 },
+        })
+      ).status,
+    ).toBe(400);
+    const ok = await create({ ...base, category: 'wallet_list', kind: 'wallet', specs });
+    expect(ok.status).toBe(200);
+    const { id, slug } = (await ok.json()) as { id: string; slug: string };
+    const [row] = await sql<
+      { kind: string; specs: Record<string, unknown>; terminals: string[] }[]
+    >`
+      select kind, specs, terminals from listings where id = ${id}
+    `;
+    expect(row).toMatchObject({ kind: 'wallet', specs: { walletCount: 412, cadence: 'weekly' } });
+    expect(row!.terminals).toEqual(['Axiom', 'GMGN']);
+
+    const versionId = randomUUID();
+    await sql`
+      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status)
+      values (${versionId}, ${id}, '1.0.0', 'w.csv', 5, 'abc', 'blobs/abc', 'live')
+    `;
+    await sql`update listings set live_version_id = ${versionId}, first_live_at = ${now} where id = ${id}`;
+    const pub = (await (await app.request(`/api/v1/listings/${slug}`)).json()) as {
+      kind: string;
+      specs: Record<string, unknown>;
+    };
+    expect(pub.kind).toBe('wallet');
+    expect(pub.specs).toMatchObject({ formats: ['csv', 'json'], walletCount: 412 });
+
+    // The legacy body without a kind still works and carries no specs.
+    const legacy = await create({ ...base, title: 'Legacy pack', category: 'userscript' });
+    expect(legacy.status).toBe(200);
+  });
+});
