@@ -89,7 +89,9 @@ function depsFor(env: Binding, url: string) {
     trenchBalance: parsed.trenchMint
       ? (wallet: string) => tokenBalance(parsed.rpcUrl, wallet, parsed.trenchMint as string)
       : undefined,
-    optimizeImage,
+    // Wasm re-encode of a 2560 px PNG exceeds this account's Worker CPU limit (error 1102),
+    // so it is opt-in. Browsers convert to WebP before upload instead (studio page).
+    optimizeImage: parsed.imageOptimize ? optimizeImage : undefined,
     escrowChain: {
       account: (address: string) => accountData(parsed.rpcUrl, address),
       sendAndConfirm: (tx: Uint8Array) => sendAndConfirm(parsed.rpcUrl, tx),
