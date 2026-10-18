@@ -2049,7 +2049,9 @@ describe('versioning: updates, entitlement windows, limits and supplements', () 
     });
     // A fresh wallet on the same network does not get another free check.
     const other = await login(a, keypair());
-    expect((await post(a, '/verify', other, body, ip)).status).toBe(402);
+    expect(
+      (await post(a, '/verify', other, body, { ...ip, 'x-forwarded-for': '9.9.9.9' })).status,
+    ).toBe(402);
     // Nor does the same wallet from another network.
     expect(
       (await post(a, '/verify', cookie, body, { 'cf-connecting-ip': '198.51.100.9' })).status,

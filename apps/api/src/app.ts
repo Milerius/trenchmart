@@ -1457,10 +1457,8 @@ function clientIpHash(
   c: { req: { header: (name: string) => string | undefined } },
   deps: Deps,
 ): string {
-  const ip =
-    c.req.header('cf-connecting-ip') ||
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'local';
+  // Edge-provided client IP only (M-03): X-Forwarded-For is client-controlled.
+  const ip = clientIp(c, deps.env);
   // IPv6 clients rotate within their /64, so the network is the unit, not the address.
   const network = ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip;
   return ipHash(`verify:${network}`, deps.env.sessionSecret);
