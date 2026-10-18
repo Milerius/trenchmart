@@ -8,41 +8,52 @@ third-party account is needed for the default setup.
 | Layer                 | Where                                                                                                            | Covers                                                                                                                                          |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | **API ops check**     | `apps/api/src/ops.ts`, every 5 min in the API cron (`*/5`), and `GET /internal/ops`                              | RPC, web uptime, R2, DB, hot-wallet balances, upgrade authority, business and safety signals (table below)                                      |
-| **External watchdog** | separate Worker `trenchmart-watchdog` (`apps/api/src/watchdog.ts`, `watchdog.wrangler.toml`), its own 5 min cron | web, API `/api/v1/health` and Solana RPC, checked from outside the API Worker, so an API outage still pages                                     |
+| **External watchdog** | separate Worker `trenchmart-watchdog` (`apps/api/src/watchdog.ts`, `watchdog.wrangler.toml`), its own 5 min cron | web, API `/api/v1/health` and Solana RPC, checked from outside the API Worker, so an API outage still surfaces                                  |
 | **Error tracking**    | Workers Logs (`[observability] enabled` on both Workers) plus the `ops_events` table                             | every unhandled API error (`console.error` stack in Workers Logs, `5xx` row in `ops_events`); webhook, scan and R2 errors are tagged separately |
-| **Status dashboard**  | `https://trenchmart.fun/admin/status` (admin wallets only, `GET /admin/ops`)                                     | current checks, firing alerts, delivery channels, error counts for 24 h, alert history                                                          |
+| **Status dashboard**  | `https://trenchmart.fun/admin/status` (admin wallets only, `GET /admin/ops`)                                     | current checks, firing alerts, delivery = assistant, error counts for 24 h, alert history                                                       |
+| **Assistant poller**  | box script `/workspace/tm-alerts/check.sh` every 10 min                                                          | open + resolved from `GET /api/v1/internal/ops/alerts` (Bearer `INTERNAL_TOKEN`) plus watchdog `GET /`                                          |
 
 ### Alert delivery
 
-Alerts go to every configured channel:
+**Chat only (owner decision, 2026-10-18).** There is no ntfy, email, Telegram, or webhook push.
+Roman's assistant polls every **10 minutes**, reads open/resolved alert state, and relays anything
+new in chat. The Workers still run the checks and persist state; they just do not push.
 
-- **ntfy push + email: needs one free signup by Roman.**
-  - Why: anonymous ntfy.sh publishing from Cloudflare Workers hits ntfy's shared daily quota, because all Workers share egress IPs (verified 2026-10-18: HTTP 429, code 42908). ntfy.sh also refuses anonymous email (40053).
-  - Steps:
-    1. Create a free account at https://ntfy.sh/signup.
-    2. Create an access token under Account → Access tokens.
-    3. Run `wrangler secret put ALERT_NTFY_TOKEN` on the API Worker (`-c wrangler.deploy.toml`) and on the watchdog (`-c watchdog.wrangler.toml`).
-    4. Subscribe to the topic in the ntfy phone app for push.
-  - Already set on both Workers: `ALERT_NTFY_TOPIC` (secret, stored in `~/.config/trenchmart/alerts.env` on the ops box; anyone who knows the topic can read the alerts) and `ALERT_EMAIL=rmscastle@gmail.com`.
-  - With the token, every alert is pushed and emailed. If an email is refused, the alert falls back to push.
-  - An alert that could not be delivered on any channel is retried on the next tick.
-- **Telegram (optional).** Create a bot with @BotFather, send it one message, and read the chat id from `https://api.telegram.org/bot<token>/getUpdates`. Then run `wrangler secret put TELEGRAM_BOT_TOKEN` and `wrangler secret put TELEGRAM_CHAT_ID` on the API Worker. For the watchdog, add `-c watchdog.wrangler.toml`.
-- **Generic webhook (optional).** Set `ALERT_WEBHOOK_URL`; it receives a JSON POST `{title, text, level}`.
+How the assistant reads state (no secrets printed by the helper script):
 
-How often an alert is sent:
+1. **Preferred:** `GET https://api.trenchmart.fun/api/v1/internal/ops/alerts` with
+   `Authorization: Bearer $INTERNAL_TOKEN` (token file:
+   `~/.config/trenchmart/internal-token`, also in `api-secrets.env`). Returns JSON
+   `{ checkedAt, ok, live, open, resolved, delivery: "assistant" }`.
+2. **Admin UI / wallet session:** `GET /api/v1/admin/ops` (same payload as `/admin/status`).
+3. **DB:** `ops_alerts` via `~/.config/trenchmart/sbq.sh` (Supabase Management API).
+4. **Watchdog:** `GET https://trenchmart-watchdog.trenchmart.workers.dev/` →
+   `{ ok, checks: [{name, ok, detail}] }`.
 
-- The API side keeps state in `ops_alerts`. An alert is sent **once when it opens**, **again every 6 h while it stays open**, and **once when it resolves**.
-- The watchdog is stateless. It reads its own recent messages back from the ntfy topic, sends DOWN once per target, and sends UP once on recovery.
-- If the DB itself is down, every alert is sent on every run without dedup, so you may get a notice every 5 min until the DB is back.
+On the ops box, run `/workspace/tm-alerts/check.sh` — it calls (1) and (4) and prints one JSON
+object. Schedule it every 10 min from the assistant.
 
-Test delivery at any time:
+How often state changes:
+
+- The API cron keeps state in `ops_alerts`. A row opens **once**, is refreshed every **6 h** while
+  still firing (`notified_at`), and gets `resolved_at` when it clears.
+- The watchdog is stateless: each cron tick logs `ALERT {...}` for failing targets; the poller
+  sees current `checks` on `GET /`.
+- If the DB itself is down, `/internal/ops` still returns live probe failures; `ops_alerts` rows
+  cannot update until the DB is back.
+
+Manual check (same as the script):
 
 ```bash
-curl -X POST -H "authorization: Bearer $INTERNAL_TOKEN" "https://api.trenchmart.fun/api/v1/internal/ops/test?code=LOW_BALANCE"
-# → {"channels":["ntfy"]}  (ntfy also relays the email)
-curl -X POST -H "authorization: Bearer $INTERNAL_TOKEN" https://api.trenchmart.fun/api/v1/internal/ops/run   # real check + delivery
-curl https://trenchmart-watchdog.<account>.workers.dev/   # watchdog's live check results
+curl -sS -H "authorization: Bearer $INTERNAL_TOKEN" \
+  https://api.trenchmart.fun/api/v1/internal/ops/alerts
+curl -sS https://trenchmart-watchdog.trenchmart.workers.dev/
+# Optional: force a check + persist notices (still no push):
+curl -X POST -H "authorization: Bearer $INTERNAL_TOKEN" \
+  https://api.trenchmart.fun/api/v1/internal/ops/run
 ```
+
+`ALERT_NTFY_*`, `TELEGRAM_*`, and `ALERT_WEBHOOK_URL` are ignored if set. Leave them unset.
 
 ## Alerts and runbooks
 
