@@ -444,13 +444,17 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     }
     if (!matched)
       throw new HttpError(401, 'BAD_SIGNATURE', 'signature does not match an open nonce');
-    const used = await deps.sql`
-      update auth_nonces set used_at = ${deps.now()} where nonce = ${matched.nonce} and used_at is null returning nonce
-    `;
+    // The signature is valid: consume the nonce, look up the user and take the first
+    // balance snapshot in one round trip instead of three (sign-in waited ~3 s).
+    const [used, existing] = await Promise.all([
+      deps.sql`
+        update auth_nonces set used_at = ${deps.now()} where nonce = ${matched.nonce} and used_at is null returning nonce
+      `,
+      deps.sql<Record<string, any>[]>`select * from users where wallet = ${body.wallet}`,
+      ensureSnapshot(deps, body.wallet),
+    ]);
     if (used.length === 0) throw new HttpError(401, 'NONCE_USED', 'nonce already used');
-    let users = await deps.sql<
-      Record<string, any>[]
-    >`select * from users where wallet = ${body.wallet}`;
+    let users = existing;
     if (!users[0]) {
       users = await deps.sql<Record<string, any>[]>`
         insert into users (wallet, roles) values (${body.wallet}, ${deps.sql.array(['buyer'])}::user_role[]) returning *
@@ -458,7 +462,6 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     }
     const user = users[0];
     if (!user) throw new HttpError(500, 'INTERNAL', 'could not create user');
-    await ensureSnapshot(deps, body.wallet);
     const exp = await issueSession(c, user.id as string);
     return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
   });
@@ -487,7 +490,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/me', async (c) => {
     const user = requireUser(c);
     const config = await loadConfig(deps);
-    const tier = await tierForWallet(deps, user.wallet as string, config);
+    const tier = await tierForWallet(deps, user.wallet as string, config, { reconcile: false });
     return c.json(
       jsonSafe({
         user: publicUser(user),
@@ -1089,18 +1092,21 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.get('/studio/requirements', async (c) => {
     const user = requireUser(c);
-    const config = await loadConfig(deps);
+    const configQ = loadConfig(deps);
+    const [config, categories, bond] = await Promise.all([
+      configQ,
+      deps.sql<{ category: string }[]>`
+        select distinct category from listings where creator_id = ${user.id} and delisted_at is null and live_version_id is not null
+      `,
+      activeBond(deps.sql, user.id as string),
+    ]);
     const tier = await tierForWallet(deps, user.wallet as string, config);
-    const categories = await deps.sql<{ category: string }[]>`
-      select distinct category from listings where creator_id = ${user.id} and delisted_at is null and live_version_id is not null
-    `;
     const required = bondToList(
       categories.map((row) => row.category),
       config.bond_lamports_by_category,
       tier.tier,
       config.og_bond_discount_bps,
     );
-    const bond = await activeBond(deps.sql, user.id as string);
     return c.json(
       jsonSafe({
         creator: ((user.roles as string[] | undefined) ?? []).includes('creator'),

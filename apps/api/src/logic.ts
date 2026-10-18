@@ -169,13 +169,18 @@ export async function tierForWallet(
   deps: Deps,
   wallet: string,
   config: AppConfig,
+  opts: { reconcile?: boolean } = {},
 ): Promise<{
   tier: Tier;
   minBalance: bigint;
   nextTier: Tier | null;
   needed: bigint;
 }> {
-  await reconcileBalance(deps, wallet);
+  // Display-only reads (/me on every page) skip the on-chain re-read: the stored history is
+  // kept current by the $TRENCH webhook, and every fee decision (checkout, verification,
+  // featuring) still reconciles first. A Solana RPC call here cost ~1 s on each page view.
+  if (opts.reconcile === false) await ensureSnapshot(deps, wallet);
+  else await reconcileBalance(deps, wallet);
   const rows = await deps.sql<
     { amount: string; ts: Date; source: 'webhook' | 'snapshot' | 'reconcile' }[]
   >`
@@ -240,20 +245,35 @@ export async function ensureSnapshot(deps: Deps, wallet: string): Promise<void> 
  * 'reconcile' row when it changed. The tier uses the minimum over the window, so a
  * balance that went up only counts once it has been held for the whole window.
  */
+// When each wallet's balance was last read from chain (this isolate). An unchanged balance
+// stores no row, so the newest row's time alone made every request (/me on every page,
+// /studio/requirements) wait for a Solana RPC call once a wallet's balance was 5 min old.
+const reconciledAt = new Map<string, number>();
+const RECONCILED_MAX = 5_000;
+
 export async function reconcileBalance(deps: Deps, wallet: string): Promise<void> {
   if (!deps.trenchBalance) return;
+  const nowMs = deps.now().getTime();
+  const checked = reconciledAt.get(wallet);
+  if (checked !== undefined && nowMs >= checked && nowMs - checked < BALANCE_RECONCILE_MS) return;
   const [last] = await deps.sql<{ amount: string; ts: Date }[]>`
     select amount::text as amount, ts from token_balances where wallet = ${wallet}
     order by ts desc limit 1
   `;
   if (!last) return ensureSnapshot(deps, wallet);
-  if (deps.now().getTime() - new Date(last.ts).getTime() < BALANCE_RECONCILE_MS) return;
+  if (nowMs - new Date(last.ts).getTime() < BALANCE_RECONCILE_MS) return;
   const amount = await readTrench(deps, wallet);
-  if (amount === null || amount === BigInt(last.amount)) return;
-  await deps.sql`
-    insert into token_balances (wallet, amount, ts, source)
-    values (${wallet}, ${amount.toString()}, ${deps.now()}, 'reconcile')
-  `;
+  if (amount === null) return;
+  if (amount !== BigInt(last.amount)) {
+    await deps.sql`
+      insert into token_balances (wallet, amount, ts, source)
+      values (${wallet}, ${amount.toString()}, ${deps.now()}, 'reconcile')
+    `;
+  }
+  // Only once the chain read is stored (or matched the stored row): a failed insert must not
+  // skip the next reconcile.
+  if (reconciledAt.size >= RECONCILED_MAX) reconciledAt.clear();
+  reconciledAt.set(wallet, nowMs);
 }
 
 function unsignedTx(input: {

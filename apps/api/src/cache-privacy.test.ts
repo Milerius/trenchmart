@@ -232,4 +232,28 @@ describe('edge cache privacy (integration)', () => {
     expect(anon.status).toBe(404);
     expect(cache.store.size).toBe(0);
   });
+
+  it('viewer-independent reads are shared with signed-in visitors, keyed without the cookie', async () => {
+    const { fetch, cache } = await edge();
+    const cookie = await signIn(fetch, keypair());
+    const anon = await fetch('/config/public');
+    expect(anon.headers.get('x-edge-cache')).toBe('MISS');
+    const signedIn = await fetch('/config/public', { headers: { cookie } });
+    expect(signedIn.headers.get('x-edge-cache')).toBe('HIT');
+    expect(await signedIn.json()).toEqual(await (await fetch('/config/public')).json());
+    // Filled by a signed-in request, then served to anonymous visitors: still no session in it.
+    const stats = await fetch('/stats', { headers: { cookie } });
+    expect(stats.headers.get('x-edge-cache')).toBe('MISS');
+    expect((await fetch('/stats')).headers.get('x-edge-cache')).toBe('HIT');
+    for (const [key, res] of cache.store) {
+      expect(key).not.toContain('tm_session');
+      expect(res.headers.get('set-cookie')).toBeNull();
+      expect(await res.clone().text()).not.toContain(cookie.split('=')[1]!.slice(0, 16));
+    }
+    // Viewer-dependent public reads still never use the shared copy when signed in.
+    for (const path of ['/listings', '/creators/someone']) {
+      const res = await fetch(path, { headers: { cookie } });
+      expect(res.headers.get('x-edge-cache'), path).toBeNull();
+    }
+  });
 });

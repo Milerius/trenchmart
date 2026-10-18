@@ -132,7 +132,13 @@ test.describe('live caching privacy', () => {
   test.skip(!live, 'set TM_LIVE_URL to run against the deployed site');
 
   test('a session cookie never gets a shared-cache response', async ({ request }) => {
-    for (const path of ['/api/v1/listings', '/api/v1/stats', '/api/v1/me', '/api/v1/me/orders']) {
+    // /stats, /config/public... are viewer-independent and shared on purpose (edge-cache.ts).
+    for (const path of [
+      '/api/v1/listings',
+      '/api/v1/me',
+      '/api/v1/me/orders',
+      '/api/v1/studio/overview',
+    ]) {
       const res = await request.get(`${api}${path}`, {
         headers: { cookie: 'tm_session=perf-guard-not-a-real-session' },
       });

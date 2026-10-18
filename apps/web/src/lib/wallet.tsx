@@ -35,6 +35,7 @@ import {
   writeSessionHint,
   type SessionUser,
 } from './wallet-session';
+import { clearStudioCache } from './studio-cache';
 import {
   createWalletConnectProvider,
   signWalletConnectMessage,
@@ -77,6 +78,8 @@ export type WalletPhase = 'idle' | 'connecting' | 'signing' | 'verifying';
 type WalletContextValue = {
   session: Session | null;
   status: AuthStatus;
+  /** False until the first /me answer: 'signed-out' before that means "not known yet". */
+  checked: boolean;
   phase: WalletPhase;
   /** The wallet account the adapter is connected to (may differ from the session's). */
   walletAddress: string | null;
@@ -156,6 +159,7 @@ type MeResponse = {
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>('signed-out');
+  const [checked, setChecked] = useState(false);
   const [phase, setPhase] = useState<WalletPhase>('idle');
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -185,6 +189,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   /** The one place session state changes: React state, the ref, and the cross-tab hint. */
   function applySession(next: Session | null, nextStatus: AuthStatus, expiresAt?: string | null) {
+    // The per-tab studio cache follows the session: dropped on sign-out or a wallet switch.
+    if (!next || (sessionRef.current && next.wallet !== sessionRef.current.wallet))
+      clearStudioCache();
     sessionRef.current = next;
     setSession(next);
     setStatus(nextStatus);
@@ -286,6 +293,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       } else if (!sessionRef.current) {
         applySession(null, 'signed-out');
       }
+    } finally {
+      setChecked(true);
     }
   }
 
@@ -303,6 +312,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       authGen.current += 1;
       const hint = readSessionHint(storage());
       if (!hint) {
+        clearStudioCache();
         sessionRef.current = null;
         setSession(null);
         setStatus('signed-out');
@@ -636,6 +646,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       status,
+      checked,
       phase,
       walletAddress,
       walletMismatch,
@@ -649,7 +660,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       signMessage,
       refresh: () => refresh(),
     }),
-    [session, status, phase, walletAddress, walletMismatch, busy, error],
+    [session, status, checked, phase, walletAddress, walletMismatch, busy, error],
   );
 
   // Mount (and download) the picker only once it has been opened.
