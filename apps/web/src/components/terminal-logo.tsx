@@ -22,6 +22,7 @@ export function TerminalMark({
       data-terminal-logo={name}
       width={16}
       height={16}
+      loading="lazy"
       decoding="async"
       draggable={false}
       className={`inline-block shrink-0 rounded-[3px] object-cover align-[-0.125em] ${className}`}

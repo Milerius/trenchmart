@@ -37,10 +37,17 @@ test('the home bundle does not load zod, tweetnacl or the chain package', async 
 
 test('shared reads are preloaded with credentials so the app reuses them', async ({ page }) => {
   await page.goto('/');
-  for (const href of ['/api/v1/me', '/api/v1/listings', '/api/v1/config/public']) {
+  for (const href of ['/api/v1/me', '/api/v1/config/public']) {
     const link = page.locator(`link[rel="preload"][as="fetch"][href="${href}"]`);
     await expect(link).toHaveAttribute('crossorigin', 'use-credentials');
   }
+  // Below-the-fold reads are not preloaded, so they never compete with the first paint.
+  for (const href of ['/api/v1/listings', '/api/v1/stats', '/api/v1/activity?limit=24']) {
+    await expect(page.locator(`link[rel="preload"][as="fetch"][href="${href}"]`)).toHaveCount(0);
+  }
+  // Only the body font is preloaded; terminal logos load lazily.
+  await expect(page.locator('link[rel="preload"][as="font"]')).toHaveCount(1);
+  await expect(page.locator('link[rel="preload"][as="image"][href^="/terminals/"]')).toHaveCount(0);
 });
 
 test('entrance animations are unchanged (rise and route fade still run)', async ({ page }) => {

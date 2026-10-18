@@ -51,6 +51,8 @@ function Ticker() {
   const [items, setItems] = useState(TICKER_FACTS);
 
   useEffect(() => {
+    // The ticker is hidden below sm: phones skip its reads entirely.
+    if (!window.matchMedia('(min-width: 640px)').matches) return;
     let stop = false;
     const fromListings = () =>
       api<{ title: string }[]>('/listings')
@@ -346,11 +348,12 @@ function Footer() {
   );
 }
 
-// Reads every page makes on mount (session, ticker titles, fee config). Preloading them in the
-// HTML starts the requests in parallel with the JS download instead of after hydration.
+// Reads every page needs right away (session, fee config). Preloading them in the HTML starts
+// them in parallel with the JS download. Below-the-fold reads (ticker, home sections) are not
+// preloaded: on a phone they would compete with the first paint for the connection.
 // The mode must match api(): same-origin with credentials ('use-credentials'), or the
 // browser fetches twice. These are hints only; nothing here changes what is cached.
-const PRELOADED_READS = ['/api/v1/me', '/api/v1/listings', '/api/v1/config/public'];
+const PRELOADED_READS = ['/api/v1/me', '/api/v1/config/public'];
 
 export function Shell({ children }: { children: ReactNode }) {
   // Home lays out its own full-bleed bands (hero, terminals); every other page gets the column.
