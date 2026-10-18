@@ -189,6 +189,18 @@ The Worker has no Cloudflare API token, so the Hyperdrive config is read from ou
 
 The workflow does not fail on drift, because a failed scheduled run emails the owner, and alerts go to the assistant chat through `/internal/ops/alerts`.
 
+### HEALTH_CHECK_FAILED
+
+Comes from the `health-check` workflow, which runs every 10 min and reports to `POST /internal/ops/report` instead of failing (a failed scheduled run emails the owner).
+
+- Critical: the public API health, the web app, or the internal ops check answered with an error. The message names which one. Open the URL, then check Workers Logs for `trenchmart-web` or `trenchmart-api`.
+- Warn: no report for 40 min. The workflow is not running, `TM_INTERNAL_TOKEN` is wrong, or the API was down while it ran. Look at the workflow's recent runs.
+- If the API is down entirely, nothing can be reported, and the relay sees `/internal/ops/alerts` unreachable instead.
+
+### BACKUP_FAILED
+
+Warn. The nightly `db-backup` workflow reported a failure (installing tools, the dump/encrypt/upload step, or missing secrets), or it has not reported for 26 h. Read that run's log, fix the cause, and re-run it with `workflow_dispatch`. Its steps continue on error, so the run itself stays green.
+
 ### DISPUTE_SPIKE
 
 Critical. 5 or more disputes in 1 hour. This may be a malicious listing or a broken release.

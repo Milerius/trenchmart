@@ -333,6 +333,49 @@ describe('monitoring and alerts', () => {
     expect(stale[0]!.message).toContain('No Hyperdrive limit report for 4 h');
   });
 
+  it('scheduled workflows report in: a failure or silence is an alert, never an email', async () => {
+    const { deps, world } = await setup();
+    const app = createApp(deps);
+    const report = (body: unknown, token = TOKEN) =>
+      app.request('/api/v1/internal/ops/report', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    expect((await report({ check: 'health-check', ok: false }, 'wrong')).status).toBe(401);
+    expect((await report({ check: 'nope', ok: true })).status).toBe(400);
+    expect((await report({ check: 'health-check', ok: 'yes' })).status).toBe(400);
+    expect(await codes(deps)).toEqual([]);
+    expect(
+      (await report({ check: 'health-check', ok: true, detail: 'api ok, web ok' })).status,
+    ).toBe(200);
+    expect((await report({ check: 'db-backup', ok: true })).status).toBe(200);
+    expect(await codes(deps)).toEqual([]);
+    await report({ check: 'health-check', ok: false, detail: 'web: HTTP 502' });
+    const failed = await opsCheck(deps);
+    expect(failed).toEqual([
+      {
+        level: 'critical',
+        code: 'HEALTH_CHECK_FAILED',
+        message: 'health-check failed: web: HTTP 502',
+      },
+    ]);
+    await report({ check: 'health-check', ok: true });
+    await report({ check: 'db-backup', ok: false, detail: 'upload failed' });
+    expect((await opsCheck(deps)).map((a) => [a.level, a.code])).toEqual([
+      ['warn', 'BACKUP_FAILED'],
+    ]);
+    await sql`delete from ops_events where kind = 'scheduled_check'`;
+    await sql`
+      insert into ops_events (kind, detail, created_at)
+      values ('scheduled_check', '{"check":"health-check","ok":true,"detail":""}', ${new Date(now.getTime() - 50 * 60_000)})
+    `;
+    const stale = await opsCheck(deps);
+    expect(stale.map((a) => [a.level, a.code])).toEqual([['warn', 'HEALTH_CHECK_FAILED']]);
+    expect(stale[0]!.message).toContain('has not reported for 50 min');
+    expect(world.sent).toEqual([]);
+  });
+
   it('ntfy: email only with an account token; refused email falls back to push', async () => {
     const posts: Record<string, string>[] = [];
     let refuseEmail = true;
