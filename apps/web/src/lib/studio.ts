@@ -55,8 +55,37 @@ export async function payVerificationFee(input: {
 }
 
 /**
- * Make sure an existing version's fee is paid before review starts. Asks the API for a
- * fresh transaction, since the one issued at creation may carry an expired blockhash.
+ * Sign and send a SOL supplement (an upload or a verification beyond the daily free limit),
+ * then record it. Returns false when there is nothing to pay.
+ */
+export async function paySupplement(input: {
+  api: ApiCall;
+  supplementId: string;
+  tx: UnsignedTx | null | undefined;
+  signAndSend: (txBase64: string) => Promise<string>;
+  retry?: RetryOptions;
+}): Promise<boolean> {
+  if (!input.tx) return false;
+  const txSig = await input.signAndSend(input.tx.txBase64);
+  await submitPayment(
+    input.api,
+    `/supplements/${input.supplementId}/submitted`,
+    txSig,
+    input.retry,
+  );
+  return true;
+}
+
+type FeeState = {
+  paid: boolean;
+  feeTx: UnsignedTx | null;
+  supplement?: { id: string; paid: boolean; tx: UnsignedTx | null } | null;
+};
+
+/**
+ * Make sure an existing version's fee (and its upload supplement, if any) is paid before
+ * review starts. Asks the API for fresh transactions, since the ones issued at creation may
+ * carry an expired blockhash.
  */
 export async function ensureVerificationFee(input: {
   api: ApiCall;
@@ -64,10 +93,18 @@ export async function ensureVerificationFee(input: {
   signAndSend: (txBase64: string) => Promise<string>;
   retry?: RetryOptions;
 }): Promise<boolean> {
-  const state = await input.api<{ paid: boolean; feeTx: UnsignedTx | null }>(
-    `/studio/versions/${input.versionId}/fee-tx`,
-    { method: 'POST' },
-  );
-  if (state.paid) return false;
-  return payVerificationFee({ ...input, feeTx: state.feeTx });
+  const state = await input.api<FeeState>(`/studio/versions/${input.versionId}/fee-tx`, {
+    method: 'POST',
+  });
+  let paid = false;
+  if (!state.paid) paid = await payVerificationFee({ ...input, feeTx: state.feeTx });
+  if (state.supplement && !state.supplement.paid) {
+    paid =
+      (await paySupplement({
+        ...input,
+        supplementId: state.supplement.id,
+        tx: state.supplement.tx,
+      })) || paid;
+  }
+  return paid;
 }

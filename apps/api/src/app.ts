@@ -96,6 +96,23 @@ import {
   type Deps,
 } from './logic';
 import { orderEscrow, recentEscrows, scanReport, transparency } from './transparency';
+import {
+  HttpDataError,
+  assertSupplementPaid,
+  consumeVerification,
+  createRenewal,
+  createVerifySupplement,
+  createVersionRow,
+  orderUpdates,
+  pickDownload,
+  renewalQuoteFor,
+  settleRenewal,
+  settleSupplement,
+  suggestedUpdatePrice,
+  supplementState,
+  uploadQuota,
+  verifyQuota,
+} from './versioning';
 
 type Vars = { user: Record<string, any> | null };
 type App = Hono<{ Variables: Vars }>;
@@ -144,6 +161,12 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   const app = new Hono<{ Variables: Vars }>();
   app.onError((err, c) => {
+    if (err instanceof HttpDataError) {
+      return c.json(
+        jsonSafe({ error: { code: err.code, message: err.message, ...err.data } }),
+        err.status as 400,
+      );
+    }
     if (err instanceof HttpError) {
       return c.json({ error: { code: err.code, message: err.message } }, err.status as 400);
     }
@@ -377,6 +400,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         verificationFeeLamports: config.verification_fee_lamports,
         bondLamportsByCategory: config.bond_lamports_by_category,
         terminals: config.terminals,
+        updateFreeDays: config.update_free_days,
+        updatePeriodDays: config.update_period_days,
+        updatePriceDefaultBps: config.update_price_default_bps,
+        updateLimitPerListingDay: config.update_limit_per_listing_day,
+        uploadLimitPerCreatorDay: config.upload_limit_per_creator_day,
+        uploadSupplementLamports: config.upload_supplement_lamports,
+        verifyFreePerDay: config.verify_free_per_day,
+        verifySupplementLamports: config.verify_supplement_lamports,
       }),
     );
   });
@@ -556,11 +587,32 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       where o.buyer_id = ${user.id} order by o.created_at desc
     `;
     const price = await solPrice();
+    const config = await loadConfig(deps);
+    const owned = rows.filter((row) => ['paid', 'released', 'disputed'].includes(row.status));
+    const tier = owned.length
+      ? (await tierForWallet(deps, user.wallet as string, config)).tier
+      : ('none' as const);
+    const rebateBps = config.tier_rebate_bps[tier];
+    const updates = new Map<string, unknown>();
+    for (const row of owned) {
+      const info = await orderUpdates(deps, row, config);
+      const fee = (info.updatePrice * BigInt(config.fee_bps)) / 10_000n;
+      const rebate = (fee * BigInt(rebateBps)) / 10_000n;
+      const { versions, ...rest } = info;
+      updates.set(row.id as string, {
+        ...rest,
+        renewTotal: info.updatePrice + fee - rebate,
+        versions: versions
+          .filter((v) => v.entitled)
+          .map((v) => ({ id: v.id, semver: v.semver, purchased: v.purchased })),
+      });
+    }
     return c.json(
       jsonSafe({
         solUsd: { centsPerSol: price.centsPerSol, source: price.source },
         orders: rows.map(({ cover_image_id: coverId, ...order }) => ({
           ...order,
+          updates: updates.get(order.id as string) ?? null,
           cover: coverId ? { url: mediaUrl(coverId as string), alt: '' } : null,
           amount: moneyView(
             order.total as bigint,
@@ -589,9 +641,23 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const license =
       await deps.sql`select 1 from licenses where order_id = ${order.id} and wallet = ${user.wallet}`;
     if (license.length === 0) throw new HttpError(403, 'NO_LICENSE', 'no license for this wallet');
+    // Latest entitled version by default; a specific entitled version (for example the exact
+    // one purchased) when asked. A version released after updates lapsed is refused.
+    const text = await c.req.text().catch(() => '');
+    let asked: string | undefined = c.req.query('version') || undefined;
+    if (!asked && text) {
+      try {
+        const parsed = JSON.parse(text) as { versionId?: unknown };
+        if (typeof parsed.versionId === 'string') asked = parsed.versionId;
+      } catch {
+        throw new HttpError(400, 'BAD_REQUEST', 'invalid body');
+      }
+    }
+    const entitlement = await orderUpdates(deps, order);
+    const versionId = pickDownload(entitlement, asked);
     const versions = await deps.sql<
       Record<string, any>[]
-    >`select * from versions where id = ${order.version_id}`;
+    >`select * from versions where id = ${versionId}`;
     const version = versions[0];
     if (!version) throw new HttpError(404, 'NOT_FOUND', 'version missing');
     const original = await deps.blob.get(version.r2_key as string);
@@ -603,7 +669,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       user.wallet as string,
       version.sha256 as string,
     );
-    const key = `licensed/${order.id}/${version.file_name}`;
+    const key = `licensed/${order.id}/${version.id}/${version.file_name}`;
     await deps.blob.put(key, bytes);
     const exp = Math.floor(deps.now().getTime() / 1000) + 300;
     await deps.sql`
@@ -613,7 +679,53 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json({
       url: deps.blob.signedGet(key, exp),
       expiresAt: new Date(exp * 1000).toISOString(),
+      versionId: version.id,
+      semver: version.semver,
     });
+  });
+
+  api.get('/orders/:id/versions', async (c) => {
+    const user = requireUser(c);
+    const order = await ownOrder(deps, c.req.param('id'), user.id as string);
+    return c.json(jsonSafe(await orderUpdates(deps, order)));
+  });
+
+  api.post('/orders/:id/updates/quote', async (c) => {
+    const user = requireUser(c);
+    const order = await ownOrder(deps, c.req.param('id'), user.id as string);
+    const q = await renewalQuoteFor(deps, order, user.wallet as string);
+    const price = await solPrice();
+    return c.json(
+      jsonSafe({
+        price: q.price,
+        fee: q.fee,
+        rebate: q.rebate,
+        total: q.total,
+        tier: q.tier,
+        feeBps: q.feeBps,
+        rebateBps: q.rebateBps,
+        startsAt: q.startsAt,
+        endsAt: q.endsAt,
+        periodDays: q.periodDays,
+        totalUsd: moneyView(q.total, price.centsPerSol, formatSol(q.total)),
+      }),
+    );
+  });
+
+  api.post('/orders/:id/updates/renew', async (c) => {
+    const user = requireUser(c);
+    const order = await ownOrder(deps, c.req.param('id'), user.id as string);
+    return c.json(jsonSafe(await createRenewal(deps, order, user)));
+  });
+
+  api.post('/orders/:id/updates/:renewalId/submitted', async (c) => {
+    const user = requireUser(c);
+    const body = await bodyOf(submittedBody, await c.req.json());
+    await ownOrder(deps, c.req.param('id'), user.id as string);
+    const result = await settleRenewal(deps, c.req.param('renewalId'), user, body.txSig);
+    if (!result.ok) throw new HttpError(400, result.code, result.message);
+    const order = await ownOrder(deps, c.req.param('id'), user.id as string);
+    return c.json(jsonSafe({ ok: true, updatesUntil: order.updates_until }));
   });
 
   api.post('/orders/:id/review', async (c) => {
@@ -665,10 +777,42 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json({ ok: true });
   });
 
+  // Standalone file verification: one free check per wallet and network per UTC day, then a
+  // SOL supplement. Anonymous use cannot be limited reliably (addresses rotate), so a wallet
+  // sign-in is required.
+  api.get('/verify/quota', async (c) => {
+    const user = c.get('user');
+    return c.json(jsonSafe(await verifyQuota(deps, user, clientIpHash(c, deps))));
+  });
+
   api.post('/verify', async (c) => {
+    const user = c.get('user');
+    if (!user) {
+      throw new HttpError(401, 'SIGN_IN_REQUIRED', 'sign in with a wallet to verify a file');
+    }
+    requireUser(c);
     const body = await bodyOf(verifyJsonBody, await c.req.json());
-    const bytes = Uint8Array.from(atob(body.contentBase64), (char) => char.charCodeAt(0));
-    return c.json(await matchFile(deps, body.fileName, bytes));
+    let bytes: Uint8Array;
+    try {
+      bytes = Uint8Array.from(atob(body.contentBase64), (char) => char.charCodeAt(0));
+    } catch {
+      throw new HttpError(400, 'BAD_REQUEST', 'file is not base64');
+    }
+    const used = await consumeVerification(deps, user, clientIpHash(c, deps), body.supplementId);
+    return c.json({ ...(await matchFile(deps, body.fileName, bytes)), free: used.free });
+  });
+
+  api.post('/verify/supplement', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await createVerifySupplement(deps, user)));
+  });
+
+  api.post('/supplements/:id/submitted', async (c) => {
+    const user = requireUser(c);
+    const body = await bodyOf(submittedBody, await c.req.json());
+    const result = await settleSupplement(deps, c.req.param('id'), user.id as string, body.txSig);
+    if (!result.ok) throw new HttpError(400, result.code, result.message);
+    return c.json({ ok: true });
   });
 
   api.get('/studio/requirements', async (c) => {
@@ -742,14 +886,18 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     await assertBond(deps, user, body.category);
     await grantCreatorRole(deps.sql, user.id as string);
     const slug = await uniqueSlug(deps, body.title);
+    const updatePrice =
+      body.updatePriceLamports !== undefined
+        ? BigInt(body.updatePriceLamports)
+        : suggestedUpdatePrice(BigInt(body.priceLamports), await loadConfig(deps));
     const inserted = await deps.sql<{ id: string }[]>`
       insert into listings (
         creator_id, slug, title, summary, description, category, terminals, price, license,
-        sub_period_days, holder_only_hours, holder_only
+        sub_period_days, holder_only_hours, holder_only, update_price
       ) values (
         ${user.id}, ${slug}, ${body.title}, ${body.summary}, ${body.description}, ${body.category}::category,
         ${deps.sql.array(body.terminals)}, ${BigInt(body.priceLamports)}, ${body.license}::license_kind,
-        ${body.subPeriodDays ?? null}, ${body.holderOnlyHours}, ${body.holderOnly}
+        ${body.subPeriodDays ?? null}, ${body.holderOnlyHours}, ${body.holderOnly}, ${updatePrice}
       ) returning id
     `;
     return c.json({ id: inserted[0]?.id, slug });
@@ -764,6 +912,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       jsonSafe({
         listing: {
           ...publicListing(listing),
+          liveVersionId: listing.live_version_id,
           handle: user.handle,
           cover: cover ? { url: mediaUrl(cover), alt: '' } : null,
           imageCount: content.draft.gallery.length,
@@ -823,7 +972,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         description = coalesce(${body.description ?? null}, description),
         price = coalesce(${body.priceLamports ? BigInt(body.priceLamports) : null}, price),
         holder_only = coalesce(${body.holderOnly ?? null}, holder_only),
-        holder_only_hours = coalesce(${body.holderOnlyHours ?? null}, holder_only_hours)
+        holder_only_hours = coalesce(${body.holderOnlyHours ?? null}, holder_only_hours),
+        update_price = coalesce(${body.updatePriceLamports !== undefined ? BigInt(body.updatePriceLamports) : null}, update_price)
       where id = ${listing.id}
     `;
     return c.json({ ok: true });
@@ -842,28 +992,65 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const tier = await tierForWallet(deps, user.wallet as string, config);
     const waived = tierAtLeast(tier.tier, config.verification_fee_free_from_tier);
     const fee = waived ? 0n : config.verification_fee_lamports;
-    const inserted = await deps.sql<{ id: string }[]>`
-      insert into versions (listing_id, semver, changelog, file_name, file_size, sha256, r2_key, status, vfee_lamports)
-      values (
-        ${listing.id}, ${body.semver}, ${body.changelog}, ${body.fileName}, ${body.fileSize}, '', ${'uploads/pending'},
-        'uploading', ${fee}
-      ) returning id
-    `;
-    const id = inserted[0]?.id;
-    if (!id) throw new HttpError(500, 'INTERNAL', 'version insert failed');
+    // Daily limits are enforced here, under a per-creator lock (see versioning.ts).
+    const created = await createVersionRow(deps, {
+      listing,
+      semver: body.semver,
+      changelog: body.changelog,
+      fileName: body.fileName,
+      fileSize: body.fileSize,
+      vfeeLamports: fee,
+      acceptSupplementLamports: body.acceptSupplementLamports,
+      config,
+    });
+    const id = created.versionId;
     const key = `uploads/${id}`;
-    await deps.sql`update versions set r2_key = ${key} where id = ${id}`;
     const exp = Math.floor(deps.now().getTime() / 1000) + 15 * 60;
     const feeTx =
       fee > 0n
         ? await buildVaultTx(deps, user.wallet as string, fee, verificationFeeMemo(id))
         : null;
+    const supplement = await supplementState(deps, created.supplement?.id, user.wallet as string);
     return c.json(
       jsonSafe({
         versionId: id,
         uploadUrl: deps.blob.signedPut(key, exp),
         verificationFee: fee,
         feeTx,
+        supplement: supplement
+          ? {
+              id: supplement.id,
+              lamports: supplement.lamports,
+              reasons: created.supplement?.reasons ?? [],
+              tx: supplement.tx,
+            }
+          : null,
+      }),
+    );
+  });
+
+  api.get('/studio/listings/:id/upload-quota', async (c) => {
+    const user = requireUser(c);
+    const listing = await ownListingParam(deps, c.req.param('id'), user.id as string);
+    const config = await loadConfig(deps);
+    const quota = await uploadQuota(deps.sql, deps.now(), config, listing);
+    const tier = await tierForWallet(deps, user.wallet as string, config);
+    const versions = await deps.sql<Record<string, any>[]>`
+      select id, semver, status, changelog, created_at, live_at from versions
+      where listing_id = ${listing.id} order by created_at desc limit 20
+    `;
+    return c.json(
+      jsonSafe({
+        listing: {
+          ...publicListing(listing),
+          updatePrice: listing.update_price,
+          liveVersionId: listing.live_version_id,
+        },
+        ...quota,
+        verificationFee: config.verification_fee_lamports,
+        feeWaived: tierAtLeast(tier.tier, config.verification_fee_free_from_tier),
+        suggestedUpdatePrice: suggestedUpdatePrice(listing.price as bigint, config),
+        versions,
       }),
     );
   });
@@ -897,8 +1084,18 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
             verificationFeeMemo(version.id as string),
           )
         : null;
+    const supplement = await supplementState(
+      deps,
+      version.supplement_id as string | null,
+      user.wallet as string,
+    );
     return c.json(
-      jsonSafe({ verificationFee: fee, paid: fee === 0n || Boolean(version.vfee_sig), feeTx }),
+      jsonSafe({
+        verificationFee: fee,
+        paid: fee === 0n || Boolean(version.vfee_sig),
+        feeTx,
+        supplement,
+      }),
     );
   });
 
@@ -908,6 +1105,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if ((version.vfee_lamports as bigint) > 0n && !version.vfee_sig) {
       throw new HttpError(400, 'FEE_REQUIRED', 'verification fee is not paid');
     }
+    await assertSupplementPaid(deps, version);
     const bytes = await deps.blob.get(`uploads/${version.id}`);
     if (!bytes) throw new HttpError(400, 'FILE_MISSING', 'upload the file first');
     const hash = await sha256Hex(bytes);
@@ -1255,6 +1453,17 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   return app;
 }
 
+function clientIpHash(
+  c: { req: { header: (name: string) => string | undefined } },
+  deps: Deps,
+): string {
+  // Edge-provided client IP only (M-03): X-Forwarded-For is client-controlled.
+  const ip = clientIp(c, deps.env);
+  // IPv6 clients rotate within their /64, so the network is the unit, not the address.
+  const network = ip.includes(':') ? ip.split(':').slice(0, 4).join(':') : ip;
+  return ipHash(`verify:${network}`, deps.env.sessionSecret);
+}
+
 function assertInternal(
   c: { req: { header: (name: string) => string | undefined } },
   env: Env,
@@ -1320,6 +1529,7 @@ function publicListing(listing: Record<string, any>) {
     ratingCount: listing.rating_count,
     firstLiveAt: listing.first_live_at,
     delistedAt: listing.delisted_at,
+    updatePrice: listing.update_price ?? null,
     categoryMeta: categoryMeta(listing.category as string),
   };
 }

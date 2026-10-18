@@ -29,6 +29,7 @@ import {
 import { ApiError, api } from '@/lib/api';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { solText } from '@/lib/money';
+import { updatePolicyText } from '@/lib/updates';
 import { useWallet } from '@/lib/wallet';
 import { ESCROW_PROGRAM_ID, explorerAddress, shortKey } from '@/lib/protocol-facts';
 
@@ -43,6 +44,8 @@ export type Listing = {
   price: string;
   license: string;
   holderOnly: boolean;
+  /** Monthly update price in lamports after the free period; 0 = free updates forever. */
+  updatePrice?: string | null;
   sales7d?: number;
   ratingAvg?: string | null;
   ratingCount?: number;
@@ -440,6 +443,15 @@ export function ListingView({ initial }: { initial: Listing | null }) {
                 <LockIcon />
               </span>
               Download once payment is confirmed in escrow. Watermarked to your wallet.
+            </li>
+            <li data-testid="update-policy" className="flex list-none gap-2">
+              <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
+                ↻
+              </span>
+              <span>
+                {updatePolicyText(listing.updatePrice, config?.updateFreeDays ?? 30)}. Every version
+                you were entitled to stays downloadable.
+              </span>
             </li>
             <li data-testid="escrow-program" className="flex list-none gap-2">
               <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">

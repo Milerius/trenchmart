@@ -11,10 +11,11 @@ import {
   mediaPath,
   type GalleryItem,
 } from '@/components/content-editor';
-import { CATEGORIES, solToLamports } from '@trenchmart/shared';
+import { CATEGORIES, defaultUpdatePrice, solToLamports } from '@trenchmart/shared';
 import { Button, Label, Money, Panel, Square } from '@/components/ui';
-import { api } from '@/lib/api';
-import { useSolUsd } from '@/lib/config';
+import { ApiError, api } from '@/lib/api';
+import { usePublicConfig, useSolUsd } from '@/lib/config';
+import { solExact } from '@/lib/money';
 import { payVerificationFee, type UnsignedTx } from '@/lib/studio';
 import { templateFor, type ContentField } from '@/lib/listing-templates';
 import { useWallet } from '@/lib/wallet';
@@ -37,6 +38,9 @@ export default function NewListingPage() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
   const [price, setPrice] = useState('');
+  const config = usePublicConfig();
+  // null until the seller edits it: the field then follows the suggested 10% of the price.
+  const [updatePrice, setUpdatePrice] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
   const [category, setCategory] = useState<string>(CATEGORIES[0]!.code);
   const [text, setText] = useState<Record<ContentField, string>>(() =>
@@ -125,6 +129,13 @@ export default function NewListingPage() {
     });
   }
 
+  const updateBps = config?.updatePriceDefaultBps ?? 1000;
+  const suggestedUpdate = (() => {
+    const value = lamportsOf(price);
+    return value === null ? '' : solExact(defaultUpdatePrice(value, updateBps));
+  })();
+  const updateField = updatePrice ?? suggestedUpdate;
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage('');
@@ -139,6 +150,7 @@ export default function NewListingPage() {
         description: String(data.get('description') ?? ''),
         category: String(data.get('category') ?? 'userscript'),
         priceLamports: lamports,
+        updatePriceLamports: solToLamports(updateField || '0').toString(),
         terminals: String(data.get('terminals') ?? '')
           .split(',')
           .map((item) => item.trim())
@@ -152,19 +164,25 @@ export default function NewListingPage() {
       return;
     }
     setBusy('Uploading file…');
-    const version = await api<{
-      versionId: string;
-      uploadUrl: string;
-      feeTx: UnsignedTx | null;
-    }>(`/studio/listings/${created.id}/versions`, {
-      method: 'POST',
-      body: JSON.stringify({
-        semver: '1.0.0',
-        changelog: 'initial',
-        fileName: file.name,
-        fileSize: file.size,
-      }),
-    });
+    let version: { versionId: string; uploadUrl: string; feeTx: UnsignedTx | null };
+    try {
+      version = await api(`/studio/listings/${created.id}/versions`, {
+        method: 'POST',
+        body: JSON.stringify({
+          semver: '1.0.0',
+          changelog: 'initial',
+          fileName: file.name,
+          fileSize: file.size,
+        }),
+      });
+    } catch (err) {
+      // Over the daily upload limit: the upload page shows the supplement before paying.
+      if (err instanceof ApiError && err.code === 'SUPPLEMENT_REQUIRED') {
+        router.push(`/studio/listings/${created.id}/versions/new`);
+        return;
+      }
+      throw err;
+    }
     if (version.feeTx) {
       // Pay while the fee transaction's blockhash is fresh. /complete refuses an unpaid fee.
       setBusy('Paying verification fee…');
@@ -277,18 +295,35 @@ export default function NewListingPage() {
               <input id="terminals" name="terminals" placeholder="Axiom, GMGN" className={INPUT} />
             </Field>
           </div>
-          <Field label="Price (SOL)" htmlFor="price">
-            <input
-              id="price"
-              name="price"
-              required
-              inputMode="decimal"
-              placeholder="1.20"
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-              className={`${INPUT} font-mono`}
-            />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Price (SOL)" htmlFor="price">
+              <input
+                id="price"
+                name="price"
+                required
+                inputMode="decimal"
+                placeholder="1.20"
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                className={`${INPUT} font-mono`}
+              />
+            </Field>
+            <Field
+              label="Monthly update price (SOL)"
+              htmlFor="update-price"
+              hint={`Buyers get updates free for ${config?.updateFreeDays ?? 30} days, then pay this per month. Suggested ${updateBps / 100}% of the price; 0 means free updates forever.`}
+            >
+              <input
+                id="update-price"
+                name="updatePrice"
+                inputMode="decimal"
+                placeholder="0.12"
+                value={updateField}
+                onChange={(event) => setUpdatePrice(event.target.value)}
+                className={`${INPUT} font-mono`}
+              />
+            </Field>
+          </div>
         </div>
 
         <GalleryEditor

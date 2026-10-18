@@ -16,3 +16,4 @@ export * from './price';
 export * from './markdown';
 export * from './report';
 export * from './terminals';
+export * from './versioning';

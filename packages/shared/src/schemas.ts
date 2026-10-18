@@ -46,9 +46,26 @@ export const listingBody = z.object({
     .max(24 * 14)
     .default(0),
   holderOnly: z.boolean().default(false),
+  /** Monthly price for updates after the free month. 0 means free updates forever. */
+  updatePriceLamports: z.string().regex(/^\d+$/).max(20).optional(),
 });
 
-export const listingPatch = listingBody.partial();
+// Explicit, without the create defaults: a partial of listingBody would fill holderOnly=false
+// and holderOnlyHours=0 into every PATCH and silently reset them.
+export const listingPatch = z.object({
+  title: z.string().min(3).max(120).optional(),
+  summary: z.string().min(3).max(280).optional(),
+  description: z.string().min(1).max(20_000).optional(),
+  priceLamports: z.string().regex(/^\d+$/).optional(),
+  holderOnlyHours: z
+    .number()
+    .int()
+    .min(0)
+    .max(24 * 14)
+    .optional(),
+  holderOnly: z.boolean().optional(),
+  updatePriceLamports: z.string().regex(/^\d+$/).max(20).optional(),
+});
 
 export const reuploadBody = z.object({
   fileName: z.string().min(1).max(180),
@@ -60,6 +77,8 @@ export const versionBody = z.object({
   changelog: z.string().max(10_000).default(''),
   fileName: z.string().min(1).max(180),
   fileSize: z.number().int().positive(),
+  /** The supplement the creator saw and accepted, required once a daily limit is used up. */
+  acceptSupplementLamports: z.string().regex(/^\d+$/).max(20).optional(),
 });
 
 export const explainBody = z.object({ note: z.string().min(1).max(5000) });
@@ -87,6 +106,8 @@ export const devLinkBody = z.object({
 export const verifyJsonBody = z.object({
   fileName: z.string().min(1).max(180),
   contentBase64: z.string().min(1),
+  /** A paid verification supplement, needed after the free verification of the day. */
+  supplementId: z.string().uuid().optional(),
 });
 
 export const reportBody = z.object({

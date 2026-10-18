@@ -18,6 +18,14 @@ const QA: [string, string][] = [
     `The list price. Creator commission is ${protocol.creatorCommission}. The buyer pays the ${protocol.marketplaceFeeLabel} marketplace fee, minus any tier rebate.`,
   ],
   [
+    'Do I get updates?',
+    `Yes, free for ${protocol.updateFreeDays} days after purchase. After that the seller's monthly update price (0 means free forever) renews them for ${protocol.updatePeriodDays} days. You can always download the version you bought and any version released while your updates were active.`,
+  ],
+  [
+    'Is file verification free?',
+    `Once per day (UTC) per wallet and network. After that each check costs ${protocol.verifySupplement}, paid on chain. A wallet sign-in is required so the limit can be enforced.`,
+  ],
+  [
     'Does $TRENCH pay yield?',
     'No. A tier can lower fees or a bond. It is not a share of the marketplace and not a promise that the token will increase in price.',
   ],
