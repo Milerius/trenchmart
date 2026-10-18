@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { categoryMeta } from '@trenchmart/shared';
+import { FeaturedRow, useFeatured } from '@/components/featured';
 import { ListingGrid, type Listing } from '@/components/listings';
 import { PreviewNotice } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -16,6 +17,7 @@ export default function CategoryPage() {
   const cents = useSolUsd();
   const meta = categoryMeta(params.category);
   const [listings, setListings] = useState<Listing[] | null>(null);
+  const featured = useFeatured('category', params.category);
 
   useEffect(() => {
     setListings(null);
@@ -33,6 +35,12 @@ export default function CategoryPage() {
         <h1 className="m-0 mt-2 text-[32px] font-semibold tracking-[-0.03em]">{meta.label}</h1>
         <p className="m-0 mt-1 text-ink-2">{meta.desc}</p>
       </div>
+      <FeaturedRow
+        items={featured}
+        centsPerSol={cents}
+        config={config}
+        tier={wallet.session?.tier}
+      />
       {!wallet.session ? <PreviewNotice onConnect={() => void wallet.connect()} /> : null}
       <ListingGrid
         listings={listings ?? []}

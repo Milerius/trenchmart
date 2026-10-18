@@ -1,0 +1,45 @@
+{
+  "voice": "af_heart",
+  "speed": 1.05,
+  "lines": [
+    {
+      "id": "v01-hook",
+      "at": 12,
+      "maxSec": 4.5,
+      "text": "Built an edge? Sell it on TrenchMart. You keep 100% of the price.",
+      "say": "Built an edge? Sell it on TrenchMart. You keep one hundred percent of the price."
+    },
+    {
+      "id": "v02-wizard",
+      "at": 156,
+      "maxSec": 7.0,
+      "text": "The listing wizard takes you through seven steps. Pick where it runs: Axiom, GMGN, Photon, Terminal or Trojan.",
+      "say": "The listing wizard takes you through seven steps. Pick where it runs: Axiom, G M G N, Photon, Terminal, or Trojan."
+    },
+    {
+      "id": "v03-pricing",
+      "at": 372,
+      "maxSec": 6.6,
+      "text": "Set a one-time price. Turn on update subscriptions: 30 days of updates free, then your monthly price.",
+      "say": "Set a one-time price. Turn on update subscriptions: thirty days of updates free, then your monthly price."
+    },
+    {
+      "id": "v04-versions",
+      "at": 588,
+      "maxSec": 4.6,
+      "text": "Ship a new version any time. The live one stays up until the update passes review."
+    },
+    {
+      "id": "v05-studio",
+      "at": 732,
+      "maxSec": 4.6,
+      "text": "Your studio tracks sales and payouts. Buyers see your bond and your track record."
+    },
+    {
+      "id": "v06-outro",
+      "at": 880,
+      "maxSec": 3.0,
+      "text": "TrenchMart. Sell your edge."
+    }
+  ]
+}

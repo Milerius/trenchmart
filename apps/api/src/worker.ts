@@ -15,6 +15,7 @@ import {
 import { createApp, type PriceCacheBox } from './app';
 import { scanWalletIntel } from './social';
 import { computeRanks } from './ranking';
+import { featureMaintenance } from './featuring';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
 // @ts-expect-error the package's .wasm.d.ts types the instance exports; wrangler imports a WebAssembly.Module
 import PNG_WASM from '@jsquash/png/codec/pkg/squoosh_png_bg.wasm';
@@ -178,6 +179,7 @@ export default {
       (async () => {
         await step('expire', () => expireOrders(deps));
         await step('release', () => releaseOrders(deps));
+        await step('featuring', () => featureMaintenance(deps));
         await step('payouts', () => proposePayouts(deps));
         await step('escrow-housekeeping', () => escrowHousekeeping(deps));
         await step('wallet-intel', () => scanWalletIntel(deps));

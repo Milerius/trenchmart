@@ -1,0 +1,51 @@
+{
+  "voice": "af_heart",
+  "speed": 1.05,
+  "lines": [
+    {
+      "id": "e01-hook",
+      "at": 12,
+      "maxSec": 4.2,
+      "text": "Buy on TrenchMart, and your SOL is not paid to the seller. Not yet.",
+      "say": "Buy on TrenchMart, and your sole is not paid to the seller. Not yet."
+    },
+    {
+      "id": "e02-buy",
+      "at": 156,
+      "maxSec": 4.3,
+      "text": "One signature creates an escrow account on-chain and funds it with your SOL.",
+      "say": "One signature creates an escrow account on-chain, and funds it with your sole."
+    },
+    {
+      "id": "e03-hold",
+      "at": 300,
+      "maxSec": 4.4,
+      "text": "The program holds it for one hour. You can download once it confirms."
+    },
+    {
+      "id": "e04-dispute",
+      "at": 444,
+      "maxSec": 4.3,
+      "text": "Something off? Open a dispute inside that hour, and the escrow freezes."
+    },
+    {
+      "id": "e05-release",
+      "at": 588,
+      "maxSec": 4.4,
+      "text": "No dispute? It releases on its own. The seller is paid, the fee is split."
+    },
+    {
+      "id": "e06-proof",
+      "at": 732,
+      "maxSec": 6.6,
+      "text": "Don't take our word for it. Every escrow is a real account on Solana devnet. Check it in the explorer."
+    },
+    {
+      "id": "e07-outro",
+      "at": 950,
+      "maxSec": 3.2,
+      "text": "TrenchMart. Your SOL, held on-chain.",
+      "say": "TrenchMart. Your sole, held on-chain."
+    }
+  ]
+}

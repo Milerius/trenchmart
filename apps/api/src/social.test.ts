@@ -621,3 +621,381 @@ describe('social: leaderboard, paid to creators, activity', () => {
     });
   });
 });
+
+describe('social: paid featuring', () => {
+  let clock = now;
+  const txs = new Map<string, unknown>();
+
+  beforeEach(async () => {
+    sql ??= createSql(databaseUrl);
+    await migrate(sql);
+    await sql`
+      truncate table audit_log, ledger, notifications, downloads, listing_reviews, review_replies,
+        review_votes, review_reports, wallet_intel, listing_upvotes, creator_rank, disputes, licenses,
+        payouts, feature_days, feature_bookings, orders, versions, listings, bonds, auth_nonces, users
+      restart identity cascade
+    `;
+    await sql`delete from config where key in ('feature_slots', 'feature_discount_bps', 'feature_rules')`;
+    clock = now;
+    txs.clear();
+  });
+
+  const featureApp = () =>
+    appFor({
+      now: () => clock,
+      getTx: async (sig: string) => (txs.get(sig) as never) ?? null,
+    });
+
+  async function creator(app: App, slug: string) {
+    const who = await user(app, { roles: ['buyer', 'creator'] });
+    await sql`
+      insert into bonds (user_id, amount, tx_sig, status)
+      values (${who.id}, ${5_000_000_000n}, ${'bond-' + randomUUID()}, 'active')
+    `;
+    return { ...who, l: await listing(who.id, slug) };
+  }
+
+  const sigs = new Map<string, string>();
+  /** A realistic base58 signature per label. */
+  const sigOf = (label: string) => {
+    if (!sigs.has(label)) sigs.set(label, bs58.encode(nacl.randomBytes(64)));
+    return sigs.get(label)!;
+  };
+
+  function paidTx(label: string, from: string, lamports: bigint, bookingId: string, at = clock) {
+    const sig = sigOf(label);
+    txs.set(sig, {
+      signature: sig,
+      err: null,
+      blockTime: Math.floor(at.getTime() / 1000),
+      confirmationStatus: 'confirmed',
+      transfers: [{ source: from, destination: vault.publicKey, lamports }],
+      memos: [`tm:feat:${bookingId}`],
+    });
+  }
+
+  it('quotes with the config tier discount, books, pays on chain and shows as sponsored', async () => {
+    const app = await featureApp();
+    const alice = await creator(app, 'feat-a');
+    const cfg = await call(app, '', 'GET', '/featuring/config');
+    expect(cfg.body.slots.home).toMatchObject({ perDay: 3, lamportsPerDay: '1500000000' });
+    expect(cfg.body.discountBps).toEqual({ none: 0, scout: 1000, trencher: 2000, og: 3000 });
+
+    // The studio overview carries the facts behind each check tile and the marketplace card.
+    const studio = await call(app, alice.cookie, 'GET', '/studio/featuring');
+    expect(studio.status).toBe(200);
+    const entry = studio.body.listings.find((l: any) => l.slug === 'feat-a');
+    expect(entry.problems).toEqual([]);
+    expect(entry.facts).toMatchObject({
+      versionLive: true,
+      openDisputes: 0,
+      bondLamports: '5000000000',
+    });
+    expect(entry.facts.semver).toBeTruthy();
+    expect(entry.card).toMatchObject({ slug: 'feat-a', title: expect.any(String) });
+
+    // Admin-configurable prices and discounts.
+    await sql`insert into config (key, value) values ('feature_discount_bps', ${sql.json({ none: 500 })})`;
+    const body = { listingId: alice.l.listingId, kind: 'home', startDay: '2026-06-01', days: 2 };
+    const quote = await call(app, alice.cookie, 'POST', '/studio/featuring/quote', body);
+    expect(quote.status).toBe(200);
+    expect(quote.body.problems).toEqual([]);
+    expect(quote.body.quote).toMatchObject({
+      subtotal: '3000000000',
+      discountBps: 500,
+      total: '2850000000',
+    });
+
+    const booked = await call(app, alice.cookie, 'POST', '/studio/featuring/bookings', body);
+    expect(booked.status).toBe(200);
+    expect(booked.body.booking).toMatchObject({ status: 'pending', total: '2850000000' });
+    expect(booked.body.tx.txBase64).toBeTruthy();
+    const id = booked.body.booking.id as string;
+
+    const cal = await call(app, '', 'GET', '/featuring/calendar?kind=home');
+    expect(cal.body.days[0]).toMatchObject({ day: '2026-06-01', booked: 1, free: 2 });
+
+    // Wrong amount, then the real payment.
+    paidTx('sig-wrong', alice.wallet.publicKey, 1n, id);
+    const wrong = await call(
+      app,
+      alice.cookie,
+      'POST',
+      `/studio/featuring/bookings/${id}/submitted`,
+      { txSig: sigOf('sig-wrong') },
+    );
+    expect(wrong.body.error.code).toBe('WRONG_AMOUNT');
+    paidTx('sig-ok', alice.wallet.publicKey, 2_850_000_000n, id);
+    const paid = await call(
+      app,
+      alice.cookie,
+      'POST',
+      `/studio/featuring/bookings/${id}/submitted`,
+      { txSig: sigOf('sig-ok') },
+    );
+    expect(paid.body).toMatchObject({ status: 'paid', txSig: sigOf('sig-ok') });
+
+    const featured = await call(app, '', 'GET', '/featured?placement=home');
+    expect(featured.body.items).toHaveLength(1);
+    expect(featured.body.items[0]).toMatchObject({
+      slug: 'feat-a',
+      sponsored: { placement: 'home' },
+    });
+    const activity = await call(app, '', 'GET', '/activity');
+    expect(activity.body.events.find((e: any) => e.kind === 'featured')).toMatchObject({
+      listing: { slug: 'feat-a' },
+      placement: 'home',
+    });
+    // Featuring never changes rank.
+    const [row] = await sql`select rank_overall from listings where id = ${alice.l.listingId}`;
+    expect(row!.rank_overall).toBeNull();
+
+    // Run ends: settled into the fee buckets.
+    clock = new Date('2026-06-03T01:00:00Z');
+    const job = await app.request('/api/v1/internal/cron/featuring', {
+      method: 'POST',
+      headers: { authorization: 'Bearer internal', 'x-internal-token': 'internal' },
+    });
+    expect(job.status).toBe(200);
+    const [done] = await sql`select status from feature_bookings where id = ${id}`;
+    expect(done!.status).toBe('completed');
+    const [sum] =
+      await sql`select coalesce(sum(amount), 0)::bigint as n from payouts where feature_booking_id = ${id}`;
+    expect(BigInt(sum!.n)).toBe(2_850_000_000n);
+  });
+
+  it('enforces eligibility, capacity, run length, the home limit and the hold', async () => {
+    const app = await featureApp();
+    const alice = await creator(app, 'feat-b');
+    const second = await listing(alice.id, 'feat-b2');
+    const book = (
+      who: { cookie: string },
+      listingId: string,
+      extra: Record<string, unknown> = {},
+    ) =>
+      call(app, who.cookie, 'POST', '/studio/featuring/bookings', {
+        listingId,
+        kind: 'home',
+        startDay: '2026-06-02',
+        days: 1,
+        ...extra,
+      });
+
+    expect((await book(alice, alice.l.listingId, { days: 8 })).body.error.code).toBe('TOO_LONG');
+    expect((await book(alice, alice.l.listingId, { startDay: '2026-05-31' })).body.error.code).toBe(
+      'IN_PAST',
+    );
+    expect(
+      (await book(alice, alice.l.listingId, { startDay: '2026-06-29', days: 2 })).body.error.code,
+    ).toBe('TOO_FAR');
+
+    expect((await book(alice, alice.l.listingId, { days: 7 })).status).toBe(200);
+    expect((await book(alice, alice.l.listingId, { startDay: '2026-06-09' })).body.error.code).toBe(
+      'TOO_LONG',
+    );
+    expect((await book(alice, second.listingId)).body.error.code).toBe('HOME_LIMIT');
+    expect((await book(alice, second.listingId, { kind: 'band' })).status).toBe(200);
+
+    // Low rating, open dispute and no bond block featuring.
+    await sql`update listings set rating_avg = 3.9, rating_count = 4 where id = ${second.listingId}`;
+    expect((await book(alice, second.listingId, { kind: 'category' })).body.error.code).toBe(
+      'LOW_RATING',
+    );
+    const bob = await user(app, { roles: ['buyer', 'creator'] });
+    const bobListing = await listing(bob.id, 'feat-bob');
+    expect((await book(bob, bobListing.listingId)).body.error.code).toBe('NO_BOND');
+
+    // Capacity: three home slots a day, the fourth is sold out; a lapsed hold frees the slot.
+    const others = [
+      await creator(app, 'feat-c'),
+      await creator(app, 'feat-d'),
+      await creator(app, 'feat-e'),
+    ];
+    expect((await book(others[0]!, others[0]!.l.listingId)).status).toBe(200);
+    expect((await book(others[1]!, others[1]!.l.listingId)).status).toBe(200);
+    expect((await book(others[2]!, others[2]!.l.listingId)).body.error.code).toBe('SOLD_OUT');
+    clock = new Date(now.getTime() + 16 * 60_000);
+    await app.request('/api/v1/internal/cron/featuring', {
+      method: 'POST',
+      headers: { authorization: 'Bearer internal', 'x-internal-token': 'internal' },
+    });
+    expect((await book(others[2]!, others[2]!.l.listingId)).status).toBe(200);
+  });
+
+  it('settles late payments safely: released holds refund, lapsed holds keep or refund their days', async () => {
+    const app = await featureApp();
+    const cron = () =>
+      app.request('/api/v1/internal/cron/featuring', {
+        method: 'POST',
+        headers: { authorization: 'Bearer internal', 'x-internal-token': 'internal' },
+      });
+    const submit = (who: { cookie: string }, id: string, label: string) =>
+      call(app, who.cookie, 'POST', `/studio/featuring/bookings/${id}/submitted`, {
+        txSig: sigOf(label),
+      });
+    const book = (who: { cookie: string; l: { listingId: string } }, startDay = '2026-06-02') =>
+      call(app, who.cookie, 'POST', '/studio/featuring/bookings', {
+        listingId: who.l.listingId,
+        kind: 'home',
+        startDay,
+        days: 1,
+      });
+
+    // 1) Hold released, then the signed payment lands: recorded and refunded in full.
+    const alice = await creator(app, 'late-a');
+    const a = (await book(alice)).body.booking;
+    paidTx('late-a', alice.wallet.publicKey, BigInt(a.total), a.id);
+    await call(app, alice.cookie, 'POST', `/studio/featuring/bookings/${a.id}/cancel`);
+    const refunded = await submit(alice, a.id, 'late-a');
+    expect(refunded.body).toMatchObject({
+      status: 'cancelled',
+      txSig: sigOf('late-a'),
+      refundLamports: a.total,
+      refundReason: 'released_before_payment',
+    });
+    const [ra] =
+      await sql`select count(*)::int as n, sum(amount)::bigint as s from payouts where feature_booking_id = ${a.id} and bucket = 'refund'`;
+    expect(ra).toMatchObject({ n: 1 });
+    expect(BigInt(ra!.s)).toBe(BigInt(a.total));
+
+    // 2) Paid in time, confirmed after the hold lapsed and the cron dropped the days: the
+    //    days come back and the listing is featured.
+    const bob = await creator(app, 'late-b');
+    const b = (await book(bob)).body.booking;
+    paidTx('late-b', bob.wallet.publicKey, BigInt(b.total), b.id);
+    clock = new Date(now.getTime() + 16 * 60_000);
+    await cron();
+    const [expired] = await sql`select status from feature_bookings where id = ${b.id}`;
+    expect(expired!.status).toBe('expired');
+    expect((await submit(bob, b.id, 'late-b')).body.status).toBe('paid');
+    const [days] =
+      await sql`select count(*)::int as n from feature_days where booking_id = ${b.id}`;
+    expect(days!.n).toBe(1);
+
+    // 3) A lapsed hold whose day filled up meanwhile is refunded instead of overselling.
+    clock = now;
+    const carol = await creator(app, 'late-c');
+    const c = (await book(carol, '2026-06-03')).body.booking;
+    paidTx('late-c', carol.wallet.publicKey, BigInt(c.total), c.id);
+    clock = new Date(now.getTime() + 16 * 60_000);
+    for (const slug of ['late-d', 'late-e', 'late-f']) {
+      const who = await creator(app, slug);
+      expect((await book(who, '2026-06-03')).status).toBe(200);
+    }
+    const lost = await submit(carol, c.id, 'late-c');
+    expect(lost.body).toMatchObject({ status: 'cancelled', refundReason: 'slot_taken' });
+    const [full] = await sql`
+      select count(*)::int as n from feature_days d join feature_bookings b on b.id = d.booking_id
+      where d.day = '2026-06-03' and d.kind = 'home' and b.id = ${c.id}
+    `;
+    expect(full!.n).toBe(0);
+
+    // 4) Overlapping maintenance runs never pay a finished run twice.
+    clock = new Date('2026-06-04T01:00:00Z');
+    await Promise.all([cron(), cron()]);
+    await cron();
+    const dup = await sql`
+      select bucket, count(*)::int as n from payouts where feature_booking_id = ${b.id} group by bucket
+    `;
+    expect(dup.length).toBeGreaterThan(0);
+    expect(dup.every((row) => row.n === 1)).toBe(true);
+  });
+
+  it('admins edit featuring config atomically and invalid values are rejected', async () => {
+    const app = await featureApp();
+    const admin = await user(app, { roles: ['admin'] });
+    const valid = {
+      slots: {
+        home: { perDay: 4, lamportsPerDay: '1000000000' },
+        category: { perDay: 2, lamportsPerDay: '600000000' },
+        band: { perDay: 6, lamportsPerDay: '200000000' },
+      },
+      discountBps: { none: 0, scout: 1000, trencher: 2000, og: 3000 },
+      rules: {
+        maxConsecutiveDays: 7,
+        maxDaysAhead: 28,
+        minRatingX10: 40,
+        holdMinutes: 15,
+        cancelHours: 24,
+        homePerCreatorPerDay: 1,
+      },
+    };
+    const bad = { ...valid, slots: { ...valid.slots, home: { perDay: 0, lamportsPerDay: '1' } } };
+    expect((await call(app, admin.cookie, 'PUT', '/admin/featuring/config', bad)).status).toBe(400);
+    const notAdmin = await user(app, { roles: ['creator'] });
+    expect((await call(app, notAdmin.cookie, 'PUT', '/admin/featuring/config', valid)).status).toBe(
+      403,
+    );
+    const ok = await call(app, admin.cookie, 'PUT', '/admin/featuring/config', valid);
+    expect(ok.status).toBe(200);
+    expect(ok.body.slots.home).toMatchObject({ perDay: 4, lamportsPerDay: '1000000000' });
+    const rows = await sql`select key from config where key like 'feature_%' order by key`;
+    expect(rows.map((r) => r.key)).toEqual([
+      'feature_discount_bps',
+      'feature_rules',
+      'feature_slots',
+    ]);
+  });
+
+  it('refunds a cancel made early enough, refuses a late one, and refunds unserved days when pulled', async () => {
+    const app = await featureApp();
+    const alice = await creator(app, 'feat-r');
+    const pay = async (startDay: string, days: number, kind = 'band') => {
+      const res = await call(app, alice.cookie, 'POST', '/studio/featuring/bookings', {
+        listingId: alice.l.listingId,
+        kind,
+        startDay,
+        days,
+      });
+      expect(res.status).toBe(200);
+      const id = res.body.booking.id as string;
+      paidTx(`sig-${id}`, alice.wallet.publicKey, BigInt(res.body.booking.total), id);
+      const paid = await call(
+        app,
+        alice.cookie,
+        'POST',
+        `/studio/featuring/bookings/${id}/submitted`,
+        {
+          txSig: sigOf(`sig-${id}`),
+        },
+      );
+      expect(paid.body.status).toBe('paid');
+      return id;
+    };
+    const early = await pay('2026-06-05', 2);
+    const cancelled = await call(
+      app,
+      alice.cookie,
+      'POST',
+      `/studio/featuring/bookings/${early}/cancel`,
+    );
+    expect(cancelled.body).toMatchObject({ status: 'cancelled', refundLamports: '400000000' });
+    const [refund] =
+      await sql`select recipient, bucket, amount from payouts where feature_booking_id = ${early}`;
+    expect(refund).toMatchObject({ recipient: alice.wallet.publicKey, bucket: 'refund' });
+
+    const soon = await pay('2026-06-01', 4);
+    const late = await call(app, alice.cookie, 'POST', `/studio/featuring/bookings/${soon}/cancel`);
+    expect(late.body.error.code).toBe('TOO_LATE');
+
+    // Listing delisted on day 2 of 4: days 3 and 4 come back.
+    clock = new Date('2026-06-02T12:00:00Z');
+    await sql`update listings set delisted_at = ${clock} where id = ${alice.l.listingId}`;
+    await app.request('/api/v1/internal/cron/featuring', {
+      method: 'POST',
+      headers: { authorization: 'Bearer internal', 'x-internal-token': 'internal' },
+    });
+    const [pulled] =
+      await sql`select status, refund_lamports from feature_bookings where id = ${soon}`;
+    expect(pulled).toMatchObject({ status: 'pulled' });
+    expect(BigInt(pulled!.refund_lamports)).toBe(400_000_000n);
+    const rows =
+      await sql`select bucket, amount from payouts where feature_booking_id = ${soon} order by bucket`;
+    const kept = rows
+      .filter((r) => r.bucket !== 'refund')
+      .reduce((n, r) => n + BigInt(r.amount), 0n);
+    expect(kept).toBe(400_000_000n);
+    const featured = await call(app, '', 'GET', '/activity');
+    expect(featured.body.sponsored).toEqual([]);
+  });
+});
