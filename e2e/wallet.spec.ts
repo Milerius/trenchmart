@@ -371,7 +371,8 @@ test('does not remember a wallet when sign-in fails', async ({ page }) => {
   await page.goto('/');
   await chooseInstalled(page, 'phantom');
   await expect(page.getByTestId('connect-modal')).toContainText('bad signature');
-  await expect(page.getByTestId('connect')).toHaveText('Connect wallet');
+  // Connected but not signed in: the header offers a one-click retry.
+  await expect(page.getByTestId('connect')).toHaveText('Sign in');
   const remembered = await page.evaluate((key) => localStorage.getItem(key), LAST_WALLET_KEY);
   expect(remembered).toBeNull();
 });
