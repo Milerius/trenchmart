@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { categoryMeta, quote, TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared';
+import { categoryMeta, quote, rankBadge, TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared';
 import { Money, Skeleton, EmptyState, Tag } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
 
@@ -20,6 +20,10 @@ export type Listing = {
   /** Seller-chosen cover from the listing gallery (approved content only). */
   cover?: { url: string; alt: string } | null;
   imageCount?: number;
+  /** Raw upvote count (every wallet); ranking uses the weighted count. */
+  upvotes?: number;
+  /** Ranking job output; null until the listing has counted sales or upvotes. */
+  rank?: { category: number | null; overall: number | null } | null;
 };
 
 export type Pricing = {
@@ -72,9 +76,16 @@ export function ListingCard({
         >
           {meta.tag}
         </span>
-        <Tag tone="ok">
-          <span aria-hidden="true">✓</span> REVIEWED
-        </Tag>
+        <span className="flex items-center gap-1.5">
+          {rankBadge(listing.rank?.category, meta.label) ? (
+            <Tag tone="info" data-testid="rank-badge">
+              {rankBadge(listing.rank?.category, meta.label)}
+            </Tag>
+          ) : null}
+          <Tag tone="ok">
+            <span aria-hidden="true">✓</span> REVIEWED
+          </Tag>
+        </span>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4">
         <h3 className="m-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-accent-hover">
@@ -91,6 +102,12 @@ export function ListingCard({
             <span>
               <span aria-hidden="true">★</span> {rating.toFixed(1)}
               <span className="sr-only"> out of 5</span>
+            </span>
+          ) : null}
+          {listing.upvotes ? (
+            <span data-testid="card-upvotes" className="ml-auto font-mono text-xs">
+              <span aria-hidden="true">▲</span> {listing.upvotes}
+              <span className="sr-only"> upvotes</span>
             </span>
           ) : null}
         </div>

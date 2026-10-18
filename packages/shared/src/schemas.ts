@@ -147,7 +147,7 @@ export const listingsQuery = z.object({
   q: z.string().max(200).optional(),
   category: z.enum(CATEGORY_CODES).optional(),
   terminal: z.string().max(40).optional(),
-  sort: z.enum(['trending', 'new', 'price_asc', 'price_desc', 'rating']).optional(),
+  sort: z.enum(['trending', 'new', 'price_asc', 'price_desc', 'rating', 'top']).optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(48).optional(),
 });

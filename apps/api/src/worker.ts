@@ -14,6 +14,7 @@ import {
 } from '@trenchmart/chain';
 import { createApp, type PriceCacheBox } from './app';
 import { scanWalletIntel } from './social';
+import { computeRanks } from './ranking';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
 // @ts-expect-error the package's .wasm.d.ts types the instance exports; wrangler imports a WebAssembly.Module
 import PNG_WASM from '@jsquash/png/codec/pkg/squoosh_png_bg.wasm';
@@ -180,6 +181,7 @@ export default {
         await step('payouts', () => proposePayouts(deps));
         await step('escrow-housekeeping', () => escrowHousekeeping(deps));
         await step('wallet-intel', () => scanWalletIntel(deps));
+        await step('ranking', () => computeRanks(deps));
         await step('ops', async () => deliverAlerts(deps, await opsCheck(deps)));
       })().finally(() => deps.sql.end({ timeout: 5 })),
     );
