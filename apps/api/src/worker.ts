@@ -10,8 +10,10 @@ import {
   simulateUnsigned,
   sendAndConfirm,
   tokenBalance,
+  walletHistory,
 } from '@trenchmart/chain';
 import { createApp, type PriceCacheBox } from './app';
+import { scanWalletIntel } from './social';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
 // @ts-expect-error the package's .wasm.d.ts types the instance exports; wrangler imports a WebAssembly.Module
 import PNG_WASM from '@jsquash/png/codec/pkg/squoosh_png_bg.wasm';
@@ -91,6 +93,8 @@ function depsFor(env: Binding, url: string) {
     trenchBalance: parsed.trenchMint
       ? (wallet: string) => tokenBalance(parsed.rpcUrl, wallet, parsed.trenchMint as string)
       : undefined,
+    walletHistory: (wallet: string, sinceMs: number) =>
+      walletHistory(parsed.rpcUrl, wallet, sinceMs),
     // Wasm re-encode of a 2560 px PNG exceeds this account's Worker CPU limit (error 1102),
     // so it is opt-in. Browsers convert to WebP before upload instead (studio page).
     optimizeImage: parsed.imageOptimize ? optimizeImage : undefined,
@@ -175,6 +179,7 @@ export default {
         await step('release', () => releaseOrders(deps));
         await step('payouts', () => proposePayouts(deps));
         await step('escrow-housekeeping', () => escrowHousekeeping(deps));
+        await step('wallet-intel', () => scanWalletIntel(deps));
         await step('ops', async () => deliverAlerts(deps, await opsCheck(deps)));
       })().finally(() => deps.sql.end({ timeout: 5 })),
     );

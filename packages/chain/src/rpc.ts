@@ -303,3 +303,44 @@ export async function tokenBalance(url: string, owner: string, mint: string): Pr
   }
   return total;
 }
+
+/**
+ * Anti-sybil read for votes and rankings: the oldest activity among the wallet's last 1000
+ * signatures (its true first transaction when it has fewer) and the wallets that sent it SOL
+ * since `sinceMs`. Reads at most `maxTx` transactions: the oldest and newest in the window,
+ * where a funding transfer from a creator would sit.
+ */
+export async function walletHistory(
+  url: string,
+  wallet: string,
+  sinceMs: number,
+  options: { maxTx?: number; fetchTx?: (signature: string) => Promise<ChainTx | null> } = {},
+): Promise<{ oldestAt: Date | null; funders: { wallet: string; at: string }[] }> {
+  const sigs = (await rpc(url, 'getSignaturesForAddress', [
+    wallet,
+    { limit: 1000, commitment: 'confirmed' },
+  ])) as { signature: string; blockTime: number | null; err: unknown }[];
+  const timed = sigs.filter((s) => typeof s.blockTime === 'number');
+  const oldest = timed.at(-1);
+  const inWindow = timed.filter((s) => (s.blockTime as number) * 1000 >= sinceMs && !s.err);
+  const max = options.maxTx ?? 12;
+  const half = Math.ceil(max / 2);
+  const pick =
+    inWindow.length <= max ? inWindow : [...inWindow.slice(0, half), ...inWindow.slice(-half)];
+  const fetchTx = options.fetchTx ?? ((signature: string) => fetchTransaction(url, signature));
+  const funders = new Map<string, string>();
+  for (const sig of pick) {
+    const tx = await fetchTx(sig.signature);
+    if (!tx || tx.err) continue;
+    for (const t of tx.transfers) {
+      if (t.destination !== wallet || t.source === wallet) continue;
+      const at = new Date((sig.blockTime as number) * 1000).toISOString();
+      const seen = funders.get(t.source);
+      if (!seen || seen < at) funders.set(t.source, at);
+    }
+  }
+  return {
+    oldestAt: oldest ? new Date((oldest.blockTime as number) * 1000) : null,
+    funders: [...funders].map(([from, at]) => ({ wallet: from, at })),
+  };
+}

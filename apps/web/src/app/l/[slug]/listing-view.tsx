@@ -8,6 +8,7 @@ import { categoryMeta, quote as quoteFor, specRows } from '@trenchmart/shared';
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
+import { ReviewsPanel } from '@/components/reviews';
 import {
   Button,
   ButtonLink,
@@ -105,7 +106,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   const [loadError, setLoadError] = useState<'missing' | 'failed' | null>(null);
   const [tab, setTab] = useState<Tab>('overview');
   const [versions, setVersions] = useState<VersionNote[]>([]);
-  const [reviews, setReviews] = useState<{ rating: number; body: string }[]>([]);
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [step, setStep] = useState<Step>('idle');
   const [message, setMessage] = useState('');
@@ -119,9 +120,6 @@ export function ListingView({ initial }: { initial: Listing | null }) {
         setListing(null);
         setLoadError(err instanceof ApiError && err.status === 404 ? 'missing' : 'failed');
       });
-    void api<{ rating: number; body: string }[]>(`/listings/${params.slug}/reviews`)
-      .then(setReviews)
-      .catch(() => setReviews([]));
     void api<VersionNote[]>(`/listings/${params.slug}/versions`)
       .then(setVersions)
       .catch(() => setVersions([]));
@@ -266,7 +264,20 @@ export function ListingView({ initial }: { initial: Listing | null }) {
             <span>
               <span aria-hidden="true">★</span> {rating.toFixed(1)}
               <span className="sr-only"> out of 5</span>
-              {listing.ratingCount ? ` · ${listing.ratingCount} reviews` : ''}
+              {listing.ratingCount ? (
+                <button
+                  type="button"
+                  className="hover:text-ink hover:underline"
+                  onClick={() => {
+                    setTab('reviews');
+                    document.getElementById('tab-reviews')?.scrollIntoView({ block: 'center' });
+                  }}
+                >
+                  {` · ${listing.ratingCount} review${listing.ratingCount === 1 ? '' : 's'}`}
+                </button>
+              ) : (
+                ''
+              )}
             </span>
           ) : null}
           {listing.terminals.length ? <span>{listing.terminals.join(' · ')}</span> : null}
@@ -322,7 +333,9 @@ export function ListingView({ initial }: { initial: Listing | null }) {
               onClick={() => setTab(name)}
             >
               {TAB_LABEL[name]}
-              {name === 'reviews' && reviews.length ? ` (${reviews.length})` : ''}
+              {name === 'reviews' && (reviewCount ?? listing.ratingCount)
+                ? ` (${reviewCount ?? listing.ratingCount})`
+                : ''}
             </button>
           ))}
         </div>
@@ -344,25 +357,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
             />
           ) : null}
           {tab === 'changelog' ? <ChangelogPanel versions={versions} /> : null}
-          {tab === 'reviews' ? (
-            <ul className="m-0 space-y-2 p-0">
-              <li className="list-none text-sm text-muted">
-                Only wallets that bought this listing can review it.
-              </li>
-              {reviews.map((review, index) => (
-                <li
-                  key={index}
-                  className="list-none rounded-card border border-line bg-surface p-4"
-                >
-                  <span className="font-mono text-sm text-accent">
-                    {'★'.repeat(review.rating)}
-                    <span className="sr-only">{review.rating} out of 5</span>
-                  </span>
-                  <p className="m-0 mt-1 text-sm text-ink-2">{review.body}</p>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          {tab === 'reviews' ? <ReviewsPanel slug={listing.slug} onCount={setReviewCount} /> : null}
         </div>
       </div>
 
