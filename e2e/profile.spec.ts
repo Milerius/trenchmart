@@ -409,3 +409,17 @@ test('studio: log out everywhere asks to confirm, revokes on the server and sign
   await expect(page.getByTestId('connect')).toHaveAttribute('data-auth', 'signed-out');
   expect(calls.filter((c) => c.path === '/auth/logout-all')).toHaveLength(1);
 });
+
+test('public profile: prototype layout, full-width banner and stat tiles', async ({ page }) => {
+  await stub(page, ({ path }) => (path === '/creators/rugradar' ? { json: PUBLIC } : undefined));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/u/rugradar');
+  const h1 = page.getByRole('heading', { level: 1, name: 'RugRadar' });
+  await expect(h1).toBeVisible();
+  expect(await h1.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBe(36);
+  expect((await page.getByTestId('banner').boundingBox())!.width).toBeGreaterThan(1400);
+  const tile = page.getByTestId('creator-stats').locator(':scope > div').first();
+  expect(await tile.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('1px');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
