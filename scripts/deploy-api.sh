@@ -19,6 +19,17 @@ grep -q 'binding *= *"HYPERDRIVE"' "$config" || {
   exit 1
 }
 
+# Keep the Worker next to the database (Supabase, aws ap-south-1). Without placement it runs
+# next to each visitor and every Postgres round trip crosses the world (studio took ~10 s).
+# Older local deploy configs lack the block, so add it to a temporary copy instead of failing.
+if ! grep -q '^\[placement\]' "$config"; then
+  placed="$root/apps/api/.wrangler.deploy.placed.toml"
+  { cat "$config"; printf '\n[placement]\nregion = "aws:ap-south-1"\n'; } >"$placed"
+  trap 'rm -f "$placed"' EXIT
+  echo "note: $(basename "$config") has no [placement]; deploying with region aws:ap-south-1"
+  config="$placed"
+fi
+
 cd "$root"
 echo "== migrate"
 pnpm --silent db:migrate
