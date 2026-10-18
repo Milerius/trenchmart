@@ -66,43 +66,46 @@ export default function DisputePage() {
   return (
     <form
       data-testid="dispute"
-      className="mx-auto max-w-xl space-y-6"
+      className="mx-auto flex max-w-3xl flex-col gap-6 sm:py-4"
       onSubmit={(event) => void submit(event)}
     >
       <div>
         <Link href="/me/purchases" className="text-sm text-muted hover:text-ink">
           ← Purchases
         </Link>
-        <h1 className="mt-3 text-[28px] font-semibold tracking-[-0.025em]">Open a dispute</h1>
-        <p className="mt-2 text-ink-2">
+        <h1 className="m-0 mt-4 text-5xl font-semibold tracking-[-0.045em]">Open a dispute</h1>
+        <p className="m-0 mt-3 text-ink-2">
           You sign one transaction that freezes the on-chain escrow, so release cannot pay the
           creator. Downloads pause while the dispute is open. If it is upheld the escrow refunds you
           in full; if it is rejected, the order returns to payout.
         </p>
       </div>
-      <fieldset className="m-0 space-y-2 border-0 p-0">
-        <legend className="mb-2 text-sm font-medium">What went wrong?</legend>
+      <fieldset
+        data-testid="dispute-reasons"
+        className="m-0 grid gap-3 border-0 p-0 sm:grid-cols-2"
+      >
+        <legend className="mb-3 font-semibold">What went wrong?</legend>
         {REASONS.map(([value, label, hint]) => (
           <label
             key={value}
-            className="flex cursor-pointer gap-3 rounded-card border border-line bg-surface p-3 has-[:checked]:border-accent-line has-[:checked]:bg-accent-bg"
+            className="flex cursor-pointer gap-3 rounded-2xl border border-line p-4 transition hover:border-line-strong has-[:checked]:border-danger/60 has-[:checked]:bg-danger/[.06]"
           >
             <input
               type="radio"
               name="reason"
               value={value}
               defaultChecked={value === 'not_as_described'}
-              className="mt-1 accent-[var(--color-accent)]"
+              className="mt-1 accent-[var(--color-danger)]"
             />
             <span>
-              <span className="block text-sm font-medium">{label}</span>
-              <span className="block text-[13px] text-muted">{hint}</span>
+              <span className="block font-medium">{label}</span>
+              <span className="block text-sm text-muted">{hint}</span>
             </span>
           </label>
         ))}
       </fieldset>
       <div>
-        <label htmlFor="details" className="text-sm font-medium">
+        <label htmlFor="details" className="font-semibold">
           Details
         </label>
         <textarea
@@ -112,14 +115,19 @@ export default function DisputePage() {
           minLength={10}
           rows={5}
           aria-describedby="details-hint"
-          className="mt-2 w-full rounded-ctl border border-line-control bg-inset px-3 py-2 text-sm"
+          className="mt-2 w-full rounded-2xl border border-line bg-inset p-4 outline-none focus:border-accent-line"
           placeholder="What you expected, what happened, and anything that helps check it"
         />
-        <p id="details-hint" className="mt-1 text-xs text-muted">
+        <p id="details-hint" className="m-0 mt-2 text-sm text-faint">
           At least 10 characters.
         </p>
       </div>
-      <Button type="submit" size="lg" disabled={busy || !!message}>
+      <Button
+        type="submit"
+        size="lg"
+        disabled={busy || !!message}
+        className="self-start !border-danger !bg-danger !text-black hover:brightness-110"
+      >
         {busy ? 'Opening dispute…' : 'Submit dispute'}
       </Button>
       {message ? (
