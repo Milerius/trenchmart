@@ -295,6 +295,44 @@ describe('monitoring and alerts', () => {
     expect(Array.isArray(body.open)).toBe(true);
   });
 
+  it('HYPERDRIVE_LIMIT: reported limit above 10, unreadable, or no report for 3 h', async () => {
+    const { deps } = await setup();
+    const app = createApp(deps);
+    const report = (body: unknown, token = TOKEN) =>
+      app.request('/api/v1/internal/ops/hyperdrive', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    // Never reported (local dev, tests): no alert.
+    expect(await codes(deps)).toEqual([]);
+    expect((await report({ limit: 20 }, 'wrong')).status).toBe(401);
+    expect((await report({ limit: 10, source: 'check' })).status).toBe(200);
+    expect(await codes(deps)).toEqual([]);
+    expect(await (await report({ limit: 20, source: 'check' })).json()).toEqual({
+      ok: true,
+      limit: 20,
+      max: 10,
+    });
+    const over = await opsCheck(deps);
+    expect(over).toEqual([
+      expect.objectContaining({ level: 'critical', code: 'HYPERDRIVE_LIMIT' }),
+    ]);
+    expect(over[0]!.message).toContain('is 20');
+    await report({ limit: 'x', source: 'check', error: 'HTTP 403' });
+    expect(await opsCheck(deps)).toEqual([
+      expect.objectContaining({ level: 'warn', code: 'HYPERDRIVE_LIMIT' }),
+    ]);
+    await sql`delete from ops_events where kind = 'hyperdrive_limit'`;
+    await sql`
+      insert into ops_events (kind, detail, created_at)
+      values ('hyperdrive_limit', '{"limit":10,"source":"check"}', ${new Date(now.getTime() - 4 * 3_600_000)})
+    `;
+    const stale = await opsCheck(deps);
+    expect(stale.map((a) => [a.level, a.code])).toEqual([['warn', 'HYPERDRIVE_LIMIT']]);
+    expect(stale[0]!.message).toContain('No Hyperdrive limit report for 4 h');
+  });
+
   it('ntfy: email only with an account token; refused email falls back to push', async () => {
     const posts: Record<string, string>[] = [];
     let refuseEmail = true;

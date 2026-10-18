@@ -4,6 +4,7 @@
 #   2. pnpm db:pending  hard gate: exits 1 if anything is still missing
 #   3. wrangler deploy  with the deploy config (must keep the HYPERDRIVE binding)
 #   4. GET /health      503 SCHEMA_BEHIND would mean the Worker still sees a schema gap
+#   5. Hyperdrive limit kept <= 10 and, with INTERNAL_TOKEN set, reported to the ops check
 # Database access: DATABASE_URL, or SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF (Management
 # API, for machines that cannot reach the pooler). Cloudflare: CLOUDFLARE_API_TOKEN/ACCOUNT_ID.
 # Usage: scripts/deploy-api.sh [wrangler config, default apps/api/wrangler.deploy.toml]
@@ -54,13 +55,30 @@ if [ -n "$hd_id" ]; then
   elif [ "$current" = "unset" ] || [ "$current" -gt "$hd_limit" ]; then
     (cd "$root/apps/api" && $wrangler hyperdrive update "$hd_id" --origin-connection-limit "$hd_limit" >/dev/null)
     echo "set to $hd_limit"
+    current="$hd_limit"
   fi
 fi
 
 echo "== health"
+healthy=0
 for i in 1 2 3 4 5 6; do
-  if curl -fsS --max-time 20 "$api_url"; then echo; exit 0; fi
+  if curl -fsS --max-time 20 "$api_url"; then echo; healthy=1; break; fi
   sleep 5
 done
-echo "health check failed after deploy: $api_url" >&2
-exit 1
+if [ "$healthy" != 1 ]; then
+  echo "health check failed after deploy: $api_url" >&2
+  exit 1
+fi
+
+# Tell the ops check what the limit is now (HYPERDRIVE_LIMIT alert; the Worker cannot read
+# the Hyperdrive config itself). Needs INTERNAL_TOKEN; best effort.
+if [ -n "${hd_id:-}" ] && [ -n "${INTERNAL_TOKEN:-}" ]; then
+  case "$current" in
+    '' | *[!0-9]*) hd_json='{"limit":null,"source":"deploy","error":"'"$current"'"}' ;;
+    *) hd_json='{"limit":'"$current"',"source":"deploy"}' ;;
+  esac
+  curl -fsS --max-time 20 -o /dev/null -X POST "${api_url%/health}/internal/ops/hyperdrive" \
+    -H "Authorization: Bearer $INTERNAL_TOKEN" -H 'content-type: application/json' \
+    --data "$hd_json" && echo "reported hyperdrive limit $current to the ops check" ||
+    echo "warning: could not report the Hyperdrive limit to the ops check" >&2
+fi

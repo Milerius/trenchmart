@@ -1,5 +1,14 @@
 import { pendingMigrations } from '@trenchmart/db';
-import { deliverAlerts, notify, opsAlertRows, opsCheck, opsStatus, recordOpsEvent } from './ops';
+import {
+  deliverAlerts,
+  notify,
+  OPS_THRESHOLDS,
+  opsAlertRows,
+  opsCheck,
+  opsStatus,
+  recordHyperdriveReport,
+  recordOpsEvent,
+} from './ops';
 import { recordExternal, statusTick } from './status';
 import { publicStatus } from './status-public';
 import { Hono } from 'hono';
@@ -1813,6 +1822,21 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const alerts = await opsCheck(deps);
     const critical = alerts.some((a) => a.level === 'critical');
     return c.json({ ok: !critical, alerts }, critical ? 503 : 200);
+  });
+
+  // The hourly hyperdrive-limit workflow and deploy-api.sh report the Hyperdrive
+  // origin_connection_limit they read (the Worker has no Cloudflare API token).
+  api.post('/internal/ops/hyperdrive', async (c) => {
+    assertInternal(c, deps.env);
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const limit =
+      typeof raw.limit === 'number' && Number.isInteger(raw.limit) && raw.limit >= 0
+        ? raw.limit
+        : null;
+    const source = typeof raw.source === 'string' ? raw.source.slice(0, 40) : 'unknown';
+    const error = typeof raw.error === 'string' ? raw.error.slice(0, 200) : undefined;
+    await recordHyperdriveReport(deps, { limit, source, ...(error ? { error } : {}) });
+    return c.json({ ok: true, limit, max: OPS_THRESHOLDS.hyperdriveMaxOrigin });
   });
 
   // Runs the check and delivers notices like the cron does (used to verify alerting).

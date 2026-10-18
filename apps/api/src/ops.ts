@@ -29,6 +29,7 @@ export const ALERT_CODES = [
   'SCAN_STUCK',
   'HTTP_5XX_SPIKE',
   'DB_POOL_FULL',
+  'HYPERDRIVE_LIMIT',
   'DISPUTE_SPIKE',
   'DISPUTES_WAITING',
   'PAYOUTS_WAITING',
@@ -44,9 +45,28 @@ export const OPS_THRESHOLDS = {
   http5xxPerWindow: 10,
   disputesPerHour: 5,
   renotifyMs: 6 * 3_600_000,
+  /** Hyperdrive origin_connection_limit must stay below the Supabase pooler's pool_size (15). */
+  hyperdriveMaxOrigin: 10,
+  /** The hourly hyperdrive-limit workflow reports in; silence this long means it broke. */
+  hyperdriveReportStaleMs: 3 * 3_600_000,
 };
 
-export type OpsEventKind = '5xx' | 'webhook_error' | 'scan_error' | 'cron_failed' | 'r2_error';
+export type OpsEventKind =
+  '5xx' | 'webhook_error' | 'scan_error' | 'cron_failed' | 'r2_error' | 'hyperdrive_limit';
+
+/**
+ * The Worker has no Cloudflare API token, so the Hyperdrive config is read outside it: the
+ * hourly hyperdrive-limit workflow and scripts/deploy-api.sh POST what they read to
+ * /internal/ops/hyperdrive. `limit` null means the config could not be read or is unset.
+ */
+export type HyperdriveReport = { limit: number | null; source: string; error?: string };
+
+export async function recordHyperdriveReport(deps: Pick<Deps, 'sql'>, report: HyperdriveReport) {
+  await deps.sql`
+    insert into ops_events (kind, detail)
+    values ('hyperdrive_limit', ${JSON.stringify(report).slice(0, 500)})
+  `;
+}
 
 /** Best-effort error counter. Never throws: monitoring must not break the request. */
 export async function recordOpsEvent(
@@ -249,6 +269,38 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
         'DB_POOL_FULL',
         `${poolFull!.n} request(s) in the last 15 min failed with "max clients reached" from the Supabase pooler; check the Hyperdrive origin_connection_limit (<= 10)`,
       );
+    const [hd] = await deps.sql<{ detail: string; created_at: Date }[]>`
+      select detail, created_at from ops_events where kind = 'hyperdrive_limit'
+      order by created_at desc limit 1
+    `;
+    if (hd) {
+      let report: Partial<HyperdriveReport> = {};
+      try {
+        report = JSON.parse(hd.detail) as HyperdriveReport;
+      } catch {
+        // An unreadable row counts as an unreadable config.
+      }
+      const age = now.getTime() - new Date(hd.created_at).getTime();
+      const limit = typeof report.limit === 'number' ? report.limit : null;
+      if (limit !== null && limit > t.hyperdriveMaxOrigin)
+        add(
+          'critical',
+          'HYPERDRIVE_LIMIT',
+          `Hyperdrive origin_connection_limit is ${limit} (max ${t.hyperdriveMaxOrigin}; the Supabase pooler allows 15), reported by ${report.source ?? '?'}`,
+        );
+      else if (limit === null)
+        add(
+          'warn',
+          'HYPERDRIVE_LIMIT',
+          `Hyperdrive origin_connection_limit could not be read or is unset (${report.source ?? '?'}: ${report.error ?? 'no value'})`,
+        );
+      else if (age > t.hyperdriveReportStaleMs)
+        add(
+          'warn',
+          'HYPERDRIVE_LIMIT',
+          `No Hyperdrive limit report for ${Math.round(age / 3_600_000)} h; the hourly hyperdrive-limit workflow may be failing`,
+        );
+    }
     const errors = await count(deps, '5xx', since);
     if (errors >= t.http5xxPerWindow)
       add('critical', 'HTTP_5XX_SPIKE', `${errors} API 5xx responses in the last 15 min`);
