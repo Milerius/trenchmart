@@ -37,7 +37,7 @@ const STATUS = {
     },
   ],
   events24h: [{ kind: '5xx', n: 3 }],
-  channels: { ntfy: true, email: true, telegram: false, webhook: false },
+  channels: { assistant: true, telegram: false, webhook: false },
   codes: ['DB_ERROR', 'LOW_BALANCE', 'RPC_DOWN'],
 };
 
@@ -75,7 +75,7 @@ test('admin status dashboard shows firing alerts, every check, channels, errors 
   await expect(page.getByTestId('ops-alerts')).toContainText('CRITICAL LOW_BALANCE');
   await expect(page.getByTestId('ops-checks')).toContainText('✗ LOW_BALANCE');
   await expect(page.getByTestId('ops-checks')).toContainText('✓ DB_ERROR');
-  await expect(page.getByTestId('ops-channels')).toContainText('email: on');
+  await expect(page.getByTestId('ops-channels')).toContainText('assistant: on');
   await expect(page.getByTestId('ops-channels')).toContainText('telegram: off');
   await expect(page.getByTestId('ops-events')).toContainText('5xx: 3');
   await expect(page.getByTestId('ops-history')).toContainText('RPC_DOWN');

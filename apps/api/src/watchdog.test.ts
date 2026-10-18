@@ -138,4 +138,25 @@ describe('external watchdog', () => {
     }) as typeof fetch;
     expect(await reportHealth(withToken, await runChecks(env, f), down)).toBe(false);
   });
+
+  it('alerts only through the chat relay: no email or ntfy request, even if old settings are set', async () => {
+    const { state, f } = world();
+    const hosts = new Set<string>();
+    const spy = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      hosts.add(url.host);
+      if (url.pathname.startsWith('/api/v1/internal/')) return Response.json({ ok: true });
+      return f(input, init);
+    }) as typeof fetch;
+    const legacy = {
+      ...env,
+      STATUS_PUSH_TOKEN: 'push-token-push-token-push-token-0001',
+      ALERT_EMAIL: 'owner@example.com',
+      ALERT_NTFY_TOPIC: 'old-topic',
+    } as WatchdogEnv;
+    state.web = 503;
+    state.api = 502;
+    expect(await watchdog(legacy, spy)).toHaveLength(2);
+    expect([...hosts].sort()).toEqual(['api.example', 'rpc.example', 'web.example']);
+  });
 });
