@@ -77,7 +77,7 @@ import {
   saveProfile,
   uploadProfileImage,
 } from './profile';
-import { studioOverview } from './studio';
+import { studioOverview, studioReviews, studioSales, studioSubscribers } from './studio';
 import { registerReviewRoutes } from './reviews';
 import { computeRanks, registerUpvoteRoutes } from './ranking';
 import { paidToCreators, registerLeaderboardRoutes } from './leaderboard';
@@ -1453,6 +1453,21 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/studio/overview', async (c) => {
     const user = requireUser(c);
     return c.json(jsonSafe(await studioOverview(deps, user)));
+  });
+
+  api.get('/studio/sales', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await studioSales(deps, user, c.req.query())));
+  });
+
+  api.get('/studio/subscribers', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await studioSubscribers(deps, user)));
+  });
+
+  api.get('/studio/reviews', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await studioReviews(deps, user, c.req.query())));
   });
 
   api.get('/studio/listings', async (c) => {

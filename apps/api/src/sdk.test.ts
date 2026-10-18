@@ -218,7 +218,21 @@ describe('SDK against the API', () => {
     const creatorSdk = w.client();
     const creatorSigner = keypairSigner(seller.secretKey);
     await creatorSdk.createApiKey(creatorSigner, { name: 'creator', scopes: ['read', 'sell', 'review'] });
+    const open = await creatorSdk.creatorReviews({ unreplied: true });
+    expect(open.reviews.map((r) => r.id)).toContain(review.id);
     expect((await creatorSdk.replyToReview(review.id, 'Thanks for buying!')).ok).toBe(true);
+    expect((await creatorSdk.creatorReviews({ unreplied: true })).reviews.map((r) => r.id)).not.toContain(review.id);
+    const all = await creatorSdk.creatorReviews();
+    expect(all.reviews.find((r) => r.id === review.id)).toMatchObject({ rating: 5, reply: 'Thanks for buying!' });
+    // Sales and subscribers carry the purchase (free update period or lifetime updates).
+    const sales = await creatorSdk.sales({ limit: 10 });
+    expect(sales.sales.find((sale) => sale.id === bought.orderId)).toMatchObject({ status: 'released', buyer: signer.publicKey });
+    const subs = await creatorSdk.subscribers();
+    const sub = subs.subscribers.find((entry) => entry.orderId === bought.orderId);
+    expect(['free', 'forever']).toContain(sub?.status);
+    expect(subs.counts.free + subs.counts.forever).toBeGreaterThanOrEqual(1);
+    // Creator data needs the sell scope: the buyer's key is refused.
+    await expect(sdk.sales()).rejects.toThrow(/INSUFFICIENT_SCOPE/);
     await sdk.revokeKey();
     await expect(sdk.me()).rejects.toThrow(/INVALID_API_KEY/);
   });

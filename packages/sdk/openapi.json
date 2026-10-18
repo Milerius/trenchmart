@@ -3640,6 +3640,129 @@
         ]
       }
     },
+    "/studio/sales": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Every completed sale of your listings, newest first (query: limit 1-100, before ISO cursor)",
+        "operationId": "getStudioSales",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/subscribers": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Buyers currently receiving updates: forever, free first period or paying renewal",
+        "operationId": "getStudioSubscribers",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/reviews": {
+      "get": {
+        "tags": [
+          "Sell"
+        ],
+        "summary": "Reviews on your listings with replies (query: unreplied=1, limit, before)",
+        "operationId": "getStudioReviews",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
     "/studio/listings/{id}/delist": {
       "post": {
         "tags": [

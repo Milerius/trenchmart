@@ -179,13 +179,14 @@ describe('client', () => {
       client.submitOrder(id, 'sig'), client.order(id), client.orders(), client.escrow(id), client.download(id),
       client.release(id), client.reviewForm(id), client.myReviews(), client.replyToReview(id, 'thanks'),
       client.voteReview(id, true), client.upvote('slug'), client.profile(), client.updateProfile({ bio: 'x' }),
-      client.uploadAvatar(new Uint8Array([1])), client.uploadBanner(new Uint8Array([1])), client.requirements(),
+      client.uploadAvatar(new Uint8Array([1])), client.uploadBanner(new Uint8Array([1])), client.requirements(), client.linkXDev('agent'),
       client.createListing({ title: 't', summary: 's', description: 'd', category: 'userscript', priceLamports: '1' }),
       client.myListings(), client.updateListing(id, { priceLamports: '2' }), client.listingContent(id),
       client.saveContent(id, { readme: 'r' }), client.publishContent(id), client.uploadImage(id, new Uint8Array([1])),
       client.uploadQuota(id), client.startVersion(id, { semver: '1.0.0', fileName: 'a.js', fileSize: 1 }),
       client.completeVersion(id), client.versionResult(id), client.explainVersion(id, 'note'), client.overview(),
       client.payouts(), client.delist(id), client.broadcast(new Uint8Array(200)),
+      client.sales({ limit: 5 }), client.subscribers(), client.creatorReviews({ unreplied: true }),
     ]);
     expect(calls.length).toBeGreaterThan(40);
     for (const call of calls) {

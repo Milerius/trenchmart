@@ -191,3 +191,50 @@ export type ReviewForm = {
 };
 
 export type Json = Record<string, unknown>;
+
+export type Sale = {
+  id: string;
+  listing_id: string;
+  slug: string;
+  title: string;
+  buyer: string;
+  semver: string | null;
+  price: string;
+  fee: string;
+  rebate: string;
+  total: string;
+  tier: string;
+  status: 'paid' | 'released' | 'disputed' | 'refunded';
+  tx_sig: string | null;
+  paid_at: string;
+  escrow_until: string | null;
+  released_at: string | null;
+};
+
+export type Subscriber = {
+  orderId: string;
+  listingId: string;
+  slug: string;
+  buyer: string;
+  status: 'forever' | 'paying' | 'free';
+  until: string | null;
+};
+
+export type CreatorReview = {
+  id: string;
+  listing_id: string;
+  slug: string;
+  title: string;
+  rating: number;
+  body: string;
+  terminal: string | null;
+  semver: string | null;
+  reviewer: string | null;
+  created_at: string;
+  edited_at: string | null;
+  reply: string | null;
+  replied_at: string | null;
+  reply_edited_at: string | null;
+};
+
+export type Page = { limit?: number; before?: string };

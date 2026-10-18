@@ -439,6 +439,24 @@ export const ROUTES: RouteDoc[] = [
     summary: 'Sales, revenue, buyers and subscribers, per listing and over time',
   },
   { method: 'get', path: '/studio/payouts', tag: 'Sell', summary: 'Payouts to your wallet' },
+  {
+    method: 'get',
+    path: '/studio/sales',
+    tag: 'Sell',
+    summary: 'Every completed sale of your listings, newest first (query: limit 1-100, before ISO cursor)',
+  },
+  {
+    method: 'get',
+    path: '/studio/subscribers',
+    tag: 'Sell',
+    summary: 'Buyers currently receiving updates: forever, free first period or paying renewal',
+  },
+  {
+    method: 'get',
+    path: '/studio/reviews',
+    tag: 'Sell',
+    summary: 'Reviews on your listings with replies (query: unreplied=1, limit, before)',
+  },
   { method: 'post', path: '/studio/listings/{id}/delist', tag: 'Sell', summary: 'Delist a listing' },
   // Profile
   { method: 'get', path: '/studio/profile', tag: 'Profile', summary: 'Your editable profile' },

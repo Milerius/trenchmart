@@ -185,3 +185,89 @@ export function profileFilled(profile: Row): { done: number; of: number } {
   ];
   return { done: parts.filter(Boolean).length, of: parts.length };
 }
+
+/** Page size bounds shared by the creator data endpoints. */
+function pageOf(limit: string | undefined, before: string | undefined) {
+  const n = Math.min(100, Math.max(1, Number(limit) || 50));
+  const at = before ? new Date(before) : null;
+  return { limit: n, before: at && !Number.isNaN(at.getTime()) ? at : null };
+}
+
+/** Every completed sale of the creator's listings, newest first (paid, released, disputed, refunded). */
+export async function studioSales(deps: Deps, user: Row, query: { limit?: string; before?: string }) {
+  const page = pageOf(query.limit, query.before);
+  const rows = await deps.sql<Row[]>`
+    select o.id, o.listing_id, l.slug, l.title, b.wallet as buyer, v.semver, o.price, o.fee, o.rebate,
+      o.total, o.tier_at_purchase as tier, o.status, o.tx_sig, o.paid_at, o.escrow_until, o.released_at
+    from orders o
+    join listings l on l.id = o.listing_id
+    join users b on b.id = o.buyer_id
+    left join versions v on v.id = o.version_id
+    where l.creator_id = ${user.id as string}
+      and o.status in ('paid', 'released', 'disputed', 'refunded') and o.paid_at is not null
+      and (${page.before}::timestamptz is null or o.paid_at < ${page.before}::timestamptz)
+    order by o.paid_at desc limit ${page.limit}
+  `;
+  const last = rows.length === page.limit ? rows[rows.length - 1] : undefined;
+  return { sales: rows, nextBefore: last ? (last.paid_at as Date).toISOString() : null };
+}
+
+/** Buyers who currently receive updates: forever, inside the free first period, or paying renewals. */
+export async function studioSubscribers(deps: Deps, user: Row) {
+  const now = deps.now();
+  const rows = await deps.sql<Row[]>`
+    select o.id as order_id, l.id as listing_id, l.slug, b.wallet as buyer, o.updates_forever,
+      o.updates_until, max(r.ends_at) filter (where r.status = 'paid') as renewal_ends_at
+    from orders o
+    join listings l on l.id = o.listing_id
+    join users b on b.id = o.buyer_id
+    left join update_renewals r on r.order_id = o.id
+    where l.creator_id = ${user.id as string} and o.status in ('paid', 'released')
+    group by o.id, l.id, b.wallet
+    having o.updates_forever or o.updates_until > ${now}
+      or max(r.ends_at) filter (where r.status = 'paid') > ${now}
+    order by l.slug, o.paid_at desc
+    limit 1000
+  `;
+  const subscribers = rows.map((row) => {
+    const renewal = row.renewal_ends_at as Date | null;
+    const status = row.updates_forever ? 'forever' : renewal && renewal > now ? 'paying' : 'free';
+    const until = row.updates_forever
+      ? null
+      : [row.updates_until as Date | null, renewal].filter((d): d is Date => !!d).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    return { orderId: row.order_id, listingId: row.listing_id, slug: row.slug, buyer: row.buyer, status, until };
+  });
+  return {
+    counts: {
+      forever: subscribers.filter((s) => s.status === 'forever').length,
+      paying: subscribers.filter((s) => s.status === 'paying').length,
+      free: subscribers.filter((s) => s.status === 'free').length,
+    },
+    subscribers,
+  };
+}
+
+/** Visible reviews on the creator's listings with any reply; `unreplied` keeps only open ones. */
+export async function studioReviews(
+  deps: Deps,
+  user: Row,
+  query: { limit?: string; before?: string; unreplied?: string },
+) {
+  const page = pageOf(query.limit, query.before);
+  const unreplied = query.unreplied === '1' || query.unreplied === 'true';
+  const rows = await deps.sql<Row[]>`
+    select r.id, r.listing_id, l.slug, l.title, r.rating, r.body, r.terminal, v.semver, u.wallet as reviewer,
+      r.created_at, r.edited_at, rr.body as reply, rr.created_at as replied_at, rr.edited_at as reply_edited_at
+    from listing_reviews r
+    join listings l on l.id = r.listing_id
+    left join users u on u.id = r.reviewer_id
+    left join versions v on v.id = r.version_id
+    left join review_replies rr on rr.review_id = r.id
+    where l.creator_id = ${user.id as string} and r.hidden_at is null
+      and (not ${unreplied} or rr.review_id is null)
+      and (${page.before}::timestamptz is null or r.created_at < ${page.before}::timestamptz)
+    order by r.created_at desc limit ${page.limit}
+  `;
+  const last = rows.length === page.limit ? rows[rows.length - 1] : undefined;
+  return { reviews: rows, nextBefore: last ? (last.created_at as Date).toISOString() : null };
+}

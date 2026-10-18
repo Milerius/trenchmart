@@ -1,0 +1,22 @@
+{
+  "name": "@trenchmart/examples",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "buy": "tsx buy-agent.ts",
+    "sell": "tsx sell-agent.ts",
+    "stack": "tsx ci/local-stack.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "1.99.0",
+    "@trenchmart/sdk": "workspace:*",
+    "bs58": "6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

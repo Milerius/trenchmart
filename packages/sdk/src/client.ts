@@ -14,6 +14,7 @@ import type {
   CheckoutOrder,
   CreateListingInput,
   CreatedApiKey,
+  CreatorReview,
   Download,
   Json,
   ListingDetail,
@@ -21,11 +22,14 @@ import type {
   ListingSummary,
   ListingsQuery,
   Order,
+  Page,
   ProfileInput,
   PublicConfig,
   Quote,
   ReviewForm,
+  Sale,
   StartedVersion,
+  Subscriber,
   UnsignedPayment,
   VersionResult,
 } from './types.js';
@@ -466,6 +470,14 @@ export class TrenchmartClient {
 
   // ---------------------------------------------------------------- selling
 
+  /**
+   * Unverified X handle link for local stacks without X OAuth. On the live site this answers
+   * 410 X_OAUTH_REQUIRED: verify X once in the studio with the same wallet instead.
+   */
+  linkXDev(handle: string): Promise<{ handle: string }> {
+    return this.request('POST', '/studio/x', { body: { handle } });
+  }
+
   requirements(): Promise<Json> {
     return this.request('GET', '/studio/requirements');
   }
@@ -586,6 +598,24 @@ export class TrenchmartClient {
 
   payouts(): Promise<Json> {
     return this.request('GET', '/studio/payouts');
+  }
+
+  /** Completed sales of your listings, newest first. Pass `nextBefore` back as `before` to page. */
+  sales(page: Page = {}): Promise<{ sales: Sale[]; nextBefore: string | null }> {
+    return this.request('GET', '/studio/sales', { query: page });
+  }
+
+  /** Buyers who currently receive updates, with counts per status. */
+  subscribers(): Promise<{ counts: { forever: number; paying: number; free: number }; subscribers: Subscriber[] }> {
+    return this.request('GET', '/studio/subscribers');
+  }
+
+  /** Reviews on your listings with your replies; `unreplied: true` keeps the ones awaiting a reply. */
+  creatorReviews(
+    opts: Page & { unreplied?: boolean } = {},
+  ): Promise<{ reviews: CreatorReview[]; nextBefore: string | null }> {
+    const { unreplied, ...page } = opts;
+    return this.request('GET', '/studio/reviews', { query: { ...page, unreplied: unreplied ? 1 : undefined } });
   }
 
   delist(listingId: string): Promise<{ ok: true }> {
