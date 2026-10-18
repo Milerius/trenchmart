@@ -1,4 +1,4 @@
-import { ButtonLink, Label } from '@/components/ui';
+import { ButtonLink, Label, Serif } from '@/components/ui';
 
 const STEPS: [string, string][] = [
   ['Connect and sign in', 'Sign a message with your wallet. No transaction is needed to sign in.'],
@@ -19,7 +19,7 @@ export default function SellPage() {
       <header className="max-w-2xl">
         <Label className="text-accent-label">Sell on TrenchMart</Label>
         <h1 className="m-0 mt-2 text-[40px] font-semibold leading-tight tracking-[-0.03em]">
-          Sell your tooling. Keep 100% of the price.
+          Sell your tooling. <Serif className="text-accent">Keep 100%</Serif> of the price.
         </h1>
         <p className="m-0 mt-3 text-[17px] text-ink-2">
           0% creator commission. Buyers pay the fee, and every version you upload goes through

@@ -5,7 +5,7 @@ import { solToLamports } from '@trenchmart/shared/money';
 import { formatTrench } from '@trenchmart/shared/tier';
 import { useState } from 'react';
 import { DEFAULT_FEES, FeeBreakdown, TIER_ORDER, TierTable } from '@/components/fees';
-import { Label } from '@/components/ui';
+import { Label, Serif } from '@/components/ui';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
 
@@ -45,7 +45,7 @@ export default function TokenPage() {
       <header className="max-w-3xl">
         <Label className="text-accent-label">$TRENCH · fair launch on pump.fun</Label>
         <h1 className="mt-3 text-[40px] font-semibold leading-tight tracking-[-0.03em]">
-          Fees fund the token. The token cuts your fees.
+          Fees fund the token. <Serif className="text-accent">The token cuts your fees.</Serif>
         </h1>
         <p className="mt-4 text-[17px] text-ink-2">
           Buyers pay a {fees.feeBps / 100}% fee on top of the listing price. Holding $TRENCH cuts
