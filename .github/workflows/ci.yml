@@ -166,6 +166,22 @@ jobs:
           fi
           pnpm db:pending
 
+  bundle-budget:
+    name: bundle-budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 26.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Performance guard: gzip JS per prerendered page must stay under budget.
+      - run: pnpm --filter @trenchmart/web build
+      - run: pnpm --filter @trenchmart/web budget
+
   audit:
     name: audit
     runs-on: ubuntu-latest

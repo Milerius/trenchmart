@@ -1,11 +1,9 @@
 'use client';
 
-import {
-  categoryMeta,
-  DEFAULT_ESCROW_HOURS,
-  escrowWindowLabel,
-  solToLamports,
-} from '@trenchmart/shared';
+import { categoryMeta } from '@trenchmart/shared/categories';
+import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
+import { escrowWindowLabel } from '@trenchmart/shared/escrow';
+import { solToLamports } from '@trenchmart/shared/money';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';

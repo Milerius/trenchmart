@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { categoryMeta } from '@trenchmart/shared';
+import { categoryMeta } from '@trenchmart/shared/categories';
 import { FeaturedRow, useFeatured } from '@/components/featured';
 import { ListingGrid, type Listing } from '@/components/listings';
 import { PreviewNotice } from '@/components/ui';

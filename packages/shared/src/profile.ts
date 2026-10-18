@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { ProfileInput } from './profile-schema';
 
 /**
  * Creator profiles: display name, bio, handle, socials and opt-in contact channels.
@@ -179,42 +179,6 @@ export function visibleContact(contact: Contact | null | undefined, isBuyer: boo
   if (!contact?.enabled) return [];
   return contact.channels.filter((c) => c.audience === 'everyone' || isBuyer);
 }
-
-export const profileBody = z
-  .object({
-    handle: z.string().max(40).optional(),
-    displayName: z.string().max(200).optional(),
-    bio: z.string().max(2000).optional(),
-    socials: z
-      .object({
-        telegram: z.string().max(200).optional(),
-        discord: z.string().max(200).optional(),
-        website: z.string().max(400).optional(),
-        github: z.string().max(200).optional(),
-      })
-      .strict()
-      .optional(),
-    contact: z
-      .object({
-        enabled: z.boolean(),
-        channels: z
-          .array(
-            z
-              .object({
-                kind: z.enum(['telegram', 'discord', 'email']),
-                value: z.string().max(200),
-                audience: z.enum(['everyone', 'buyers']),
-              })
-              .strict(),
-          )
-          .max(3),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-
-export type ProfileInput = z.infer<typeof profileBody>;
 
 export type ProfileFields = {
   handle?: string;

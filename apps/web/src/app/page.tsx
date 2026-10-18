@@ -1,10 +1,12 @@
 'use client';
 
-import { DEFAULT_ESCROW_HOURS, escrowWindowLabel, escrowWindowShort } from '@trenchmart/shared';
+import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
+import { escrowWindowLabel, escrowWindowShort } from '@trenchmart/shared/escrow';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { preload } from 'react-dom';
 import { solText } from '@/lib/money';
-import { CATEGORIES } from '@trenchmart/shared';
+import { CATEGORIES } from '@trenchmart/shared/categories';
 import { ActivityBand, useActivity } from '@/components/activity';
 import { FeaturedRow, useFeatured } from '@/components/featured';
 import { TierTable } from '@/components/fees';
@@ -44,6 +46,13 @@ type Stats = {
 const HOME_TABS: BoardTab[] = ['earners', 'rated', 'rising'];
 
 export default function HomePage() {
+  // Home-only reads start with the HTML (see PRELOADED_READS in the shell).
+  for (const href of [
+    '/api/v1/stats',
+    '/api/v1/creators/leaderboard?tab=earners&range=30d&limit=6',
+    '/api/v1/activity?limit=24',
+  ])
+    preload(href, { as: 'fetch', crossOrigin: 'use-credentials' });
   const wallet = useWallet();
   const config = usePublicConfig();
   const [terminal, setTerminal] = useState('All');

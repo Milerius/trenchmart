@@ -1,4 +1,4 @@
-import type { CategoryCode } from '@trenchmart/shared';
+import type { CategoryCode } from '@trenchmart/shared/config';
 
 export type ContentField = 'readme' | 'howto' | 'requirements';
 export type ContentTemplate = Record<ContentField, string>;

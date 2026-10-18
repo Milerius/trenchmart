@@ -1,12 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_CONFIG_JSON,
-  MALICIOUS_DISPUTE_MS,
-  PAYMENT_GRACE_MS,
-  canTransitionOrder,
-  disputeBody,
-} from '@trenchmart/shared';
+import { DEFAULT_CONFIG_JSON } from '@trenchmart/shared/config';
+import { MALICIOUS_DISPUTE_MS, PAYMENT_GRACE_MS } from '@trenchmart/shared/escrow';
+import { disputeBody } from '@trenchmart/shared/schemas';
+import { canTransitionOrder } from '@trenchmart/shared/state';
 import {
   CONTACT_URL,
   DISPUTE_REASONS,

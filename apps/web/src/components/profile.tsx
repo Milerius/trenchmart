@@ -8,7 +8,7 @@ import {
   type ContactChannel,
   type SocialKind,
   type Socials,
-} from '@trenchmart/shared';
+} from '@trenchmart/shared/profile';
 import type { ReactNode } from 'react';
 import {
   CheckIcon,

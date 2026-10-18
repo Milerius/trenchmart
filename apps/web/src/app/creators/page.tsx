@@ -1,6 +1,6 @@
 'use client';
 
-import { CATEGORIES } from '@trenchmart/shared';
+import { CATEGORIES } from '@trenchmart/shared/categories';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';

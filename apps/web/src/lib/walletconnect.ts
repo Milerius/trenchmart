@@ -1,6 +1,5 @@
-import { fromBase64, toBase64 } from '@trenchmart/chain';
+import { fromBase64, toBase64 } from './base64';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
 
 /**
  * Public Reown project id (cloud.reown.com). The allowed origin is https://trenchmart.fun.
@@ -294,6 +293,7 @@ export function mockWalletConnectProvider(mock: WalletConnectMock): WcProviderLi
         if (mock.secret && params?.message) {
           const secret = bs58.decode(mock.secret);
           const message = bs58.decode(params.message);
+          const { default: nacl } = await import('tweetnacl');
           return { signature: bs58.encode(nacl.sign.detached(message, secret)) };
         }
         return { signature: bs58.encode(new Uint8Array(64).fill(7)) };

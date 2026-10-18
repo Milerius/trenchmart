@@ -1,6 +1,8 @@
 'use client';
 
-import { DEFAULT_CONFIG_JSON, formatTrench, solToLamports } from '@trenchmart/shared';
+import { DEFAULT_CONFIG_JSON } from '@trenchmart/shared/config';
+import { solToLamports } from '@trenchmart/shared/money';
+import { formatTrench } from '@trenchmart/shared/tier';
 import { useState } from 'react';
 import { DEFAULT_FEES, FeeBreakdown, TIER_ORDER, TierTable } from '@/components/fees';
 import { Label } from '@/components/ui';

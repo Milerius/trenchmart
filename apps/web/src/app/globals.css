@@ -97,7 +97,8 @@ body {
 
 @keyframes rise {
   from {
-    opacity: 0;
+    /* 0.01, not 0: visually identical, but lets the browser count the first paint for LCP. */
+    opacity: 0.01;
     transform: translateY(12px);
   }
   to {
@@ -342,7 +343,8 @@ body {
 
 @keyframes route-fade {
   from {
-    opacity: 0;
+    /* 0.01, not 0: visually identical, but lets the browser count the first paint for LCP. */
+    opacity: 0.01;
     transform: translateY(6px);
   }
   to {

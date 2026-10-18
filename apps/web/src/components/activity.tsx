@@ -1,6 +1,7 @@
 'use client';
 
-import { categoryMeta, type PublicIdentity } from '@trenchmart/shared';
+import { categoryMeta } from '@trenchmart/shared/categories';
+import { type PublicIdentity } from '@trenchmart/shared/social';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
