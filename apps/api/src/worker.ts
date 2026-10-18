@@ -13,7 +13,7 @@ import {
 } from '@trenchmart/chain';
 import { createApp, type PriceCacheBox } from './app';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
-import { readEnv } from './env';
+import { readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
 import { expireOrders, proposePayouts, releaseOrders } from './logic';
@@ -88,6 +88,19 @@ export default {
         return Response.json(
           { error: { code: 'MAINNET_REFUSED', message: 'refusing mainnet' } },
           { status: 500 },
+        );
+      }
+      // H-01: report (names only) and fail closed if a secret is missing or a default.
+      const weak = isLocalAppUrl(env.APP_URL as string | undefined)
+        ? []
+        : weakSecrets(stringEnv(env));
+      if (weak.length) {
+        return Response.json(
+          {
+            ok: false,
+            error: { code: 'INSECURE_CONFIG', message: 'weak or missing secrets', names: weak },
+          },
+          { status: 503 },
         );
       }
       return Response.json({ ok: true, cluster });
