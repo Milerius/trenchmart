@@ -8,7 +8,8 @@
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "budget": "tsx scripts/bundle-budget.ts"
+    "budget": "tsx scripts/bundle-budget.ts",
+    "build:cf": "opennextjs-cloudflare build --config wrangler.deploy.jsonc && tsx scripts/seed-static-cache.ts"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.12",
