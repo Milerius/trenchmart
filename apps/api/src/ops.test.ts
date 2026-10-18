@@ -312,5 +312,4 @@ describe('monitoring and alerts', () => {
     await postNtfy(f, { ...base, alertNtfyToken: 'tk' }, { Title: 'x' }, 'b');
     expect(posts.length).toBe(1);
   });
-
 });

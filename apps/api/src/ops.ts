@@ -382,7 +382,6 @@ export async function deliverAlerts(deps: Deps, alerts: OpsAlert[]): Promise<Not
   return notices;
 }
 
-
 /** Open + recently resolved rows for the assistant poller (machine-readable). */
 export async function opsAlertRows(deps: Deps) {
   const open = await deps.sql<Record<string, unknown>[]>`

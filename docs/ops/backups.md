@@ -16,11 +16,11 @@ migration is not point-in-time recoverable.
 
 ### Required GitHub Actions secrets
 
-| Secret | Purpose |
-| --- | --- |
-| `TM_DATABASE_URL` | Supabase session-pooler URL (same shape as local `dburl.sh`) |
-| `CLOUDFLARE_API_TOKEN` | Token with R2 edit on `trenchmart-files` |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
+| Secret                  | Purpose                                                      |
+| ----------------------- | ------------------------------------------------------------ |
+| `TM_DATABASE_URL`       | Supabase session-pooler URL (same shape as local `dburl.sh`) |
+| `CLOUDFLARE_API_TOKEN`  | Token with R2 edit on `trenchmart-files`                     |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id                                        |
 
 If a secret is missing the job exits 0 and skips (so CI stays green until secrets are set).
 

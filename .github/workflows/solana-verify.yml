@@ -58,6 +58,7 @@ jobs:
           curl -fsSL https://release.anza.xyz/v4.3.2/install | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH"
           solana-verify --version
           solana --version
 

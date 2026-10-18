@@ -11,7 +11,7 @@ third-party account is needed for the default setup.
 | **External watchdog** | separate Worker `trenchmart-watchdog` (`apps/api/src/watchdog.ts`, `watchdog.wrangler.toml`), its own 5 min cron | web, API `/api/v1/health` and Solana RPC, checked from outside the API Worker, so an API outage still surfaces                                  |
 | **Error tracking**    | Workers Logs (`[observability] enabled` on both Workers) plus the `ops_events` table                             | every unhandled API error (`console.error` stack in Workers Logs, `5xx` row in `ops_events`); webhook, scan and R2 errors are tagged separately |
 | **Status dashboard**  | `https://trenchmart.fun/admin/status` (admin wallets only, `GET /admin/ops`)                                     | current checks, firing alerts, delivery = assistant, error counts for 24 h, alert history                                                       |
-| **Assistant poller**  | box script `/workspace/tm-alerts/check.sh` every 10 min                                                          | open + resolved from `GET /api/v1/internal/ops/alerts` (Bearer `INTERNAL_TOKEN`) plus watchdog `GET /`                                           |
+| **Assistant poller**  | box script `/workspace/tm-alerts/check.sh` every 10 min                                                          | open + resolved from `GET /api/v1/internal/ops/alerts` (Bearer `INTERNAL_TOKEN`) plus watchdog `GET /`                                          |
 
 ### Alert delivery
 
