@@ -1,9 +1,10 @@
 /**
- * Makes the narrower listing-image copies the API serves for `?w=480|960` (content.ts
+ * Backfill for the narrower listing-image copies the API serves for `?w=480|960|1200` (content.ts
  * MEDIA_WIDTHS). Uploads are stored once at up to 1600 px; phones and cards need far less.
- * Re-encoding in the Worker costs too much CPU, so this runs offline and is safe to rerun.
+ * New uploads get them from the seller's browser (webp.ts uploadCopies); this covers older
+ * images. Re-encoding in the Worker costs too much CPU, so it runs offline; safe to rerun.
  *
- *   echo media/<sha>.webp | tsx scripts/media-variants.ts            # R2 keys on stdin
+ *   echo '<image id> media/<sha>.webp' | tsx scripts/media-variants.ts   # one row per line
  *
  * Reads and writes R2 through `wrangler r2 object get/put --remote` (WRANGLER, R2_BUCKET).
  */
@@ -38,8 +39,11 @@ await Promise.all([
 ]);
 
 const dir = mkdtempSync(join(tmpdir(), 'tm-variants-'));
-const keys = readFileSync(0, 'utf8').split(/\s+/).filter(Boolean);
-for (const key of keys) {
+const rows = readFileSync(0, 'utf8')
+  .split('\n')
+  .map((line) => line.trim().split(/\s+/))
+  .filter((parts): parts is [string, string] => parts.length === 2);
+for (const [id, key] of rows) {
   const src = join(dir, 'src');
   run(['r2', 'object', 'get', `${bucket}/${key}`, '--remote', '--file', src]);
   const bytes = readFileSync(src);
@@ -60,7 +64,7 @@ for (const key of keys) {
     );
     const file = join(dir, `w${width}.webp`);
     writeFileSync(file, out);
-    const target = mediaVariantKey(key, width);
+    const target = mediaVariantKey(id, width);
     run([
       'r2',
       'object',

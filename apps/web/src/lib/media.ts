@@ -1,6 +1,6 @@
 /**
  * Responsive listing images. The API stores each upload at up to 1600 px and narrower WebP
- * copies for `?w=480` and `?w=960` (apps/api content.ts MEDIA_WIDTHS); a width without a copy
+ * copies for `?w=480`, `?w=960` and `?w=1200` (apps/api content.ts MEDIA_WIDTHS); a width without a copy
  * redirects to the original, so these URLs are always valid.
  */
 const MEDIA = /^\/api\/v1\/media\/[0-9a-f-]{36}$/i;
@@ -12,7 +12,7 @@ export const HERO_SIZES = '(min-width: 1024px) 800px, 100vw';
 
 export function mediaSrcSet(url: string): string | undefined {
   if (!MEDIA.test(url)) return undefined;
-  return `${url}?w=480 480w, ${url}?w=960 960w, ${url} 1600w`;
+  return `${url}?w=480 480w, ${url}?w=960 960w, ${url}?w=1200 1200w, ${url} 1600w`;
 }
 
 /** A small copy for thumbnails (strip, lightbox rail). */

@@ -163,6 +163,62 @@ export async function optimizeStoredImages(deps: Deps, limit = 5) {
   return done;
 }
 
+/** A narrower copy is a small WebP; the 1200 px one stays well under this. */
+export const VARIANT_MAX_BYTES = 512 * 1024;
+
+/**
+ * Stores the seller's browser-made narrower copy of an uploaded image (`?w=` in
+ * mediaResponse). The Worker cannot afford to re-encode (CPU limit), so the browser that
+ * already converts the upload to WebP also sends the 480/960/1200 px copies.
+ * Checked like any upload (sniffed WebP, metadata stripped), and it must have exactly the
+ * requested width and the original's aspect ratio. Only while the image is not yet on the
+ * approved public page, and never replaced: what reviewers approved is what visitors get.
+ */
+export async function uploadImageVariant(
+  deps: Deps,
+  listingId: string,
+  imageId: string,
+  width: number,
+  body: Uint8Array,
+) {
+  if (!(MEDIA_WIDTHS as readonly number[]).includes(width))
+    throw new HttpError(400, 'BAD_WIDTH', `width must be one of ${MEDIA_WIDTHS.join(', ')}`);
+  if (body.length > VARIANT_MAX_BYTES)
+    throw new HttpError(413, 'IMAGE_TOO_LARGE', 'an image copy is limited to 512 KB');
+  let clean;
+  try {
+    clean = cleanImage(body);
+  } catch (err) {
+    if (err instanceof ImageError) throw new HttpError(400, err.code, err.message);
+    throw err;
+  }
+  if (clean.mime !== 'image/webp')
+    throw new HttpError(400, 'IMAGE_TYPE', 'image copies must be WebP');
+  const rows = await deps.sql<Row[]>`
+    select m.*, c.live from listing_media m
+    left join listing_content c on c.listing_id = m.listing_id
+    where m.id = ${imageId} and m.listing_id = ${listingId}
+  `;
+  const row = rows[0];
+  if (!row) throw new HttpError(404, 'NOT_FOUND', 'image not found');
+  if (((row.live?.mediaIds as string[] | undefined) ?? []).includes(imageId))
+    throw new HttpError(409, 'IMAGE_LIVE', 'this image is already on the approved page');
+  const original = { width: row.width as number, height: row.height as number };
+  if (width >= original.width)
+    throw new HttpError(400, 'BAD_WIDTH', 'a copy must be narrower than the original');
+  const expectedHeight = Math.max(1, Math.round((original.height * width) / original.width));
+  if (clean.width !== width || Math.abs(clean.height - expectedHeight) > 1)
+    throw new HttpError(
+      400,
+      'IMAGE_DIMENSIONS',
+      `expected ${width}x${expectedHeight}, got ${clean.width}x${clean.height}`,
+    );
+  const key = mediaVariantKey(imageId, width);
+  if (await deps.blob.get(key)) return { width, stored: false };
+  await deps.blob.put(key, clean.bytes);
+  return { width, stored: true };
+}
+
 export async function deleteImage(deps: Deps, listingId: string, imageId: string) {
   const content = await contentRow(deps, listingId);
   const live = (content?.live ?? null) as Row | null;
@@ -180,6 +236,7 @@ export async function deleteImage(deps: Deps, listingId: string, imageId: string
   const shared =
     await deps.sql`select 1 from listing_media where r2_key = ${rows[0].r2_key} limit 1`;
   if (shared.length === 0) await deps.blob.delete(rows[0].r2_key as string);
+  for (const width of MEDIA_WIDTHS) await deps.blob.delete(mediaVariantKey(imageId, width));
   if (content) {
     const draft = { ...EMPTY_DRAFT, ...(content.draft as Partial<ContentDraft>) };
     const next = {
@@ -364,9 +421,11 @@ export async function publicContent(deps: Deps, listingId: string) {
 
 /** Serve an image: public once it is on a live page, otherwise only to the listing owner. */
 /** Narrower copies of each listing image for phones and cards (`?w=`), stored next to it. */
-export const MEDIA_WIDTHS = [480, 960] as const;
-export const mediaVariantKey = (r2Key: string, width: number) =>
-  `${r2Key.replace(/\.[a-z0-9]+$/i, '')}@w${width}.webp`;
+export const MEDIA_WIDTHS = [480, 960, 1200] as const;
+// Keyed by the image row, not its R2 key: identical uploads share one R2 object, and a copy
+// sent for one seller's image must never show up under another seller's image.
+export const mediaVariantKey = (imageId: string, width: number) =>
+  `media/copies/${imageId}/w${width}.webp`;
 
 export async function mediaResponse(
   deps: Deps,
@@ -392,9 +451,7 @@ export async function mediaResponse(
   // rather than answering it under the ?w= URL: that answer would be cached as immutable and
   // hide a copy made later. (Relative Location: works behind the web's /api/v1 proxy too.)
   const wanted = width !== null && (MEDIA_WIDTHS as readonly number[]).includes(width);
-  const variant = wanted
-    ? await deps.blob.get(mediaVariantKey(row.r2_key as string, width!))
-    : null;
+  const variant = wanted ? await deps.blob.get(mediaVariantKey(id, width!)) : null;
   if (wanted && !variant)
     return new Response(null, {
       status: 302,
