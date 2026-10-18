@@ -263,6 +263,17 @@ test.describe('phase 5: header, nav and footer', () => {
     });
     expect(style.position).toBe('sticky');
     expect(style.filter).toContain('blur(18px)');
+    // Prototype nav: Explore, Creators, $TRENCH, Verify, Docs.
+    const primary = header.getByRole('navigation', { name: 'Primary' });
+    await expect(primary.getByRole('link')).toHaveText([
+      'Explore',
+      'Creators',
+      '$TRENCH',
+      'Verify',
+      'Docs',
+    ]);
+    await expect(header.getByRole('button', { name: 'Open menu' })).toBeHidden();
+    await page.goto('/search');
     const current = header.getByRole('link', { name: 'Explore', exact: true });
     await expect(current).toHaveAttribute('aria-current', 'page');
     expect(
@@ -287,6 +298,30 @@ test.describe('phase 5: header, nav and footer', () => {
     });
     expect(style.position).toBe('static');
     expect(style.filter).toBe('none');
+    // Compact prototype header: logo, connect and a menu button; nav and search live in the menu.
+    await expect(header.getByRole('navigation', { name: 'Primary' })).toBeHidden();
+    await expect(page.getByTestId('search')).toBeHidden();
+    const box = await header.boundingBox();
+    expect(box?.height).toBeLessThan(80);
+    const toggle = header.getByRole('button', { name: 'Open menu' });
+    await toggle.click();
+    await expect(header.getByRole('button', { name: 'Close menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    const menu = header.getByRole('navigation', { name: 'Mobile' });
+    await expect(menu.getByRole('link')).toHaveText([
+      'Explore',
+      'Creators',
+      '$TRENCH',
+      'Verify',
+      'Docs',
+      'Sell',
+    ]);
+    await page.getByTestId('search-mobile').fill('trojan');
+    await page.getByTestId('search-mobile').press('Enter');
+    await expect(page).toHaveURL(/\/search\?q=trojan/);
+    await expect(header.getByRole('navigation', { name: 'Mobile' })).toHaveCount(0);
   });
 
   test('footer lists the real devnet addresses and every site link', async ({ page }) => {

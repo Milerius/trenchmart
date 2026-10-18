@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { preload } from 'react-dom';
+import { Menu, Search, X } from 'lucide-react';
 import { NetworkBanner } from '@/components/ui';
 import { type ActivityEvent, activityText, type SponsoredChip } from '@/components/activity';
 import { api } from '@/lib/api';
@@ -127,92 +128,120 @@ function Nav() {
     router.push(q ? `/search?q=${encodeURIComponent(q)}` : '/search');
   }
 
+  // Prototype nav: Explore, Creators, $TRENCH, Verify, Docs (+ Studio once signed in).
   const links = [
-    { href: '/', label: 'Explore' },
-    { href: '/sell', label: 'Sell' },
+    { href: '/search', label: 'Explore' },
+    { href: '/creators', label: 'Creators' },
     { href: '/token', label: '$TRENCH' },
-    ...(wallet.session
-      ? [
-          { href: '/me/purchases', label: 'Purchases' },
-          { href: '/studio', label: 'Studio' },
-        ]
-      : [{ href: '/creators', label: 'Creators' }]),
+    { href: '/verify', label: 'Verify' },
+    { href: '/docs', label: 'Docs' },
+    ...(wallet.session ? [{ href: '/studio', label: 'Studio' }] : []),
   ];
-  const active = (href: string) =>
-    href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+  const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [pathname]);
+
+  const searchForm = (mobile: boolean) => (
+    <form
+      onSubmit={search}
+      role="search"
+      className={mobile ? 'flex w-full' : 'ml-auto hidden min-w-0 md:flex md:w-56 xl:w-64'}
+    >
+      <label className="flex h-10 w-full items-center gap-2 rounded-full border border-line-control bg-inset px-3.5 focus-within:border-accent/60">
+        <Search size={15} aria-hidden="true" className="shrink-0 text-muted" />
+        <input
+          ref={mobile ? undefined : searchRef}
+          data-testid={mobile ? 'search-mobile' : 'search'}
+          name="q"
+          type="search"
+          aria-label="Search listings"
+          placeholder="Search scripts, wallets, filters"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+        />
+        {mobile ? null : (
+          <kbd
+            aria-hidden="true"
+            className="rounded border border-line px-1.5 font-mono text-[10px] text-muted"
+          >
+            /
+          </kbd>
+        )}
+      </label>
+    </form>
+  );
 
   return (
-    // Glass and sticky only from md up: on a phone the header wraps to three rows, and a
-    // backdrop blur over scrolling content is the costliest paint on low-end GPUs.
+    // Glass and sticky only from md up: a backdrop blur over scrolling content is the
+    // costliest paint on low-end phone GPUs.
     <header
       data-testid="nav"
       className="z-40 border-b border-line-soft bg-bg md:sticky md:top-0 md:border-white/[.06] md:bg-[rgba(16,18,16,0.6)] md:backdrop-blur-[18px] md:backdrop-saturate-[1.4]"
     >
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-6 sm:py-4">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
         <Logo />
-        <nav
-          aria-label="Primary"
-          className="order-3 flex w-full gap-1 overflow-x-auto text-sm sm:order-none sm:ml-3 sm:w-auto"
-        >
+        <nav aria-label="Primary" className="ml-4 hidden items-center gap-1 text-sm lg:flex">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               aria-current={active(link.href) ? 'page' : undefined}
-              className={`motion-nav rounded-full px-3.5 py-2.5 whitespace-nowrap ${active(link.href) ? 'bg-white/[.08] text-ink' : 'text-ink-2 hover:bg-white/[.05] hover:text-ink'}`}
+              className={`motion-nav rounded-full px-3.5 py-2 whitespace-nowrap ${active(link.href) ? 'bg-white/[.08] text-ink' : 'text-ink-2 hover:bg-white/[.05] hover:text-ink'}`}
             >
               {link.label}
             </Link>
           ))}
         </nav>
-        <form
-          onSubmit={search}
-          role="search"
-          className="order-4 flex min-w-0 flex-1 sm:order-none sm:min-w-56"
+        {searchForm(false)}
+        <Link
+          href="/sell"
+          aria-current={active('/sell') ? 'page' : undefined}
+          className={`motion-nav hidden rounded-full px-3.5 py-2 text-sm whitespace-nowrap sm:block ${active('/sell') ? 'bg-white/[.08] text-ink' : 'text-ink-2 hover:text-ink'}`}
         >
-          <label className="flex h-11 w-full items-center gap-2.5 rounded-full border border-line-control bg-inset px-4 focus-within:border-accent/60">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#9BA19A"
-              strokeWidth="2"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="M20 20l-3.5-3.5" />
-            </svg>
-            <input
-              ref={searchRef}
-              data-testid="search"
-              name="q"
-              type="search"
-              aria-label="Search listings"
-              placeholder="Search scripts, wallet lists, filters, creators…"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
-            />
-            <kbd
-              aria-hidden="true"
-              className="hidden rounded border border-line px-1.5 font-mono text-[10px] text-muted lg:inline"
-            >
-              /
-            </kbd>
-          </label>
-        </form>
-        <div className="ml-auto flex items-center gap-2">
+          Sell
+        </Link>
+        <div className="ml-auto flex items-center gap-2 md:ml-0">
           {wallet.session ? (
             <span
               data-testid="tier-pill"
-              className="hidden h-11 items-center rounded-full border border-accent-line bg-accent-bg px-4 font-mono text-xs text-accent md:flex"
+              className="hidden h-10 items-center rounded-full border border-accent-line bg-accent-bg px-4 font-mono text-xs text-accent xl:flex"
             >
               {tierChip(wallet.session.tier, config)}
             </span>
           ) : null}
           <WalletMenu />
+          <button
+            type="button"
+            data-testid="menu-toggle"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-2 hover:text-ink lg:hidden"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+          </button>
         </div>
       </div>
+      {menuOpen ? (
+        <nav
+          id="mobile-menu"
+          data-testid="mobile-menu"
+          aria-label="Mobile"
+          className="flex flex-col gap-1 border-t border-line px-4 py-3 sm:px-6 lg:hidden"
+        >
+          <div className="pb-2 md:hidden">{searchForm(true)}</div>
+          {[...links, { href: '/sell', label: 'Sell' }].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={active(link.href) ? 'page' : undefined}
+              className={`block rounded-lg px-3 py-3 ${active(link.href) ? 'bg-white/[.06] text-ink' : 'text-ink-2 hover:bg-white/5 hover:text-ink'}`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
       {wallet.error ? (
         <p
           role="alert"

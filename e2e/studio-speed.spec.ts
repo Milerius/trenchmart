@@ -91,7 +91,7 @@ test('coming back to the studio renders the last data at once, then refreshes', 
   await page.goto('/studio');
   await expect(page.getByText('Speed Pack').filter({ visible: true }).first()).toBeVisible();
   await page.getByRole('link', { name: 'Explore' }).first().click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/search$/);
   slowOverview(3_000);
   const before = calls.filter((c) => c.path === '/studio/overview').length;
   await page.getByRole('link', { name: 'Studio' }).first().click();
