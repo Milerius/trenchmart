@@ -2,6 +2,7 @@
 
 import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
 import { escrowWindowLabel } from '@trenchmart/shared/escrow';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type KeyboardEvent } from 'react';
@@ -14,7 +15,7 @@ import { Markdown } from '@/components/markdown';
 import { VerifiedBadge } from '@/components/profile';
 import { ReviewsPanel } from '@/components/reviews';
 import { CheckoutElectric, DecryptHash } from '@/components/listing-fx';
-import { ListingCard, type Listing as CardListing } from '@/components/listings';
+import type { Listing as CardListing } from '@/components/listings';
 import { TerminalNames } from '@/components/terminal-logo';
 import { RankPanel, UpvoteChip, UpvotePanel, useUpvotes } from '@/components/upvotes';
 import {
@@ -50,6 +51,10 @@ import {
   Star,
   Wallet as WalletIcon,
 } from 'lucide-react';
+
+// Loaded on demand: keeps the shared home card module out of the listing page's
+// first-load graph, so the home bundle is not split into extra chunks.
+const ListingCard = dynamic(() => import('@/components/listings').then((m) => m.ListingCard));
 
 export type Listing = {
   id: string;
