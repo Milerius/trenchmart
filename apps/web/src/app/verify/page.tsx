@@ -6,7 +6,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { preload } from 'react-dom';
 import nacl from 'tweetnacl';
 import { reportMessage } from '@trenchmart/shared/report';
-import { Button, Card, Label, Panel, StatusTag, Tag, type Tone, utc } from '@/components/ui';
+import { FileUp } from 'lucide-react';
+import { MARKET_WRAP, PageHero } from '@/components/page-hero';
+import { Button, Card, Label, Panel, Serif, StatusTag, Tag, type Tone, utc } from '@/components/ui';
 import { solText } from '@/lib/money';
 import { ApiError, api } from '@/lib/api';
 import { paySupplement } from '@/lib/studio';
@@ -99,87 +101,111 @@ export default function VerifyPage() {
   }
 
   return (
-    <div className="space-y-14">
-      <section className="mx-auto max-w-xl space-y-6">
-        <div>
-          <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Verify a file</h1>
-          <p className="m-0 mt-2 text-ink-2">
-            Drop a file you downloaded. A match means the bytes are exactly a version that passed
-            automated review. The file is not stored.
-          </p>
-        </div>
-        {wallet.session ? (
+    <>
+      <PageHero
+        eyebrow="Verify & proof"
+        title={
           <>
-            <label
-              htmlFor="verify-file"
-              className="flex cursor-pointer flex-col items-center gap-2 rounded-panel border border-dashed border-line-control bg-inset px-6 py-12 text-center hover:border-accent-line"
-            >
-              <span className="text-base font-semibold">{busy || 'Choose a file to check'}</span>
-              <span className="text-[13px] text-muted">
-                We compare its SHA-256 with every reviewed version.
-              </span>
-              <input
-                id="verify-file"
-                type="file"
-                className="sr-only"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void onFile(file).catch((err: Error) => setError(err.message));
-                }}
-              />
-            </label>
-            <p data-testid="verify-quota" className="m-0 text-[13px] text-ink-2">
-              {quota
-                ? quota.freeLeft
-                  ? `Your free verification for today (UTC) is available.`
-                  : `Free verification used today. Next free one at ${utc(quota.resetsAt)}; until then each check costs ${solText(quota.supplementLamports)}.`
-                : '1 free verification per wallet per day (UTC).'}
-            </p>
+            Don&apos;t trust. <Serif>Verify.</Serif>
           </>
-        ) : (
-          <Panel data-testid="verify-signin" className="p-5 text-sm">
-            <p className="m-0 font-semibold">Sign in with a wallet to verify a file</p>
-            <p className="m-0 mt-1 text-ink-2">
-              Each wallet gets 1 free verification per day (UTC), then a small SOL supplement per
-              check. Signing in costs nothing.
-            </p>
-            <Button className="mt-4" onClick={() => void wallet.connect()} disabled={wallet.busy}>
-              {wallet.busy ? 'Check your wallet…' : 'Connect wallet'}
-            </Button>
-          </Panel>
-        )}
-        {held ? (
-          <Panel tone="warn" data-testid="verify-supplement" className="space-y-3 p-4 text-sm">
-            <p className="m-0 font-semibold">Your free verification for today is used</p>
-            <p className="m-0 text-ink-2">
-              Verify <span className="font-mono">{held.file.name}</span> for{' '}
-              {solText(held.lamports)}, paid on chain from your wallet. Or come back after{' '}
-              {quota ? utc(quota.resetsAt) : 'midnight UTC'}.
-            </p>
-            <Button
-              data-testid="pay-verify"
-              disabled={!!busy}
-              onClick={() => void payAndCheck().catch((err: Error) => setError(err.message))}
-            >
-              {busy || `Pay ${solText(held.lamports)} and verify`}
-            </Button>
-          </Panel>
-        ) : null}
-        {result ? (
-          <Panel tone={result.match ? 'ok' : 'warn'} role="status" className="p-4 text-sm">
-            <p className="m-0 font-semibold">{result.match ? '✓ Match' : 'No match'}</p>
-            <p className="m-0 mt-1 text-ink-2">{result.message}</p>
-          </Panel>
-        ) : null}
-        {error ? (
-          <p role="alert" className="m-0 text-sm text-danger">
-            {error}
-          </p>
-        ) : null}
-      </section>
-      <ProofSection />
-      <ReportVerifier />
-    </div>
+        }
+        sub="Check a file against every reviewed version, read the escrow program and treasury straight from Solana devnet, and validate signed scan reports in your browser."
+      />
+      <div className={`${MARKET_WRAP} space-y-16 py-12`}>
+        <div className="grid items-start gap-8 lg:grid-cols-2">
+          <section aria-labelledby="verify-heading" className="space-y-6">
+            <div>
+              <h2 id="verify-heading" className="m-0 text-2xl font-semibold tracking-[-0.02em]">
+                Verify a file
+              </h2>
+              <p className="m-0 mt-2 text-ink-2">
+                Drop a file you downloaded. A match means the bytes are exactly a version that
+                passed automated review. The file is not stored.
+              </p>
+            </div>
+            {wallet.session ? (
+              <>
+                <label
+                  htmlFor="verify-file"
+                  className="flex cursor-pointer flex-col items-center gap-3 rounded-[22px] border border-dashed border-line-control bg-inset px-6 py-14 text-center transition hover:border-accent-line"
+                >
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-accent-line bg-accent-bg text-accent">
+                    <FileUp size={20} aria-hidden="true" />
+                  </span>
+                  <span className="text-base font-semibold">
+                    {busy || 'Choose a file to check'}
+                  </span>
+                  <span className="text-[13px] text-muted">
+                    We compare its SHA-256 with every reviewed version.
+                  </span>
+                  <input
+                    id="verify-file"
+                    type="file"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void onFile(file).catch((err: Error) => setError(err.message));
+                    }}
+                  />
+                </label>
+                <p data-testid="verify-quota" className="m-0 text-[13px] text-ink-2">
+                  {quota
+                    ? quota.freeLeft
+                      ? `Your free verification for today (UTC) is available.`
+                      : `Free verification used today. Next free one at ${utc(quota.resetsAt)}; until then each check costs ${solText(quota.supplementLamports)}.`
+                    : '1 free verification per wallet per day (UTC).'}
+                </p>
+              </>
+            ) : (
+              <Panel data-testid="verify-signin" className="p-5 text-sm">
+                <p className="m-0 font-semibold">Sign in with a wallet to verify a file</p>
+                <p className="m-0 mt-1 text-ink-2">
+                  Each wallet gets 1 free verification per day (UTC), then a small SOL supplement
+                  per check. Signing in costs nothing.
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => void wallet.connect()}
+                  disabled={wallet.busy}
+                >
+                  {wallet.busy ? 'Check your wallet…' : 'Connect wallet'}
+                </Button>
+              </Panel>
+            )}
+            {held ? (
+              <Panel tone="warn" data-testid="verify-supplement" className="space-y-3 p-4 text-sm">
+                <p className="m-0 font-semibold">Your free verification for today is used</p>
+                <p className="m-0 text-ink-2">
+                  Verify <span className="font-mono">{held.file.name}</span> for{' '}
+                  {solText(held.lamports)}, paid on chain from your wallet. Or come back after{' '}
+                  {quota ? utc(quota.resetsAt) : 'midnight UTC'}.
+                </p>
+                <Button
+                  data-testid="pay-verify"
+                  disabled={!!busy}
+                  onClick={() => void payAndCheck().catch((err: Error) => setError(err.message))}
+                >
+                  {busy || `Pay ${solText(held.lamports)} and verify`}
+                </Button>
+              </Panel>
+            ) : null}
+            {result ? (
+              <Panel tone={result.match ? 'ok' : 'warn'} role="status" className="p-4 text-sm">
+                <p className="m-0 font-semibold">{result.match ? '✓ Match' : 'No match'}</p>
+                <p className="m-0 mt-1 text-ink-2">{result.message}</p>
+              </Panel>
+            ) : null}
+            {error ? (
+              <p role="alert" className="m-0 text-sm text-danger">
+                {error}
+              </p>
+            ) : null}
+          </section>
+          <ReportVerifier />
+        </div>
+        <ProofSection />
+      </div>
+    </>
   );
 }
 
@@ -426,7 +452,7 @@ function ProofSection() {
     : [];
   const confirmed = checks.filter((item) => item.check.tone === 'ok').length;
   return (
-    <section id="proof" data-testid="proof" className="mx-auto max-w-3xl">
+    <section id="proof" data-testid="proof">
       <div>
         <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">On-chain proof</h2>
         <p className="m-0 mt-2 text-ink-2">
@@ -745,7 +771,7 @@ function ReportVerifier() {
   }
 
   return (
-    <section id="report" data-testid="report-verifier" className="mx-auto max-w-3xl space-y-4">
+    <section id="report" data-testid="report-verifier" className="space-y-4">
       <div>
         <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">Check a scan report</h2>
         <p className="m-0 mt-2 text-ink-2">
