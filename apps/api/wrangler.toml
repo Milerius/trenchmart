@@ -25,3 +25,9 @@ queue = "scan-static"
 # [[hyperdrive]]
 # binding = "HYPERDRIVE"
 # id = "<hyperdrive config id>"
+
+# M-03: edge rate limit for writes, keyed per client IP + method (see clientIp in app.ts).
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }

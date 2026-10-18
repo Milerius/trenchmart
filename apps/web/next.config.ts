@@ -12,6 +12,26 @@ export default function config(phase: string): NextConfig {
     // registering a Wallet Standard wallet, which is what made Connect look dead.
     // Sign-in messages name the apex domain (SIWS_DOMAIN / APP_URL). Phantom refuses to show a sign-in
     // request whose domain differs from the page origin, so wallet connect fails on www. Send www to the apex.
+    // Security headers (mainnet readiness #11). frame-ancestors/X-Frame-Options stop
+    // clickjacking of wallet prompts; they do not affect wallet extension injection.
+    async headers() {
+      return [
+        {
+          source: '/:path*',
+          headers: [
+            { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+            {
+              key: 'Content-Security-Policy',
+              value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+            },
+            { key: 'X-Frame-Options', value: 'DENY' },
+            { key: 'X-Content-Type-Options', value: 'nosniff' },
+            { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+            { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          ],
+        },
+      ];
+    },
     async redirects() {
       return [
         {
@@ -25,8 +45,7 @@ export default function config(phase: string): NextConfig {
         { source: '/listings/:slug', destination: '/l/:slug', permanent: true },
       ];
     },
-    async rewrites() {
-      return [{ source: '/api/v1/:path*', destination: `${apiUrl}/api/v1/:path*` }];
-    },
+    // /api/v1/* is proxied by app/api/v1/[...path]/route.ts (not a rewrite) so the API can
+    // see the visitor's IP for rate limiting (M-03).
   };
 }

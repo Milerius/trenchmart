@@ -28,6 +28,8 @@ type Binding = Record<string, unknown> & {
   // R2 bucket for uploads and licensed copies. workerd's node:fs is a per-request VFS,
   // so a disk-backed store loses every upload between requests.
   FILES?: R2BucketLike;
+  // Workers Rate Limiting binding (M-03): edge counter, no database write per request.
+  RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
 };
 
 type Ctx = { waitUntil: (p: Promise<unknown>) => void };
@@ -109,7 +111,10 @@ export default {
     if (!dbUrl) throw new Error('HYPERDRIVE or DATABASE_URL is required');
     const run = async (): Promise<Response> => {
       const deps = depsFor(env, dbUrl);
-      const app = createApp({ ...deps, sandboxQueue: env.SCAN_QUEUE }, priceCache);
+      const app = createApp(
+        { ...deps, sandboxQueue: env.SCAN_QUEUE, rateLimiter: env.RATE_LIMITER },
+        priceCache,
+      );
       const close = () => deps.sql.end({ timeout: 5 });
       let response: Response;
       try {

@@ -1524,4 +1524,71 @@ describe('owner product decisions', () => {
     );
     await sql`delete from config where key = 'checkout_paused'`;
   });
+  it('hardening: edge-keyed rate limit, trusted proxy IP, webhook secret and on-chain balances, headers', async () => {
+    const keys: string[] = [];
+    const app = await appFor(
+      { PROXY_SECRET: 'proxy-secret', HELIUS_WEBHOOK_SECRET: 'hook-secret-hook-secret' },
+      {
+        rateLimiter: {
+          async limit({ key }) {
+            keys.push(key);
+            return { success: !key.startsWith('198.51.100.9') };
+          },
+        },
+        trenchBalance: async () => 42n,
+      },
+    );
+    const post = (headers: Record<string, string>) =>
+      app.request('/api/v1/auth/nonce', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify({ wallet: keypair().publicKey }),
+      });
+    // X-Forwarded-For is client-controlled and ignored; CF-Connecting-IP is the key.
+    const plain = await post({ 'cf-connecting-ip': '203.0.113.5', 'x-forwarded-for': '9.9.9.9' });
+    expect(plain.status).toBe(200);
+    expect(keys.at(-1)).toBe('203.0.113.5:POST');
+    // A forged proxy header without the secret is ignored.
+    await post({
+      'cf-connecting-ip': '203.0.113.5',
+      'x-tm-client-ip': '1.1.1.1',
+      'x-tm-proxy': 'nope',
+    });
+    expect(keys.at(-1)).toBe('203.0.113.5:POST');
+    // The web proxy, with the secret, forwards the visitor's IP.
+    await post({
+      'cf-connecting-ip': '2a06:98c0:3600::103',
+      'x-tm-client-ip': '192.0.2.44',
+      'x-tm-proxy': 'proxy-secret',
+    });
+    expect(keys.at(-1)).toBe('192.0.2.44:POST');
+    const limited = await post({ 'cf-connecting-ip': '198.51.100.9' });
+    expect(limited.status).toBe(429);
+    expect(plain.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(plain.headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
+    expect(plain.headers.get('strict-transport-security')).toContain('max-age=');
+
+    const hook = (auth: string, body: unknown) =>
+      app.request('/api/v1/hooks/helius', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: auth },
+        body: JSON.stringify(body),
+      });
+    expect((await hook('Bearer wrong', [])).status).toBe(401);
+    expect((await hook('hook-secret-hook-secre', [])).status).toBe(401);
+    const wallet = keypair().publicKey;
+    const ok = await hook('Bearer hook-secret-hook-secret', [
+      {
+        signature: bs58.encode(nacl.randomBytes(64)),
+        memo: 'tm:forged',
+        tokenBalances: [{ wallet, amount: '999999999999', mint: 'x' }, { wallet: 'not a key' }],
+      },
+    ]);
+    expect(ok.status).toBe(200);
+    // The body's amount is ignored: the stored balance is what chain says (42).
+    const rows = await sql<
+      { amount: string }[]
+    >`select amount::text as amount from token_balances where wallet = ${wallet}`;
+    expect(rows).toEqual([{ amount: '42' }]);
+  });
 });

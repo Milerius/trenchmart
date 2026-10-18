@@ -90,6 +90,8 @@ export type Deps = {
   /** Simulates an unsigned transaction (sigVerify off). Optional: skipped when absent. */
   simulate?: (tx: Uint8Array) => Promise<Simulation>;
   sandboxQueue?: SandboxQueue;
+  /** Cloudflare Workers rate-limit binding (M-03). When absent, a Postgres counter is used. */
+  rateLimiter?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   /** Required when ESCROW_PROGRAM_ID is set. */
   escrowChain?: EscrowChain;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
@@ -169,6 +171,24 @@ export async function tierForWallet(
   const tier = tierFor(minBalance, config.tier_thresholds);
   const next = nextTierNeed(minBalance, config.tier_thresholds);
   return { tier, minBalance, nextTier: next.nextTier, needed: next.needed };
+}
+
+/**
+ * I-06: a webhook names wallets that moved $TRENCH, but its amounts are never trusted.
+ * The balance is re-read from chain and stored only if the RPC answered.
+ */
+export async function recordChainBalance(
+  deps: Deps,
+  wallet: string,
+  txSig: string,
+): Promise<boolean> {
+  const amount = await readTrench(deps, wallet);
+  if (amount === null) return false;
+  await deps.sql`
+    insert into token_balances (wallet, amount, ts, source, tx_sig)
+    values (${wallet}, ${amount.toString()}, ${deps.now()}, 'webhook', ${txSig})
+  `;
+  return true;
 }
 
 async function readTrench(deps: Deps, wallet: string): Promise<bigint | null> {
