@@ -257,7 +257,7 @@ export function PreviewNotice({
     <div
       role="note"
       data-testid="preview-notice"
-      className={`flex gap-3 rounded-card border border-info-line bg-info-bg p-4 ${compact ? 'flex-col' : 'flex-wrap items-center'}`}
+      className={`flex gap-3 rounded-card border border-info-line bg-info-bg p-4 ${compact ? 'flex-col' : 'flex-col sm:flex-row sm:flex-wrap sm:items-center'}`}
     >
       <div className="flex min-w-0 flex-1 gap-3">
         <Square tone="info">
@@ -272,7 +272,12 @@ export function PreviewNotice({
         </div>
       </div>
       {onConnect ? (
-        <Button variant="secondary" size="sm" onClick={onConnect}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onConnect}
+          className="self-start sm:self-auto"
+        >
           Connect to see your price
         </Button>
       ) : null}
