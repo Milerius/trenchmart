@@ -20,7 +20,7 @@ import WEBP_ENC_WASM from '@jsquash/webp/codec/enc/webp_enc_simd.wasm';
 // @ts-expect-error the package's .wasm.d.ts types the instance exports; wrangler imports a WebAssembly.Module
 import RESIZE_WASM from '@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
 import { createImageOptimizer } from './image-optimize';
-import { readEnv, weakSecrets, isLocalAppUrl } from './env';
+import { assertDeployedEnv, readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
 import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
@@ -74,6 +74,7 @@ const optimizeImage = createImageOptimizer(() => ({
 }));
 
 function depsFor(env: Binding, url: string) {
+  assertDeployedEnv(stringEnv(env));
   const parsed = readEnv(stringEnv(env));
   // One request rarely needs more than a few concurrent queries; keep the socket count low.
   const sql = createSql(url, { max: 5 });
