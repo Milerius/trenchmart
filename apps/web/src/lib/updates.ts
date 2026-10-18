@@ -52,12 +52,20 @@ export function updatePolicyText(updatePrice: string | null | undefined, freeDay
   return `Free updates for ${freeDays} days, then ${solText(updatePrice)}/month`;
 }
 
-export const SUPPLEMENT_REASONS: Record<string, string> = {
-  listing_update_limit: 'This listing already had its free update today (UTC).',
-  creator_upload_limit: 'You already used your 5 free uploads today (UTC).',
-  verify_limit: 'Your free verification for today (UTC) is used.',
-};
+/** Supplement reasons; the upload count comes from the live config (quota.limits), never hard-coded. */
+export function supplementReasons(uploadsPerCreatorPerDay?: number): Record<string, string> {
+  const uploads =
+    uploadsPerCreatorPerDay === undefined
+      ? 'free uploads'
+      : `${uploadsPerCreatorPerDay} free uploads`;
+  return {
+    listing_update_limit: 'This listing already had its free update today (UTC).',
+    creator_upload_limit: `You already used your ${uploads} today (UTC).`,
+    verify_limit: 'Your free verification for today (UTC) is used.',
+  };
+}
 
-export function supplementReasonText(reasons: string[]): string {
-  return reasons.map((reason) => SUPPLEMENT_REASONS[reason] ?? reason).join(' ');
+export function supplementReasonText(reasons: string[], uploadsPerCreatorPerDay?: number): string {
+  const text = supplementReasons(uploadsPerCreatorPerDay);
+  return reasons.map((reason) => text[reason] ?? reason).join(' ');
 }

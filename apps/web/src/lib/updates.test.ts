@@ -55,6 +55,8 @@ describe('purchases update banner', () => {
     expect(updatePolicyText('0', 30)).toBe('Free updates forever');
     expect(updatePolicyText(null, 30)).toBe('Free updates forever');
     expect(supplementReasonText(['listing_update_limit'])).toContain('free update today');
+    expect(supplementReasonText(['creator_upload_limit'], 7)).toContain('your 7 free uploads');
+    expect(supplementReasonText(['creator_upload_limit'])).not.toMatch(/\d/);
   });
 });
 
