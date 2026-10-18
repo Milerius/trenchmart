@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Img, staticFile, useCurrentFrame } from 'remotion';
 import { ease, typed } from '../../anim';
 import { C, MONO, SANS } from '../../theme';
 import { Upload } from '../../ui/icons';
@@ -142,12 +142,13 @@ const Stepper: React.FC<{ step: number }> = ({ step }) => (
   </div>
 );
 
+/** Logos are the files the live wizard bundles under apps/web/public/terminals. */
 const TERMINALS = [
-  { name: 'Axiom', host: 'axiom.trade' },
-  { name: 'GMGN', host: 'gmgn.ai' },
-  { name: 'Photon', host: 'photon-sol.tinyastro.io' },
-  { name: 'Terminal', host: 'trade.padre.gg' },
-  { name: 'Trojan', host: 'trojan.com' },
+  { name: 'Axiom', host: 'axiom.trade', logo: 'axiom.svg' },
+  { name: 'GMGN', host: 'gmgn.ai', logo: 'gmgn.png' },
+  { name: 'Photon', host: 'photon-sol.tinyastro.io', logo: 'photon.png' },
+  { name: 'Terminal', host: 'trade.padre.gg', logo: 'terminal.svg' },
+  { name: 'Trojan', host: 'trojan.com', logo: 'trojan.png' },
 ];
 
 const CheckBadge: React.FC<{ on: number }> = ({ on }) => (
@@ -182,7 +183,7 @@ const WizardCard: React.FC = () => {
     <Card style={{ width: CARD_W, padding: 30, boxSizing: 'border-box' }}>
       <Stepper step={step} />
       <Divider style={{ margin: '24px 0' }} />
-      <div style={{ position: 'relative', height: 404 }}>
+      <div style={{ position: 'relative', height: 418 }}>
         <div
           style={{
             position: 'absolute',
@@ -255,7 +256,7 @@ const WizardCard: React.FC = () => {
           <div
             style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}
           >
-            {[...TERMINALS, { name: 'Any site', host: 'all terminals' }].map((t, i) => {
+            {[...TERMINALS, { name: 'Any site', host: 'all terminals', logo: '' }].map((t, i) => {
               const at = WIZARD.terminals[i];
               const on = at !== undefined && frame >= at;
               const pulse = at !== undefined ? ease(frame, at, at + 10) : 0;
@@ -278,6 +279,7 @@ const WizardCard: React.FC = () => {
                       borderRadius: 11,
                       border: `1px solid ${C.border}`,
                       background: C.surface2,
+                      overflow: 'hidden',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -287,7 +289,14 @@ const WizardCard: React.FC = () => {
                       color: C.text,
                     }}
                   >
-                    {i === 5 ? '◎' : t.name[0]}
+                    {t.logo ? (
+                      <Img
+                        src={staticFile(`launch/terminals/${t.logo}`)}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      '◎'
+                    )}
                   </div>
                   <div
                     style={{
@@ -321,8 +330,8 @@ const WizardCard: React.FC = () => {
             })}
           </div>
           <div style={{ fontFamily: SANS, fontSize: 17, color: C.muted, marginTop: 14 }}>
-            <span style={{ color: C.accent }}>{selected} selected</span> · TrenchMart is not
-            affiliated with these terminals.
+            <span style={{ color: C.accent }}>{selected} selected</span> · Names and logos belong to
+            their owners; TrenchMart is not affiliated with these terminals.
           </div>
         </div>
       </div>
