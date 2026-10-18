@@ -54,6 +54,10 @@ export const ESCROW_INSTRUCTIONS = [
   'open_dispute',
   'refund',
   'reject_dispute',
+  'refund_after_timeout',
+  'close',
+  'init_config',
+  'set_config',
 ] as const;
 
 export const DISPUTE_REASONS = ['malicious', 'not_as_described', 'broken', 'other'] as const;
@@ -151,7 +155,7 @@ export const protocol = {
   contactUrl: CONTACT_URL,
   cluster: ESCROW_CLUSTER,
   programId: ESCROW_PROGRAM_ID,
-  pdaSeeds: 'escrow + order id',
+  pdaSeeds: 'escrow + buyer + order id',
   marketplaceFeeBps: DEFAULT_CONFIG_JSON.fee_bps,
   marketplaceFeeLabel,
   creatorCommission: bpsPercent(CREATOR_COMMISSION_BPS),

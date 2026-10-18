@@ -97,7 +97,7 @@ describe('protocol facts', () => {
   it('matches the devnet program, the payout batch, and the contact address', () => {
     const program = readFileSync(new URL('programs/trench_escrow/src/lib.rs', root), 'utf8');
     expect(program).toContain(`declare_id!("${ESCROW_PROGRAM_ID}")`);
-    expect(program).toContain('seeds = [b"escrow", order_id.as_ref()]');
+    expect(program).toContain('seeds = [b"escrow", buyer.key().as_ref(), order_id.as_ref()]');
     for (const name of ESCROW_INSTRUCTIONS) expect(program).toContain(`pub fn ${name}`);
     expect(program).toContain('pub resolver: Signer');
     const logic = readFileSync(new URL('apps/api/src/logic.ts', root), 'utf8');
