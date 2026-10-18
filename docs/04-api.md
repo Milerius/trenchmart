@@ -31,14 +31,15 @@ Expiration Time: <iso +10m>
 
 ## Browse
 
-| Method | Path                       | Who | Notes                                                                                                                                                                                    |
-| ------ | -------------------------- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/listings`                | 🔓  | query: `q, category, terminal, sort=trending\|new\|price_asc\|price_desc\|rating, cursor, limit≤48`. Hides holder-only-window listings from tier `none` (shows them with `lockedUntil`). |
-| GET    | `/listings/:slug`          | 🔓  | listing + live version + creator card + `security` block                                                                                                                                 |
-| GET    | `/listings/:slug/versions` | 🔓  | changelog (live/superseded only)                                                                                                                                                         |
-| GET    | `/listings/:slug/reviews`  | 🔓  | paginated                                                                                                                                                                                |
-| GET    | `/creators/top`            | 🔓  | 30d volume                                                                                                                                                                               |
-| GET    | `/categories`              | 🔓  | from enum + counts                                                                                                                                                                       |
+| Method | Path                       | Who | Notes                                                                                                                                                                                                                                                                       |
+| ------ | -------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/listings`                | 🔓  | query: `q, category, terminal, sort=trending\|new\|price_asc\|price_desc\|rating, cursor, limit≤48`. Hides holder-only-window listings from tier `none` (shows them with `lockedUntil`).                                                                                    |
+| GET    | `/listings/:slug`          | 🔓  | listing + live version + creator card + `security` block                                                                                                                                                                                                                    |
+| GET    | `/listings/:slug/versions` | 🔓  | changelog (live/superseded only)                                                                                                                                                                                                                                            |
+| GET    | `/listings/:slug/reviews`  | 🔓  | paginated                                                                                                                                                                                                                                                                   |
+| GET    | `/creators/top`            | 🔓  | 30d volume                                                                                                                                                                                                                                                                  |
+| GET    | `/categories`              | 🔓  | from enum + counts                                                                                                                                                                                                                                                          |
+| GET    | `/status`                  | 🔓  | public status page data: overall state, per-component state, latency p50/p95 and 90 daily bars (`none` for days without probes), sanitized incidents. Allowlisted fields only (no alert text, wallets or balances). Edge-cached 60 s, CORS `*`. See docs/ops/status-page.md |
 
 `security` block shape (drives the Security report tab):
 
@@ -142,6 +143,8 @@ per line (`#` and `//` comments skipped). Upload the standard export as `.txt` o
 | POST   | `/hooks/helius`                       | 🤖 `Authorization: <HELIUS_WEBHOOK_SECRET>`. Handles (a) SOL transfers to vault → match memo → mark order/bond paid; (b) $TRENCH token transfers → insert `token_balances` rows for affected wallets. Idempotent on tx signature. |
 | GET    | `/internal/sandbox/next`              | 🤖 `INTERNAL_TOKEN`. Returns next sandbox job `{versionId, fileUrl, declared, targetUrls}` or 204                                                                                                                                 |
 | POST   | `/internal/sandbox/:versionId/result` | 🤖 result payload (see 05)                                                                                                                                                                                                        |
+| POST   | `/internal/status/run`                | 🤖 `INTERNAL_TOKEN`. Runs one status tick (probes, incidents, roll-up) now; the API cron runs it every 5 min                                                                                                                      |
+| POST   | `/internal/status/external`           | 🤖 `STATUS_PUSH_TOKEN` (watchdog only). `{checks:[{name: web\|api\|rpc, ok, ms}]}`; 401 when the token is unset or short                                                                                                          |
 
 ## Payment verification (shared by webhook and `/submitted`)
 

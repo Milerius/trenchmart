@@ -1,6 +1,6 @@
 # Public status page
 
-Status: probes and storage (this file grows with the public endpoint and the `/status` page).
+Status: probes, storage and the public endpoint `GET /api/v1/status` (the `/status` page follows).
 Everything runs on the existing free tiers: no new service, no new cron, no new secret.
 
 ## Components
@@ -80,3 +80,59 @@ not as invented data.
   ```
 
 - Thresholds live in `STATUS_COMPONENTS` (`apps/api/src/status.ts`).
+
+## Public endpoint: `GET /api/v1/status`
+
+Anonymous, `access-control-allow-origin: *`, edge-cached **60 s** (stale-while-revalidate 300 s,
+shared by signed-in visitors; `EDGE_RULES` in `apps/api/src/edge-cache.ts`). One read of the three
+status tables per minute per colo, whatever the traffic.
+
+```jsonc
+{
+  "checkedAt": "2026-10-18T07:45:00.000Z", // newest probe, null before the first tick
+  "generatedAt": "…",
+  "cluster": "devnet",
+  "overall": "operational", // operational | degraded | down | unknown (worst component)
+  "intervalMinutes": 5,
+  "windowDays": 90,
+  "components": [
+    {
+      "id": "api",
+      "name": "API",
+      "state": "operational", // unknown when the newest probe is older than 20 min
+      "checkedAt": "…",
+      "latencyMs": 80,
+      "p50Ms": 95,
+      "p95Ms": 310, // last 24 h of probes
+      "uptime90": 99.93, // % of probes not down over the days that have data; null if none
+      "days": [
+        { "date": "2026-07-21", "state": "none", "uptime": null, "samples": 0 },
+        "… 90 days, oldest first",
+      ],
+    },
+  ],
+  "incidents": [
+    {
+      "id": 12,
+      "component": "rpc",
+      "componentName": "Solana RPC",
+      "title": "Solana RPC unavailable",
+      "impact": "major", // down = major, degraded = minor
+      "status": "resolved",
+      "startedAt": "…",
+      "resolvedAt": "…",
+      "durationMinutes": 15,
+    },
+  ],
+}
+```
+
+- A day is `down` if any probe that day was down, `degraded` if any was degraded, `operational`
+  otherwise, and `none` (grey) when there is no probe at all. Days before the first tick are
+  `none`: the page never back-fills history it does not have.
+- Incidents seen on a single tick are left out of the list (they still colour that day's bar);
+  ongoing ones are always listed. Titles are fixed templates per component and state.
+- Every field is built from an allowlist (`apps/api/src/status-public.ts`). It never reads
+  `ops_alerts`, `ops_events` or env values, and `status-public.test.ts` fails if any other key, an
+  alert code or message, a wallet, a URL or a secret appears in the body. The internal endpoints
+  (`/internal/ops`, `/internal/ops/alerts`, `/internal/status/run`) still need `INTERNAL_TOKEN`.

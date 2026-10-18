@@ -85,7 +85,7 @@ jobs:
           node-version: 26.12.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @trenchmart/api exec vitest run src/product.test.ts src/social.test.ts src/x-oauth.test.ts src/studio.test.ts src/cache-privacy.test.ts src/agent.test.ts src/sdk.test.ts src/openapi.test.ts src/tier-balance.test.ts src/ops.test.ts src/status.test.ts
+      - run: pnpm --filter @trenchmart/api exec vitest run src/product.test.ts src/social.test.ts src/x-oauth.test.ts src/studio.test.ts src/cache-privacy.test.ts src/agent.test.ts src/sdk.test.ts src/openapi.test.ts src/tier-balance.test.ts src/ops.test.ts src/status.test.ts src/status-public.test.ts
 
   e2e:
     name: e2e
