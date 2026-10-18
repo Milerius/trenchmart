@@ -187,13 +187,22 @@ export function ConnectModal({
     target?.focus();
   }, [present, open, view]);
 
+  // Read busy/view through refs: a listener re-added per change left a window after each
+  // render (before the effect ran) where Escape still saw the old `busy` and was ignored,
+  // e.g. right after "You declined the sign-in request" appeared.
+  const busyRef = useRef(busy);
+  const viewRef = useRef(view);
+  busyRef.current = busy;
+  viewRef.current = view;
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (busy) return;
-        if (view === 'walletconnect') onLeaveRef.current();
-        if (view === 'list') onCloseRef.current();
+        if (busyRef.current) return;
+        const current = viewRef.current;
+        if (current === 'walletconnect') onLeaveRef.current();
+        if (current === 'list') onCloseRef.current();
         else setView('list');
         return;
       }
@@ -219,7 +228,7 @@ export function ConnectModal({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, busy, view]);
+  }, [open]);
 
   if (!present) return null;
 

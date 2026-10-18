@@ -8,7 +8,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: 'http://127.0.0.1:3000',
-    trace: 'on-first-retry',
+    // CI keeps the trace of a first failure too, so a flake that passes on retry can be read
+    // (uploaded as the e2e-results artifact).
+    trace: process.env.CI ? 'retain-on-first-failure' : 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
