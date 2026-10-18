@@ -138,6 +138,48 @@ describe('status page probes', () => {
     });
   });
 
+  it('times sign-in as the nonce insert only; cleanup is outside the timing', async () => {
+    // A slow cleanup (1.2 s, more than the 1 s sign-in threshold) must not mark sign-in degraded,
+    // and a failing insert must mark it down. Only rows of the probe wallet are affected.
+    await sql.unsafe(`
+      create or replace function status_probe_slow_delete() returns trigger language plpgsql as $$
+      begin
+        if old.wallet = 'status-probe' then perform pg_sleep(1.2); end if;
+        return old;
+      end $$;
+      drop trigger if exists status_probe_slow_delete on auth_nonces;
+      create trigger status_probe_slow_delete before delete on auth_nonces
+        for each row execute function status_probe_slow_delete();
+    `);
+    try {
+      const { deps } = await statusSetup(sql, clock, { STATUS_PUSH_TOKEN: STATUS_PUSH });
+      const probes = await runStatusProbes(deps);
+      const auth = probes.find((p) => p.component === 'auth')!;
+      expect(auth.state).toBe('operational');
+      expect(auth.latencyMs).toBeLessThan(1000);
+      expect(await sql`select 1 from auth_nonces where wallet = 'status-probe'`).toHaveLength(0);
+
+      await sql.unsafe(`
+        create or replace function status_probe_reject_insert() returns trigger language plpgsql as $$
+        begin
+          if new.wallet = 'status-probe' then raise exception 'nonce insert rejected'; end if;
+          return new;
+        end $$;
+        drop trigger if exists status_probe_reject_insert on auth_nonces;
+        create trigger status_probe_reject_insert before insert on auth_nonces
+          for each row execute function status_probe_reject_insert();
+      `);
+      expect(byId(await runStatusProbes(deps))).toMatchObject({ auth: 'down', db: 'operational' });
+    } finally {
+      await sql.unsafe(`
+        drop trigger if exists status_probe_slow_delete on auth_nonces;
+        drop trigger if exists status_probe_reject_insert on auth_nonces;
+        drop function if exists status_probe_slow_delete();
+        drop function if exists status_probe_reject_insert();
+      `);
+    }
+  });
+
   it('maps ops alerts onto components without carrying their messages', async () => {
     const { deps } = await statusSetup(sql, clock);
     const wallet = 'HSGhq8Yx1yzSJ3vXwXrEJm5KHuK3G3NJ9bQ6P9Yq5pZ8';

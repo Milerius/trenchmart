@@ -115,21 +115,42 @@ async function direct(deps: Deps): Promise<Probe[]> {
   ]);
 }
 
+/**
+ * Sign-in writes a nonce, the same insert as POST /auth/nonce. The probe writes an already-expired
+ * one (unusable), times only the insert, and deletes the row afterwards, outside the timing.
+ */
+async function probeDbThenAuth(deps: Deps): Promise<[Probe, Probe]> {
+  const db = await measure('db', async () => {
+    await deps.sql`select 1`;
+    return true;
+  });
+  const nonce = `status-probe-${crypto.randomUUID()}`;
+  const auth = await measure('auth', async () => {
+    await deps.sql`
+      insert into auth_nonces (nonce, wallet, expires_at)
+      values (${nonce}, 'status-probe', ${new Date(0)})
+    `;
+    return true;
+  });
+  await deps.sql`delete from auth_nonces where nonce = ${nonce}`.catch(() => undefined);
+  return [db, auth];
+}
+
 /** One light probe per public component, then the ops alerts of the same tick on top. */
 export async function runStatusProbes(deps: Deps, alerts: OpsAlert[] = []): Promise<Probe[]> {
   // With a push token the watchdog reports these three from outside (recordExternal).
   const external = deps.env.statusPushToken ? [] : await direct(deps);
-  const internal = await Promise.all([
+  // Database then sign-in run one after the other, so sign-in reuses the connection the database
+  // probe opened. Run side by side, with the cleanup delete inside the timing, the sign-in row
+  // read ~1.2 s ("degraded") on every cron tick while the real POST /auth/nonce answered in
+  // ~0.4 s. Escrow and uploads touch other services, so they still run alongside.
+  const [escrow, uploads, [db, auth]] = await Promise.all([
     deps.env.escrowProgramId && deps.escrowChain
       ? measure('escrow', async () => {
           const program = await deps.escrowChain!.account(deps.env.escrowProgramId);
           return program !== null && program.data.length > 0;
         })
       : null,
-    measure('db', async () => {
-      await deps.sql`select 1`;
-      return true;
-    }),
     measure('uploads', async () => {
       const key = 'status/probe';
       const stamp = new TextEncoder().encode(String(Date.now()));
@@ -138,17 +159,9 @@ export async function runStatusProbes(deps: Deps, alerts: OpsAlert[] = []): Prom
       await deps.blob.delete(key);
       return back !== null && back.length === stamp.length;
     }),
-    // Sign-in writes a nonce: write an already-expired one (unusable) and delete it.
-    measure('auth', async () => {
-      const nonce = `status-probe-${crypto.randomUUID()}`;
-      await deps.sql`
-        insert into auth_nonces (nonce, wallet, expires_at)
-        values (${nonce}, 'status-probe', ${new Date(0)})
-      `;
-      await deps.sql`delete from auth_nonces where nonce = ${nonce}`;
-      return true;
-    }),
+    probeDbThenAuth(deps),
   ]);
+  const internal = [escrow, db, uploads, auth];
   const probes = [...external, ...internal.filter((p): p is Probe => p !== null)];
   return applyAlerts(
     probes,

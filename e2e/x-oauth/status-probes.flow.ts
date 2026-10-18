@@ -65,3 +65,38 @@ test('a status tick needs the internal token and records every component with it
   // The sign-in probe cleans up after itself.
   expect(await sql`select 1 from auth_nonces where wallet = 'status-probe'`).toHaveLength(0);
 });
+
+test('sign-in is timed on the nonce insert only, so a slow cleanup does not read as degraded', async ({
+  request,
+}) => {
+  // Make deleting the probe nonce take 1.2 s (over the 1 s sign-in threshold). Only rows of the
+  // probe wallet are slowed. Before the fix the cleanup was inside the timing and read degraded.
+  await sql.unsafe(`
+    create or replace function e2e_status_slow_delete() returns trigger language plpgsql as $$
+    begin
+      if old.wallet = 'status-probe' then perform pg_sleep(1.2); end if;
+      return old;
+    end $$;
+    drop trigger if exists e2e_status_slow_delete on auth_nonces;
+    create trigger e2e_status_slow_delete before delete on auth_nonces
+      for each row execute function e2e_status_slow_delete();
+  `);
+  try {
+    const res = await request.post(`${API}/api/v1/internal/status/run`, {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(res.status()).toBe(200);
+    const body = (await res.json()) as {
+      probes: { component: string; state: string; latencyMs: number | null }[];
+    };
+    const auth = body.probes.find((p) => p.component === 'auth')!;
+    expect(auth.latencyMs).toBeLessThan(1000);
+    expect(auth.state).toBe('operational');
+    expect(await sql`select 1 from auth_nonces where wallet = 'status-probe'`).toHaveLength(0);
+  } finally {
+    await sql.unsafe(`
+      drop trigger if exists e2e_status_slow_delete on auth_nonces;
+      drop function if exists e2e_status_slow_delete();
+    `);
+  }
+});
