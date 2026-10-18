@@ -46,7 +46,10 @@ export function FactGrid({ facts }: { facts: { testId: string; label: string; te
           <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.04em] text-muted">
             {fact.label}
           </dt>
-          <dd data-testid={fact.testId} className="m-0 mt-1 text-base font-semibold text-ink [overflow-wrap:anywhere]">
+          <dd
+            data-testid={fact.testId}
+            className="m-0 mt-1 text-base font-semibold text-ink [overflow-wrap:anywhere]"
+          >
             {fact.text}
           </dd>
         </div>
@@ -74,5 +77,7 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
 }
 
 export function Code({ children }: { children: ReactNode }) {
-  return <code className="font-mono text-[13px] text-ink [overflow-wrap:anywhere]">{children}</code>;
+  return (
+    <code className="font-mono text-[13px] text-ink [overflow-wrap:anywhere]">{children}</code>
+  );
 }

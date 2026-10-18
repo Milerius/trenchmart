@@ -38,10 +38,10 @@ export default function TreasuryDocsPage() {
       </DocSection>
       <DocSection id="program" title="The on-chain program">
         <p>
-          <span className="break-all font-mono text-ink">{protocol.programId}</span> on {protocol.cluster} can
-          holds each order&apos;s deposit inside its own PDA and pays it out with the fee split.
-          Every live order uses it, and it is tested on every pull request. Its IDL is published on
-          chain and it embeds a security.txt.
+          <span className="break-all font-mono text-ink">{protocol.programId}</span> on{' '}
+          {protocol.cluster} can holds each order&apos;s deposit inside its own PDA and pays it out
+          with the fee split. Every live order uses it, and it is tested on every pull request. Its
+          IDL is published on chain and it embeds a security.txt.
         </p>
       </DocSection>
     </article>
