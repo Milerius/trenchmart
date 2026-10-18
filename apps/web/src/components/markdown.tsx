@@ -1,7 +1,13 @@
 'use client';
 
-import { Fragment, useMemo, type ReactNode } from 'react';
-import { safeMarkdown, type SafeBlock, type SafeInline } from '@trenchmart/shared';
+import { createContext, Fragment, useContext, useMemo, type ReactNode } from 'react';
+import { mediaIdOf, safeMarkdown, type SafeBlock, type SafeInline } from '@trenchmart/shared';
+
+/**
+ * Editor previews only: maps a media id to a local object URL for an image that is picked but
+ * not uploaded yet. The src still has to pass isMediaUrl, so nothing else can load.
+ */
+export const MediaPreviewContext = createContext<Record<string, string>>({});
 
 /**
  * Renders listing Markdown from the sanitized tree in @trenchmart/shared. Everything is a
@@ -191,6 +197,7 @@ function Inlines({ nodes }: { nodes: SafeInline[] }) {
 }
 
 function InlineNode({ node }: { node: SafeInline }): ReactNode {
+  const previews = useContext(MediaPreviewContext);
   switch (node.t) {
     case 'text':
       return node.v;
@@ -235,7 +242,7 @@ function InlineNode({ node }: { node: SafeInline }): ReactNode {
       return (
         // Only our own media route reaches here (isMediaUrl); seller uploads are re-checked server side.
         <img
-          src={node.src}
+          src={previews[mediaIdOf(node.src) ?? ''] ?? node.src}
           alt={node.alt}
           loading="lazy"
           referrerPolicy="no-referrer"
