@@ -17,15 +17,19 @@ export function dayIndex(at: Date, now: Date, days = OVERVIEW_DAYS): number {
 }
 
 /** Signed-in creator's dashboard: every number comes from orders, renewals, reviews and payouts. */
+// Hyperdrive reaches Supabase through the session-mode pooler (15 clients in total). Its
+// origin_connection_limit was 20, so bursts got EMAXCONNSESSION; it is now 12, and Hyperdrive
+// queues instead. Keep this request's share small anyway.
 const OVERVIEW_PARALLEL = 3;
 
 const TRANSIENT_DB =
-  /Network connection lost|CONNECTION_CLOSED|CONNECTION_ENDED|CONNECTION_DESTROYED|ECONNRESET/;
+  /EMAXCONNSESSION|max clients reached|Network connection lost|CONNECTION_CLOSED|CONNECTION_ENDED|CONNECTION_DESTROYED|ECONNRESET/;
 
 /**
- * Runs a read-only task again once when the database connection dropped under it. Live, about
- * 1 in 15 overview reads (~16 queries) lost its Hyperdrive socket ("Network connection lost");
- * postgres.js discards that connection, so the second attempt gets a fresh one. Never for writes.
+ * Runs a read-only task again once (after 150 ms) when the database connection dropped or the
+ * pooler was full. Live, about 1 in 15 overview reads failed this way ("Network connection
+ * lost", EMAXCONNSESSION). postgres.js discards a dead connection, so the second attempt gets a
+ * fresh one. Never for writes.
  */
 export async function retryTransientRead<T>(task: () => Promise<T>): Promise<T> {
   try {
@@ -36,6 +40,7 @@ export async function retryTransientRead<T>(task: () => Promise<T>): Promise<T> 
       !TRANSIENT_DB.test(`${err.message} ${(err as { code?: string }).code ?? ''}`)
     )
       throw err;
+    await new Promise((r) => setTimeout(r, 150));
     return task();
   }
 }
