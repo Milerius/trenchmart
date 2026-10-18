@@ -22,10 +22,11 @@ Then add the binding to `apps/api/wrangler.toml` and redeploy:
 ```toml
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "<id printed by the create command>"
+id = "067fbd6cc9a949e7a62155bf3fd2fe91"   # trenchmart-db, created 2026-10-18
 ```
 
-The API token needs **Account › Hyperdrive › Edit**.
+Already bound in `apps/api/wrangler.toml` and `wrangler.deploy.toml`. The API token needs
+**Account › Hyperdrive › Edit** to create or update the config.
 
 ## Per-request connections
 

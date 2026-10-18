@@ -210,7 +210,7 @@ export async function creatorStats(deps: Deps, creatorId: string) {
   const [rating] = await deps.sql<Row[]>`
     select count(*)::int as count, avg(r.rating)::float as avg
     from listing_reviews r join listings l on l.id = r.listing_id
-    where l.creator_id = ${creatorId}
+    where l.creator_id = ${creatorId} and r.hidden_at is null
   `;
   const [listings] = await deps.sql<Row[]>`
     select count(*) filter (where live_version_id is not null and delisted_at is null and paused_at is null)::int as live
@@ -245,7 +245,7 @@ export async function creatorReviews(deps: Deps, creatorId: string, limit = 5) {
     join listings l on l.id = r.listing_id
     join orders o on o.id = r.order_id
     join users u on u.id = o.buyer_id
-    where l.creator_id = ${creatorId}
+    where l.creator_id = ${creatorId} and r.hidden_at is null
     order by r.created_at desc limit ${limit}
   `;
   return rows.map((row) => ({

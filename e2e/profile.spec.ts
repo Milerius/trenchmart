@@ -114,6 +114,9 @@ test('public profile: name, verified X, socials, real stats, contact and categor
   await expect(stats).toContainText('4 in the last 30 days');
   // No reviews yet: the rating is left out instead of showing a made-up number.
   await expect(stats).not.toContainText('Rating');
+  // The grid fits the tiles that are shown: no empty cell where the rating would be.
+  await expect(stats).toHaveAttribute('data-tiles', '4');
+  await expect(stats).toHaveClass(/md:grid-cols-4/);
   await expect(stats).toContainText('2.00 SOL');
   await expect(stats).toContainText('Mar 2026');
   await expect(page.getByTestId('reviews')).toHaveCount(0);
@@ -229,10 +232,10 @@ test('edit profile: saves fields and contact, shows per-field errors, updates th
   });
 });
 
-test('edit profile: X without an X app falls back to the unverified devnet link', async ({
+test('edit profile: without an X app, X verification shows as coming soon (no dead button)', async ({
   page,
 }) => {
-  let profile: Record<string, unknown> = { ...OWN };
+  let profile: Record<string, unknown> = { ...OWN, capabilities: { xOAuth: false } };
   const { calls } = await stub(
     page,
     ({ method, path, body }) => {
@@ -253,24 +256,43 @@ test('edit profile: X without an X app falls back to the unverified devnet link'
   await page.goto('/studio/profile');
   const card = page.getByTestId('x-card');
   await expect(card).toContainText('X not linked');
-  await card.getByRole('button', { name: 'Connect X' }).click();
+  await expect(card.getByTestId('x-soon')).toHaveText('VERIFICATION COMING SOON');
+  await expect(card).toContainText('Sign-in with X is not available yet');
+  // The page never offers a sign-in that cannot work: no Connect/Verify button, only a
+  // disabled "coming soon" one, and nothing calls /auth/x/start.
+  await expect(card.getByRole('button', { name: /Connect X|Verify with X/ })).toHaveCount(0);
+  const soon = card.getByRole('button', { name: 'X verification coming soon' });
+  await expect(soon).toBeDisabled();
+  await soon.click({ force: true });
+  await card.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/x-verify/unconfigured.png' });
+  expect(calls.some((c) => c.path === '/auth/x/start')).toBe(false);
+
+  // Devnet: a handle can still be linked, clearly marked unverified.
+  await card.getByRole('button', { name: 'Link handle (unverified)' }).click();
   await page.getByPlaceholder('yourhandle').fill('rugradar');
   await page.getByRole('button', { name: 'Link X' }).click();
   await expect(card).toContainText('@rugradar');
   await expect(card).toContainText('NOT VERIFIED');
-  await expect(card.getByRole('button', { name: 'Verify with X' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'X verification coming soon' })).toBeDisabled();
+  await expect(card.getByRole('button', { name: 'Change handle' })).toBeVisible();
   expect(calls.some((c) => c.method === 'POST' && c.path === '/studio/x')).toBe(true);
 });
 
-test('edit profile: with an X app, Connect X goes to X sign-in and the result is shown', async ({
+test('edit profile: with an X app, Verify with X redirects to X authorize (PKCE)', async ({
   page,
 }) => {
   const authorize =
-    'https://x.com/i/oauth2/authorize?response_type=code&code_challenge_method=S256';
+    'https://x.com/i/oauth2/authorize?response_type=code&client_id=client-1' +
+    '&redirect_uri=https%3A%2F%2Ftrenchmart.fun%2Fapi%2Fv1%2Fauth%2Fx%2Fcallback' +
+    '&scope=users.read+tweet.read&state=s1&code_challenge=c1&code_challenge_method=S256';
   const { calls } = await stub(
     page,
     ({ path }) => {
-      if (path === '/studio/profile') return { json: OWN };
+      if (path === '/studio/profile')
+        return {
+          json: { ...OWN, xHandle: 'rugradar', xVerified: false, capabilities: { xOAuth: true } },
+        };
       if (path === '/auth/x/start') return { json: { url: authorize } };
       return undefined;
     },
@@ -280,14 +302,43 @@ test('edit profile: with an X app, Connect X goes to X sign-in and the result is
     route.fulfill({ contentType: 'text/html', body: '<title>X sign-in</title>' }),
   );
   await page.goto('/studio/profile');
-  await page.getByTestId('x-card').getByRole('button', { name: 'Connect X' }).click();
-  await page.waitForURL(/x\.com\/i\/oauth2\/authorize/);
+  const card = page.getByTestId('x-card');
+  await expect(card.getByTestId('x-soon')).toHaveCount(0);
+  await card.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/x-verify/configured.png' });
+  await card.getByRole('button', { name: 'Verify with X' }).click();
+  await page.waitForURL(/^https:\/\/x\.com\/i\/oauth2\/authorize/);
+  const url = new URL(page.url());
+  expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+  expect(url.searchParams.get('redirect_uri')).toBe(
+    'https://trenchmart.fun/api/v1/auth/x/callback',
+  );
   expect(calls.some((c) => c.path === '/studio/x')).toBe(false);
 
   await page.goto('/studio/profile?x=taken');
   await expect(page.getByRole('status')).toHaveText(
     'That X account is already linked to another wallet.',
   );
+});
+
+test('edit profile: an X sign-in error is shown on the X card, not lost off-screen', async ({
+  page,
+}) => {
+  await stub(
+    page,
+    ({ path }) => {
+      if (path === '/studio/profile') return { json: { ...OWN, capabilities: { xOAuth: true } } };
+      if (path === '/auth/x/start')
+        return { status: 500, json: { error: { code: 'INTERNAL', message: 'X is down' } } };
+      return undefined;
+    },
+    true,
+  );
+  await page.goto('/studio/profile');
+  const card = page.getByTestId('x-card');
+  await card.getByRole('button', { name: 'Connect X' }).click();
+  await expect(card.getByTestId('x-error')).toHaveText('X is down');
+  await expect(card.getByRole('button', { name: 'Connect X' })).toBeEnabled();
 });
 
 test('edit profile: avatar upload sends the file and shows it', async ({ page }) => {

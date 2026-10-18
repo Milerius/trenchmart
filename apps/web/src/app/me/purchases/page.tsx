@@ -23,6 +23,7 @@ import { explorerAddress, explorerTx, shortKey } from '@/lib/protocol-facts';
 import { submitPayment } from '@/lib/studio';
 import { updateBanner, updatesStatus, type OrderUpdates } from '@/lib/updates';
 import { useWallet } from '@/lib/wallet';
+import { ReviewDialog, Stars } from '@/components/reviews';
 
 type Order = {
   id: string;
@@ -67,6 +68,14 @@ const TABS: { key: TabKey; label: string; statuses: string[]; empty: string }[] 
 ];
 const ATTENTION: Record<string, number> = { disputed: 0, paid: 1, pending: 2 };
 
+type MyReview = {
+  id: string;
+  orderId: string;
+  rating: number;
+  hidden: boolean;
+  editableUntil: string;
+};
+
 export default function PurchasesPage() {
   const wallet = useWallet();
   const [orders, setOrders] = useState<Order[] | null>(null);
@@ -75,13 +84,27 @@ export default function PurchasesPage() {
   const [busyId, setBusyId] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState<TabKey>('active');
+  const [reviews, setReviews] = useState<Record<string, MyReview>>({});
+  const [reviewing, setReviewing] = useState('');
 
   function load() {
     setLoadError('');
     void api<{ orders: Order[] }>('/me/orders')
       .then((body) => setOrders(body.orders))
       .catch((err: Error) => setLoadError(err.message));
+    void api<MyReview[]>('/me/reviews')
+      .then((rows) => setReviews(Object.fromEntries(rows.map((r) => [r.orderId, r]))))
+      .catch(() => setReviews({}));
   }
+
+  // "Write a review" on a listing links here with ?review=<orderId>.
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('review');
+    if (wanted && wallet.session) {
+      setTab('completed');
+      setReviewing(wanted);
+    }
+  }, [wallet.session]);
 
   useEffect(() => {
     if (wallet.session) load();
@@ -274,6 +297,8 @@ export default function PurchasesPage() {
                     renewing={busyId === `renew:${order.id}`}
                     onDownload={(versionId) => void download(order.id, versionId)}
                     onRenew={() => void renew(order.id)}
+                    review={reviews[order.id] ?? null}
+                    onReview={() => setReviewing(order.id)}
                   />
                 ))}
               </ul>
@@ -281,6 +306,20 @@ export default function PurchasesPage() {
           </div>
         </div>
       )}
+      {reviewing ? (
+        <ReviewDialog
+          orderId={reviewing}
+          onClose={() => {
+            setReviewing('');
+            if (window.location.search.includes('review='))
+              window.history.replaceState(null, '', '/me/purchases');
+          }}
+          onPosted={(text) => {
+            setMessage(text);
+            load();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -330,6 +369,8 @@ function OrderCard({
   renewing,
   onDownload,
   onRenew,
+  review,
+  onReview,
 }: {
   order: Order;
   now: number;
@@ -337,7 +378,10 @@ function OrderCard({
   renewing: boolean;
   onDownload: (versionId?: string) => void;
   onRenew: () => void;
+  review: MyReview | null;
+  onReview: () => void;
 }) {
+  const canEdit = review ? new Date(review.editableUntil).getTime() > now : false;
   return (
     <li
       data-testid="order-card"
@@ -388,6 +432,28 @@ function OrderCard({
           <ButtonLink href={`/me/purchases/${order.id}/dispute`} variant="secondary">
             Open a dispute
           </ButtonLink>
+        ) : null}
+        {order.status === 'released' && !review ? (
+          <Button data-testid="write-review" variant="secondary" onClick={onReview}>
+            ★ Write a review
+          </Button>
+        ) : null}
+        {review ? (
+          <span
+            data-testid="my-review"
+            className="inline-flex items-center gap-2 text-sm text-ink-2"
+          >
+            <Stars value={review.rating} className="text-xs" />
+            {review.hidden ? 'Hidden pending moderation' : 'Your review'}
+            {canEdit ? (
+              <button type="button" className="text-accent hover:underline" onClick={onReview}>
+                Edit
+              </button>
+            ) : null}
+          </span>
+        ) : null}
+        {order.status === 'paid' ? (
+          <span className="text-[13px] text-muted">Reviews open when escrow releases.</span>
         ) : null}
         {order.status === 'disputed' ? (
           <span className="text-sm text-ink-2">

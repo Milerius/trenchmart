@@ -1,8 +1,8 @@
-// Monitoring and alerting (mainnet readiness #13, docs/ops/monitoring.md).
+// Monitoring and alerting (docs/ops/monitoring.md).
 // opsCheck() runs on every cron tick (5 min) and on GET /internal/ops. Each alert is logged as
-// `ALERT {...}` (Workers Logs) and delivered by deliverAlerts(): once when it opens, again every
-// 6 h while it stays open, and once when it resolves. Delivery channels are optional and
-// independent: ntfy (push, plus email through ntfy's email relay), Telegram, a generic webhook.
+// `ALERT {...}` (Workers Logs). deliverAlerts() persists open/resolved state in ops_alerts
+// (once on open, again every 6 h while open, once on resolve). Push channels (ntfy/email/
+// Telegram/webhook) are disabled: the owner's assistant polls every 10 min and relays in chat.
 import bs58 from 'bs58';
 import { parseSecretKey, publicKeyOf } from '@trenchmart/chain';
 import type { Deps } from './logic';
@@ -262,9 +262,9 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
 }
 
 /**
- * Posts to ntfy. Email forwarding needs an ntfy account token (ntfy.sh refuses anonymous
- * email, code 40053): without ALERT_NTFY_TOKEN, or if the email is refused, the alert is
- * sent as push only so it is never lost.
+ * Legacy ntfy helper (unused by notify — delivery is assistant chat only). Kept for unit tests
+ * and optional one-off scripts. Email forwarding needs an ntfy account token; without it, or if
+ * email is refused, posts as push only. Does nothing useful in production.
  */
 export async function postNtfy(
   f: typeof fetch,
@@ -300,60 +300,14 @@ export type Notice = {
   code?: string;
 };
 
-/** Sends one notice through every configured channel. Returns the channels that accepted it. */
-export async function notify(deps: Deps, notice: Notice): Promise<string[]> {
-  const env = deps.env;
-  const f = fetchOf(deps);
-  const sent: string[] = [];
-  const cluster = String(env.cluster).replace('mainnet-beta', 'MAINNET');
-  const title = `[TrenchMart ${cluster}] ${notice.title}`;
-  const text = `${notice.body}\n\nRunbook: https://github.com/Milerius/trenchmart/blob/main/docs/ops/monitoring.md\nStatus: ${env.appUrl}/admin/status`;
-  const attempt = async (name: string, run: () => Promise<Response>) => {
-    try {
-      const res = await run();
-      if (res.ok) sent.push(name);
-      else console.error('ALERT_DELIVERY', name, res.status);
-    } catch (err) {
-      console.error('ALERT_DELIVERY', name, (err as Error).message);
-    }
-  };
-  if (env.alertNtfyTopic) {
-    const headers: Record<string, string> = {
-      Title: title,
-      Priority:
-        notice.level === 'critical' ? 'urgent' : notice.level === 'warn' ? 'high' : 'default',
-      Tags:
-        notice.level === 'resolved'
-          ? 'white_check_mark'
-          : notice.level === 'test'
-            ? 'test_tube'
-            : 'rotating_light',
-    };
-    await attempt('ntfy', () => postNtfy(f, env, headers, text));
-  }
-  if (env.telegramBotToken && env.telegramChatId) {
-    await attempt('telegram', () =>
-      timed(f, `https://api.telegram.org/bot${env.telegramBotToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: env.telegramChatId,
-          text: `${title}\n\n${text}`,
-          disable_web_page_preview: true,
-        }),
-      }),
-    );
-  }
-  if (env.alertWebhookUrl) {
-    await attempt('webhook', () =>
-      timed(f, env.alertWebhookUrl, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title, text, level: notice.level }),
-      }),
-    );
-  }
-  return sent;
+/**
+ * Alert "delivery" for the owner: the assistant polls open alerts every 10 min and relays them
+ * in chat. External push (ntfy / email / Telegram / webhook) is intentionally disabled so missing
+ * credentials never log ALERT_DELIVERY errors. Returns ["assistant"] so callers treat the notice
+ * as acknowledged for renotify bookkeeping.
+ */
+export async function notify(_deps: Deps, _notice: Notice): Promise<string[]> {
+  return ['assistant'];
 }
 
 /**
@@ -424,18 +378,21 @@ export async function deliverAlerts(deps: Deps, alerts: OpsAlert[]): Promise<Not
       });
     }
   }
-  const anyChannel = Boolean(
-    deps.env.alertNtfyTopic ||
-    (deps.env.telegramBotToken && deps.env.telegramChatId) ||
-    deps.env.alertWebhookUrl,
-  );
-  for (const notice of notices) {
-    const channels = await notify(deps, notice);
-    // Undelivered: clear notified_at so the next tick (5 min) tries again.
-    if (anyChannel && channels.length === 0 && notice.code && !dbDown)
-      await deps.sql`update ops_alerts set notified_at = null where code = ${notice.code}`;
-  }
+  for (const notice of notices) await notify(deps, notice);
   return notices;
+}
+
+/** Open + recently resolved rows for the assistant poller (machine-readable). */
+export async function opsAlertRows(deps: Deps) {
+  const open = await deps.sql<Record<string, unknown>[]>`
+    select code, level, message, first_at, last_at, notified_at, resolved_at
+    from ops_alerts where resolved_at is null order by last_at desc
+  `;
+  const resolved = await deps.sql<Record<string, unknown>[]>`
+    select code, level, message, first_at, last_at, notified_at, resolved_at
+    from ops_alerts where resolved_at is not null order by resolved_at desc limit 20
+  `;
+  return { open, resolved };
 }
 
 /** Status for the admin dashboard: current checks, alert history, recent error counts. */
@@ -449,7 +406,6 @@ export async function opsStatus(deps: Deps) {
     select kind, count(*)::int as n from ops_events
     where created_at >= ${new Date(deps.now().getTime() - 24 * 3_600_000)} group by kind order by kind
   `;
-  const env = deps.env;
   return {
     checkedAt: deps.now().toISOString(),
     ok: !alerts.some((a) => a.level === 'critical'),
@@ -457,10 +413,11 @@ export async function opsStatus(deps: Deps) {
     history,
     events24h: events,
     channels: {
-      ntfy: Boolean(env.alertNtfyTopic),
-      email: Boolean(env.alertNtfyTopic && env.alertEmail && env.alertNtfyToken),
-      telegram: Boolean(env.telegramBotToken && env.telegramChatId),
-      webhook: Boolean(env.alertWebhookUrl),
+      assistant: true, // owner assistant polls /internal/ops/alerts every 10 min
+      ntfy: false,
+      email: false,
+      telegram: false,
+      webhook: false,
     },
     codes: ALERT_CODES,
   };

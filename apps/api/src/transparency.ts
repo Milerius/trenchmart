@@ -137,9 +137,9 @@ export async function transparency(deps: Deps) {
           sha256: await programHash(elf),
           securityTxt: securityTxtOf(elf),
           verifiedBuild: {
-            status: 'not_verified',
+            status: 'ci_compare',
             detail:
-              'No reproducible (solana-verify, Docker) build is published yet. Compare sha256 above with `solana-verify get-program-hash -u devnet <program>` and with your own `anchor build` of programs/trench_escrow.',
+              'CI runs solana-verify in Docker (`.github/workflows/solana-verify.yml`). Compare sha256 above with the workflow summary / artifact. OtterSec explorer badge is mainnet-only — see docs/ops/verified-build.md.',
           },
         };
       }

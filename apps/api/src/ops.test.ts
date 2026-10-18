@@ -230,26 +230,22 @@ describe('monitoring and alerts', () => {
     expect(await codes(broken.deps)).toEqual(['DB_ERROR']);
   });
 
-  it('delivers once on open, re-sends after 6 h, once on resolve, through ntfy (with email) and Telegram', async () => {
+  it('persists once on open, again after 6 h, once on resolve; no external push (assistant delivery)', async () => {
     const { deps, world } = await setup();
     world.lamports = 1_000n;
     const first = await deliverAlerts(deps, await opsCheck(deps));
     expect(first.map((n) => n.title)).toEqual(['CRITICAL LOW_BALANCE']);
-    expect(world.sent.map((s) => new URL(s.url).host)).toEqual(['ntfy.sh', 'api.telegram.org']);
-    expect(world.sent[0]!.url).toBe('https://ntfy.sh/secret-topic');
-    expect(world.sent[0]!.headers.Email).toBe('owner@example.com');
-    expect(world.sent[0]!.headers.Priority).toBe('urgent');
-    expect(world.sent[0]!.body).toContain('docs/ops/monitoring.md');
-    world.sent = [];
+    expect(world.sent).toEqual([]); // notify is a no-op for ntfy/telegram/webhook
     expect(await deliverAlerts(deps, await opsCheck(deps))).toEqual([]);
     now = new Date(now.getTime() + 6 * 3_600_000);
     expect((await deliverAlerts(deps, await opsCheck(deps))).length).toBe(1);
     world.lamports = 1_000_000_000n;
-    world.sent = [];
     const resolved = await deliverAlerts(deps, await opsCheck(deps));
     expect(resolved.map((n) => n.title)).toEqual(['RESOLVED LOW_BALANCE']);
-    expect(world.sent.length).toBe(2);
+    expect(world.sent).toEqual([]);
     expect(await deliverAlerts(deps, await opsCheck(deps))).toEqual([]);
+    const open = await sql`select code from ops_alerts where resolved_at is null`;
+    expect(open).toEqual([]);
   });
 
   it('records API 5xx and webhook errors; internal and admin endpoints are protected', async () => {
@@ -278,13 +274,19 @@ describe('monitoring and alerts', () => {
     expect(
       ((await run.json()) as { notices: { title: string }[] }).notices.map((n) => n.title),
     ).toEqual(['CRITICAL WEBHOOK_FAILED']);
-    world.sent = [];
     const test = await app.request('/api/v1/internal/ops/test?code=LOW_BALANCE', {
       method: 'POST',
       headers: { authorization: `Bearer ${TOKEN}` },
     });
-    expect(await test.json()).toEqual({ channels: ['ntfy', 'telegram'] });
-    expect(world.sent[0]!.headers.Title).toContain('TEST LOW_BALANCE');
+    expect(await test.json()).toEqual({ channels: ['assistant'] });
+    expect(world.sent).toEqual([]);
+    const alerts = await app.request('/api/v1/internal/ops/alerts', {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(alerts.status).toBe(200);
+    const body = (await alerts.json()) as { delivery: string; open: unknown[] };
+    expect(body.delivery).toBe('assistant');
+    expect(Array.isArray(body.open)).toBe(true);
   });
 
   it('ntfy: email only with an account token; refused email falls back to push', async () => {
@@ -309,24 +311,5 @@ describe('monitoring and alerts', () => {
     refuseEmail = false;
     await postNtfy(f, { ...base, alertNtfyToken: 'tk' }, { Title: 'x' }, 'b');
     expect(posts.length).toBe(1);
-  });
-
-  it('retries an undelivered alert on the next tick', async () => {
-    const { deps, world } = await setup();
-    let down = true;
-    const inner = deps.opsFetch!;
-    deps.opsFetch = (async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      if (down && (url.includes('ntfy.sh') || url.includes('telegram')))
-        return new Response('quota', { status: 429 });
-      return inner(input, init);
-    }) as typeof fetch;
-    world.lamports = 1_000n;
-    expect((await deliverAlerts(deps, await opsCheck(deps))).length).toBe(1);
-    down = false;
-    expect((await deliverAlerts(deps, await opsCheck(deps))).map((n) => n.title)).toEqual([
-      'CRITICAL LOW_BALANCE',
-    ]);
-    expect(await deliverAlerts(deps, await opsCheck(deps))).toEqual([]);
   });
 });

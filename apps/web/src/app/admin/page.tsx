@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { ReviewModeration } from '@/components/review-moderation';
 import { api } from '@/lib/api';
 import { useWallet } from '@/lib/wallet';
 
@@ -66,6 +67,7 @@ export default function AdminPage() {
         {disputes.length === 0 ? <li className="text-muted">No open disputes.</li> : null}
       </ul>
       {message ? <p>{message}</p> : null}
+      <ReviewModeration />
     </section>
   );
 }

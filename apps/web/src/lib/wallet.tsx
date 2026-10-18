@@ -65,6 +65,8 @@ type WalletContextValue = {
   connect: () => Promise<void>;
   logout: () => Promise<void>;
   signAndSend: (txBase64: string) => Promise<string>;
+  /** Signs a plain-text message (free, no transaction); returns the base58 signature. */
+  signMessage: (text: string) => Promise<string>;
   refresh: () => Promise<void>;
 };
 
@@ -348,7 +350,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }
 
-  async function signAndSend(txBase64: string): Promise<string> {
+  /** The signed-in wallet's signer, reconnected silently after a reload. */
+  async function activeSigner(): Promise<Signer> {
     let signer = signerRef.current;
     if (!signer) {
       const secret = e2eSecret();
@@ -360,6 +363,27 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       signer = await signerFor(last, true);
       signerRef.current = signer;
     }
+    return signer;
+  }
+
+  async function signMessage(text: string): Promise<string> {
+    const signer = await activeSigner();
+    if (session && signer.address !== session.wallet)
+      throw new Error('Your wallet switched accounts. Reconnect the wallet you signed in with.');
+    try {
+      const signature = await withTimeout(
+        signer.signMessage(new TextEncoder().encode(text)),
+        WALLET_TIMEOUT_MS,
+        WALLET_TIMEOUT_MESSAGE,
+      );
+      return bs58.encode(signature);
+    } catch (err) {
+      throw new Error(walletRejectionMessage(err), { cause: err });
+    }
+  }
+
+  async function signAndSend(txBase64: string): Promise<string> {
+    const signer = await activeSigner();
     let signed: Uint8Array;
     try {
       signed = await signer.signTransaction(fromBase64(txBase64));
@@ -374,7 +398,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ session, busy, error, connect, logout, signAndSend, refresh }),
+    () => ({ session, busy, error, connect, logout, signAndSend, signMessage, refresh }),
     [session, busy, error],
   );
 

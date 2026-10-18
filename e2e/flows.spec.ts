@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { studioOverview } from './studio-fixtures';
 import { expect, test, type Page } from '@playwright/test';
 
 // Money flows end to end in the browser: checkout into escrow, opening a dispute, staking the
@@ -308,7 +309,7 @@ function studioHandler(address: string, state: { xLinked: boolean; bond: string 
         },
       };
     }
-    if (path === '/studio/listings' && method === 'GET') return { json: [] };
+    if (path === '/studio/overview') return { json: studioOverview(address) };
     // Devnet without an X app: the studio falls back to the unverified handle link (M-04).
     if (path === '/auth/x/start')
       return {
@@ -345,20 +346,23 @@ test('studio asks for a wallet before opening', async ({ page }) => {
   ).toBeVisible();
 });
 
-test('studio: link X, then stake the creator bond with a signed transaction', async ({ page }) => {
+test('studio: X links from the profile, then stake the creator bond with a signed transaction', async ({
+  page,
+}) => {
   const { secret, address } = wallet();
   const state = { xLinked: false, bond: '0' };
   const calls = await setup(page, address, secret, studioHandler(address, state));
   await page.goto('/studio');
-  const ready = page.getByRole('heading', { name: 'Ready to sell' }).locator('..');
+  const ready = page.getByRole('region', { name: 'Ready to sell' });
   await expect(ready).toContainText('X account linked (needed)');
   await expect(ready).toContainText('Creator bond (needed)');
-
-  await page.getByLabel('X handle').fill('trenchmaker');
-  await page.getByRole('button', { name: 'Link X' }).click();
-  await expect(ready).toContainText('X account linked (done)');
+  await expect(ready).toContainText('2 of 4 required');
+  // No inline X form any more: the checklist sends the creator to the profile editor.
   await expect(page.getByLabel('X handle')).toHaveCount(0);
-  expect(calls.find((c) => c.path === '/studio/x')!.body).toEqual({ handle: 'trenchmaker' });
+  await expect(page.getByTestId('link-x-profile')).toHaveAttribute(
+    'href',
+    '/studio/profile#socials',
+  );
 
   await page.getByLabel('Bond SOL').fill('5');
   await page.getByRole('button', { name: 'Stake bond' }).click();
@@ -374,57 +378,14 @@ test('studio: link X, then stake the creator bond with a signed transaction', as
   });
 });
 
-test('studio: a rejected X link shows the reason', async ({ page }) => {
-  const { secret, address } = wallet();
-  const base = studioHandler(address, { xLinked: false, bond: '0' });
-  await setup(page, address, secret, (call) =>
-    call.path === '/studio/x'
-      ? {
-          status: 400,
-          json: { error: { code: 'BAD_HANDLE', message: 'That X handle is not valid.' } },
-        }
-      : base(call),
-  );
-  await page.goto('/studio');
-  await page.getByLabel('X handle').fill('!!');
-  await page.getByRole('button', { name: 'Link X' }).click();
-  await expect(page.getByTestId('studio').getByRole('status')).toHaveText(
-    'That X handle is not valid.',
-  );
-});
-
-test('studio: with an X app configured, Link X goes to X sign-in (OAuth PKCE)', async ({
+test('studio: an old X callback to /studio is forwarded to the profile with its result', async ({
   page,
 }) => {
   const { secret, address } = wallet();
-  const base = studioHandler(address, { xLinked: false, bond: '0' });
-  const authorize =
-    'https://x.com/i/oauth2/authorize?response_type=code&client_id=c&state=s&code_challenge=x&code_challenge_method=S256';
-  const calls = await setup(page, address, secret, (call) =>
-    call.path === '/auth/x/start' ? { json: { url: authorize } } : base(call),
-  );
-  await page.route('https://x.com/**', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<title>X sign-in</title>' }),
-  );
-  await page.goto('/studio');
-  await page.getByRole('button', { name: 'Link X' }).click();
-  await page.waitForURL(/x\.com\/i\/oauth2\/authorize/);
-  expect(new URL(page.url()).searchParams.get('code_challenge_method')).toBe('S256');
-  // The typed handle is never sent: the account comes from X itself.
-  expect(calls.some((c) => c.path === '/studio/x')).toBe(false);
-});
-
-test('studio: the X sign-in result is shown after the callback', async ({ page }) => {
-  const { secret, address } = wallet();
   await setup(page, address, secret, studioHandler(address, { xLinked: true, bond: '0' }));
-  await page.goto('/studio?x=linked');
-  await expect(page.getByTestId('studio').getByRole('status')).toHaveText(
-    'X account verified and linked.',
-  );
   await page.goto('/studio?x=taken');
-  await expect(page.getByTestId('studio').getByRole('status')).toHaveText(
-    'That X account is already linked to another wallet.',
-  );
+  // The profile editor shows the result (covered in profile.spec.ts).
+  await page.waitForURL('**/studio/profile?x=taken');
 });
 
 test('studio upload: creates the listing, pays the verification fee, uploads the file, opens the live review', async ({

@@ -1639,6 +1639,10 @@ describe('owner product decisions', () => {
       body: JSON.stringify({ handle: 'someone' }),
     });
     expect(closed.status).toBe(410);
+    const bobProfile = (await (
+      await app.request('/api/v1/studio/profile', { headers: { cookie: bobCookie } })
+    ).json()) as { capabilities: { xOAuth: boolean } };
+    expect(bobProfile.capabilities).toEqual({ xOAuth: true });
     // A handle dev-linked before OAuth was configured does not count as linked: the studio
     // shows the verify button again and new listings require the verified link.
     const aliceOnOauth = await login(app, alice);
@@ -2307,6 +2311,8 @@ describe('creator profiles', () => {
       avatar: null,
       xVerified: false,
       contact: { enabled: false, channels: [] },
+      // No X_CLIENT_ID here: the editor must show X verification as unavailable.
+      capabilities: { xOAuth: false },
     });
 
     const saved = await put(app, cookie, {
@@ -2592,5 +2598,123 @@ describe('listing wizard: kind and specs', () => {
     // The legacy body without a kind still works and carries no specs.
     const legacy = await create({ ...base, title: 'Legacy pack', category: 'userscript' });
     expect(legacy.status).toBe(200);
+  });
+});
+
+describe('studio overview', () => {
+  beforeEach(async () => {
+    sql = createSql(databaseUrl);
+    await migrate(sql);
+    await reset();
+  });
+
+  afterAll(async () => {
+    await sql?.end();
+  });
+
+  it('reports only real numbers: empty for a new creator, then sales, renewals, escrow and payouts', async () => {
+    const app = await appFor();
+    const seller = keypair();
+    const cookie = await login(app, seller);
+    const overview = async () =>
+      (await (
+        await app.request('/api/v1/studio/overview', { headers: { cookie } })
+      ).json()) as Record<string, any>;
+
+    const empty = await overview();
+    expect(empty.days).toBe(30);
+    expect(empty.revenue.total).toBe('0');
+    expect(empty.revenue.daily).toHaveLength(30);
+    expect(empty.sales).toMatchObject({ total30d: 0, last7d: 0 });
+    expect(empty.rating).toBeNull();
+    expect(empty.updates).toEqual({ paying: 0, monthly: '0', inFreeMonth: 0 });
+    expect(empty.payouts).toMatchObject({ sent: '0', inMultisig: '0', queued: '0', inEscrow: '0' });
+    expect(empty.listings).toEqual([]);
+    expect(empty.creator).toMatchObject({
+      wallet: seller.publicKey,
+      xVerified: false,
+      profileFilled: { done: 0, of: 5 },
+    });
+    expect((await app.request('/api/v1/studio/overview')).status).toBe(401);
+
+    const [sellerRow] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${seller.publicKey}`;
+    const buyer = keypair();
+    await login(app, buyer);
+    const [buyerRow] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${buyer.publicKey}`;
+    const listingId = randomUUID();
+    const v1 = randomUUID();
+    const v2 = randomUUID();
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price, update_price)
+      values (${listingId}, ${sellerRow!.id}, 'dash-pack', 'Dash Pack', 'Sum', 'Desc', 'userscript', ${1_000_000_000n}, ${100_000_000n})
+    `;
+    await sql`
+      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status, created_at)
+      values (${v1}, ${listingId}, '1.0.0', 'a.user.js', 5, 'a1', 'blobs/a1', 'live', ${new Date(now.getTime() - 86_400_000)}),
+             (${v2}, ${listingId}, '1.1.0', 'a.user.js', 5, 'a2', 'blobs/a2', 'needs_creator', ${now})
+    `;
+    await sql`update listings set live_version_id = ${v1} where id = ${listingId}`;
+    const order = async (status: string, daysAgo: number, extra: { escrowUntil?: Date } = {}) => {
+      const id = randomUUID();
+      const paidAt = new Date(now.getTime() - daysAgo * 86_400_000);
+      await sql`
+        insert into orders (
+          id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total,
+          tier_at_purchase, memo, status, paid_at, escrow_until, expires_at, updates_until
+        ) values (
+          ${id}, ${buyerRow!.id}, ${listingId}, ${v1}, ${1_000_000_000n}, 500, 0, 0, 0, ${1_000_000_000n},
+          'none', ${'tm:' + id.slice(0, 8)}, ${status}, ${paidAt}, ${extra.escrowUntil ?? paidAt},
+          ${paidAt}, ${new Date(paidAt.getTime() + 30 * 86_400_000)}
+        )
+      `;
+      return id;
+    };
+    const recent = await order('paid', 0, { escrowUntil: new Date(now.getTime() + 3_600_000) });
+    const old = await order('released', 40);
+    await order('released', 3);
+    await order('refunded', 1);
+    // The 40-day-old order renewed its updates 5 days ago; the renewal counts as revenue.
+    await sql`
+      insert into update_renewals (order_id, buyer_id, price, fee_bps, rebate_bps, fee, rebate, total, tier, memo, status, starts_at, ends_at, paid_at, expires_at)
+      values (${old}, ${buyerRow!.id}, ${100_000_000n}, 500, 0, 0, 0, ${100_000_000n}, 'none', 'tm:renew1', 'paid',
+        ${new Date(now.getTime() - 5 * 86_400_000)}, ${new Date(now.getTime() + 25 * 86_400_000)},
+        ${new Date(now.getTime() - 5 * 86_400_000)}, ${now})
+    `;
+    await sql`
+      insert into listing_reviews (order_id, listing_id, rating, body) values (${recent}, ${listingId}, 5, 'Great')
+    `;
+    await sql`
+      insert into payouts (order_id, recipient, bucket, amount, status)
+      values (${old}, ${seller.publicKey}, 'creator', ${1_000_000_000n}, 'sent'),
+             (${old}, ${seller.publicKey}, 'ops', ${7n}, 'sent')
+    `;
+
+    const full = await overview();
+    expect(full.sales).toMatchObject({ total30d: 2, last7d: 2 });
+    expect(full.sales.daily[29]).toBe(1);
+    expect(full.revenue.total).toBe('2100000000');
+    expect(full.revenue.daily[29]).toBe('1000000000');
+    expect(full.updates).toEqual({ paying: 1, monthly: '100000000', inFreeMonth: 2 });
+    expect(full.rating).toEqual({ avg: 5, count: 1, distribution: [1, 0, 0, 0, 0] });
+    expect(full.payouts).toMatchObject({
+      sent: '1000000000',
+      inEscrow: '1000000000',
+      queued: '0',
+    });
+    expect(full.listings).toHaveLength(1);
+    expect(full.listings[0]).toMatchObject({
+      slug: 'dash-pack',
+      sales: 3,
+      sales7d: 2,
+      subscribers: 1,
+      rating: { avg: 5, count: 1 },
+      live: { semver: '1.0.0', status: 'live' },
+      latest: { id: v2, semver: '1.1.0', status: 'needs_creator' },
+      coverUrl: null,
+    });
   });
 });
