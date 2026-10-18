@@ -25,7 +25,7 @@ import { filesystemBlob } from './blob';
 import { readEnv } from './env';
 import { sha256Hex, type Deps } from './logic';
 import type { EscrowChain } from './escrow';
-import { API_SCOPES, scopeFor } from './agent';
+import { API_SCOPES, scopeArray, scopeFor } from './agent';
 import { ROUTES, scopeOf } from './openapi';
 
 /** Integration: the agent API (keys, scopes, revocation, limits, validated broadcast). */
@@ -984,5 +984,15 @@ describe('agent API', () => {
     expect(
       (await call(h.app, 'GET', `/studio/listings/${listingId}/upload-quota`, { key })).status,
     ).toBe(200);
+  });
+});
+
+describe('scopeArray (text[] as returned through Hyperdrive)', () => {
+  it('accepts arrays and Postgres array literals, drops unknown scopes', () => {
+    expect(scopeArray(['read', 'trade'])).toEqual(['read', 'trade']);
+    expect(scopeArray('{read,sell,profile}')).toEqual(['read', 'sell', 'profile']);
+    expect(scopeArray('{"read","admin"}')).toEqual(['read']);
+    expect(scopeArray('{}')).toEqual([]);
+    expect(scopeArray(null)).toEqual([]);
   });
 });
