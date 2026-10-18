@@ -1,6 +1,6 @@
 # Public status page
 
-Status: probes, storage and the public endpoint `GET /api/v1/status` (the `/status` page follows).
+Status: live at [trenchmart.fun/status](https://trenchmart.fun/status), backed by `GET /api/v1/status`.
 Everything runs on the existing free tiers: no new service, no new cron, no new secret.
 
 ## Components
@@ -139,3 +139,23 @@ status tables per minute per colo, whatever the traffic.
   `ops_alerts`, `ops_events` or env values, and `status-public.test.ts` fails if any other key, an
   alert code or message, a wallet, a URL or a secret appears in the body. The internal endpoints
   (`/internal/ops`, `/internal/ops/alerts`, `/internal/status/run`) still need `INTERNAL_TOKEN`.
+
+## The page: `/status`
+
+`apps/web/src/app/status/page.tsx` + `apps/web/src/components/status.tsx`, linked from the footer
+and listed in the sitemap. It loads `/api/v1/status` through the web's same-origin proxy and
+reloads it every 60 s (and on **Refresh**). It shows:
+
+- the overall banner (operational, degraded or outage with the affected component names, or
+  "No recent checks" when the probes stopped reporting) and the time of the last check (UTC);
+- four tiles: the lowest 90-day uptime of any component, API p50/p95 over 24 h, open incidents,
+  and how many of the 90 days have data;
+- one row per component: state, last latency, p50/p95 over 24 h, the 90-day bar (30 days on a
+  phone; each day's tooltip has its state, uptime and number of checks) and the 90-day uptime;
+- the incident history, or an empty state.
+
+**Grey means no data.** While history is short, the days before the first probe are grey and the
+page says when history starts. Nothing is back-filled or estimated.
+
+Tests: `e2e/status-page.spec.ts` (stubbed API: no history, partial history, degraded with
+incidents, mobile, API failure, axe) and `e2e/x-oauth/status-page.flow.ts` (real API + Postgres).

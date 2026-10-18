@@ -234,6 +234,9 @@ function Footer() {
         <Link href="/docs" className="hover:text-ink">
           Docs
         </Link>
+        <Link href="/status" className="hover:text-ink">
+          Status
+        </Link>
         <Link href="/terms" className="hover:text-ink">
           Terms
         </Link>
