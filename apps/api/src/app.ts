@@ -27,8 +27,6 @@ import {
   jsonSafe,
   listingsQuery,
   randomNonce,
-  bondToList,
-  requiredBondLamports,
   signJwt,
   siwsExpiresAt,
   tierAtLeast,
@@ -116,6 +114,8 @@ import {
 import { openApiSpec } from './openapi';
 import {
   activeBond,
+  bondFor,
+  bondStatus,
   applyPayment,
   grantCreatorRole,
   audit,
@@ -1142,21 +1142,13 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.get('/studio/requirements', async (c) => {
     const user = requireUser(c);
-    const configQ = loadConfig(deps);
-    const [config, categories, bond] = await Promise.all([
-      configQ,
-      deps.sql<{ category: string }[]>`
-        select distinct category from listings where creator_id = ${user.id} and delisted_at is null and live_version_id is not null
-      `,
-      activeBond(deps.sql, user.id as string),
+    const config = await loadConfig(deps);
+    const [bonds, tier] = await Promise.all([
+      bondStatus(deps, user as { id: string; wallet: string }, config),
+      tierForWallet(deps, user.wallet as string, config),
     ]);
-    const tier = await tierForWallet(deps, user.wallet as string, config);
-    const required = bondToList(
-      categories.map((row) => row.category),
-      config.bond_lamports_by_category,
-      tier.tier,
-      config.og_bond_discount_bps,
-    );
+    const bond = bonds.active;
+    const required = bonds.required;
     return c.json(
       jsonSafe({
         creator: ((user.roles as string[] | undefined) ?? []).includes('creator'),
@@ -1171,6 +1163,11 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         verificationFee: config.verification_fee_lamports,
         feeWaived: tierAtLeast(tier.tier, config.verification_fee_free_from_tier),
         bondByCategory: config.bond_lamports_by_category,
+        // Exactly what POST /studio/listings checks for each category (same function).
+        bondRequiredByCategory: bonds.requiredByCategory,
+        bondOkByCategory: Object.fromEntries(
+          Object.entries(bonds.requiredByCategory).map(([k, v]) => [k, bond >= v]),
+        ),
       }),
     );
   });
@@ -2101,16 +2098,9 @@ async function ownVersion(deps: Deps, id: string, userId: string) {
 }
 
 async function assertBond(deps: Deps, user: Record<string, any>, category: string) {
-  const config = await loadConfig(deps);
-  const tier = await tierForWallet(deps, user.wallet as string, config);
-  const required = requiredBondLamports(
-    [category],
-    config.bond_lamports_by_category,
-    tier.tier,
-    config.og_bond_discount_bps,
-  );
-  const bond = await activeBond(deps.sql, user.id as string);
-  if (bond < required) throw new HttpError(400, 'BOND_REQUIRED', 'stake the category bond first');
+  const status = await bondStatus(deps, user as { id: string; wallet: string });
+  if (status.active < bondFor(status, category))
+    throw new HttpError(400, 'BOND_REQUIRED', 'stake the category bond first');
 }
 
 async function uniqueSlug(deps: Deps, title: string): Promise<string> {

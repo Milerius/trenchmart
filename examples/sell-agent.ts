@@ -172,10 +172,10 @@ async function main() {
     } catch (err) {
       if (!(err instanceof TrenchmartError) || err.code !== 'BOND_REQUIRED' || !flag('TM_PAY_BOND'))
         throw err;
-      // Each category has its own bond (bondByCategory); stake the difference (1 to 5 SOL per stake).
+      // bondRequiredByCategory is exactly what creation checks; stake the difference (1 to 5 SOL per stake).
       const now = await client.requirements();
       const needed = BigInt(
-        String((now.bondByCategory as Record<string, string>)[input.category] ?? '0'),
+        String((now.bondRequiredByCategory as Record<string, string>)[input.category] ?? '0'),
       );
       const missing = needed - BigInt(String(now.bondActive ?? '0'));
       const bond = await client.payBond(

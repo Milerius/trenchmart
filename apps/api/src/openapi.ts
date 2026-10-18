@@ -339,7 +339,8 @@ export const ROUTES: RouteDoc[] = [
     method: 'get',
     path: '/studio/requirements',
     tag: 'Sell',
-    summary: 'What listing needs: category bond, verification fee (X is optional)',
+    summary:
+      'What listing needs: bond per category (bondRequiredByCategory, the exact check creation runs), verification fee (X is optional)',
   },
   {
     method: 'post',
