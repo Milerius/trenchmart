@@ -1,10 +1,24 @@
 //! TrenchMart per-order SOL escrow.
 //!
-//! One `Escrow` PDA per order, at `["escrow", order_id]`. The buyer creates and funds it in
+//! One `Escrow` PDA per order, at `["escrow", buyer, order_id]` (v2; v1 escrows used
+//! `["escrow", order_id]` and keep working). The buyer creates and funds it in
 //! one transaction; after `escrow_until` anyone may crank `release`, which pays the seller the
 //! price and the four fee buckets their split of the net fee. Inside the window the buyer can
 //! `open_dispute`, which freezes the funds until the resolver either `refund`s the buyer or
 //! `reject_dispute`s back to the prior state.
+//!
+//! v2 (security review M-01, M-02, L-01, L-02, L-04, I-04):
+//! - The dispute resolver lives in a program-wide `Config` PDA (`["config"]`), set by the
+//!   program's upgrade authority and rotatable by the config admin. `refund`,
+//!   `reject_dispute` and resolver-side `open_dispute` authorize against `config.resolver`, never against the
+//!   `resolver` stored in the escrow (kept only as a record), so a lost or leaked resolver
+//!   key can be replaced for every in-flight escrow.
+//! - `open_dispute` also accepts `config.resolver`: it can open the dispute on chain the moment the buyer files it,
+//!   so a permissionless `release` can no longer race an off-chain dispute (M-01).
+//! - `refund_after_timeout`: if a dispute is still open `config.dispute_timeout` seconds
+//!   after `escrow_until`, anyone can return the deposit to the buyer (M-02 fallback).
+//! - `close`: terminal escrows can be closed and their rent returned to the buyer (L-01).
+//! - `initialize` refuses incoherent terms (L-04).
 //!
 //! # Invariants (each one is exercised in `tests/escrow.rs`)
 //!
@@ -14,15 +28,17 @@
 //!    destination from its arguments, and no instruction pays the resolver.
 //! 2. **Exactly the deposit moves, never the rent.** `fund` moves `quote().total` in;
 //!    `release` moves `price + net_fee == total` out; `refund` moves `deposit` out. The
-//!    rent-exempt floor paid at `initialize` stays behind (see finding L-01: never reclaimed).
+//!    rent-exempt floor paid at `initialize` stays behind until `close` returns it to the
+//!    buyer once the escrow is terminal.
 //! 3. **One terminal exit per escrow.** The state machine in `state.rs` has no edge out of
 //!    `Refunded` or `Expired`, and `release` runs only from `Paid`, so funds leave at most once.
 //! 4. **Time gates.** `fund` only until `expires_at`; `release` only from `escrow_until`;
 //!    a `Paid` escrow can be disputed only before `escrow_until`; `expire` only after
 //!    `expires_at` and only for an unfunded (`Pending`) escrow.
 //! 5. **Authority.** `fund` and `open_dispute` need the stored buyer's signature
-//!    (`has_one = buyer` + `Signer`); `refund` and `reject_dispute` need the stored resolver's.
-//!    `release` and `expire` are permissionless by design: they can only follow the stored terms.
+//!    (`has_one = buyer` + `Signer`; the resolver may also `open_dispute`); `refund` and `reject_dispute` need
+//!    `config.resolver`'s. `release`, `expire`, `close` and `refund_after_timeout` are
+//!    permissionless by design: they can only follow the stored terms.
 //! 6. **Account authenticity.** `Account<Escrow>` checks the owner (this program) and the
 //!    8-byte discriminator, so look-alike accounts are rejected. `init` with canonical-bump
 //!    seeds makes re-initialization impossible and binds the address to `order_id`.
@@ -65,16 +81,49 @@ solana_security_txt::security_txt! {
 pub mod trench_escrow {
     use super::*;
 
+    /// Creates the program config. Only the program's upgrade authority can call it, once.
+    pub fn init_config(
+        ctx: Context<InitConfig>,
+        resolver: Pubkey,
+        dispute_timeout: i64,
+    ) -> Result<()> {
+        require!(valid_timeout(dispute_timeout), EscrowError::BadTimeout);
+        require!(resolver != Pubkey::default(), EscrowError::BadTerms);
+        let config = &mut ctx.accounts.config;
+        config.admin = ctx.accounts.authority.key();
+        config.resolver = resolver;
+        config.dispute_timeout = dispute_timeout;
+        config.bump = ctx.bumps.config;
+        Ok(())
+    }
+
+    /// Rotates the resolver, the dispute timeout and/or the admin. Signed by `config.admin`.
+    pub fn set_config(
+        ctx: Context<SetConfig>,
+        admin: Pubkey,
+        resolver: Pubkey,
+        dispute_timeout: i64,
+    ) -> Result<()> {
+        require!(valid_timeout(dispute_timeout), EscrowError::BadTimeout);
+        require!(
+            resolver != Pubkey::default() && admin != Pubkey::default(),
+            EscrowError::BadTerms
+        );
+        let config = &mut ctx.accounts.config;
+        config.admin = admin;
+        config.resolver = resolver;
+        config.dispute_timeout = dispute_timeout;
+        Ok(())
+    }
+
     /// Creates the order's escrow PDA and records its terms. Pays only rent; moves no price.
     ///
     /// Checks: `fee_bps`, `rebate_bps` <= 10_000; the four split parts sum to exactly 10_000
     /// (summed in `u32`, so wrapping values cannot fake it); the total `price + fee - rebate`
-    /// fits in `u64`. The PDA seeds bind the account to `order_id`, and `init` fails if the
-    /// account already exists, so terms can never be rewritten.
-    ///
-    /// Not checked (finding L-04): `expires_at`/`escrow_until` ordering, or that recipients
-    /// differ from the buyer or the escrow itself. The API is the source of these values and
-    /// verifies them after funding.
+    /// fits in `u64`; `price > 0`; `now <= expires_at <= escrow_until`; no recipient is the
+    /// escrow itself or the default key (L-04). The PDA seeds bind the account to the buyer
+    /// and `order_id` (L-02), and `init` fails if the account already exists, so terms can
+    /// never be rewritten.
     pub fn initialize(
         ctx: Context<Initialize>,
         order_id: [u8; 16],
@@ -93,6 +142,22 @@ pub mod trench_escrow {
         let sum = u32::from(bps[0]) + u32::from(bps[1]) + u32::from(bps[2]) + u32::from(bps[3]);
         require!(sum == 10_000, EscrowError::BadSplit);
         let _ = quote(args.price, args.fee_bps, args.rebate_bps).map_err(map_fee)?;
+        require!(args.price > 0, EscrowError::BadAmount);
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            now <= args.expires_at && args.expires_at <= args.escrow_until,
+            EscrowError::BadTerms
+        );
+        let me = ctx.accounts.escrow.key();
+        for key in [
+            args.seller,
+            args.buyback,
+            args.ai_verification,
+            args.ops,
+            args.safety,
+        ] {
+            require!(key != me && key != Pubkey::default(), EscrowError::BadTerms);
+        }
 
         let escrow = &mut ctx.accounts.escrow;
         escrow.buyer = ctx.accounts.buyer.key();
@@ -228,35 +293,93 @@ pub mod trench_escrow {
         Ok(())
     }
 
-    /// Buyer freezes the escrow. Moves nothing.
+    /// Buyer (or the config resolver) freezes the escrow. Moves nothing.
     ///
     /// From `Paid`: only while `now < escrow_until` (the error is `TooEarly`, which here means
     /// "too late"; finding I-04). From `Released`: allowed at any time, as a record only; the
     /// funds are gone and `refund` refuses (`FundsAlreadyReleased`). `disputed_from` remembers
     /// the origin so `reject_dispute` returns to it.
     ///
-    /// Only the buyer can open a dispute. An off-chain dispute the buyer never signs on chain
-    /// does not stop a permissionless `release` after the window (finding M-01).
+    /// v2: the config resolver may also open it from `Paid` inside the window, so an off-chain dispute no longer
+    /// depends on the buyer signing in time (finding M-01). v2 reports a closed window as
+    /// `WindowClosed` (I-04).
     pub fn open_dispute(ctx: Context<OpenDispute>) -> Result<()> {
         let from = ctx.accounts.escrow.status;
         transition(from, EscrowStatus::Disputed)?;
+        let who = ctx.accounts.signer.key();
+        let by_buyer = who == ctx.accounts.escrow.buyer;
+        let by_resolver = who == ctx.accounts.config.resolver;
+        require!(by_buyer || by_resolver, EscrowError::Unauthorized);
         if from == EscrowStatus::Paid {
             let now = Clock::get()?.unix_timestamp;
             require!(
                 now < ctx.accounts.escrow.escrow_until,
-                EscrowError::TooEarly
+                EscrowError::WindowClosed
             );
+        } else {
+            // A post-release dispute is the buyer's record only.
+            require!(by_buyer, EscrowError::IllegalTransition);
         }
         ctx.accounts.escrow.disputed_from = from;
         ctx.accounts.escrow.status = EscrowStatus::Disputed;
         Ok(())
     }
 
+    /// Default outcome when the resolver never acts (M-02): once a dispute opened from `Paid`
+    /// is still open `config.dispute_timeout` seconds after `escrow_until`, anyone may return
+    /// the whole deposit to the stored buyer. Same destination and amount as `refund`.
+    pub fn refund_after_timeout(ctx: Context<RefundAfterTimeout>) -> Result<()> {
+        transition(ctx.accounts.escrow.status, EscrowStatus::Refunded)?;
+        require!(
+            ctx.accounts.escrow.disputed_from == EscrowStatus::Paid,
+            EscrowError::FundsAlreadyReleased
+        );
+        let now = Clock::get()?.unix_timestamp;
+        let deadline = ctx
+            .accounts
+            .escrow
+            .escrow_until
+            .checked_add(ctx.accounts.config.dispute_timeout)
+            .ok_or(EscrowError::Overflow)?;
+        require!(now >= deadline, EscrowError::TimeoutNotReached);
+        let deposit = ctx.accounts.escrow.deposit;
+        move_lamports(
+            &ctx.accounts.escrow.to_account_info(),
+            &ctx.accounts.buyer.to_account_info(),
+            deposit,
+        )?;
+        ctx.accounts.escrow.deposit = 0;
+        ctx.accounts.escrow.status = EscrowStatus::Refunded;
+        Ok(())
+    }
+
+    /// Closes a terminal escrow and returns its rent to the stored buyer (L-01).
+    /// Permissionless. `Refunded` and `Expired` close at once; `Released` only
+    /// `RELEASED_CLOSE_GRACE` seconds after `escrow_until`, so the record stays readable while
+    /// a post-release dispute can still be handled off chain.
+    pub fn close(ctx: Context<Close>) -> Result<()> {
+        let escrow = &ctx.accounts.escrow;
+        let ok = match escrow.status {
+            EscrowStatus::Refunded | EscrowStatus::Expired => true,
+            EscrowStatus::Released => {
+                let now = Clock::get()?.unix_timestamp;
+                let after = escrow
+                    .escrow_until
+                    .checked_add(RELEASED_CLOSE_GRACE)
+                    .ok_or(EscrowError::Overflow)?;
+                now >= after
+            }
+            _ => false,
+        };
+        require!(ok, EscrowError::NotClosable);
+        Ok(())
+    }
+
     /// Resolver returns the whole deposit to the stored buyer.
     ///
     /// Checks: status `Disputed`, disputed from `Paid` (funds still here), signer is the
-    /// stored resolver, destination is the stored buyer. No time limit, so a dispute can be
-    /// settled late; there is also no fallback if the resolver never acts (finding M-02).
+    /// config resolver, destination is the stored buyer. No time limit for the resolver; if it
+    /// never acts, `refund_after_timeout` is the fallback (M-02).
     pub fn refund(ctx: Context<Refund>) -> Result<()> {
         transition(ctx.accounts.escrow.status, EscrowStatus::Refunded)?;
         require!(
@@ -289,6 +412,16 @@ pub mod trench_escrow {
         ctx.accounts.escrow.disputed_from = EscrowStatus::Pending;
         Ok(())
     }
+}
+
+/// Seconds after `escrow_until` before a `Released` escrow may be closed.
+pub const RELEASED_CLOSE_GRACE: i64 = 7 * 86_400;
+/// Bounds for `config.dispute_timeout`: 1 hour to 90 days.
+pub const MIN_DISPUTE_TIMEOUT: i64 = 3_600;
+pub const MAX_DISPUTE_TIMEOUT: i64 = 90 * 86_400;
+
+fn valid_timeout(secs: i64) -> bool {
+    (MIN_DISPUTE_TIMEOUT..=MAX_DISPUTE_TIMEOUT).contains(&secs)
 }
 
 /// Rejects any status change that is not an edge of the state machine in `state.rs`.
@@ -348,6 +481,17 @@ pub struct InitializeArgs {
     pub escrow_until: i64,
 }
 
+/// Program-wide settings. `resolver` is the only key that can settle disputes.
+#[account]
+#[derive(InitSpace)]
+pub struct Config {
+    pub admin: Pubkey,
+    pub resolver: Pubkey,
+    /// Seconds after `escrow_until` before `refund_after_timeout` may run.
+    pub dispute_timeout: i64,
+    pub bump: u8,
+}
+
 /// One order's escrow. Field order is the on-chain layout that `packages/chain` decodes;
 /// do not reorder.
 #[account]
@@ -401,7 +545,39 @@ impl From<EscrowStatus> for Status {
     }
 }
 
-/// `escrow` must be the canonical PDA for `order_id` and must not exist yet.
+/// Signed and paid by the program's current upgrade authority.
+#[derive(Accounts)]
+pub struct InitConfig<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    #[account(
+        seeds = [crate::ID.as_ref()],
+        bump,
+        seeds::program = anchor_lang::solana_program::bpf_loader_upgradeable::ID,
+        constraint = program_data.upgrade_authority_address == Some(authority.key())
+            @ EscrowError::ConfigAuthority
+    )]
+    pub program_data: Account<'info, ProgramData>,
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + Config::INIT_SPACE,
+        seeds = [b"config"],
+        bump
+    )]
+    pub config: Account<'info, Config>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Signed by `config.admin`.
+#[derive(Accounts)]
+pub struct SetConfig<'info> {
+    pub admin: Signer<'info>,
+    #[account(mut, seeds = [b"config"], bump = config.bump, has_one = admin)]
+    pub config: Account<'info, Config>,
+}
+
+/// `escrow` must be the canonical PDA for `(buyer, order_id)` and must not exist yet.
 #[derive(Accounts)]
 #[instruction(order_id: [u8; 16])]
 pub struct Initialize<'info> {
@@ -411,7 +587,7 @@ pub struct Initialize<'info> {
         init,
         payer = buyer,
         space = 8 + Escrow::INIT_SPACE,
-        seeds = [b"escrow", order_id.as_ref()],
+        seeds = [b"escrow", buyer.key().as_ref(), order_id.as_ref()],
         bump
     )]
     pub escrow: Account<'info, Escrow>,
@@ -457,31 +633,59 @@ pub struct Expire<'info> {
     pub escrow: Account<'info, Escrow>,
 }
 
-/// Signed by the stored buyer.
+/// Signed by the stored buyer or by `config.resolver` (M-01).
 #[derive(Accounts)]
 pub struct OpenDispute<'info> {
-    pub buyer: Signer<'info>,
-    #[account(mut, has_one = buyer)]
+    pub signer: Signer<'info>,
+    #[account(seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(mut)]
     pub escrow: Account<'info, Escrow>,
 }
 
-/// Signed by the stored resolver; pays only the stored buyer.
+/// Signed by `config.resolver`; pays only the stored buyer.
 #[derive(Accounts)]
 pub struct Refund<'info> {
     pub resolver: Signer<'info>,
-    #[account(mut, has_one = resolver)]
+    #[account(seeds = [b"config"], bump = config.bump, has_one = resolver)]
+    pub config: Account<'info, Config>,
+    #[account(mut)]
     pub escrow: Account<'info, Escrow>,
     /// CHECK: deposit returns to the stored buyer.
     #[account(mut, address = escrow.buyer)]
     pub buyer: UncheckedAccount<'info>,
 }
 
-/// Signed by the stored resolver.
+/// Signed by `config.resolver`.
 #[derive(Accounts)]
 pub struct RejectDispute<'info> {
     pub resolver: Signer<'info>,
-    #[account(mut, has_one = resolver)]
+    #[account(seeds = [b"config"], bump = config.bump, has_one = resolver)]
+    pub config: Account<'info, Config>,
+    #[account(mut)]
     pub escrow: Account<'info, Escrow>,
+}
+
+/// No signer; pays only the stored buyer, only after the configured timeout.
+#[derive(Accounts)]
+pub struct RefundAfterTimeout<'info> {
+    #[account(seeds = [b"config"], bump = config.bump)]
+    pub config: Account<'info, Config>,
+    #[account(mut)]
+    pub escrow: Account<'info, Escrow>,
+    /// CHECK: deposit returns to the stored buyer.
+    #[account(mut, address = escrow.buyer)]
+    pub buyer: UncheckedAccount<'info>,
+}
+
+/// No signer; the rent goes only to the stored buyer.
+#[derive(Accounts)]
+pub struct Close<'info> {
+    #[account(mut, close = buyer)]
+    pub escrow: Account<'info, Escrow>,
+    /// CHECK: rent returns to the stored buyer.
+    #[account(mut, address = escrow.buyer)]
+    pub buyer: UncheckedAccount<'info>,
 }
 
 /// Custom error codes start at 6000 in declaration order. Clients match on the numbers, so
@@ -496,4 +700,18 @@ pub enum EscrowError {
     TooEarly,
     FundsAlreadyReleased,
     Overflow,
+    /// v2: a `Paid` escrow can no longer be disputed (`now >= escrow_until`).
+    WindowClosed,
+    /// v2: `initialize` terms are incoherent (times, recipients) or a config key is empty.
+    BadTerms,
+    /// v2: `init_config` signer is not the program's upgrade authority.
+    ConfigAuthority,
+    /// v2: `refund_after_timeout` before `escrow_until + dispute_timeout`.
+    TimeoutNotReached,
+    /// v2: `close` on an escrow that is not terminal (or a `Released` one inside the grace).
+    NotClosable,
+    /// v2: `dispute_timeout` outside 1 hour to 90 days.
+    BadTimeout,
+    /// v2: `open_dispute` signer is neither the stored buyer nor the config resolver.
+    Unauthorized,
 }

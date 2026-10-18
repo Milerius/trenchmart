@@ -44,6 +44,12 @@ export type Env = {
   escrowResolver: string;
   /** Resolver secret key (JSON array or base58). Signs release, refund, reject_dispute. */
   escrowResolverSecret: string;
+  /** Deployed trench_escrow version: 2 adds the config PDA, buyer-keyed seeds, resolver freeze. */
+  escrowProgramVersion: 1 | 2;
+  /** Low-value fee payer for escrow txs (M-02). Falls back to the resolver when unset. */
+  escrowCrankSecret: string;
+  /** Kill switch: when true, POST /orders returns 503 (mainnet readiness #18). */
+  checkoutPaused: boolean;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
 
@@ -113,6 +119,9 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     escrowProgramId: blank(source.ESCROW_PROGRAM_ID),
     escrowResolver: blank(source.ESCROW_RESOLVER),
     escrowResolverSecret: blank(source.ESCROW_RESOLVER_SECRET),
+    escrowProgramVersion: source.ESCROW_PROGRAM_VERSION === '2' ? 2 : 1,
+    escrowCrankSecret: blank(source.ESCROW_CRANK_SECRET),
+    checkoutPaused: /^(1|true|yes)$/i.test(source.CHECKOUT_PAUSED ?? ''),
     r2:
       accountId && accessKeyId && secretAccessKey
         ? {

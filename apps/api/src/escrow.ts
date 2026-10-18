@@ -4,6 +4,7 @@ import {
   ESCROW_BUDGET,
   decodeEscrow,
   ESCROW_ACCOUNT_DISCRIMINATOR,
+  closeIx,
   escrowAddress,
   fundIx,
   initializeIx,
@@ -12,6 +13,7 @@ import {
   orderIdBytes,
   parseSecretKey,
   publicKeyOf,
+  refundAfterTimeoutIx,
   refundIx,
   rejectDisputeIx,
   releaseIx,
@@ -104,8 +106,14 @@ export function checkoutTx(input: {
   memo: string;
   args: EscrowInitArgs;
   recentBlockhash: string;
+  version?: 1 | 2;
 }): { txBase64: string; escrow: string } {
-  const escrow = escrowAddress(input.orderId, input.programId);
+  const version = input.version ?? 1;
+  const escrow = escrowAddress(
+    input.orderId,
+    input.programId,
+    version === 2 ? input.buyer : undefined,
+  );
   const instructions: Instruction[] = [
     ...computeBudgetIxs(ESCROW_BUDGET),
     initializeIx({
@@ -113,6 +121,7 @@ export function checkoutTx(input: {
       buyer: input.buyer,
       orderId: input.orderId,
       args: input.args,
+      version,
     }),
     fundIx({ programId: input.programId, buyer: input.buyer, escrow }),
     memoIx(input.memo, input.buyer),
@@ -130,6 +139,7 @@ export function openDisputeTx(input: {
   buyer: string;
   escrow: string;
   recentBlockhash: string;
+  version?: 1 | 2;
 }): string {
   return toBase64(
     compileLegacyTx({
@@ -186,6 +196,30 @@ export function escrowMismatch(
   return null;
 }
 
+/** The crank key pays fees (M-02); the resolver signs only where its authority is needed. */
+function crankOf(env: Env): { pubkey: string; secret: Uint8Array } | null {
+  if (!env.escrowCrankSecret) return null;
+  const secret = parseSecretKey(env.escrowCrankSecret);
+  return { pubkey: publicKeyOf(secret), secret };
+}
+
+function feePayerOf(env: Env): { pubkey: string; secret: Uint8Array } {
+  const crank = crankOf(env);
+  if (crank) return crank;
+  const resolver = resolverOf(env);
+  if (!resolver.secret)
+    throw new EscrowError(503, 'ESCROW_MISCONFIGURED', 'ESCROW_RESOLVER_SECRET is not set');
+  return { pubkey: resolver.pubkey, secret: resolver.secret };
+}
+
+/** Permissionless instructions: only the fee payer (crank, else resolver) signs. */
+function crankSigned(env: Env, instructions: Instruction[], recentBlockhash: string): Uint8Array {
+  const payer = feePayerOf(env);
+  const tx = compileLegacyTx({ feePayer: payer.pubkey, instructions, recentBlockhash });
+  return signTx(tx, [payer.secret]);
+}
+
+/** Resolver-authority instructions: the crank pays when configured, the resolver co-signs. */
 function resolverSigned(
   env: Env,
   instructions: Instruction[],
@@ -194,8 +228,11 @@ function resolverSigned(
   const resolver = resolverOf(env);
   if (!resolver.secret)
     throw new EscrowError(503, 'ESCROW_MISCONFIGURED', 'ESCROW_RESOLVER_SECRET is not set');
-  const tx = compileLegacyTx({ feePayer: resolver.pubkey, instructions, recentBlockhash });
-  return signTx(tx, [resolver.secret]);
+  const payer = feePayerOf(env);
+  const tx = compileLegacyTx({ feePayer: payer.pubkey, instructions, recentBlockhash });
+  const keys =
+    payer.pubkey === resolver.pubkey ? [resolver.secret] : [payer.secret, resolver.secret];
+  return signTx(tx, keys);
 }
 
 export function releaseTx(
@@ -204,7 +241,7 @@ export function releaseTx(
   account: EscrowAccount,
   recentBlockhash: string,
 ) {
-  return resolverSigned(
+  return crankSigned(
     env,
     [
       releaseIx({
@@ -230,7 +267,15 @@ export function refundTx(
   const resolver = resolverOf(env).pubkey;
   return resolverSigned(
     env,
-    [refundIx({ programId: env.escrowProgramId, resolver, escrow, buyer: account.buyer })],
+    [
+      refundIx({
+        programId: env.escrowProgramId,
+        resolver,
+        escrow,
+        buyer: account.buyer,
+        version: env.escrowProgramVersion,
+      }),
+    ],
     recentBlockhash,
   );
 }
@@ -239,7 +284,49 @@ export function rejectDisputeTx(env: Env, escrow: string, recentBlockhash: strin
   const resolver = resolverOf(env).pubkey;
   return resolverSigned(
     env,
-    [rejectDisputeIx({ programId: env.escrowProgramId, resolver, escrow })],
+    [
+      rejectDisputeIx({
+        programId: env.escrowProgramId,
+        resolver,
+        escrow,
+        version: env.escrowProgramVersion,
+      }),
+    ],
+    recentBlockhash,
+  );
+}
+
+/** v2 (M-01): the resolver opens the dispute on chain the moment the buyer files it. */
+export function freezeTx(env: Env, escrow: string, recentBlockhash: string) {
+  if (env.escrowProgramVersion !== 2)
+    throw new EscrowError(409, 'ESCROW_V1', 'resolver freeze needs escrow program v2');
+  const resolver = resolverOf(env).pubkey;
+  return resolverSigned(
+    env,
+    [openDisputeIx({ programId: env.escrowProgramId, buyer: resolver, escrow, version: 2 })],
+    recentBlockhash,
+  );
+}
+
+/** v2 (L-01): close a terminal escrow; the rent goes back to the buyer. */
+export function closeTx(env: Env, escrow: string, buyer: string, recentBlockhash: string) {
+  return crankSigned(
+    env,
+    [closeIx({ programId: env.escrowProgramId, escrow, buyer })],
+    recentBlockhash,
+  );
+}
+
+/** v2 (M-02): default outcome when the resolver never acted before the timeout. */
+export function refundAfterTimeoutTx(
+  env: Env,
+  escrow: string,
+  buyer: string,
+  recentBlockhash: string,
+) {
+  return crankSigned(
+    env,
+    [refundAfterTimeoutIx({ programId: env.escrowProgramId, escrow, buyer })],
     recentBlockhash,
   );
 }

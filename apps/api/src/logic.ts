@@ -61,6 +61,9 @@ import {
   refundTx,
   rejectDisputeTx,
   releaseTx,
+  freezeTx,
+  closeTx,
+  refundAfterTimeoutTx,
   type EscrowChain,
 } from './escrow';
 import type { IsolatedSandboxResult } from './sandbox';
@@ -335,6 +338,9 @@ async function listingById(sql: Sql, id: string): Promise<Row> {
 }
 
 export async function createOrder(deps: Deps, userId: string, listingId: string) {
+  // Kill switch (mainnet readiness #18): CHECKOUT_PAUSED=1 stops new orders at once.
+  if (deps.env.checkoutPaused || (await checkoutPausedInDb(deps)))
+    throw new HttpError(503, 'CHECKOUT_PAUSED', 'checkout is paused for maintenance');
   const quoted = await quoteListing(deps, userId, listingId);
   const listing = quoted.listing;
   if (listing.creator_id === userId)
@@ -386,6 +392,7 @@ export async function createOrder(deps: Deps, userId: string, listingId: string)
       memo,
       args,
       recentBlockhash: latest.blockhash,
+      version: deps.env.escrowProgramVersion,
     });
     await preflightTx(deps, built.txBase64);
     await deps.sql`
@@ -771,6 +778,76 @@ async function releaseEscrow(
   return { sig, account };
 }
 
+/**
+ * v2 housekeeping, run by the cron:
+ * - L-01: close terminal escrows so the buyer gets the ~0.00294 SOL rent back. Refunded and
+ *   expired close at once; released ones after the program's 7-day grace.
+ * - M-02: a dispute the resolver never settled is refunded to the buyer once the on-chain
+ *   timeout has passed (permissionless `refund_after_timeout`).
+ * Returns the order ids whose escrow was closed.
+ */
+export async function escrowHousekeeping(deps: Deps, limit = 10): Promise<string[]> {
+  const programId = deps.env.escrowProgramId;
+  if (!programId || deps.env.escrowProgramVersion !== 2) return [];
+  const chain = chainOf(deps);
+  const graceCutoff = new Date(deps.now().getTime() - 7 * 86_400_000 - 60_000);
+  const rows = await deps.sql<Row[]>`
+    select id, status, escrow_address from orders
+    where escrow_address is not null and escrow_closed_at is null
+      and (status in ('refunded', 'expired') or (status = 'released' and escrow_until < ${graceCutoff}))
+    order by created_at
+    limit ${limit}
+  `;
+  const closed: string[] = [];
+  for (const order of rows) {
+    const address = order.escrow_address as string;
+    try {
+      const account = await readEscrow(chain, programId, address);
+      if (!account) {
+        // Never initialized (expired before checkout) or closed by someone else.
+        await deps.sql`update orders set escrow_closed_at = ${deps.now()} where id = ${order.id}`;
+        continue;
+      }
+      // A pending (never funded) escrow must be expired on chain before it can close; that
+      // is permissionless and rare, so it is left to a manual crank.
+      if (!['refunded', 'expired', 'released'].includes(account.status)) continue;
+      const latest = await deps.blockhash();
+      const sig = await chain.sendAndConfirm(
+        closeTx(deps.env, address, account.buyer, latest.blockhash),
+      );
+      await deps.sql`update orders set escrow_closed_at = ${deps.now()} where id = ${order.id}`;
+      await audit(deps.sql, null, 'order', order.id as string, 'escrow_closed', { sig });
+      closed.push(order.id as string);
+    } catch (err) {
+      console.error('escrow close failed', order.id, (err as Error).message);
+    }
+  }
+  const stale = await deps.sql<Row[]>`
+    select o.id, o.escrow_address from orders o
+    join disputes d on d.order_id = o.id and d.status = 'open'
+    where o.status = 'disputed' and o.disputed_from = 'paid' and o.escrow_address is not null
+      and o.escrow_until < ${new Date(deps.now().getTime() - 3_600_000)}
+    limit ${limit}
+  `;
+  for (const order of stale) {
+    try {
+      const address = order.escrow_address as string;
+      const account = await readEscrow(chain, programId, address);
+      if (!account || account.status !== 'disputed') continue;
+      const latest = await deps.blockhash();
+      // The program enforces the deadline; a premature attempt fails preflight harmlessly.
+      const sig = await chain.sendAndConfirm(
+        refundAfterTimeoutTx(deps.env, address, account.buyer, latest.blockhash),
+      );
+      await audit(deps.sql, null, 'order', order.id as string, 'escrow_timeout_refund', { sig });
+      console.error('ALERT dispute timed out and was refunded on chain', order.id, sig);
+    } catch {
+      // Not yet due on chain: expected until escrow_until + dispute_timeout.
+    }
+  }
+  return closed;
+}
+
 export async function proposePayouts(
   deps: Deps,
 ): Promise<{ batchId: string; count: number } | null> {
@@ -867,14 +944,47 @@ async function slash(deps: Deps, userId: string, lamports: bigint, refId: string
   return lamports - left;
 }
 
+/** Optional DB kill switch: `config` row `checkout_paused` = 'true' (admin-settable). */
+async function checkoutPausedInDb(deps: Deps): Promise<boolean> {
+  const rows = await deps.sql<{ value: unknown }[]>`
+    select value from config where key = 'checkout_paused'
+  `;
+  const value = rows[0]?.value;
+  return value === true || value === 'true' || value === '1';
+}
+
+type Resolution = { status: 'upheld' | 'rejected'; resolution: string; slashLamports?: bigint };
+
+/**
+ * L-07: one transaction, with the dispute row locked (`for update`), and every write
+ * conditional on the dispute still being open. Two concurrent admin resolutions serialize;
+ * the second sees a closed dispute and gets 404. If anything fails after the on-chain
+ * settlement, the DB rolls back and a retry reconciles from the chain (the escrow is then
+ * already `refunded` or back to `paid`/`released`).
+ */
 export async function resolveDispute(
   deps: Deps,
   disputeId: string,
   adminId: string,
-  body: { status: 'upheld' | 'rejected'; resolution: string; slashLamports?: bigint },
+  body: Resolution,
+): Promise<void> {
+  await deps.sql.begin(async (tx) => {
+    const locked = await tx`
+      select id from disputes where id = ${disputeId} and status = 'open' for update
+    `;
+    if (locked.length === 0) throw new HttpError(404, 'NOT_FOUND', 'open dispute not found');
+    await resolveLocked({ ...deps, sql: tx as unknown as Sql }, disputeId, adminId, body);
+  });
+}
+
+async function resolveLocked(
+  deps: Deps,
+  disputeId: string,
+  adminId: string,
+  body: Resolution,
 ): Promise<void> {
   const rows = await deps.sql<Row[]>`
-    select d.*, o.buyer_id, o.total, o.price, o.status as order_status, o.disputed_from, o.listing_id, o.version_id, o.escrow_address, l.creator_id
+    select d.*, o.buyer_id, o.total, o.price, o.status as order_status, o.disputed_from, o.listing_id, o.version_id, o.escrow_address, o.refund_sig, l.creator_id
     from disputes d
     join orders o on o.id = d.order_id
     join listings l on l.id = o.listing_id
@@ -896,16 +1006,31 @@ export async function resolveDispute(
     const address = dispute.escrow_address as string;
     const account = await readEscrow(chain, programId, address);
     if (!account) throw new HttpError(409, 'ESCROW_MISSING', 'escrow account not found');
-    if (account.status === 'disputed') {
+    let status = account.status;
+    // v2: a dispute that never reached the chain is frozen by the resolver first (M-01).
+    if (
+      status === 'paid' &&
+      body.status === 'upheld' &&
+      deps.env.escrowProgramVersion === 2 &&
+      BigInt(Math.floor(now.getTime() / 1000)) < account.escrowUntil
+    ) {
+      const latest = await deps.blockhash();
+      await chain.sendAndConfirm(freezeTx(deps.env, address, latest.blockhash));
+      status = 'disputed';
+    }
+    if (status === 'disputed') {
       const latest = await deps.blockhash();
       const tx =
         body.status === 'upheld'
           ? refundTx(deps.env, address, account, latest.blockhash)
           : rejectDisputeTx(deps.env, address, latest.blockhash);
       settleSig = await chain.sendAndConfirm(tx);
-    } else if (account.status === 'released') {
+    } else if (status === 'released') {
       // The window lapsed and release was cranked before the dispute reached the chain.
       fundsAlreadyReleased = true;
+    } else if (status === 'refunded' && body.status === 'upheld') {
+      // Retry after a partial failure, or refunded by timeout: the chain already settled.
+      settleSig = (dispute.refund_sig as string | null) ?? null;
     } else if (body.status === 'upheld') {
       throw new HttpError(
         409,
@@ -917,10 +1042,13 @@ export async function resolveDispute(
   if (body.status === 'rejected') {
     const next = dispute.disputed_from === 'released' || fundsAlreadyReleased ? 'released' : 'paid';
     await deps.sql`update orders set status = ${next}::order_status where id = ${dispute.order_id}`;
-    await deps.sql`
+    const closed = await deps.sql`
       update disputes set status = 'rejected', resolution = ${body.resolution}, resolved_by = ${adminId}, resolved_at = ${now}
-      where id = ${disputeId}
+      where id = ${disputeId} and status = 'open'
+      returning id
     `;
+    if (closed.length === 0)
+      throw new HttpError(409, 'DISPUTE_CHANGED', 'dispute was resolved concurrently');
     await audit(deps.sql, adminId, 'dispute', disputeId, 'rejected', {
       resolution: body.resolution,
       sig: settleSig,
@@ -982,10 +1110,13 @@ export async function resolveDispute(
     await slash(deps, dispute.creator_id as string, 9_000_000_000_000n, disputeId);
     await audit(deps.sql, adminId, 'user', dispute.creator_id as string, 'banned', { disputeId });
   }
-  await deps.sql`
+  const closed = await deps.sql`
     update disputes set status = 'upheld', resolution = ${body.resolution}, resolved_by = ${adminId}, resolved_at = ${now}
-    where id = ${disputeId}
+    where id = ${disputeId} and status = 'open'
+    returning id
   `;
+  if (closed.length === 0)
+    throw new HttpError(409, 'DISPUTE_CHANGED', 'dispute was resolved concurrently');
   await notify(deps.sql, dispute.buyer_id as string, 'dispute', { disputeId, status: 'upheld' });
   await notify(deps.sql, dispute.creator_id as string, 'dispute', { disputeId, status: 'upheld' });
   await audit(deps.sql, adminId, 'dispute', disputeId, 'upheld', { resolution: body.resolution });
@@ -1022,17 +1153,35 @@ export async function openDispute(
   await audit(deps.sql, userId, 'order', orderId, 'disputed', { reason });
   // A dispute inside the window must also reach the chain, or release stays permissionless.
   let txBase64: string | null = null;
+  let onChain = false;
   if (order.escrow_address && order.status === 'paid' && deps.env.escrowProgramId) {
-    const buyer = await userById(deps.sql, userId);
-    const latest = await deps.blockhash();
-    txBase64 = openDisputeTx({
-      programId: deps.env.escrowProgramId,
-      buyer: buyer.wallet as string,
-      escrow: order.escrow_address as string,
-      recentBlockhash: latest.blockhash,
-    });
+    // v2 (M-01): the resolver freezes the escrow itself, so the buyer does not have to sign
+    // anything in time. If that fails (RPC, resolver balance), fall back to the buyer's tx.
+    if (deps.env.escrowProgramVersion === 2 && deps.env.escrowResolverSecret) {
+      try {
+        const latest = await deps.blockhash();
+        const sig = await chainOf(deps).sendAndConfirm(
+          freezeTx(deps.env, order.escrow_address as string, latest.blockhash),
+        );
+        await audit(deps.sql, null, 'order', orderId, 'escrow_frozen', { sig });
+        onChain = true;
+      } catch (err) {
+        console.error('escrow freeze failed', orderId, (err as Error).message);
+      }
+    }
+    if (!onChain) {
+      const buyer = await userById(deps.sql, userId);
+      const latest = await deps.blockhash();
+      txBase64 = openDisputeTx({
+        programId: deps.env.escrowProgramId,
+        buyer: buyer.wallet as string,
+        escrow: order.escrow_address as string,
+        recentBlockhash: latest.blockhash,
+        version: deps.env.escrowProgramVersion,
+      });
+    }
   }
-  return { id: inserted[0]?.id, txBase64 };
+  return { id: inserted[0]?.id, txBase64, onChain };
 }
 
 /** Fresh open_dispute tx for an open dispute whose escrow is still Paid on chain. */
@@ -1053,6 +1202,7 @@ export async function disputeTx(deps: Deps, orderId: string, userId: string) {
     buyer: buyer.wallet as string,
     escrow: order.escrow_address as string,
     recentBlockhash: latest.blockhash,
+    version: deps.env.escrowProgramVersion,
   });
   await preflightTx(deps, txBase64);
   return { onChain: false, txBase64 };

@@ -18,7 +18,7 @@ import {
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import type { EscrowChain } from './escrow';
-import { releaseOrders, resolveDispute } from './logic';
+import { escrowHousekeeping, releaseOrders, resolveDispute } from './logic';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
@@ -1306,5 +1306,222 @@ describe('owner product decisions', () => {
     expect(refundPayouts).toEqual([
       { bucket: 'refund', status: 'sent', recipient: buyer.publicKey },
     ]);
+  });
+  it('escrow v2: buyer-keyed PDA, resolver freeze on dispute, crank fee payer, atomic resolve, close, kill switch', async () => {
+    const programId = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
+    const resolver = nacl.sign.keyPair();
+    const crank = nacl.sign.keyPair();
+    const buckets = [randomKeypair(), randomKeypair(), randomKeypair(), randomKeypair()].map(
+      (k) => k.publicKey,
+    );
+    const accounts = new Map<string, Uint8Array>();
+    const sent: { signers: number; effect: string }[] = [];
+    let effect: EscrowStatusName | 'closed' = 'disputed';
+    const chain: EscrowChain = {
+      async account(address) {
+        const data = accounts.get(address);
+        return data ? { data, owner: programId, lamports: 1n } : null;
+      },
+      async sendAndConfirm(tx) {
+        const signers = tx[0]!;
+        const message = tx.subarray(1 + 64 * signers);
+        // M-02: the crank pays (first signature); the resolver co-signs only its own actions.
+        expect(nacl.sign.detached.verify(message, tx.subarray(1, 65), crank.publicKey)).toBe(true);
+        if (signers === 2)
+          expect(nacl.sign.detached.verify(message, tx.subarray(65, 129), resolver.publicKey)).toBe(
+            true,
+          );
+        sent.push({ signers, effect });
+        for (const [address, data] of accounts) {
+          const account = decodeEscrow(data);
+          if (effect === 'closed') {
+            if (account.status === 'refunded') accounts.delete(address);
+          } else if (effect === 'disputed' && account.status === 'paid') {
+            accounts.set(
+              address,
+              encodeEscrowForTest({ ...account, status: 'disputed', disputedFrom: 'paid' }),
+            );
+          } else if (effect === 'refunded' && account.status === 'disputed') {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            accounts.set(address, encodeEscrowForTest({ ...account, status: 'refunded' }));
+          }
+        }
+        return bs58.encode(nacl.randomBytes(64));
+      },
+    };
+    const txs = new Map<string, { memos: string[]; err: unknown }>();
+    const env = readEnv({
+      SOLANA_CLUSTER: 'devnet',
+      VAULT_ADDRESS: vault.publicKey,
+      SESSION_SECRET: 'test-secret-test-secret-test-secret',
+      SOL_USD_OVERRIDE: '100',
+      RATE_LIMIT_PER_MIN: '1000',
+      API_URL: 'http://localhost:8787',
+      ESCROW_PROGRAM_ID: programId,
+      ESCROW_PROGRAM_VERSION: '2',
+      ESCROW_RESOLVER: bs58.encode(resolver.publicKey),
+      ESCROW_RESOLVER_SECRET: bs58.encode(resolver.secretKey),
+      ESCROW_CRANK_SECRET: bs58.encode(crank.secretKey),
+      BUCKET_WALLET_BUYBACK: buckets[0]!,
+      BUCKET_WALLET_AI_VERIFICATION: buckets[1]!,
+      BUCKET_WALLET_OPS: buckets[2]!,
+      BUCKET_WALLET_SAFETY: buckets[3]!,
+    });
+    const blob = filesystemBlob(
+      await mkdtemp(join(tmpdir(), 'tm-v2-')),
+      env.sessionSecret,
+      env.apiUrl,
+    );
+    let clock = now;
+    const deps: Deps = {
+      sql,
+      blob,
+      env,
+      now: () => clock,
+      getTx: async (signature) => {
+        const known = txs.get(signature);
+        return known
+          ? {
+              signature,
+              err: known.err,
+              blockTime: Math.floor(clock.getTime() / 1000),
+              confirmationStatus: 'confirmed',
+              transfers: [],
+              memos: known.memos,
+            }
+          : null;
+      },
+      blockhash: async () => ({ blockhash, lastValidBlockHeight: 1 }),
+      escrowChain: chain,
+    };
+    const app = createApp(deps);
+    const buyer = keypair();
+    const cookie = await login(app, buyer);
+    const seller = randomKeypair();
+    const creatorId = randomUUID();
+    const listingId = randomUUID();
+    const versionId = randomUUID();
+    await sql`insert into users (id, wallet, roles) values (${creatorId}, ${seller.publicKey}, ${sql.array(['creator'])}::user_role[])`;
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price, live_version_id)
+      values (${listingId}, ${creatorId}, 'v2', 'V2', 'Sum', 'Desc', 'userscript', ${100_000_000n}, null)
+    `;
+    await sql`
+      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status)
+      values (${versionId}, ${listingId}, '1.0.0', 'v2.user.js', ${clean.length}, 'v2', 'blobs/v2', 'live')
+    `;
+    await blob.put('blobs/v2', new TextEncoder().encode(clean));
+    await sql`update listings set live_version_id = ${versionId}, first_live_at = ${now} where id = ${listingId}`;
+
+    const buyRes = await app.request('/api/v1/orders', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ listingId }),
+    });
+    expect(buyRes.status).toBe(200);
+    const order = (await buyRes.json()) as { orderId: string; escrow: string; memo: string };
+    // L-02: the PDA includes the buyer, so a squatter cannot take this order's address.
+    expect(order.escrow).toBe(escrowAddress(order.orderId, programId, buyer.publicKey));
+    expect(order.escrow).not.toBe(escrowAddress(order.orderId, programId));
+    const row = (
+      await sql<Record<string, any>[]>`select * from orders where id = ${order.orderId}`
+    )[0]!;
+    accounts.set(
+      order.escrow,
+      encodeEscrowForTest({
+        buyer: buyer.publicKey,
+        seller: seller.publicKey,
+        resolver: bs58.encode(resolver.publicKey),
+        buyback: buckets[0]!,
+        aiVerification: buckets[1]!,
+        ops: buckets[2]!,
+        safety: buckets[3]!,
+        status: 'paid',
+        disputedFrom: 'pending',
+        price: row.price as bigint,
+        deposit: row.total as bigint,
+        feeBps: row.fee_bps as number,
+        rebateBps: row.rebate_bps as number,
+        splitBuybackBps: 4000,
+        splitAiBps: 2500,
+        splitOpsBps: 2000,
+        splitSafetyBps: 1500,
+        expiresAt: BigInt(Math.floor((row.expires_at as Date).getTime() / 1000)),
+        escrowUntil: BigInt(Math.floor((row.escrow_until as Date).getTime() / 1000)),
+        bump: 255,
+        orderId: orderIdBytes(order.orderId),
+      }),
+    );
+    const sig = bs58.encode(nacl.randomBytes(64));
+    txs.set(sig, { memos: [order.memo], err: null });
+    const submitted = await app.request(`/api/v1/orders/${order.orderId}/submitted`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ txSig: sig }),
+    });
+    expect(submitted.status).toBe(200);
+
+    // M-01: filing the dispute freezes the escrow on chain at once; the buyer signs nothing.
+    effect = 'disputed';
+    const opened = await app.request(`/api/v1/orders/${order.orderId}/dispute`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ reason: 'broken', details: 'It does not load on axiom at all.' }),
+    });
+    expect(opened.status).toBe(200);
+    const dispute = (await opened.json()) as { disputeId: string; txBase64: string | null };
+    expect(dispute.txBase64).toBeNull();
+    expect(sent).toEqual([{ signers: 2, effect: 'disputed' }]);
+    expect(decodeEscrow(accounts.get(order.escrow)!).status).toBe('disputed');
+    // After the window the cron still holds back: the chain refuses a Disputed release too.
+    clock = new Date((row.escrow_until as Date).getTime() + 1000);
+    expect(await releaseOrders(deps)).toEqual([]);
+
+    // L-07: two concurrent resolutions serialize; exactly one settles and pays out once.
+    effect = 'refunded';
+    const admin = (
+      await sql<{ id: string }[]>`select id from users where wallet = ${buyer.publicKey}`
+    )[0]!;
+    const results = await Promise.allSettled([
+      resolveDispute(deps, dispute.disputeId, admin.id, { status: 'upheld', resolution: 'a' }),
+      resolveDispute(deps, dispute.disputeId, admin.id, { status: 'upheld', resolution: 'b' }),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const refundRows =
+      await sql`select 1 from payouts where order_id = ${order.orderId} and bucket = 'refund'`;
+    expect(refundRows).toHaveLength(1);
+    const ledgerRows =
+      await sql`select 1 from ledger where ref_id = ${order.orderId} and account = 'escrow' and delta < 0`;
+    expect(ledgerRows).toHaveLength(1);
+    expect(sent.filter((t) => t.effect === 'refunded')).toHaveLength(1);
+
+    // L-01: the cron closes the refunded escrow (crank signs alone) and marks the order.
+    effect = 'closed';
+    expect(await escrowHousekeeping(deps)).toEqual([order.orderId]);
+    expect(accounts.has(order.escrow)).toBe(false);
+    expect(sent.at(-1)).toEqual({ signers: 1, effect: 'closed' });
+    const closedRow = (
+      await sql<
+        Record<string, any>[]
+      >`select escrow_closed_at from orders where id = ${order.orderId}`
+    )[0]!;
+    expect(closedRow.escrow_closed_at).toBeTruthy();
+    expect(await escrowHousekeeping(deps)).toEqual([]);
+
+    // Kill switch: the config flag stops new checkouts with a 503.
+    await sql`
+      insert into config (key, value) values ('checkout_paused', 'true'::jsonb)
+      on conflict (key) do update set value = excluded.value
+    `;
+    const paused = await app.request('/api/v1/orders', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ listingId }),
+    });
+    expect(paused.status).toBe(503);
+    expect(((await paused.json()) as { error: { code: string } }).error.code).toBe(
+      'CHECKOUT_PAUSED',
+    );
+    await sql`delete from config where key = 'checkout_paused'`;
   });
 });

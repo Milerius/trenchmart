@@ -222,6 +222,60 @@ test('dispute: reason and details are sent, and the wallet signs the escrow free
   );
 });
 
+test('dispute (escrow v2): the server freezes the escrow, the wallet is never asked to sign', async ({
+  page,
+}) => {
+  const { secret, address } = wallet();
+  const calls = await setup(page, address, secret, ({ method, path }) => {
+    if (method === 'POST' && path === '/orders/order-1/dispute') {
+      return { json: { disputeId: 'disp-2', txBase64: null, onChain: true } };
+    }
+    return undefined;
+  });
+  await page.goto('/me/purchases/order-1/dispute');
+  await page.getByLabel('Details').fill('The script stopped labelling coins after the update.');
+  await page.getByRole('button', { name: 'Submit dispute' }).click();
+  await expect(page.getByTestId('dispute').getByRole('status')).toHaveText(
+    'Dispute disp-2 opened. The escrow is frozen and downloads pause.',
+  );
+  expect(calls.some((c) => c.path === '/tx/send')).toBe(false);
+  expect(calls.some((c) => c.path === '/orders/order-1/dispute/tx')).toBe(false);
+});
+
+test('checkout: the kill switch (503 CHECKOUT_PAUSED) is explained and nothing is signed', async ({
+  page,
+}) => {
+  const { secret, address } = wallet();
+  const calls = await setup(page, address, secret, ({ method, path }) => {
+    if (path === '/listings/trojan-trenches-intel') return { json: LISTING };
+    if (path.startsWith('/listings/trojan-trenches-intel/')) return { json: [] };
+    if (method === 'POST' && path === '/orders/quote') {
+      return {
+        json: {
+          price: '100000000',
+          fee: '5000000',
+          rebate: '0',
+          total: '105000000',
+          tier: 'none',
+          totalUsd: { usdCents: null },
+        },
+      };
+    }
+    if (method === 'POST' && path === '/orders') {
+      return {
+        status: 503,
+        json: { error: { code: 'CHECKOUT_PAUSED', message: 'checkout is paused for maintenance' } },
+      };
+    }
+    return undefined;
+  });
+  await page.goto('/l/trojan-trenches-intel');
+  await page.getByTestId('buy').click();
+  await expect(page.getByTestId('toast')).toHaveText('checkout is paused for maintenance');
+  await expect(page.getByTestId('buy')).toHaveText('Try again');
+  expect(calls.some((c) => c.path === '/tx/send')).toBe(false);
+});
+
 test('dispute: an API refusal is shown', async ({ page }) => {
   const { secret, address } = wallet();
   await setup(page, address, secret, ({ path }) =>
