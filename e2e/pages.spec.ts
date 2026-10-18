@@ -7,6 +7,16 @@ for (const path of pages) {
   test(`${path} renders and has no serious axe violations`, async ({ page }) => {
     await page.goto(path);
     await expect(page.getByTestId('nav')).toBeVisible();
+    // Scroll through once so every scroll reveal ([data-reveal]) has fired: a block still waiting
+    // at opacity 0 would read as a 1:1 contrast failure (flaky on the home stats tiles).
+    await page.evaluate(async () => {
+      for (let y = 0; y < document.documentElement.scrollHeight; y += window.innerHeight / 2) {
+        window.scrollTo(0, y);
+        await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 30)));
+      }
+      window.scrollTo(0, 0);
+    });
+    await expect(page.locator('[data-reveal="wait"]')).toHaveCount(0);
     // Let the one-shot entrance animations (rise, route fade) settle so axe measures the
     // final colours rather than a half-faded frame. Infinite loops (ticker, glow) are skipped.
     await page.evaluate(() =>

@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ListingGrid, type Listing } from '@/components/listings';
-import { Label, PreviewNotice } from '@/components/ui';
+import { Label, PreviewNotice, Serif } from '@/components/ui';
 import { api } from '@/lib/api';
 import { usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
@@ -30,7 +30,15 @@ function Results() {
       <div>
         <Label>Search</Label>
         <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
-          {q ? `Results for “${q}”` : 'All live listings'}
+          {q ? (
+            <>
+              Results for <Serif>“{q}”</Serif>
+            </>
+          ) : (
+            <>
+              All live <Serif>listings</Serif>
+            </>
+          )}
         </h1>
         {/* The line is always there so the grid below does not move when the count arrives. */}
         <p className="m-0 mt-1 min-h-5 text-sm text-muted">

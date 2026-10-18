@@ -33,6 +33,7 @@
   --color-info-line: #1e3448;
   --font-sans: var(--font-geist-sans), Geist, ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace;
+  --font-serif: var(--font-instrument-serif), 'Instrument Serif', Georgia, serif;
   --radius-tag: 6px;
   --radius-ctl: 10px;
   --radius-card: 14px;

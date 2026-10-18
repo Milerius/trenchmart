@@ -131,6 +131,13 @@ export function Square({ tone = 'neutral', children }: { tone?: Tone; children: 
   );
 }
 
+/** Display accent: an italic serif word or phrase inside a heading. Text stays in the heading's name. */
+export function Serif({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <em className={`font-serif font-normal italic tracking-[-0.01em] ${className}`}>{children}</em>
+  );
+}
+
 export function Card({ className = '', ...props }: ComponentProps<'div'>) {
   return <div className={`rounded-card border border-line bg-surface ${className}`} {...props} />;
 }

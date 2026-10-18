@@ -19,7 +19,7 @@ import {
   profileHref,
 } from '@/components/leaderboard';
 import { XIcon } from '@/components/icons';
-import { Button, EmptyState, Label, Money, Skeleton, Tag } from '@/components/ui';
+import { Button, EmptyState, Label, Money, Serif, Skeleton, Tag } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
@@ -129,7 +129,7 @@ function Leaderboard() {
         <div className="max-w-xl">
           <Label>Creators</Label>
           <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
-            Creator leaderboard
+            Creator <Serif>leaderboard</Serif>
           </h1>
           <p className="m-0 mt-1 text-ink-2">
             Built from released escrow orders and verified-buyer reviews. Featured placements can’t

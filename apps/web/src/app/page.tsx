@@ -18,6 +18,7 @@ import {
   Label,
   Money,
   PreviewNotice,
+  Serif,
   ShieldIcon,
   Skeleton,
   Tag,
@@ -122,7 +123,7 @@ export default function HomePage() {
             className="rise mt-4 text-[42px] font-semibold leading-[1.04] tracking-[-0.035em] sm:text-[58px]"
             style={{ animationDelay: '90ms' }}
           >
-            The verified edge, for sale.
+            The verified edge, <Serif className="text-accent">for sale.</Serif>
           </h1>
           <p
             className="rise mt-5 max-w-xl text-[17px] leading-relaxed text-ink-2"
@@ -179,7 +180,12 @@ export default function HomePage() {
       <Reveal>
         <section aria-labelledby="creators-heading" data-testid="top-creators">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <SectionHead id="creators-heading" kicker="Creators" title="Top creators this month" />
+            <SectionHead
+              id="creators-heading"
+              kicker="Creators"
+              title="Top creators"
+              accent="this month"
+            />
             <div className="flex flex-wrap items-center gap-2">
               <div role="tablist" aria-label="Top creators" className="flex gap-1">
                 {HOME_TABS.map((value) => (
@@ -230,7 +236,7 @@ export default function HomePage() {
 
       <section id="market" aria-labelledby="market-heading" className="scroll-mt-24">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <SectionHead id="market-heading" kicker="Market" title="Trending this week" />
+          <SectionHead id="market-heading" kicker="Market" title="Trending" accent="this week" />
           <div
             data-testid="terminal-filter"
             role="group"
@@ -275,7 +281,8 @@ export default function HomePage() {
           <SectionHead
             id="how-heading"
             kicker="How buying works"
-            title="Four steps, no surprises."
+            title="Four steps,"
+            accent="no surprises."
           />
           <ol className="stagger mt-8 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -311,7 +318,7 @@ export default function HomePage() {
 
       <Reveal>
         <section aria-labelledby="cat-heading">
-          <SectionHead id="cat-heading" kicker="Categories" title="Find your edge" />
+          <SectionHead id="cat-heading" kicker="Categories" title="Find your" accent="edge" />
           <ul className="mt-8 grid gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
             {CATEGORIES.map((cat) => (
               <li key={cat.code} className="list-none">
@@ -337,7 +344,7 @@ export default function HomePage() {
       <Reveal>
         <section aria-labelledby="fees-heading" className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">
           <div>
-            <SectionHead id="fees-heading" kicker="Fees" title="Hold $TRENCH, pay less." />
+            <SectionHead id="fees-heading" kicker="Fees" title="Hold $TRENCH," accent="pay less." />
             <p className="mt-4 max-w-md text-ink-2">
               Buyers pay a 5% fee on top of the listing price. Your $TRENCH tier cuts it, down to
               zero for OG holders. Creators keep 100% of the listing price.
@@ -357,7 +364,8 @@ export default function HomePage() {
           <SectionHead
             id="trust-heading"
             kicker="Trust"
-            title="Built so you don't have to trust anyone."
+            title="Built so you don't have to"
+            accent="trust anyone."
           />
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
@@ -391,7 +399,7 @@ export default function HomePage() {
         <section className="motion-card flex flex-wrap items-center justify-between gap-6 rounded-panel border border-accent-line bg-accent-bg p-8">
           <div>
             <h2 className="m-0 text-2xl font-semibold tracking-[-0.02em]">
-              Have an edge? Sell it.
+              Have an edge? <Serif className="text-accent">Sell it.</Serif>
             </h2>
             <p className="mt-2 max-w-lg text-ink-2">
               Upload a file and watch the automated review run live. 0% commission, payouts in SOL.
@@ -406,12 +414,28 @@ export default function HomePage() {
   );
 }
 
-function SectionHead({ id, kicker, title }: { id: string; kicker: string; title: string }) {
+function SectionHead({
+  id,
+  kicker,
+  title,
+  accent,
+}: {
+  id: string;
+  kicker: string;
+  title: string;
+  accent?: string;
+}) {
   return (
     <div>
       <Label className="text-accent-label">{kicker}</Label>
       <h2 id={id} className="mt-2 text-[28px] font-semibold tracking-[-0.025em]">
         {title}
+        {accent ? (
+          <>
+            {' '}
+            <Serif>{accent}</Serif>
+          </>
+        ) : null}
       </h2>
     </div>
   );
