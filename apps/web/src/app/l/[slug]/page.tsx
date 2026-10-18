@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { cache } from 'react';
+import { safeMarkdown } from '@trenchmart/shared/markdown';
+import type { ParsedMarkdown } from '@/components/listing-markdown';
 import { publicApi } from '@/lib/server-api';
 import { ListingView, type Listing } from './listing-view';
 
@@ -42,5 +44,9 @@ export default async function ListingPage({ params }: Props) {
   // /l/<listing id> resolves to the canonical slug URL.
   if (data && data.slug !== slug) permanentRedirect(`/l/${data.slug}`);
   // API unreachable: render the client view, which retries in the browser.
-  return <ListingView initial={data} />;
+  // Parse the listing's own Markdown here so the browser gets the tree, not the parser.
+  const markdown: ParsedMarkdown = {};
+  for (const source of [data?.content?.readme, data?.content?.howto, data?.content?.requirements])
+    if (source) markdown[source] = safeMarkdown(source);
+  return <ListingView initial={data} markdown={markdown} />;
 }
