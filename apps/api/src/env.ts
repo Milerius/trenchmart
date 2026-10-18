@@ -54,6 +54,15 @@ export type Env = {
   proxySecret: string;
   /** Server-side wasm WebP re-encode at upload (CPU heavy; off unless IMAGE_OPTIMIZE=1). */
   imageOptimize: boolean;
+  /** Alert delivery (ops.ts). ntfy topic is a secret: anyone who knows it can read alerts. */
+  alertNtfyServer: string;
+  alertNtfyTopic: string;
+  alertEmail: string;
+  telegramBotToken: string;
+  telegramChatId: string;
+  alertWebhookUrl: string;
+  /** Expected escrow program upgrade authority; a change raises UPGRADE_AUTHORITY_CHANGED. */
+  expectedUpgradeAuthority: string;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
 
@@ -187,6 +196,13 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     checkoutPaused: /^(1|true|yes)$/i.test(source.CHECKOUT_PAUSED ?? ''),
     proxySecret: blank(source.PROXY_SECRET),
     imageOptimize: source.IMAGE_OPTIMIZE === '1',
+    alertNtfyServer: blank(source.ALERT_NTFY_SERVER) || 'https://ntfy.sh',
+    alertNtfyTopic: blank(source.ALERT_NTFY_TOPIC),
+    alertEmail: blank(source.ALERT_EMAIL),
+    telegramBotToken: blank(source.TELEGRAM_BOT_TOKEN),
+    telegramChatId: blank(source.TELEGRAM_CHAT_ID),
+    alertWebhookUrl: blank(source.ALERT_WEBHOOK_URL),
+    expectedUpgradeAuthority: blank(source.EXPECTED_UPGRADE_AUTHORITY),
     r2:
       accountId && accessKeyId && secretAccessKey
         ? {
