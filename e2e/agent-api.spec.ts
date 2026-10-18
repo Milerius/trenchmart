@@ -167,9 +167,7 @@ test('agent docs: auth, scopes, flows, errors, links to OpenAPI and llms.txt', a
     'https://api.trenchmart.fun/api/v1/openapi.json',
   );
   await expect(page.locator('section#errors')).toContainText('NOT_ISSUED');
-  await expect(page.locator('section#not-available')).toContainText(
-    'Webhooks are not available',
-  );
+  await expect(page.locator('section#not-available')).toContainText('Webhooks are not available');
   const nav = page.getByTestId('docs-nav');
   await expect(nav.getByRole('link', { name: 'Agent API' })).toHaveAttribute(
     'aria-current',
