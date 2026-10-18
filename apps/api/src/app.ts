@@ -1,5 +1,6 @@
 import { pendingMigrations } from '@trenchmart/db';
 import { deliverAlerts, notify, opsAlertRows, opsCheck, opsStatus, recordOpsEvent } from './ops';
+import { statusTick } from './status';
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { cors } from 'hono/cors';
@@ -1824,6 +1825,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         delivery: 'assistant',
       }),
     );
+  });
+
+  // One status-page tick, same as the cron (probes, incidents, daily roll-up). Internal only:
+  // the public, sanitized view is GET /status.
+  api.post('/internal/status/run', async (c) => {
+    assertInternal(c, deps.env);
+    const probes = await statusTick(deps, await opsCheck(deps));
+    return c.json({ checkedAt: deps.now().toISOString(), probes });
   });
 
   api.get('/admin/ops', async (c) => {

@@ -3,6 +3,8 @@
 // outage (which also stops the API's own cron alerts) still surfaces. Deployed with
 // `wrangler deploy -c watchdog.wrangler.toml`. Alert delivery is chat-only: the owner's
 // assistant polls GET / (this Worker) and GET /api/v1/internal/ops/alerts every 10 min.
+// The API Worker also calls GET / through a service binding (WATCHDOG) on its 5-minute cron and
+// records each check's state and latency for the public status page (status.ts).
 // Failures are logged as `ALERT {...}` in Workers Logs; there is no ntfy/email/Telegram push.
 
 export type WatchdogEnv = {
@@ -12,7 +14,8 @@ export type WatchdogEnv = {
   CLUSTER?: string;
 };
 
-type Check = { name: 'web' | 'api' | 'rpc'; ok: boolean; detail: string };
+// ms: wall time of the check, read by the API cron for the public status page (status.ts).
+export type Check = { name: 'web' | 'api' | 'rpc'; ok: boolean; detail: string; ms: number };
 
 async function timed(f: typeof fetch, url: string, init: RequestInit = {}, ms = 10_000) {
   const ctrl = new AbortController();
@@ -26,11 +29,17 @@ async function timed(f: typeof fetch, url: string, init: RequestInit = {}, ms = 
 
 export async function runChecks(env: WatchdogEnv, f: typeof fetch = fetch): Promise<Check[]> {
   const probe = async (name: Check['name'], run: () => Promise<string | null>): Promise<Check> => {
+    const start = Date.now();
     try {
       const problem = await run();
-      return { name, ok: problem === null, detail: problem ?? 'ok' };
+      return { name, ok: problem === null, detail: problem ?? 'ok', ms: Date.now() - start };
     } catch (err) {
-      return { name, ok: false, detail: `unreachable: ${(err as Error).message}` };
+      return {
+        name,
+        ok: false,
+        detail: `unreachable: ${(err as Error).message}`,
+        ms: Date.now() - start,
+      };
     }
   };
   return Promise.all([

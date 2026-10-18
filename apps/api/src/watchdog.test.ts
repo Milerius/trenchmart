@@ -31,7 +31,10 @@ function world() {
 describe('external watchdog', () => {
   it('checks web, API and RPC', async () => {
     const { state, f } = world();
-    expect((await runChecks(env, f)).every((c) => c.ok)).toBe(true);
+    const good = await runChecks(env, f);
+    expect(good.every((c) => c.ok)).toBe(true);
+    // Each check carries its latency for the status page.
+    expect(good.every((c) => Number.isInteger(c.ms) && c.ms >= 0)).toBe(true);
     state.rpc = '429';
     expect((await runChecks(env, f)).every((c) => c.ok)).toBe(true);
     state.api = 503;

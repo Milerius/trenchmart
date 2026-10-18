@@ -1,0 +1,66 @@
+# Public status page
+
+Status: probes and storage (this file grows with the public endpoint and the `/status` page).
+Everything runs on the existing free tiers: no new service, no new cron, no new secret.
+
+## Components
+
+| id        | Shown as                  | Probe (every 5 min, API cron)                                                            | Slow above |
+| --------- | ------------------------- | ---------------------------------------------------------------------------------------- | ---------- |
+| `web`     | Website                   | external watchdog: `GET https://trenchmart.fun` (5xx or no answer = down)                | 2500 ms    |
+| `api`     | API                       | external watchdog: `GET https://api.trenchmart.fun/api/v1/health`                        | 1500 ms    |
+| `rpc`     | Solana RPC                | external watchdog: `getHealth` on the RPC (429 counts as up)                             | 2000 ms    |
+| `escrow`  | Escrow program & resolver | read of the escrow program account from the API Worker                                   | 2000 ms    |
+| `db`      | Database                  | `select 1` through Hyperdrive                                                            | 750 ms     |
+| `uploads` | Uploads & scanning        | file storage write, read back, delete (`status/probe`)                                   | 2500 ms    |
+| `auth`    | Sign-in                   | write and delete an already-expired sign-in nonce (`auth_nonces`, wallet `status-probe`) | 1000 ms    |
+
+A failed probe is **down**; a probe slower than its threshold is **degraded**. The ops alerts of
+the same tick (`opsCheck`, docs/ops/monitoring.md) can then make a component worse, never better.
+Only the component and the state cross over (`ALERT_COMPONENT` in `apps/api/src/status.ts`):
+
+| Alert codes                                                                                                                | Component | At worst |
+| -------------------------------------------------------------------------------------------------------------------------- | --------- | -------- |
+| `DB_ERROR`                                                                                                                 | db        | down     |
+| `SCHEMA_BEHIND`, `DB_POOL_FULL`                                                                                            | db        | degraded |
+| `WEB_DOWN`                                                                                                                 | web       | degraded |
+| `RPC_DOWN`                                                                                                                 | rpc       | degraded |
+| `HTTP_5XX_SPIKE`                                                                                                           | api       | degraded |
+| `R2_ERROR`, `SCAN_ERRORS`, `SCAN_STUCK`                                                                                    | uploads   | degraded |
+| `RELEASE_STUCK`, `LOW_BALANCE`, `RESOLVER_MISCONFIGURED`, `UPGRADE_AUTHORITY_CHANGED`, `WEBHOOK_FAILED`, `CHECKOUT_PAUSED` | escrow    | degraded |
+
+Disputes, payouts and every other internal code never touch the public page. Alert messages (which
+can name wallets, balances, files and URLs) are never copied into the status tables.
+
+Web, API and RPC are measured **outside** the API Worker: the API cron calls the watchdog Worker
+through the service binding `WATCHDOG` (`[[services]]` in `apps/api/wrangler.toml`; keep it in
+`wrangler.deploy.toml`), and the watchdog reports each check's `ms`. Without the binding (local
+runs, or the watchdog not answering) the API probes the same three URLs itself.
+
+## Storage (migration `0031_status.sql`)
+
+- `status_probes`: one row per component per tick (`component`, `state`, `latency_ms`,
+  `checked_at`), about 2,000 rows a day, kept **14 days**.
+- `status_daily`: per UTC day and component: `samples`, `operational`, `degraded`, `down`,
+  `p50_ms`, `p95_ms`. Yesterday and today are recomputed every tick; kept **100 days** (the page
+  shows 90).
+- `status_incidents`: opened on the first tick a component is not operational, `worst` escalates
+  degraded to down, `resolved_at` is set on the first operational tick. At most one open incident
+  per component (partial unique index).
+
+All three tables have row level security on with no policies (only the API, as table owner, reads
+them). A tick during a full database outage cannot be stored: those minutes show as fewer samples,
+not as invented data.
+
+## Operating it
+
+- The cron step is `status` in `apps/api/src/worker.ts`, after `ops`. A failure is logged as
+  `CRON_FAILED status: …` like any other step.
+- Run one tick by hand (internal token, same as the cron):
+
+  ```bash
+  curl -X POST -H "authorization: Bearer $INTERNAL_TOKEN" \
+    https://api.trenchmart.fun/api/v1/internal/status/run
+  ```
+
+- Thresholds live in `STATUS_COMPONENTS` (`apps/api/src/status.ts`).
