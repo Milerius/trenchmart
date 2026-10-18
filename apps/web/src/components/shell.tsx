@@ -324,6 +324,8 @@ function Footer() {
 const PRELOADED_READS = ['/api/v1/me', '/api/v1/listings', '/api/v1/config/public'];
 
 export function Shell({ children }: { children: ReactNode }) {
+  // Home lays out its own full-bleed bands (hero, terminals); every other page gets the column.
+  const fullBleed = usePathname() === '/';
   for (const href of PRELOADED_READS)
     preload(href, { as: 'fetch', crossOrigin: 'use-credentials' });
   return (
@@ -337,7 +339,10 @@ export function Shell({ children }: { children: ReactNode }) {
       <NetworkBanner />
       <Ticker />
       <Nav />
-      <main id="content" className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main
+        id="content"
+        className={fullBleed ? 'overflow-x-clip' : 'mx-auto max-w-7xl px-4 py-8 sm:px-6'}
+      >
         {children}
       </main>
       <Footer />

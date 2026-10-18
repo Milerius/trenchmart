@@ -213,6 +213,7 @@ export function ListingGrid({
   loading = false,
   emptyTitle = 'No live listings yet',
   emptyBody = 'Every listing passes automated review before it shows here. Check back soon, or be the first to sell.',
+  wide = false,
 }: {
   listings: Listing[];
   centsPerSol: string | null;
@@ -221,10 +222,13 @@ export function ListingGrid({
   loading?: boolean;
   emptyTitle?: string;
   emptyBody?: string;
+  /** Four columns on wide screens (home market). */
+  wide?: boolean;
 }) {
+  const grid = `grid gap-4 sm:grid-cols-2 lg:grid-cols-3${wide ? ' xl:grid-cols-4' : ''}`;
   if (loading) {
     return (
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+      <ul className={grid} aria-busy="true">
         {[0, 1, 2].map((key) => (
           <li key={key} className="overflow-hidden rounded-card border border-line bg-surface">
             {/* Same shape as a real card (16:10 cover + body) so nothing shifts on load. */}
@@ -254,7 +258,7 @@ export function ListingGrid({
     );
   }
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <ul className={grid}>
       {listings.map((listing, index) => (
         <li key={listing.slug}>
           <ListingCard
