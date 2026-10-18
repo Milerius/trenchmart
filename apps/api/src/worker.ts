@@ -9,6 +9,7 @@ import {
   latestBlockhash,
   simulateUnsigned,
   sendAndConfirm,
+  tokenBalance,
 } from '@trenchmart/chain';
 import { createApp, type PriceCacheBox } from './app';
 import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
@@ -62,6 +63,9 @@ function depsFor(env: Binding, url: string) {
     getTx: (signature: string) => fetchTransaction(parsed.rpcUrl, signature),
     blockhash: () => latestBlockhash(parsed.rpcUrl),
     simulate: (tx: Uint8Array) => simulateUnsigned(parsed.rpcUrl, tx),
+    trenchBalance: parsed.trenchMint
+      ? (wallet: string) => tokenBalance(parsed.rpcUrl, wallet, parsed.trenchMint as string)
+      : undefined,
     escrowChain: {
       account: (address: string) => accountData(parsed.rpcUrl, address),
       sendAndConfirm: (tx: Uint8Array) => sendAndConfirm(parsed.rpcUrl, tx),

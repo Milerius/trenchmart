@@ -18,6 +18,12 @@ import {
 /** Devnet program id from programs/trench_escrow/src/lib.rs. */
 export const ESCROW_PROGRAM_ID = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
 export const ESCROW_CLUSTER = 'devnet';
+/** Devnet deployment addresses (2026-10-17). /api/v1/transparency reads them live from chain. */
+export const DEVNET_ADDRESSES = {
+  multisig: 'CaatcAQaDTEsrSoC3maTP1kgBWEY66hhgBNKa8Aeg55B',
+  vault: '47RLqPda5YLW7rFHkoJ2K5yACWu4qc7j2yYU2so64bz7',
+  trenchMint: '8Gu4hXYypyRrxY6763AdhQnyHma82L3ww9wq3vy2cbq6',
+} as const;
 /** trenchmart.fun has no mail server yet, so contact goes through GitHub, which is real and public. */
 export const CONTACT_URL = 'https://github.com/Milerius/trenchmart/issues';
 export const CONTACT_LABEL = 'GitHub issues (github.com/Milerius/trenchmart)';

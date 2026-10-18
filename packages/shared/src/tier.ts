@@ -22,7 +22,7 @@ export type BalanceRow = {
   source: BalanceSource;
 };
 
-/** A value like "[X]" disables that tier. Only an integer string enables it. */
+/** A value that is not an integer string (e.g. "off") disables that tier. */
 export function parseThreshold(value: unknown): bigint | undefined {
   if (typeof value === 'bigint') return value >= 0n ? value : undefined;
   if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
@@ -126,4 +126,11 @@ export function bondToList(
     .map((category) => requiredBondLamports([category], byCategory, tier, ogDiscountBps))
     .reduce<bigint | null>((min, value) => (min === null || value < min ? value : min), null);
   return cheapest !== null && cheapest > live ? cheapest : live;
+}
+
+/** "1000000" (whole tokens) → "1,000,000 $TRENCH". A value that is not an integer → "not set". */
+export function formatTrench(wholeTokens: unknown): string {
+  const value = parseThreshold(wholeTokens);
+  if (value === undefined) return 'not set';
+  return `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')} $TRENCH`;
 }

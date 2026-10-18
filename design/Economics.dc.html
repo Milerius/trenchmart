@@ -175,13 +175,13 @@ class Component extends DCLogic {
       { name: 'Creator commission', who: 'Creator', amt: '0%', disc: '—', why: 'Creators keep 100% of the list price.' },
       { name: 'Verification fee', who: 'Creator, per version', amt: '0.25 SOL (≈ $45.00)', disc: 'Free from Trencher', why: 'Funds AI verification runs; stops spam uploads.' },
       { name: 'Creator bond', who: 'Creator, refundable', amt: '1–5 SOL by category (≈ $180–$900)', disc: '−50% for OG', why: 'Skin in the game; slashed for malicious listings.' },
-      { name: 'Featured slot', who: 'Creator, optional', amt: '[X] SOL / week', disc: 'Paid in $TRENCH −20%', why: 'Promotion, ranked with holder votes.' },
+      { name: 'Featured slot', who: 'Creator, optional', amt: '0.5 SOL / week', disc: 'Paid in $TRENCH −20%', why: 'Promotion, ranked with holder votes.' },
       { name: 'Subscriptions', who: 'Buyer, recurring', amt: '5% of each renewal', disc: 'Same as marketplace', why: 'For live wallet lists and alert feeds.' }
     ];
     const defs = [
-      { name: 'Scout', req: 'HOLD ≥ [X] $TRENCH', headline: '−25% of the 5% fee', bps: 2500n, perks: ['Holder price on every listing', 'Holder badge on reviews', 'Weekly drops newsletter'] },
-      { name: 'Trencher', req: 'HOLD ≥ [Y] $TRENCH', headline: '−60% of the fee · free verification', bps: 6000n, perks: ['48h early access to new drops', 'Holder-only listings', 'Free verification for your uploads', 'Vote on featured listings'] },
-      { name: 'OG', req: 'HOLD ≥ [Z] $TRENCH', headline: '0% marketplace fee', bps: 10000n, perks: ['Everything in Trencher', 'Half creator bond', 'Private alpha room'] }
+      { name: 'Scout', req: 'HOLD ≥ 100,000 $TRENCH', headline: '−25% of the 5% fee', bps: 2500n, perks: ['Holder price on every listing', 'Holder badge on reviews', 'Weekly drops newsletter'] },
+      { name: 'Trencher', req: 'HOLD ≥ 1,000,000 $TRENCH', headline: '−60% of the fee · free verification', bps: 6000n, perks: ['48h early access to new drops', 'Holder-only listings', 'Free verification for your uploads', 'Vote on featured listings'] },
+      { name: 'OG', req: 'HOLD ≥ 10,000,000 $TRENCH', headline: '0% marketplace fee', bps: 10000n, perks: ['Everything in Trencher', 'Half creator bond', 'Private alpha room'] }
     ];
     const tiers = defs.map((t) => {
       const on = this.state.tier === t.name;

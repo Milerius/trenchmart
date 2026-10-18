@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection, FactGrid } from '@/components/doc';
 import { FeeFlowDiagram } from '@/components/diagrams';
+import { formatTrench } from '@trenchmart/shared';
 import { bonds, feeSplit, protocol, tierRows } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Fees · TrenchMart docs' };
@@ -52,11 +53,11 @@ export default function FeesDocsPage() {
       </DocSection>
       <DocSection id="tiers" title="Tier rebates">
         <p>
-          The rebate is a discount on the fee, not on the price. Thresholds in the seed are the
-          placeholders {protocol.thresholds.scout}, {protocol.thresholds.trencher}, and{' '}
-          {protocol.thresholds.og}. Only an integer string enables a tier, so the seed leaves every
-          wallet on no tier until those values are set. The window for the minimum balance is{' '}
-          {protocol.tierWindowHours} hours.
+          The rebate is a discount on the fee, not on the price. Scout needs{' '}
+          {formatTrench(protocol.thresholds.scout)}, Trencher{' '}
+          {formatTrench(protocol.thresholds.trencher)}, and OG{' '}
+          {formatTrench(protocol.thresholds.og)}. The tier uses the lowest balance held during the
+          last {protocol.tierWindowHours} hours.
         </p>
         <div className="overflow-x-auto rounded-card border border-line">
           <table className="w-full border-collapse text-left text-sm">

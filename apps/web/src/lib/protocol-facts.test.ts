@@ -53,7 +53,7 @@ describe('protocol facts', () => {
     expect(protocol.tierWindowHours).toBe(72);
     expect(protocol.maxFileDefault).toBe('5 MiB');
     expect(protocol.maxFileSetup).toBe('25 MiB');
-    expect(protocol.thresholds).toEqual({ scout: '[X]', trencher: '[Y]', og: '[Z]' });
+    expect(protocol.thresholds).toEqual({ scout: '100000', trencher: '1000000', og: '10000000' });
   });
 
   it('derives tier buyer fees and category bonds from config', () => {

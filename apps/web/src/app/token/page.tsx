@@ -1,6 +1,6 @@
 'use client';
 
-import { solToLamports } from '@trenchmart/shared';
+import { DEFAULT_CONFIG_JSON, formatTrench, solToLamports } from '@trenchmart/shared';
 import { useState } from 'react';
 import { DEFAULT_FEES, FeeBreakdown, TIER_ORDER, TierTable } from '@/components/fees';
 import { Label } from '@/components/ui';
@@ -59,22 +59,21 @@ export default function TokenPage() {
           <div className="mt-5 border-t border-line-soft pt-4">
             <Label>Minimum balance to qualify</Label>
             <ul className="m-0 mt-2 flex flex-wrap gap-2 p-0">
-              {Object.entries(
-                config?.tierThresholds ?? { scout: '[X]', trencher: '[Y]', og: '[Z]' },
-              ).map(([name, threshold]) => (
-                <li
-                  key={name}
-                  data-testid="tier-pill"
-                  className="list-none rounded-full border border-line-control px-3 py-1 font-mono text-[13px] text-ink-2"
-                >
-                  {TIER_LABEL[name] ?? name} · {threshold}
-                </li>
-              ))}
+              {Object.entries(config?.tierThresholds ?? DEFAULT_CONFIG_JSON.tier_thresholds).map(
+                ([name, threshold]) => (
+                  <li
+                    key={name}
+                    data-testid="tier-pill"
+                    className="list-none rounded-full border border-line-control px-3 py-1 font-mono text-[13px] text-ink-2"
+                  >
+                    {TIER_LABEL[name] ?? name} · {formatTrench(threshold)}
+                  </li>
+                ),
+              )}
             </ul>
             <p className="m-0 mt-2 text-xs text-muted">
-              Thresholds stay disabled until the owner sets real numbers. Placeholders are shown as
-              proposed. Your tier uses your lowest balance over the last{' '}
-              {config?.tierWindowHours ?? 72} hours.
+              Your tier uses your lowest $TRENCH balance over the last{' '}
+              {config?.tierWindowHours ?? 72} hours, read from Solana devnet.
             </p>
           </div>
         </div>

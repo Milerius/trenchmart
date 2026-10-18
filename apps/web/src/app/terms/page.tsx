@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
+import { formatTrench } from '@trenchmart/shared';
 import { CONTACT_LABEL, CONTACT_URL, bonds, protocol } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Terms of Service · TrenchMart' };
@@ -88,9 +89,11 @@ export default function TermsPage() {
         <p>
           Holding $TRENCH can place a wallet in a tier. A tier can lower the buyer fee, waive the{' '}
           {protocol.verificationFee} verification fee from {protocol.verificationFeeFreeFrom}{' '}
-          upward, discount an OG bond, and unlock holder-only listings. Thresholds are
-          configuration. The seeded placeholders do not enable a tier until they are replaced with
-          integers. The balance that counts is the lowest balance in a {protocol.tierWindowHours}
+          upward, discount an OG bond, and unlock holder-only listings. The thresholds are Scout{' '}
+          {formatTrench(protocol.thresholds.scout)}, Trencher{' '}
+          {formatTrench(protocol.thresholds.trencher)}, and OG{' '}
+          {formatTrench(protocol.thresholds.og)}. The balance that counts is the lowest balance in a{' '}
+          {protocol.tierWindowHours}
           -hour window.
         </p>
         <p>

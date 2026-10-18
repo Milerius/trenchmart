@@ -90,7 +90,12 @@ export type Deps = {
   escrowChain?: EscrowChain;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
   llmFetch?: typeof fetch;
+  /** On-chain $TRENCH balance of a wallet in base units. Optional: tiers fall back to stored rows. */
+  trenchBalance?: (wallet: string) => Promise<bigint>;
 };
+
+/** How often a quote may re-read a wallet's on-chain balance. */
+export const BALANCE_RECONCILE_MS = 5 * 60_000;
 
 function chainOf(deps: Deps): EscrowChain {
   if (!deps.escrowChain)
@@ -145,6 +150,7 @@ export async function tierForWallet(
   nextTier: Tier | null;
   needed: bigint;
 }> {
+  await reconcileBalance(deps, wallet);
   const rows = await deps.sql<
     { amount: string; ts: Date; source: 'webhook' | 'snapshot' | 'reconcile' }[]
   >`
@@ -161,12 +167,49 @@ export async function tierForWallet(
   return { tier, minBalance, nextTier: next.nextTier, needed: next.needed };
 }
 
+async function readTrench(deps: Deps, wallet: string): Promise<bigint | null> {
+  if (!deps.trenchBalance) return null;
+  try {
+    return await deps.trenchBalance(wallet);
+  } catch {
+    // An RPC failure must never invent a balance. Keep the stored history as it is.
+    return null;
+  }
+}
+
+/**
+ * First sight of a wallet: store its on-chain balance as a trusted 'snapshot'
+ * (docs/07-token-tiers.md). Without chain access the old 0 snapshot is kept.
+ */
 export async function ensureSnapshot(deps: Deps, wallet: string): Promise<void> {
   const existing = await deps.sql`select 1 from token_balances where wallet = ${wallet} limit 1`;
   if (existing.length > 0) return;
+  const amount = deps.trenchBalance ? await readTrench(deps, wallet) : 0n;
+  if (amount === null) return;
   await deps.sql`
     insert into token_balances (wallet, amount, ts, source)
-    values (${wallet}, 0, ${deps.now()}, 'snapshot')
+    values (${wallet}, ${amount.toString()}, ${deps.now()}, 'snapshot')
+  `;
+}
+
+/**
+ * Re-read the on-chain balance at most every BALANCE_RECONCILE_MS and store a
+ * 'reconcile' row when it changed. The tier uses the minimum over the window, so a
+ * balance that went up only counts once it has been held for the whole window.
+ */
+export async function reconcileBalance(deps: Deps, wallet: string): Promise<void> {
+  if (!deps.trenchBalance) return;
+  const [last] = await deps.sql<{ amount: string; ts: Date }[]>`
+    select amount::text as amount, ts from token_balances where wallet = ${wallet}
+    order by ts desc limit 1
+  `;
+  if (!last) return ensureSnapshot(deps, wallet);
+  if (deps.now().getTime() - new Date(last.ts).getTime() < BALANCE_RECONCILE_MS) return;
+  const amount = await readTrench(deps, wallet);
+  if (amount === null || amount === BigInt(last.amount)) return;
+  await deps.sql`
+    insert into token_balances (wallet, amount, ts, source)
+    values (${wallet}, ${amount.toString()}, ${deps.now()}, 'reconcile')
   `;
 }
 

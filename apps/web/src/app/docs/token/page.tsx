@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
+import { formatTrench } from '@trenchmart/shared';
 import { protocol, tierRows } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: '$TRENCH · TrenchMart docs' };
@@ -15,10 +16,11 @@ export default function TokenDocsPage() {
       <DocSection id="tiers" title="Tiers">
         <p>
           A tier is the lowest balance observed during the last {protocol.tierWindowHours} hours,
-          compared with the configured thresholds. The seed stores {protocol.thresholds.scout},{' '}
-          {protocol.thresholds.trencher}, and {protocol.thresholds.og}. Those placeholders do not
-          parse as integers, so no tier is active until the owner replaces them with whole-token
-          amounts.
+          compared with the configured thresholds: Scout {formatTrench(protocol.thresholds.scout)},
+          Trencher {formatTrench(protocol.thresholds.trencher)}, and OG{' '}
+          {formatTrench(protocol.thresholds.og)} (of a 1,000,000,000 supply). Balances are read from
+          the $TRENCH mint on Solana devnet when you sign in and re-checked at most every five
+          minutes when you get a quote.
         </p>
         <ul className="m-0 grid gap-2 p-0">
           {tierRows.map((row) => (
@@ -26,7 +28,7 @@ export default function TokenDocsPage() {
               <span className="font-semibold text-ink">{row.label}</span>
               <span className="mt-1 block">
                 Buyer fee {row.buyerFee}. Rebate {row.rebateLabel}.
-                {row.threshold ? ` Seed threshold ${row.threshold}.` : ''}
+                {row.threshold ? ` Hold at least ${formatTrench(row.threshold)}.` : ''}
               </span>
             </li>
           ))}

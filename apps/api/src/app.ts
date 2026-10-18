@@ -125,6 +125,9 @@ export type PriceCacheBox = { value: PriceCache };
 
 // The Worker builds one app per request (a postgres.js client cannot be shared across
 // requests in workerd), so it passes a module-level box to keep the SOL price cache warm.
+/** Listing links may carry the id instead of the slug; both resolve to the same page. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null }): App {
   async function solPrice() {
     const quote = await cachedSolUsd({
@@ -371,7 +374,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const rows = await deps.sql<Record<string, any>[]>`
       select l.*, u.handle, u.wallet as creator_wallet, u.x_handle
       from listings l join users u on u.id = l.creator_id
-      where l.slug = ${slug}
+      where l.slug = ${slug} or (${UUID_RE.test(slug)} and l.id::text = ${slug.toLowerCase()})
+      limit 1
     `;
     const listing = rows[0];
     if (!listing) throw new HttpError(404, 'NOT_FOUND', 'listing not found');

@@ -211,7 +211,7 @@ function Footer() {
           className="font-mono hover:text-ink"
           data-testid="footer-program"
         >
-          Escrow program {shortKey(ESCROW_PROGRAM_ID)} ↗
+          Escrow program (devnet) {shortKey(ESCROW_PROGRAM_ID)} ↗
         </a>
         <Link href="/token" className="hover:text-ink">
           Fees &amp; $TRENCH

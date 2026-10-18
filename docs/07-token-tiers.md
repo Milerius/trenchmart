@@ -3,14 +3,16 @@
 - Token launches on **pump.fun** (fair launch). The marketplace never mints; it only reads balances. `TRENCH_MINT` env var; until launch, use a devnet SPL token you create for testing.
 - pump.fun tokens use 6 decimals; read `decimals` from the mint, don't hard-code.
 
-## Tiers (thresholds are placeholders)
+## Tiers
 
-| Tier         | Requirement         | Perks                                                                                                                               |
-| ------------ | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| None         | —                   | Standard 5% fee                                                                                                                     |
-| **Scout**    | min balance ≥ `[X]` | −25% marketplace fee · holder price on listings · holder badge on reviews                                                           |
-| **Trencher** | ≥ `[Y]`             | −60% fee · free verification for own uploads · 48h early access to new listings · holder-only listings · vote on featured (phase 2) |
-| **OG**       | ≥ `[Z]`             | 0% marketplace fee · everything in Trencher · 50% creator bond · private alpha room link · can apply to be a verifier               |
+Thresholds are whole $TRENCH (1,000,000,000 supply, 6 decimals), stored in `config.tier_thresholds` and compared with base-unit balances (`× 10^trench_decimals`).
+
+| Tier         | Requirement        | Perks                                                                                                                               |
+| ------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| None         | —                  | Standard 5% fee                                                                                                                     |
+| **Scout**    | ≥ 100,000 (0.01%)  | −25% marketplace fee · holder price on listings · holder badge on reviews                                                           |
+| **Trencher** | ≥ 1,000,000 (0.1%) | −60% fee · free verification for own uploads · 48h early access to new listings · holder-only listings · vote on featured (phase 2) |
+| **OG**       | ≥ 10,000,000 (1%)  | 0% marketplace fee · everything in Trencher · 50% creator bond · private alpha room link · can apply to be a verifier               |
 
 ## Anti-gaming rule
 
@@ -71,7 +73,7 @@ export function tierFor(
 }
 ```
 
-Thresholds stored as strings in config; a value like `"[X]"` → undefined → tier disabled.
+Thresholds are stored as whole-token integer strings in config (`"100000"`, `"1000000"`, `"10000000"`). A value that is not an integer string → undefined → that tier is disabled.
 
 ## Where tier is used
 

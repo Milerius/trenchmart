@@ -261,7 +261,8 @@ create table audit_log (
 {
   "fee_bps": 500,
   "tier_rebate_bps": { "none": 0, "scout": 2500, "trencher": 6000, "og": 10000 },
-  "tier_thresholds": { "scout": "[X]", "trencher": "[Y]", "og": "[Z]" },
+  "tier_thresholds": { "scout": "100000", "trencher": "1000000", "og": "10000000" },
+  "trench_decimals": 6,
   "tier_window_hours": 72,
   "fee_split_bps": { "buyback": 4000, "verifiers": 2500, "ops": 2000, "safety": 1500 },
   "escrow_hours": 48,
@@ -283,7 +284,7 @@ create table audit_log (
 }
 ```
 
-Tier thresholds are placeholders until the token launches; tier logic must treat a `"[X]"` string as "tier disabled".
+Tier thresholds are whole $TRENCH (Scout 100k, Trencher 1M, OG 10M of a 1B supply). Tier logic treats any non-integer string as "tier disabled".
 
 ## State machines
 
