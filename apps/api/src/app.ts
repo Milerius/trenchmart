@@ -1,3 +1,4 @@
+import { deliverAlerts, notify, opsCheck, opsStatus, recordOpsEvent } from './ops';
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { cors } from 'hono/cors';
@@ -86,7 +87,6 @@ import {
   disputeTx,
   proposePayouts,
   quoteListing,
-  opsCheck,
   recordChainBalance,
   releaseOrders,
   resolveDispute,
@@ -161,6 +161,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return quote;
   }
 
+  // Error events feed the ops check (5xx spike, webhook and scan pipeline failures).
+  const recordErrorEvent = async (path: string, err: unknown) => {
+    const detail = `${path}: ${(err as Error)?.message ?? String(err)}`;
+    await recordOpsEvent(deps, '5xx', detail);
+    if (path.includes('/hooks/')) await recordOpsEvent(deps, 'webhook_error', detail);
+    if (/\/(versions\/[^/]+\/(complete|explain|reupload)|internal\/sandbox)/.test(path))
+      await recordOpsEvent(deps, 'scan_error', detail);
+  };
   const app = new Hono<{ Variables: Vars }>();
   app.onError((err, c) => {
     if (err instanceof HttpDataError) {
@@ -176,9 +184,11 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       return c.json({ error: { code: err.code, message: err.message } }, err.status as 400);
     }
     if (err instanceof BlobUnavailableError) {
+      void recordOpsEvent(deps, 'r2_error', `${c.req.path}: ${err.message}`);
       return c.json({ error: { code: 'STORAGE_UNAVAILABLE', message: err.message } }, 503);
     }
     console.error(err);
+    void recordErrorEvent(c.req.path, err);
     return c.json({ error: { code: 'INTERNAL', message: 'Internal error' } }, 500);
   });
   // Security headers on every API response (mainnet readiness #11).
@@ -1447,6 +1457,31 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const alerts = await opsCheck(deps);
     const critical = alerts.some((a) => a.level === 'critical');
     return c.json({ ok: !critical, alerts }, critical ? 503 : 200);
+  });
+
+  // Runs the check and delivers notices like the cron does (used to verify alerting).
+  api.post('/internal/ops/run', async (c) => {
+    assertInternal(c, deps.env);
+    const alerts = await opsCheck(deps);
+    const notices = await deliverAlerts(deps, alerts);
+    return c.json({ alerts, notices });
+  });
+
+  // Delivery test: one notice per channel, marked TEST. ?code= sends a sample of that alert.
+  api.post('/internal/ops/test', async (c) => {
+    assertInternal(c, deps.env);
+    const code = c.req.query('code') ?? 'DELIVERY';
+    const channels = await notify(deps, {
+      title: `TEST ${code}`,
+      body: `Test of the ${code} alert path. No action needed.`,
+      level: 'test',
+    });
+    return c.json({ channels });
+  });
+
+  api.get('/admin/ops', async (c) => {
+    requireRole(requireUser(c), 'admin');
+    return c.json(jsonSafe(await opsStatus(deps)));
   });
 
   api.post('/internal/cron/:job', async (c) => {

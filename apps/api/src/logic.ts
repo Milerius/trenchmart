@@ -43,8 +43,6 @@ import {
   compilePayoutBatch,
   compileUnsignedTransferMemo,
   fromBase64,
-  parseSecretKey,
-  publicKeyOf,
   toBase64,
   TRANSFER_BUDGET,
   type ChainTx,
@@ -65,7 +63,6 @@ import {
   releaseTx,
   freezeTx,
   closeTx,
-  resolverOf,
   refundAfterTimeoutTx,
   type EscrowChain,
 } from './escrow';
@@ -102,6 +99,8 @@ export type Deps = {
   escrowChain?: EscrowChain;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
   llmFetch?: typeof fetch;
+  /** Fetch used by monitoring checks and alert delivery (ops.ts). Defaults to the global fetch. */
+  opsFetch?: typeof fetch;
   /** On-chain $TRENCH balance of a wallet in base units. Optional: tiers fall back to stored rows. */
   trenchBalance?: (wallet: string) => Promise<bigint>;
 };
@@ -1854,86 +1853,4 @@ export async function landingStats(deps: Deps) {
     volumeLamports: (row.volume ?? 0n).toString(),
     note: null as string | null,
   };
-}
-
-export type OpsAlert = { level: 'warn' | 'critical'; code: string; message: string };
-
-/** Lamports below which a hot wallet can no longer pay for its transactions reliably. */
-export const LOW_BALANCE_LAMPORTS = 50_000_000n;
-
-/**
- * Sentry-free monitoring (mainnet readiness #13). Runs with every cron tick and on
- * `GET /internal/ops`. Each alert is logged as `ALERT {...}` so Workers Logs / Logpush or an
- * uptime monitor polling /internal/ops can page on it. Read-only.
- */
-export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
-  const alerts: OpsAlert[] = [];
-  const now = deps.now();
-  if (deps.env.escrowProgramId && deps.escrowChain) {
-    const wallets: [string, string][] = [];
-    try {
-      wallets.push(['resolver', resolverOf(deps.env).pubkey]);
-    } catch {
-      alerts.push({
-        level: 'critical',
-        code: 'RESOLVER_MISCONFIGURED',
-        message: 'escrow resolver is not set',
-      });
-    }
-    if (deps.env.escrowCrankSecret)
-      wallets.push(['crank', publicKeyOf(parseSecretKey(deps.env.escrowCrankSecret))]);
-    for (const [role, pubkey] of wallets) {
-      try {
-        const info = await deps.escrowChain.account(pubkey);
-        const lamports = info?.lamports ?? 0n;
-        if (lamports < LOW_BALANCE_LAMPORTS)
-          alerts.push({
-            level: 'critical',
-            code: 'LOW_BALANCE',
-            message: `${role} ${pubkey} holds ${lamports} lamports; top it up so releases and refunds keep landing`,
-          });
-      } catch (err) {
-        alerts.push({
-          level: 'warn',
-          code: 'RPC',
-          message: `balance read failed: ${(err as Error).message}`,
-        });
-      }
-    }
-  }
-  const stuck = await deps.sql<{ n: number }[]>`
-    select count(*)::int as n from orders o
-    where o.status = 'paid' and o.escrow_until < ${new Date(now.getTime() - 15 * 60_000)}
-      and not exists (select 1 from disputes d where d.order_id = o.id and d.status = 'open')
-  `;
-  if ((stuck[0]?.n ?? 0) > 0)
-    alerts.push({
-      level: 'critical',
-      code: 'RELEASE_STUCK',
-      message: `${stuck[0]!.n} paid order(s) are more than 15 min past their escrow window and not released`,
-    });
-  const disputes = await deps.sql<{ n: number }[]>`
-    select count(*)::int as n from disputes
-    where status = 'open' and created_at < ${new Date(now.getTime() - 24 * 3_600_000)}
-  `;
-  if ((disputes[0]?.n ?? 0) > 0)
-    alerts.push({
-      level: 'warn',
-      code: 'DISPUTES_WAITING',
-      message: `${disputes[0]!.n} dispute(s) open for more than 24 h; the on-chain timeout refunds the buyer after 7 days`,
-    });
-  const payouts = await deps.sql<{ n: number }[]>`
-    select count(*)::int as n from payouts
-    where status in ('pending', 'proposed') and created_at < ${new Date(now.getTime() - 48 * 3_600_000)}
-  `;
-  if ((payouts[0]?.n ?? 0) > 0)
-    alerts.push({
-      level: 'warn',
-      code: 'PAYOUTS_WAITING',
-      message: `${payouts[0]!.n} vault payout line(s) waiting more than 48 h for the multisig`,
-    });
-  if (deps.env.checkoutPaused)
-    alerts.push({ level: 'warn', code: 'CHECKOUT_PAUSED', message: 'checkout kill switch is on' });
-  for (const alert of alerts) console.error('ALERT', JSON.stringify(alert));
-  return alerts;
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useWallet } from '@/lib/wallet';
@@ -35,6 +36,9 @@ export default function AdminPage() {
   return (
     <section className="space-y-4">
       <h1 className="text-3xl">Admin</h1>
+      <Link href="/admin/status" className="text-sm underline" data-testid="admin-status-link">
+        System status
+      </Link>
       <ul className="space-y-3">
         {disputes.map((dispute) => (
           <li key={dispute.id} className="rounded-xl border border-line p-4">
