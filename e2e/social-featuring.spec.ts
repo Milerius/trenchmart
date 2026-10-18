@@ -576,8 +576,14 @@ test('studio featuring fits a phone screen', async ({ page }) => {
   });
   await page.goto('/studio/featuring');
   await expect(page.getByTestId('feature-check')).toHaveCount(4);
+  // The calendar loads after the checks; measure once it is there, so a late overflow fails.
+  const cal = page.getByTestId('feature-calendar');
+  await expect(cal.getByRole('button', { name: /of 3 left/ }).first()).toBeVisible();
   const fits = await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
   );
   expect(fits).toBe(true);
+  // All seven days fit without scrolling the calendar sideways.
+  const box = (await cal.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
 });
