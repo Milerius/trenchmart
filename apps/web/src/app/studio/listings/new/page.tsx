@@ -1,5 +1,6 @@
 'use client';
 
+import { toWebp } from '@/lib/webp';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent, type ReactNode } from 'react';
@@ -93,10 +94,11 @@ export default function NewListingPage() {
     for (const [index, image] of images.entries()) {
       if (!image.file) continue;
       setBusy(`Uploading image ${index + 1} of ${images.length}…`);
+      const upload = await toWebp(image.file);
       const saved = await api<{ id: string }>(`/studio/listings/${listingId}/images`, {
         method: 'POST',
-        headers: { 'content-type': image.file.type },
-        body: image.file,
+        headers: { 'content-type': upload.type },
+        body: upload,
       });
       ids.set(image.id, saved.id);
       gallery.push({ imageId: saved.id, alt: image.alt });
