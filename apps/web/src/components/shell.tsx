@@ -355,13 +355,14 @@ function Footer() {
 // browser fetches twice. These are hints only; nothing here changes what is cached.
 // Pages that draw their own full-width hero and content column.
 const FULL_BLEED = new Set(['/', '/search', '/creators', '/token', '/verify', '/sell']);
+const FULL_BLEED_PREFIXES = ['/c/', '/u/'];
 
 const PRELOADED_READS = ['/api/v1/me', '/api/v1/config/public'];
 
 export function Shell({ children }: { children: ReactNode }) {
   // Redesigned pages lay out their own full-width hero and column; the rest get the column.
   const path = usePathname();
-  const fullBleed = FULL_BLEED.has(path) || path.startsWith('/c/');
+  const fullBleed = FULL_BLEED.has(path) || FULL_BLEED_PREFIXES.some((p) => path.startsWith(p));
   for (const href of PRELOADED_READS)
     preload(href, { as: 'fetch', crossOrigin: 'use-credentials' });
   return (
