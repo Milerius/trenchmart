@@ -731,7 +731,13 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   // Seller images. Public once they are on an approved page; the owner can preview drafts.
   api.get('/media/:id', async (c) => {
     const user = c.get('user');
-    return mediaResponse(deps, c.req.param('id'), (user?.id as string | undefined) ?? null);
+    const w = Number(c.req.query('w'));
+    return mediaResponse(
+      deps,
+      c.req.param('id'),
+      (user?.id as string | undefined) ?? null,
+      Number.isInteger(w) ? w : null,
+    );
   });
 
   api.get('/listings/:slug/versions', async (c) => {

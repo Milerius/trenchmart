@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cacheKey, createCacheApiIncrementalCache } from './isr-cache';
+import { cacheKey, createCacheApiIncrementalCache, staticAssetUrl } from './isr-cache';
 
 function memoryCache() {
   const store = new Map<string, Response>();
@@ -65,5 +65,54 @@ describe('Cache API incremental cache (ISR)', () => {
     const cache = createCacheApiIncrementalCache(() => null);
     await cache.set('k', 1);
     expect(await cache.get('k')).toBeNull();
+  });
+
+  it('reports a fresh entry as just modified, so Next serves it as a HIT instead of STALE', async () => {
+    const mem = memoryCache();
+    let t = 1_000_000;
+    const cache = createCacheApiIncrementalCache(() => mem, { buildId: () => 'b', now: () => t });
+    await cache.set('/l/demo', { type: 'app', html: 'x', revalidate: 300 });
+    t += 120_000; // 2 min later: inside the 5 min window
+    expect(((await cache.get('/l/demo')) as { lastModified: number } | null)?.lastModified).toBe(t);
+    t += 200_000; // past the window: the real time, so Next revalidates once
+    expect(((await cache.get('/l/demo')) as { lastModified: number } | null)?.lastModified).toBe(
+      1_000_000,
+    );
+  });
+
+  it('leaves entries without a revalidate time alone', async () => {
+    const mem = memoryCache();
+    let t = 5_000;
+    const cache = createCacheApiIncrementalCache(() => mem, { buildId: () => 'b', now: () => t });
+    await cache.set('/x', { type: 'app', html: 'x' });
+    t += 10;
+    expect(((await cache.get('/x')) as { lastModified: number } | null)?.lastModified).toBe(5_000);
+  });
+
+  it('falls back to the build-time copy in static assets on a cold colo', async () => {
+    const asked: string[] = [];
+    const assets = {
+      async fetch(url: Request | string) {
+        const u = typeof url === 'string' ? url : url.url;
+        asked.push(u);
+        return u.endsWith('/index.cache')
+          ? new Response(JSON.stringify({ type: 'app', html: 'home' }))
+          : new Response('nope', { status: 404 });
+      },
+    };
+    const cache = createCacheApiIncrementalCache(() => memoryCache(), {
+      buildId: () => 'B1',
+      now: () => 9_000,
+      assets: () => assets,
+      builtAt: () => 7_000,
+    });
+    expect(await cache.get('/index')).toEqual({
+      value: { type: 'app', html: 'home' },
+      lastModified: 7_000,
+    });
+    expect(asked[0]).toBe(staticAssetUrl('/index', 'B1'));
+    expect(await cache.get('/missing')).toBeNull();
+    // Fetch-cache entries never come from the build copy.
+    expect(await cache.get('/index', 'fetch')).toBeNull();
   });
 });

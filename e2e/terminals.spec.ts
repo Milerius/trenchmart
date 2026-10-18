@@ -123,6 +123,24 @@ test('market grid: first three covers load eagerly with high priority, the rest 
   await expect(page.getByText('Terminal · Axiom')).toBeVisible();
 });
 
+test('market covers are responsive: phones download the 480 px copy, not the 1600 px original', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const asked: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/api/v1/media/')) asked.push(new URL(r.url()).search);
+  });
+  await stub(page);
+  await page.goto('/search');
+  const cover = page.locator('main img[src^="/api/v1/media/"]').first();
+  await expect(cover).toHaveAttribute('srcset', /\?w=480 480w, .*\?w=960 960w, .* 1600w/);
+  await expect(cover).toHaveAttribute('sizes', /100vw/);
+  await expect.poll(() => asked.length).toBeGreaterThan(0);
+  // DPR 1 phone: one-column card, ~390 px wide.
+  expect(asked[0]).toBe('?w=480');
+});
+
 test('search page keeps its height while loading (no footer jump)', async ({ page }) => {
   let release: () => void = () => {};
   const gate = new Promise<void>((resolve) => (release = resolve));

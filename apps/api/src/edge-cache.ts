@@ -28,6 +28,8 @@ const DAY = 86_400;
 
 export const EDGE_RULES: Rule[] = [
   // Seller images are stored under a fresh UUID per upload, so the bytes never change.
+  // Narrower copies (?w=480|960) are cached under their own query key; one that does not
+  // exist yet answers a 302 to the original, which is never stored.
   { pattern: /^\/api\/v1\/media\/[0-9a-f-]{36}$/i, fresh: 30 * DAY, stale: DAY, immutable: true },
   // On-chain proof for /verify: chain reads are cached about a minute.
   { pattern: /^\/api\/v1\/transparency$/, fresh: 60, stale: 300, shared: true },

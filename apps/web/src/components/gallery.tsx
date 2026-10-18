@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { HERO_SIZES, mediaSrcSet, mediaThumb } from '@/lib/media';
 
 // The lightbox loads only when someone opens an image.
 const Lightbox = dynamic(() => import('./lightbox').then((m) => m.Lightbox), { ssr: false });
@@ -30,6 +31,8 @@ export function Gallery({ images, title }: { images: GalleryImage[]; title: stri
       >
         <img
           src={current.url}
+          srcSet={mediaSrcSet(current.url)}
+          sizes={HERO_SIZES}
           alt={current.alt || `${title} image ${active + 1}`}
           fetchPriority="high"
           decoding="async"
@@ -58,7 +61,7 @@ export function Gallery({ images, title }: { images: GalleryImage[]; title: stri
                 }`}
               >
                 <img
-                  src={image.url}
+                  src={mediaThumb(image.url)}
                   alt=""
                   className="h-full w-full object-cover"
                   loading="lazy"
