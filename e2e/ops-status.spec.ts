@@ -80,6 +80,17 @@ test('admin status dashboard shows firing alerts, every check, channels, errors 
   await expect(page.getByTestId('ops-events')).toContainText('5xx: 3');
   await expect(page.getByTestId('ops-history')).toContainText('RPC_DOWN');
   await expect(page.getByTestId('ops-history')).toContainText('resolved');
+  if (process.env.PR_SHOTS) {
+    await page.screenshot({
+      path: `${process.env.PR_SHOTS}/admin-status-desktop.png`,
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: `${process.env.PR_SHOTS}/admin-status-mobile.png`,
+      fullPage: true,
+    });
+  }
 });
 
 test('the status dashboard is admin-only and never calls /admin/ops for other wallets', async ({

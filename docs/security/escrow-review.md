@@ -15,32 +15,46 @@ The real risks are in the design around the program, not in its arithmetic:
 - unsafe default secrets and a spoofable rate limiter in the API (H-01, M-03);
 - unverified X handles (M-04).
 
-| ID   | Severity | Area    | Title                                                                               | Status                                      |
-| ---- | -------- | ------- | ----------------------------------------------------------------------------------- | ------------------------------------------- |
-| H-01 | High\*   | API     | Secrets fall back to public `change-me` defaults                                    | Open: confirm prod secrets, add fail-closed |
-| M-01 | Medium   | Program | An off-chain dispute does not freeze funds until the buyer signs `open_dispute`     | Open: program change recommended            |
-| M-02 | Medium   | Program | One hot resolver key per escrow: no rotation, no timeout; it also pays release fees | Open: program + ops change                  |
-| M-03 | Medium   | API     | Rate limit keyed on client-controlled `X-Forwarded-For`; one DB write per request   | Open                                        |
-| M-04 | Medium   | API     | X handle linking is unverified (`POST /studio/x`): creators can impersonate         | Open: needs X OAuth                         |
-| L-01 | Low      | Program | Escrow rent (0.00294 SOL) is never reclaimed; no `close` instruction                | Open: program change                        |
-| L-02 | Low      | Program | PDA seeds omit the buyer, so a known order id can be squatted (griefing)            | Open: program change                        |
-| L-03 | Low      | Program | A sub-rent credit to an empty recipient blocks `release`                            | Mitigated by ops (buckets funded)           |
-| L-04 | Low      | Program | `initialize` has no sanity checks; a recipient equal to the escrow bricks `release` | Open (API issues and verifies all terms)    |
-| L-05 | Low      | API     | Escrow checkout memo matched by substring                                           | **Fixed**                                   |
-| L-06 | Low      | API     | Release payout ledger used today's env buckets and split, not what the program paid | **Fixed**                                   |
-| L-07 | Low      | API     | `resolveDispute` is not transactional and not concurrency-safe                      | Open                                        |
-| I-01 | Info     | Program | The buyer can dispute again after a rejection, inside the window                    | Accepted (delay only)                       |
-| I-02 | Info     | Program | `Released -> Disputed` is allowed forever, as a status flag only                    | Accepted                                    |
-| I-03 | Info     | Program | The program trusts buyer-supplied terms; the API must verify them                   | Mitigated (`escrowMismatch`, tested)        |
-| I-04 | Info     | Program | `open_dispute` after the window returns `TooEarly`                                  | Open: add an error on the next upgrade      |
-| I-05 | Info     | Program | Unaudited, no verified build; a source rebuild hash differs from devnet             | Open                                        |
-| I-06 | Info     | API     | Webhook secret not compared in constant time; webhook token balances are trusted    | Open                                        |
-| I-07 | Info     | API     | `POST /tx/send` relays any signed transaction for any session                       | Open                                        |
-| I-08 | Info     | API     | The funding tx is bound to the order only by memo                                   | Accepted (the account is authoritative)     |
-| I-09 | Info     | API     | `decodeEscrow` accepts data longer than the layout                                  | Accepted (owner + discriminator checked)    |
-| I-10 | Info     | API     | Order memos carry a 32-bit short id                                                 | Accepted                                    |
+| ID   | Severity | Area    | Title                                                                               | Status                                                                                    |
+| ---- | -------- | ------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| H-01 | High\*   | API     | Secrets fall back to public `change-me` defaults                                    | **Fixed** #36 (fail closed, secrets rotated) + #46                                        |
+| M-01 | Medium   | Program | An off-chain dispute does not freeze funds until the buyer signs `open_dispute`     | **Fixed** #37 (resolver `freeze`, live on devnet)                                         |
+| M-02 | Medium   | Program | One hot resolver key per escrow: no rotation, no timeout; it also pays release fees | **Fixed** #37 (config PDA, `set_resolver`, 7-day `refund_after_timeout`, crank fee payer) |
+| M-03 | Medium   | API     | Rate limit keyed on client-controlled `X-Forwarded-For`; one DB write per request   | **Fixed** #38 (Workers rate-limit binding on proxied client IP)                           |
+| M-04 | Medium   | API     | X handle linking is unverified (`POST /studio/x`): creators can impersonate         | **Fixed** #42 (X OAuth 2.0 PKCE; needs X app credentials)                                 |
+| L-01 | Low      | Program | Escrow rent (0.00294 SOL) is never reclaimed; no `close` instruction                | **Fixed** #37 (`close`, cron housekeeping)                                                |
+| L-02 | Low      | Program | PDA seeds omit the buyer, so a known order id can be squatted (griefing)            | **Fixed** #37 (seeds `["escrow", buyer, order_id]`)                                       |
+| L-03 | Low      | Program | A sub-rent credit to an empty recipient blocks `release`                            | Mitigated by ops (buckets funded)                                                         |
+| L-04 | Low      | Program | `initialize` has no sanity checks; a recipient equal to the escrow bricks `release` | **Fixed** #37 (`initialize` checks)                                                       |
+| L-05 | Low      | API     | Escrow checkout memo matched by substring                                           | **Fixed**                                                                                 |
+| L-06 | Low      | API     | Release payout ledger used today's env buckets and split, not what the program paid | **Fixed**                                                                                 |
+| L-07 | Low      | API     | `resolveDispute` is not transactional and not concurrency-safe                      | **Fixed** #37 (`sql.begin` + `for update`)                                                |
+| I-01 | Info     | Program | The buyer can dispute again after a rejection, inside the window                    | Accepted (delay only)                                                                     |
+| I-02 | Info     | Program | `Released -> Disputed` is allowed forever, as a status flag only                    | Accepted                                                                                  |
+| I-03 | Info     | Program | The program trusts buyer-supplied terms; the API must verify them                   | Mitigated (`escrowMismatch`, tested)                                                      |
+| I-04 | Info     | Program | `open_dispute` after the window returns `TooEarly`                                  | **Fixed** #37 (`WindowClosed`)                                                            |
+| I-05 | Info     | Program | Unaudited, no verified build; a source rebuild hash differs from devnet             | Open: audit declined by owner; verified build needs Docker/workflow scope                 |
+| I-06 | Info     | API     | Webhook secret not compared in constant time; webhook token balances are trusted    | **Fixed** #38 (constant-time compare, balances re-read on chain)                          |
+| I-07 | Info     | API     | `POST /tx/send` relays any signed transaction for any session                       | Open                                                                                      |
+| I-08 | Info     | API     | The funding tx is bound to the order only by memo                                   | Accepted (the account is authoritative)                                                   |
+| I-09 | Info     | API     | `decodeEscrow` accepts data longer than the layout                                  | Accepted (owner + discriminator checked)                                                  |
+| I-10 | Info     | API     | Order memos carry a 32-bit short id                                                 | Accepted                                                                                  |
 
 \* High if any of those secrets is unset in a deployed Worker. I could not see the Cloudflare secrets, so this is conditional.
+
+## Status update (2026-10-18)
+
+Program v2 (#37) was upgraded on devnet through the Squads vault (execute sig `423paLho…6Q1pSacng1KrE7ZK`). The on-chain hash matches the build. The config PDA `DWgrsny5…Z4joJ` is initialized: resolver `7q5UJ8…`, dispute timeout 7 days.
+
+Live smoke test, order `54ad8cd9…`:
+
+| Step                                           | Signature         |
+| ---------------------------------------------- | ----------------- |
+| Checkout into the buyer-keyed PDA              | `5BZNfyJG…QK7NWF` |
+| Resolver freeze, without the buyer's signature | `3cgda7vh…Grds`   |
+| Admin refund                                   | `5qiRbgdQ…94LWP`  |
+
+Owner decisions (2026-10-18): no third-party audit, no hardware-wallet multisig. The owner holds the mainnet upgrade authority and resolver keys himself. Remaining open items: I-05 (verified build) and I-07 (`/tx/send` relay; low impact because the wallet signs every transaction).
 
 ## What was verified as correct
 
