@@ -1,0 +1,44 @@
+{
+  "voice": "af_heart",
+  "speed": 1.05,
+  "lines": [
+    {
+      "id": "s01-hook",
+      "at": 12,
+      "maxSec": 3.9,
+      "text": "Every file on TrenchMart is checked before anyone can buy it."
+    },
+    {
+      "id": "s02-upload",
+      "at": 156,
+      "maxSec": 4.1,
+      "text": "Upload a script, and its hash is pinned the moment it lands."
+    },
+    {
+      "id": "s03-review",
+      "at": 300,
+      "maxSec": 6.6,
+      "text": "A static scan and a sandboxed run go first. Then a rules engine and an LLM give their verdict, live.",
+      "say": "A static scan and a sandboxed run go first. Then a rules engine and an L L M give their verdict, live."
+    },
+    {
+      "id": "s04-verdict",
+      "at": 516,
+      "maxSec": 6.2,
+      "text": "When they disagree, the stricter verdict wins. The model can only make it stricter."
+    },
+    {
+      "id": "s05-report",
+      "at": 732,
+      "maxSec": 4.6,
+      "text": "Every listing has a signed scan report. Check it yourself on /verify.",
+      "say": "Every listing has a signed scan report. Check it yourself on slash verify."
+    },
+    {
+      "id": "s06-outro",
+      "at": 880,
+      "maxSec": 3.4,
+      "text": "TrenchMart. Reviewed, then listed."
+    }
+  ]
+}

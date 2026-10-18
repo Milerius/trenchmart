@@ -1,0 +1,60 @@
+{
+  "voice": "af_heart",
+  "speed": 1.05,
+  "lines": [
+    {
+      "id": "t01-hook",
+      "at": 12,
+      "maxSec": 3.8,
+      "text": "Hold $TRENCH, and pay lower fees on every purchase.",
+      "say": "Hold trench, and pay lower fees on every purchase."
+    },
+    {
+      "id": "t02-fee",
+      "at": 156,
+      "maxSec": 4.5,
+      "text": "Buyers pay a 5% fee on top. Creators pay 0% commission.",
+      "say": "Buyers pay a five percent fee on top. Creators pay zero commission."
+    },
+    {
+      "id": "t03-scout",
+      "at": 300,
+      "maxSec": 3.9,
+      "text": "Hold 100K and you're a Scout: 25% off the fee.",
+      "say": "Hold a hundred K, and you're a Scout: twenty-five percent off the fee."
+    },
+    {
+      "id": "t04-trencher",
+      "at": 396,
+      "maxSec": 3.0,
+      "text": "1M makes you a Trencher: 60% off.",
+      "say": "One million makes you a Trencher: sixty percent off."
+    },
+    {
+      "id": "t05-og",
+      "at": 492,
+      "maxSec": 2.8,
+      "text": "10M is OG. No fee at all.",
+      "say": "Ten million is O G. No fee at all."
+    },
+    {
+      "id": "t06-checkout",
+      "at": 588,
+      "maxSec": 3.9,
+      "text": "Your discount is applied right in checkout, before you sign."
+    },
+    {
+      "id": "t07-window",
+      "at": 732,
+      "maxSec": 4.7,
+      "text": "Tiers use your lowest balance over the last 72 hours. No flash-buy games.",
+      "say": "Tiers use your lowest balance over the last seventy-two hours. No flash-buy games."
+    },
+    {
+      "id": "t08-outro",
+      "at": 880,
+      "maxSec": 3.4,
+      "text": "TrenchMart. Tiers are live on devnet today."
+    }
+  ]
+}
