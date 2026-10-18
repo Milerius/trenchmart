@@ -18,7 +18,7 @@ import {
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import type { EscrowChain } from './escrow';
-import { escrowHousekeeping, releaseOrders, resolveDispute } from './logic';
+import { escrowHousekeeping, opsCheck, releaseOrders, resolveDispute } from './logic';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
@@ -1590,5 +1590,65 @@ describe('owner product decisions', () => {
       { amount: string }[]
     >`select amount::text as amount from token_balances where wallet = ${wallet}`;
     expect(rows).toEqual([{ amount: '42' }]);
+  });
+  it('ops check: low hot-wallet balance, stuck release, internal endpoint', async () => {
+    const resolver = nacl.sign.keyPair();
+    const env = readEnv({
+      SOLANA_CLUSTER: 'devnet',
+      VAULT_ADDRESS: vault.publicKey,
+      SESSION_SECRET: 'test-secret-test-secret-test-secret',
+      INTERNAL_TOKEN: 'internal',
+      API_URL: 'http://localhost:8787',
+      ESCROW_PROGRAM_ID: 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw',
+      ESCROW_RESOLVER_SECRET: bs58.encode(resolver.secretKey),
+    });
+    let lamports = 1_000_000_000n;
+    const deps: Deps = {
+      sql,
+      blob: filesystemBlob(await mkdtemp(join(tmpdir(), 'tm-ops-')), env.sessionSecret, env.apiUrl),
+      env,
+      now: () => now,
+      getTx: async () => null,
+      blockhash: async () => ({ blockhash, lastValidBlockHeight: 1 }),
+      escrowChain: {
+        account: async () => ({
+          data: new Uint8Array(),
+          owner: '11111111111111111111111111111111',
+          lamports,
+        }),
+        sendAndConfirm: async () => '',
+      },
+    };
+    expect(await opsCheck(deps)).toEqual([]);
+    lamports = 1_000n;
+    expect((await opsCheck(deps)).map((a) => a.code)).toEqual(['LOW_BALANCE']);
+    lamports = 1_000_000_000n;
+    const buyerId = randomUUID();
+    const creatorId = randomUUID();
+    const listingId = randomUUID();
+    const versionId = randomUUID();
+    await sql`insert into users (id, wallet) values (${buyerId}, ${randomKeypair().publicKey}), (${creatorId}, ${randomKeypair().publicKey})`;
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price)
+      values (${listingId}, ${creatorId}, 'ops', 'Ops', 'Sum', 'Desc', 'userscript', ${1n})
+    `;
+    await sql`
+      insert into versions (id, listing_id, semver, file_name, file_size, sha256, r2_key, status)
+      values (${versionId}, ${listingId}, '1.0.0', 'o.user.js', 1, 'o', 'blobs/o', 'live')
+    `;
+    await sql`
+      insert into orders (id, buyer_id, listing_id, version_id, price, fee_bps, rebate_bps, fee, rebate, total, tier_at_purchase, memo, status, expires_at, escrow_until)
+      values (${randomUUID()}, ${buyerId}, ${listingId}, ${versionId}, 1, 0, 0, 0, 0, 1, 'none', 'tm:ops', 'paid', ${now}, ${new Date(now.getTime() - 3_600_000)})
+    `;
+    expect((await opsCheck(deps)).map((a) => a.code)).toEqual(['RELEASE_STUCK']);
+    const app = createApp(deps);
+    expect((await app.request('/api/v1/internal/ops')).status).toBe(401);
+    const res = await app.request('/api/v1/internal/ops', {
+      headers: { authorization: 'Bearer internal' },
+    });
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { alerts: { code: string }[] }).alerts[0]!.code).toBe(
+      'RELEASE_STUCK',
+    );
   });
 });

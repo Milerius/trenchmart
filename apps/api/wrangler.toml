@@ -31,3 +31,7 @@ queue = "scan-static"
 name = "RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 120, period = 60 }
+
+# Workers Logs: keeps console output (ALERT lines from opsCheck and the cron) searchable.
+[observability]
+enabled = true

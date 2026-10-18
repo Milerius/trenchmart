@@ -85,6 +85,7 @@ import {
   disputeTx,
   proposePayouts,
   quoteListing,
+  opsCheck,
   recordChainBalance,
   releaseOrders,
   resolveDispute,
@@ -1239,6 +1240,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       ),
       cfConnectingIp: c.req.header('cf-connecting-ip') ?? null,
     });
+  });
+
+  // Monitoring endpoint for an external uptime check: 200 {"ok":true} or 503 with alerts.
+  api.get('/internal/ops', async (c) => {
+    assertInternal(c, deps.env);
+    const alerts = await opsCheck(deps);
+    const critical = alerts.some((a) => a.level === 'critical');
+    return c.json({ ok: !critical, alerts }, critical ? 503 : 200);
   });
 
   api.post('/internal/cron/:job', async (c) => {
