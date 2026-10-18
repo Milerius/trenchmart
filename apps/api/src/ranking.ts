@@ -27,7 +27,7 @@ import {
  * leaderboard snapshot. Admin-tunable through the `rank_config` config row.
  */
 
-const upvoteBody = z.object({ up: z.boolean() });
+export const upvoteBody = z.object({ up: z.boolean() });
 const DAY_MS = 86_400_000;
 
 export async function loadRankConfig(deps: Deps): Promise<RankConfig> {

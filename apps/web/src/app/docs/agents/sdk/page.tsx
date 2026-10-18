@@ -49,7 +49,7 @@ const METHODS: [string, string][] = [
   ],
   ['release(orderId) · waitAndRelease(orderId)', 'Release after the escrow window.'],
   [
-    'review(signer, orderId, {rating, body, terminal?}) · replyToReview(id, body) · voteReview · upvote',
+    'review(signer, orderId, {rating, body, terminal?}) · replyToReview(id, body) · voteReview · upvote(slug, up?) · upvotes(slug)',
     'Signed reviews and social actions.',
   ],
   [

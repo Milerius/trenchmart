@@ -254,6 +254,7 @@ describe('client', () => {
       client.replyToReview(id, 'thanks'),
       client.voteReview(id, true),
       client.upvote('slug'),
+      client.upvotes('slug'),
       client.profile(),
       client.updateProfile({ bio: 'x' }),
       client.uploadAvatar(new Uint8Array([1])),
@@ -311,6 +312,16 @@ describe('client', () => {
     expect((err as TrenchmartError).status).toBe(403);
     expect((err as TrenchmartError).code).toBe('INSUFFICIENT_SCOPE');
     expect(n).toBe(2);
+  });
+
+  it('sends the upvote body the API validates ({up}), true by default', async () => {
+    const { client, calls } = mockClient(() => ({ body: { count: 1 } }));
+    await client.upvote('my-pack');
+    await client.upvote('my-pack', false);
+    expect(calls.map((c) => [c.method, c.path, c.body])).toEqual([
+      ['POST', '/api/v1/listings/my-pack/upvote', { up: true }],
+      ['POST', '/api/v1/listings/my-pack/upvote', { up: false }],
+    ]);
   });
 
   it('refuses to sign a key challenge that does not state the requested scopes', async () => {

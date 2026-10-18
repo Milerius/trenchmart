@@ -25,6 +25,7 @@ import {
 import { broadcastBody, challengeBody, challengeKeyBody, studioKeyBody, scopeFor } from './agent';
 import { contentBody, reviewContentBody } from './content';
 import { bookingBody } from './featuring';
+import { upvoteBody } from './ranking';
 
 /**
  * OpenAPI 3.1 description of the agent-facing API, served at /api/v1/openapi.json. Request
@@ -632,7 +633,8 @@ export const ROUTES: RouteDoc[] = [
     method: 'post',
     path: '/listings/{slug}/upvote',
     tag: 'Reviews',
-    summary: 'Toggle your upvote',
+    summary: 'Upvote a listing (up: true) or remove your upvote (up: false)',
+    body: upvoteBody,
   },
   {
     method: 'post',

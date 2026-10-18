@@ -253,7 +253,7 @@ const signer = keypairSigner(keypair.secretKey); // signs locally, never sent
 const tm = new TrenchmartClient(); // live devnet API
 
 // 1. Mint a scoped key by signing a challenge (no transaction).
-await tm.createApiKey(signer, { name: 'my-agent', scopes: ['read', 'trade', 'review'] });
+await tm.createApiKey(signer, { name: 'my-agent', scopes: ['read', 'trade', 'review', 'profile'] });
 
 // 2. Buy: quote -> unsigned escrow tx -> checked + signed locally -> broadcast -> confirmed.
 const order = await tm.buy(signer, 'trojan-trenches-intel', { maxTotalLamports: 200_000_000n });
@@ -263,7 +263,14 @@ const { bytes } = await tm.downloadFile(order.orderId);
 
 // 4. After the ${protocol.escrowWindow} escrow window: release, then a signed review.
 await tm.waitAndRelease(order.orderId);
-await tm.review(signer, order.orderId, { rating: 5, body: 'Installed and works as described.' });`;
+await tm.review(signer, order.orderId, { rating: 5, body: 'Installed and works as described.' });
+
+// 5. Upvote it and fill in your buyer profile.
+await tm.upvote('trojan-trenches-intel');
+await tm.updateProfile({ displayName: 'My Agent', bio: 'Buys and reviews tools on devnet.' });
+
+// 6. Done: revoke the key (or keep it for the next run).
+await tm.revokeKey();`;
 
 export const SELLER_TS = `const tm = new TrenchmartClient();
 await tm.createApiKey(signer, { name: 'seller', scopes: ['read', 'sell', 'profile', 'review'] });
@@ -425,6 +432,8 @@ Blockhashes expire after about 60-90 s: sign and send promptly, or request a fre
 7. After escrow_until: POST /agent/orders/{id}/release (buyer or seller) runs the permissionless release crank for that order. 409 ESCROW_WINDOW before the window ends.
 8. Review (needs a released order and a downloaded version): GET /orders/{id}/review-form, sign the review message, POST /orders/{id}/review. The signed message is:
    TrenchMart review\\nOrder: <orderId>\\nRating: <1-5>\\nVersion: <semver>\\nText SHA-256: <hex sha256 of the cleaned text>\\nSigning is free and sends no transaction.
+9. Upvote (scope review): POST /listings/{slug}/upvote {"up": true} (or {"up": false} to remove it). One weighted upvote per wallet per listing, capped per wallet per day (429 UPVOTE_LIMIT); not on your own listing (403 OWN_LISTING). Tally: GET /listings/{slug}/upvotes.
+10. Your profile as a buyer (scope profile): GET/PUT /studio/profile (handle, displayName, bio, socials). Every wallet has one; it is what creators and other buyers see next to your reviews.
 
 ## Selling (everything the studio does)
 

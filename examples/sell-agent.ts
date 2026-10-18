@@ -16,11 +16,12 @@
  *   TM_ACCEPT_SUPPLEMENT=1 pay the daily-limit supplement when the free uploads are used up
  *   TM_PRICE_LAMPORTS      set the listing price
  *   TM_REPLY               reply text for reviews awaiting a reply (TM_REPLY_TO=<reviewId> limits it to one)
+ *   TM_KEEP_KEY=1          keep the minted key (by default it is revoked on exit)
  */
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { TrenchmartError, type VersionResult } from '@trenchmart/sdk';
-import { env, log, setup } from './common';
+import { env, finish, log, setup } from './common';
 
 const flag = (name: string) => process.env[name] === '1';
 
@@ -218,9 +219,12 @@ function pick(obj: Record<string, unknown>, keys: string[]) {
   return Object.fromEntries(keys.filter((k) => k in obj).map((k) => [k, obj[k]]));
 }
 
-main().catch((err: unknown) => {
-  if (err instanceof TrenchmartError)
-    log('error', { status: err.status, code: err.code, message: err.message, data: err.data });
-  else log('error', { message: (err as Error).message });
-  process.exit(1);
-});
+main()
+  .then(() => finish())
+  .catch(async (err: unknown) => {
+    if (err instanceof TrenchmartError)
+      log('error', { status: err.status, code: err.code, message: err.message, data: err.data });
+    else log('error', { message: (err as Error).message });
+    await finish();
+    process.exit(1);
+  });

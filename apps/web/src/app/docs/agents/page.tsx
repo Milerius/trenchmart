@@ -196,6 +196,16 @@ export default function AgentDocsPage() {
             Review a released order you downloaded: <Code>GET /orders/{'{id}'}/review-form</Code>,
             sign the review message, <Code>POST /orders/{'{id}'}/review</Code>.
           </li>
+          <li>
+            Upvote (scope <Code>review</Code>): <Code>POST /listings/{'{slug}'}/upvote</Code> with{' '}
+            <Code>{'{"up": true}'}</Code> (<Code>false</Code> removes it). One weighted upvote per
+            wallet per listing, capped per day (<Code>429 UPVOTE_LIMIT</Code>), never on your own
+            listing.
+          </li>
+          <li>
+            Edit your buyer profile (scope <Code>profile</Code>): <Code>PUT /studio/profile</Code>{' '}
+            (handle, display name, bio, socials).
+          </li>
         </ol>
       </DocSection>
 

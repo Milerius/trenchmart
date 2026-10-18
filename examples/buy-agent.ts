@@ -7,67 +7,107 @@
  * TM_MAX_LAMPORTS (price cap), TM_API_KEY (reuse a key instead of minting one),
  * TM_WAIT_RELEASE=1 (wait out the escrow window, release, then review),
  * TM_REVIEW (review text), TM_ORDER (skip buying: release and review this order),
+ * TM_UPVOTE=0 (skip the upvote), TM_DISPLAY_NAME / TM_BIO (edit the buyer profile),
+ * TM_KEEP_KEY=1 (keep the minted key; by default it is revoked on exit),
  * TM_API_URL / TM_RPC_URL (local stacks).
  */
 import { createHash } from 'node:crypto';
 import { TrenchmartError } from '@trenchmart/sdk';
-import { env, log, setup } from './common';
+import { env, finish, log, setup } from './common';
 
 async function main() {
-  const { client, signer } = await setup('example buyer agent', ['read', 'trade', 'review']);
-
-  if (process.env.TM_ORDER) {
-    await releaseAndReview(process.env.TM_ORDER);
-    return;
+  const { client, signer } = await setup('example buyer agent', [
+    'read',
+    'trade',
+    'review',
+    'profile',
+  ]);
+  try {
+    await run();
+  } finally {
+    await finish(client);
   }
 
-  // 1. Discover: search, then read each candidate and its signed security report.
-  const candidates: string[] = [];
-  if (process.env.TM_LISTING) candidates.push(process.env.TM_LISTING);
-  else {
-    const found = await client.listings({ sort: 'price_asc', limit: 12 });
-    candidates.push(...(Array.isArray(found) ? found : found.items).map((item) => item.slug));
-  }
-  for (const slug of candidates) {
-    const listing = await client.listing(slug);
-    if (listing.creator.wallet === signer.publicKey) continue;
-    const report = await client.securityReport(listing.slug).catch(() => null);
-    const steps = (
-      (report?.report as { steps?: { kind: string; summary: string }[] } | undefined)?.steps ?? []
-    ).map((step) => `${step.kind}:${step.summary}`);
-    log('listing', {
-      slug: listing.slug,
-      title: listing.title,
-      price: listing.price,
-      seller: listing.creator.wallet,
-      scan: steps,
-    });
-
-    // 2. Buy: the SDK checks the unsigned escrow transaction (programs, signer, total,
-    //    seller), signs it locally, relays it through the validated broadcast endpoint and
-    //    waits for the API to confirm the funded escrow.
-    let bought;
-    try {
-      bought = await client.buy(signer, listing.slug, {
-        maxTotalLamports: process.env.TM_MAX_LAMPORTS
-          ? BigInt(process.env.TM_MAX_LAMPORTS)
-          : undefined,
-      });
-    } catch (err) {
-      if (
-        err instanceof TrenchmartError &&
-        ['ALREADY_OWNED', 'OWN_LISTING', 'HOLDER_ONLY', 'HOLDER_WINDOW'].includes(err.code)
-      ) {
-        log('skip', { slug: listing.slug, reason: err.code });
-        continue;
-      }
-      throw err;
+  async function run() {
+    if (process.env.TM_ORDER) {
+      const order = await client.order(process.env.TM_ORDER);
+      await releaseAndReview(process.env.TM_ORDER);
+      await upvoteAndProfile(String(order.slug));
+      return;
     }
-    log('bought', bought);
-    await afterPurchase(bought, listing.terminals[0]);
-    return;
+
+    // 1. Discover: search, then read each candidate and its signed security report.
+    const candidates: string[] = [];
+    if (process.env.TM_LISTING) candidates.push(process.env.TM_LISTING);
+    else {
+      const found = await client.listings({ sort: 'price_asc', limit: 12 });
+      candidates.push(...(Array.isArray(found) ? found : found.items).map((item) => item.slug));
+    }
+    for (const slug of candidates) {
+      const listing = await client.listing(slug);
+      if (listing.creator.wallet === signer.publicKey) continue;
+      const report = await client.securityReport(listing.slug).catch(() => null);
+      const steps = (
+        (report?.report as { steps?: { kind: string; summary: string }[] } | undefined)?.steps ?? []
+      ).map((step) => `${step.kind}:${step.summary}`);
+      log('listing', {
+        slug: listing.slug,
+        title: listing.title,
+        price: listing.price,
+        seller: listing.creator.wallet,
+        scan: steps,
+      });
+
+      // 2. Buy: the SDK checks the unsigned escrow transaction (programs, signer, total,
+      //    seller), signs it locally, relays it through the validated broadcast endpoint and
+      //    waits for the API to confirm the funded escrow.
+      let bought;
+      try {
+        bought = await client.buy(signer, listing.slug, {
+          maxTotalLamports: process.env.TM_MAX_LAMPORTS
+            ? BigInt(process.env.TM_MAX_LAMPORTS)
+            : undefined,
+        });
+      } catch (err) {
+        if (
+          err instanceof TrenchmartError &&
+          ['ALREADY_OWNED', 'OWN_LISTING', 'HOLDER_ONLY', 'HOLDER_WINDOW'].includes(err.code)
+        ) {
+          log('skip', { slug: listing.slug, reason: err.code });
+          continue;
+        }
+        throw err;
+      }
+      log('bought', bought);
+      await afterPurchase(bought, listing.terminals[0]);
+      await upvoteAndProfile(listing.slug);
+      return;
+    }
+    throw new Error('no listing this wallet can buy');
   }
-  throw new Error('no listing this wallet can buy');
+
+  // 5. Upvote what it bought (weighted, one per listing, capped per day) and fill in the
+  //    buyer profile other buyers and creators see next to its reviews.
+  async function upvoteAndProfile(slug: string) {
+    if (env('TM_UPVOTE', '1') === '1') {
+      try {
+        const state = await client.upvote(slug);
+        log('upvoted', { slug, ...pick(state, ['count', 'counted', 'viewer']) });
+      } catch (err) {
+        // Daily cap reached: not fatal for the run.
+        if (!(err instanceof TrenchmartError) || err.code !== 'UPVOTE_LIMIT') throw err;
+        log('upvote skipped', { slug, reason: err.code });
+      }
+    }
+    if (process.env.TM_DISPLAY_NAME || process.env.TM_BIO) {
+      await client.updateProfile({
+        displayName: process.env.TM_DISPLAY_NAME,
+        bio: process.env.TM_BIO,
+      });
+      const profile = await client.profile();
+      log('profile updated', { displayName: profile.displayName, bio: profile.bio });
+    }
+  }
 
   async function afterPurchase(
     bought: { orderId: string; escrowUntil: string },
@@ -105,6 +145,10 @@ async function main() {
     });
     log('reviewed', review);
   }
+}
+
+function pick(obj: Record<string, unknown>, keys: string[]) {
+  return Object.fromEntries(keys.filter((k) => k in obj).map((k) => [k, obj[k]]));
 }
 
 main().catch((err: unknown) => {

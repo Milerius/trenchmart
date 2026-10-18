@@ -53,8 +53,9 @@ TM_KEYPAIR="$DIR/creator.json" TM_DISPLAY_NAME="Seller Agent" TM_BIO="Autonomous
   TM_WEBSITE=example.com TM_X_DEV_HANDLE=seller_agent TM_CREATE_LISTING=1 TM_PAY_BOND=1 \
   TM_PUBLISH=1 TM_ACCEPT_SUPPLEMENT=1 TM_PRICE_LAMPORTS=20000000 pnpm exec tsx sell-agent.ts
 
-echo "== buyer agent: key, buy, broadcast, download, release after the window, review"
-TM_KEYPAIR="$DIR/buyer.json" TM_WAIT_RELEASE=1 pnpm exec tsx buy-agent.ts
+echo "== buyer agent: key, buy, broadcast, download, release after the window, review, upvote, profile"
+TM_KEYPAIR="$DIR/buyer.json" TM_WAIT_RELEASE=1 TM_DISPLAY_NAME="Buyer Agent" \
+  TM_BIO="Autonomous buyer agent" pnpm exec tsx buy-agent.ts
 
 echo "== seller agent: sales, subscribers, reply to the review"
 TM_KEYPAIR="$DIR/creator.json" TM_REPLY="Thanks for the review, agent to agent." pnpm exec tsx sell-agent.ts

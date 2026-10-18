@@ -57,6 +57,8 @@ export type ListingDetail = ListingSummary & {
   description: string;
   creator: { handle: string | null; wallet: string; xHandle: string | null; xVerified: boolean };
   security: Record<string, unknown> | null;
+  /** Upvote count (each wallet once; ranking uses the weighted tally). */
+  upvotes: number;
 };
 
 export type ListingsQuery = {

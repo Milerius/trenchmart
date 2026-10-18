@@ -16,7 +16,7 @@ Every file passes automated security review in seconds. Every order is held by a
 
 **[trenchmart.fun](https://trenchmart.fun)** · [Docs](https://trenchmart.fun/docs) · [Security review](docs/security/escrow-review.md) · [Mainnet readiness](docs/mainnet-readiness.md)
 
-[How buying works](#how-buying-works) · [Fees and tiers](#fees-and-tiers) · [Trust and security](#trust-and-security) · [For creators](#for-creators) · [Status](#status) · [Quickstart](#quickstart) · [Docs](#documentation)
+[How buying works](#how-buying-works) · [Fees and tiers](#fees-and-tiers) · [Trust and security](#trust-and-security) · [For creators](#for-creators) · [For agents](#for-agents) · [Status](#status) · [Quickstart](#quickstart) · [Docs](#documentation)
 
 <br />
 
@@ -162,6 +162,17 @@ Approved files are pinned by SHA-256. Buyers only ever receive that exact file, 
 - **Verification fee.** 0.25 SOL per version, paid at upload into the Squads vault. It's waived from the Trencher tier up.
 - **Payouts in SOL** from the Squads vault after each order's 1 hour escrow releases.
 
+## For agents
+
+AI agents buy and sell through a non-custodial, versioned API at `https://api.trenchmart.fun/api/v1` (devnet). The API builds unsigned transactions; the agent checks and signs them with its own keypair, then relays them through a validated broadcast endpoint (only byte-identical messages the API issued to that wallet, signed by that wallet, calling allowlisted programs) or its own RPC. TrenchMart never holds an agent's key.
+
+- **Keys.** Mint a scoped key (`read`, `trade`, `sell`, `profile`, `review`) by signing a challenge with the wallet (no transaction), or create one in Studio → API keys. Keys are hashed at rest, capped at 10 per wallet, rate limited per key (60/min by default) and revocable.
+- **Buyers.** Browse and read signed security reports, buy into the on-chain escrow, download the watermarked file, release after the window, leave a signed review, upvote, and edit their profile.
+- **Creators.** Profile and socials, bond, listings of every type with their specs, uploads through the same security scan (verdict and reasons by polling), prices and update prices, sales, subscribers, payouts, review replies and featured spots.
+- **Docs.** [trenchmart.fun/docs/agents](https://trenchmart.fun/docs/agents), the [endpoint reference](https://trenchmart.fun/docs/agents/reference), the [OpenAPI 3.1 spec](https://api.trenchmart.fun/api/v1/openapi.json), and raw [`/llms.txt`](https://trenchmart.fun/llms.txt) and [`/llms-full.txt`](https://trenchmart.fun/llms-full.txt).
+- **SDK.** [`@trenchmart/sdk`](packages/sdk) (TypeScript): typed client, local signers, and transaction checks before signing. It is ready for npm but not published yet (see its README).
+- **Examples.** [`examples/`](examples) has a buyer agent and a seller agent. CI runs both end to end on a local validator for every PR.
+
 ## Status
 
 TrenchMart is a **devnet proof of concept**. The site, API, escrow program and Squads vault are live on Solana devnet, with test SOL only.
@@ -172,6 +183,7 @@ TrenchMart is a **devnet proof of concept**. The site, API, escrow program and S
 | Verified build                    | CI compares a `solana-verify` build against the deployed program ([verified-build](docs/ops/verified-build.md)).                                                                                      |
 | X sign-in                         | Built (PKCE, verified ids); waiting on the production X app. Until then, devnet handles are labelled unverified.                                                                                      |
 | API hardening                     | Fail-closed secrets, edge rate limiting, security headers, Hyperdrive TLS to Postgres.                                                                                                                |
+| Agent API and SDK                 | Live on devnet: scoped keys, validated broadcast, buyer and creator flows, docs and llms.txt. The SDK is not on npm yet (license and npm token pending).                                              |
 | Monitoring and backups            | 5-minute health checks; nightly encrypted backups ([monitoring](docs/ops/monitoring.md), [backups](docs/ops/backups.md)).                                                                             |
 | Mainnet                           | Not yet. The open items are tracked in [mainnet readiness](docs/mainnet-readiness.md), including the $TRENCH launch and lifting the devnet guard.                                                     |
 
@@ -212,23 +224,24 @@ The screenshots in this README are captured from the live devnet site at [trench
 
 ## Documentation
 
-| Topic                  | Doc                                                                                                                               |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Product and scope      | [`docs/01-product.md`](docs/01-product.md) · [`docs/13-product-decisions.md`](docs/13-product-decisions.md)                       |
-| Architecture           | [`docs/02-architecture.md`](docs/02-architecture.md) · [`docs/TOOLCHAIN.md`](docs/TOOLCHAIN.md)                                   |
-| Data model and API     | [`docs/03-data-model.md`](docs/03-data-model.md) · [`docs/04-api.md`](docs/04-api.md)                                             |
-| Security               | [`docs/05-security-pipeline.md`](docs/05-security-pipeline.md) · [escrow security review](docs/security/escrow-review.md)         |
-| Mainnet readiness      | [`docs/mainnet-readiness.md`](docs/mainnet-readiness.md): what is done, what is left, and the owner decisions                     |
-| Operations             | [`docs/ops/`](docs/ops/): monitoring, backups, verified build                                                                     |
-| User docs (live)       | [trenchmart.fun/docs](https://trenchmart.fun/docs): buyers, sellers, escrow, fees, $TRENCH, security, treasury, FAQ               |
-| Payments and escrow    | [`docs/06-payments-escrow.md`](docs/06-payments-escrow.md) · [`docs/ESCROW_TESTNET_EVIDENCE.md`](docs/ESCROW_TESTNET_EVIDENCE.md) |
-| $TRENCH tiers          | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                                |
-| Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/)        |
-| Brand assets           | [`brand/`](brand/): logo mark, wordmark (dark and light), X avatar and header, favicon. `pnpm brand` re-renders the PNGs          |
-| Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                                     |
-| Database deploy        | [`docs/DEPLOY_DATABASE.md`](docs/DEPLOY_DATABASE.md): Supabase, Hyperdrive, per-request connections, RLS                          |
-| Costs and budget       | [`docs/11-costs.md`](docs/11-costs.md) · [`docs/12-budget.md`](docs/12-budget.md) · [`DEPLOYMENT_COSTS.md`](DEPLOYMENT_COSTS.md)  |
-| Brief for build agents | [`AGENT_PROMPT.md`](AGENT_PROMPT.md)                                                                                              |
+| Topic                  | Doc                                                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product and scope      | [`docs/01-product.md`](docs/01-product.md) · [`docs/13-product-decisions.md`](docs/13-product-decisions.md)                                                               |
+| Architecture           | [`docs/02-architecture.md`](docs/02-architecture.md) · [`docs/TOOLCHAIN.md`](docs/TOOLCHAIN.md)                                                                           |
+| Data model and API     | [`docs/03-data-model.md`](docs/03-data-model.md) · [`docs/04-api.md`](docs/04-api.md)                                                                                     |
+| Security               | [`docs/05-security-pipeline.md`](docs/05-security-pipeline.md) · [escrow security review](docs/security/escrow-review.md)                                                 |
+| Mainnet readiness      | [`docs/mainnet-readiness.md`](docs/mainnet-readiness.md): what is done, what is left, and the owner decisions                                                             |
+| Operations             | [`docs/ops/`](docs/ops/): monitoring, backups, verified build                                                                                                             |
+| Agent API              | [trenchmart.fun/docs/agents](https://trenchmart.fun/docs/agents) · [`packages/sdk`](packages/sdk) · [`examples/`](examples) · [llms.txt](https://trenchmart.fun/llms.txt) |
+| User docs (live)       | [trenchmart.fun/docs](https://trenchmart.fun/docs): buyers, sellers, escrow, fees, $TRENCH, security, treasury, FAQ                                                       |
+| Payments and escrow    | [`docs/06-payments-escrow.md`](docs/06-payments-escrow.md) · [`docs/ESCROW_TESTNET_EVIDENCE.md`](docs/ESCROW_TESTNET_EVIDENCE.md)                                         |
+| $TRENCH tiers          | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                                                                        |
+| Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/)                                                |
+| Brand assets           | [`brand/`](brand/): logo mark, wordmark (dark and light), X avatar and header, favicon. `pnpm brand` re-renders the PNGs                                                  |
+| Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                                                                             |
+| Database deploy        | [`docs/DEPLOY_DATABASE.md`](docs/DEPLOY_DATABASE.md): Supabase, Hyperdrive, per-request connections, RLS                                                                  |
+| Costs and budget       | [`docs/11-costs.md`](docs/11-costs.md) · [`docs/12-budget.md`](docs/12-budget.md) · [`DEPLOYMENT_COSTS.md`](DEPLOYMENT_COSTS.md)                                          |
+| Brief for build agents | [`AGENT_PROMPT.md`](AGENT_PROMPT.md)                                                                                                                                      |
 
 <div align="center">
 <sub>Devnet proof of concept. Not financial advice. Tools don't guarantee profits.</sub>
