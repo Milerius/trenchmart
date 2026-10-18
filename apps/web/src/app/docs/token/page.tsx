@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
-import { formatTrench } from '@trenchmart/shared';
+import { formatTrench } from '@trenchmart/shared/tier';
 import { protocol, tierRows } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: '$TRENCH · TrenchMart docs' };

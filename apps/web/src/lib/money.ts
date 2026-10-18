@@ -1,4 +1,4 @@
-import { lamportsToUsdCents } from '@trenchmart/shared';
+import { lamportsToUsdCents } from '@trenchmart/shared/price';
 
 const LAMPORTS = 1_000_000_000n;
 

@@ -1,10 +1,13 @@
 'use client';
 
-import { DEFAULT_ESCROW_HOURS, escrowWindowLabel } from '@trenchmart/shared';
+import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
+import { escrowWindowLabel } from '@trenchmart/shared/escrow';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { categoryMeta, quote as quoteFor, specRows } from '@trenchmart/shared';
+import { categoryMeta } from '@trenchmart/shared/categories';
+import { quote as quoteFor } from '@trenchmart/shared/fee';
+import { specRows } from '@trenchmart/shared/listing-kinds';
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';

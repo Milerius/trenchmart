@@ -1,14 +1,14 @@
 'use client';
 
+import { CATEGORIES } from '@trenchmart/shared/categories';
 import {
   categoryForKind,
-  CATEGORIES,
-  defaultUpdatePrice,
   kindMeta,
   specRows,
   type ListingKind,
   type ListingSpecs,
-} from '@trenchmart/shared';
+} from '@trenchmart/shared/listing-kinds';
+import { defaultUpdatePrice } from '@trenchmart/shared/versioning';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';

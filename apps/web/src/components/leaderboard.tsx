@@ -1,6 +1,6 @@
 'use client';
 
-import type { PublicIdentity } from '@trenchmart/shared';
+import type { PublicIdentity } from '@trenchmart/shared/social';
 import Link from 'next/link';
 import { XIcon } from '@/components/icons';
 import { Avatar, VerifiedBadge } from '@/components/profile';

@@ -1,11 +1,9 @@
 'use client';
 
-import {
-  categoryMeta,
-  DEFAULT_ESCROW_HOURS,
-  escrowWindowLabel,
-  solToLamports,
-} from '@trenchmart/shared';
+import { categoryMeta } from '@trenchmart/shared/categories';
+import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
+import { escrowWindowLabel } from '@trenchmart/shared/escrow';
+import { solToLamports } from '@trenchmart/shared/money';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -780,7 +778,13 @@ function ListingRow({
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-14 shrink-0 place-items-center overflow-hidden rounded-tag border border-line-soft bg-inset font-mono text-[9px] text-muted">
             {l.coverUrl ? (
-              <img src={l.coverUrl} alt="" className="h-full w-full object-cover" />
+              <img
+                src={l.coverUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
             ) : (
               meta.tag
             )}

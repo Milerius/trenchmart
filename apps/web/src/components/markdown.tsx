@@ -1,7 +1,12 @@
 'use client';
 
 import { createContext, Fragment, useContext, useMemo, type ReactNode } from 'react';
-import { mediaIdOf, safeMarkdown, type SafeBlock, type SafeInline } from '@trenchmart/shared';
+import {
+  mediaIdOf,
+  safeMarkdown,
+  type SafeBlock,
+  type SafeInline,
+} from '@trenchmart/shared/markdown';
 
 /**
  * Editor previews only: maps a media id to a local object URL for an image that is picked but
