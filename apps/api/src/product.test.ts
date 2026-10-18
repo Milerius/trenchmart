@@ -19,6 +19,10 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import type { EscrowChain } from './escrow';
 import { escrowHousekeeping, releaseOrders, resolveDispute } from './logic';
+import { optimizeStoredImages, uploadImage } from './content';
+import { createImageOptimizer } from './image-optimize';
+import { createRequire } from 'node:module';
+import encodePng, { init as initPngEncode } from '@jsquash/png/encode';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
 import { readEnv } from './env';
@@ -1523,5 +1527,78 @@ describe('owner product decisions', () => {
       'CHECKOUT_PAUSED',
     );
     await sql`delete from config where key = 'checkout_paused'`;
+  });
+  it('re-encodes listing images to WebP at upload and backfills stored PNGs', async () => {
+    const req = createRequire(import.meta.url);
+    const wasm = (path: string): object =>
+      new (
+        globalThis as unknown as { WebAssembly: { Module: new (b: Uint8Array) => object } }
+      ).WebAssembly.Module(readFileSync(req.resolve(path)));
+    const modules = () => ({
+      png: wasm('@jsquash/png/codec/pkg/squoosh_png_bg.wasm'),
+      jpeg: wasm('@jsquash/jpeg/codec/dec/mozjpeg_dec.wasm'),
+      webpEncode: wasm('@jsquash/webp/codec/enc/webp_enc_simd.wasm'),
+      resize: wasm('@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm'),
+    });
+    await initPngEncode(modules().png as never);
+    const width = 1800;
+    const height = 900;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = (i / 4) % 251;
+      data[i + 1] = (i / 7) % 199;
+      data[i + 2] = 90;
+      data[i + 3] = 255;
+    }
+    const png = new Uint8Array(await encodePng({ data, width, height } as never));
+    const env = readEnv({
+      SOLANA_CLUSTER: 'devnet',
+      VAULT_ADDRESS: vault.publicKey,
+      SESSION_SECRET: 'test-secret-test-secret-test-secret',
+      API_URL: 'http://localhost:8787',
+    });
+    const blob = filesystemBlob(
+      await mkdtemp(join(tmpdir(), 'tm-img-')),
+      env.sessionSecret,
+      env.apiUrl,
+    );
+    const base: Deps = {
+      sql,
+      blob,
+      env,
+      now: () => now,
+      getTx: async () => null,
+      blockhash: async () => ({ blockhash, lastValidBlockHeight: 1 }),
+    };
+    const creatorId = randomUUID();
+    const listingId = randomUUID();
+    await sql`insert into users (id, wallet, roles) values (${creatorId}, ${randomKeypair().publicKey}, ${sql.array(['creator'])}::user_role[])`;
+    await sql`
+      insert into listings (id, creator_id, slug, title, summary, description, category, price)
+      values (${listingId}, ${creatorId}, 'img', 'Img', 'Sum', 'Desc', 'userscript', ${1n})
+    `;
+    // Without an optimizer (old behaviour) the PNG is stored as is...
+    const legacy = await uploadImage(base, listingId, creatorId, png);
+    const stored = await sql<
+      { mime: string; bytes: number }[]
+    >`select mime, bytes from listing_media where id = ${legacy.id}`;
+    expect(stored[0]).toEqual({ mime: 'image/png', bytes: png.length });
+    // ...and the backfill converts it in place, keeping the row id the live page points at.
+    const deps = { ...base, optimizeImage: createImageOptimizer(modules) };
+    const backfilled = await optimizeStoredImages(deps);
+    expect(backfilled.map((b) => b.id)).toEqual([legacy.id]);
+    const after = (
+      await sql<Record<string, any>[]>`select * from listing_media where id = ${legacy.id}`
+    )[0]!;
+    expect(after.mime).toBe('image/webp');
+    expect([after.width, after.height]).toEqual([1600, 800]);
+    expect(after.bytes).toBeLessThan(png.length);
+    expect(await blob.get(after.r2_key as string)).not.toBeNull();
+    // New uploads are converted on the way in.
+    const fresh = await uploadImage(deps, listingId, creatorId, png);
+    const row = (
+      await sql<Record<string, any>[]>`select mime, width from listing_media where id = ${fresh.id}`
+    )[0]!;
+    expect(row).toEqual({ mime: 'image/webp', width: 1600 });
   });
 });

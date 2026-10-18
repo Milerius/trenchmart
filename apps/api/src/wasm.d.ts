@@ -1,5 +1,4 @@
 declare module '*.wasm' {
-  /** A compiled WebAssembly.Module (wrangler's CompiledWasm rule). */
-  const module: object;
+  const module: WebAssembly.Module;
   export default module;
 }

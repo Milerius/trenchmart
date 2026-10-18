@@ -62,6 +62,7 @@ import {
   saveDraft,
   studioContent,
   uploadImage,
+  optimizeStoredImages,
 } from './content';
 import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
 import { EscrowError } from './escrow';
@@ -1218,6 +1219,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (job === 'release') return c.json({ released: await releaseOrders(deps) });
     if (job === 'payouts') return c.json({ batch: await proposePayouts(deps) });
     if (job === 'ledger') return c.json(jsonSafe({ vault: await ledgerVault(deps.sql) }));
+    if (job === 'optimize-media') return c.json({ optimized: await optimizeStoredImages(deps) });
     throw new HttpError(404, 'NOT_FOUND', 'unknown job');
   });
 

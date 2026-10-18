@@ -90,6 +90,8 @@ export type Deps = {
   /** Simulates an unsigned transaction (sigVerify off). Optional: skipped when absent. */
   simulate?: (tx: Uint8Array) => Promise<Simulation>;
   sandboxQueue?: SandboxQueue;
+  /** Re-encodes PNG/JPEG uploads to a smaller WebP (image-optimize.ts). Optional. */
+  optimizeImage?: import('./image-optimize').ImageOptimizer;
   /** Required when ESCROW_PROGRAM_ID is set. */
   escrowChain?: EscrowChain;
   /** Fetch used for the optional model review. Defaults to the global fetch. */

@@ -3,6 +3,7 @@ import { MARKDOWN_MAX_CHARS } from '@trenchmart/shared';
 import { attestationMessage, runAiVerifier, signAttestation } from '@trenchmart/ai-verifier';
 import {
   cleanImage,
+  type CleanImage,
   contentMediaIds,
   extensionOf,
   ImageError,
@@ -97,6 +98,7 @@ export async function uploadImage(
       `a listing can hold ${MEDIA_MAX} uploaded images; remove some first`,
     );
   }
+  clean = await optimized(deps, clean);
   const sha = await sha256Hex(clean.bytes);
   const key = `media/${sha}.${extensionOf(clean.mime)}`;
   await deps.blob.put(key, clean.bytes);
@@ -113,6 +115,52 @@ export async function uploadImage(
     stripped: clean.stripped,
   });
   return { ...imageView(row), alt: '', stripped: clean.stripped };
+}
+
+/** WebP re-encode when it is smaller; the result goes through the same image checks. */
+async function optimized(deps: Deps, clean: CleanImage): Promise<CleanImage> {
+  if (!deps.optimizeImage) return clean;
+  try {
+    const out = await deps.optimizeImage(clean.bytes, clean.mime);
+    if (!out) return clean;
+    return { ...cleanImage(out.bytes), stripped: clean.stripped };
+  } catch (err) {
+    console.error('image optimize failed', (err as Error).message);
+    return clean;
+  }
+}
+
+/**
+ * One-off backfill: re-encode stored PNG/JPEG listing images. Keeps each row's id (so the
+ * approved/live page still points at it) and swaps its bytes, key, size and hash.
+ */
+export async function optimizeStoredImages(deps: Deps, limit = 5) {
+  const rows = await deps.sql<Row[]>`
+    select id, r2_key, mime, bytes from listing_media
+    where mime in ('image/png', 'image/jpeg') and bytes > 60000
+    order by bytes desc
+    limit ${limit}
+  `;
+  const done: { id: string; before: number; after: number }[] = [];
+  for (const row of rows) {
+    const bytes = await deps.blob.get(row.r2_key as string);
+    if (!bytes) continue;
+    const next = await optimized(deps, { ...cleanImage(bytes), stripped: [] });
+    // Not smaller as WebP: keep the original.
+    if (next.mime !== 'image/webp') continue;
+    const sha = await sha256Hex(next.bytes);
+    const key = `media/${sha}.webp`;
+    await deps.blob.put(key, next.bytes);
+    await deps.sql`
+      update listing_media set r2_key = ${key}, mime = ${next.mime}, sha256 = ${sha},
+        width = ${next.width}, height = ${next.height}, bytes = ${next.bytes.length}
+      where id = ${row.id}
+    `;
+    const shared = await deps.sql`select 1 from listing_media where r2_key = ${row.r2_key} limit 1`;
+    if (shared.length === 0) await deps.blob.delete(row.r2_key as string);
+    done.push({ id: row.id as string, before: bytes.length, after: next.bytes.length });
+  }
+  return done;
 }
 
 export async function deleteImage(deps: Deps, listingId: string, imageId: string) {
