@@ -363,10 +363,16 @@ export async function publicContent(deps: Deps, listingId: string) {
 }
 
 /** Serve an image: public once it is on a live page, otherwise only to the listing owner. */
+/** Narrower copies of each listing image for phones and cards (`?w=`), stored next to it. */
+export const MEDIA_WIDTHS = [480, 960] as const;
+export const mediaVariantKey = (r2Key: string, width: number) =>
+  `${r2Key.replace(/\.[a-z0-9]+$/i, '')}@w${width}.webp`;
+
 export async function mediaResponse(
   deps: Deps,
   id: string,
   viewerId: string | null,
+  width: number | null = null,
 ): Promise<Response> {
   const notFound = () =>
     Response.json({ error: { code: 'NOT_FOUND', message: 'image not found' } }, { status: 404 });
@@ -382,19 +388,34 @@ export async function mediaResponse(
   const isPublic = ((row.live?.mediaIds as string[] | undefined) ?? []).includes(id);
   const isOwner = viewerId !== null && viewerId === row.creator_id;
   if (!isPublic && !isOwner) return notFound();
-  const bytes = await deps.blob.get(row.r2_key as string);
+  // A narrower copy when one was made for this width. Without one, redirect to the original
+  // rather than answering it under the ?w= URL: that answer would be cached as immutable and
+  // hide a copy made later. (Relative Location: works behind the web's /api/v1 proxy too.)
+  const wanted = width !== null && (MEDIA_WIDTHS as readonly number[]).includes(width);
+  const variant = wanted
+    ? await deps.blob.get(mediaVariantKey(row.r2_key as string, width!))
+    : null;
+  if (wanted && !variant)
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: id,
+        'cache-control': isPublic ? 'public, max-age=300' : 'private, no-store',
+      },
+    });
+  const bytes = variant ?? (await deps.blob.get(row.r2_key as string));
   if (!bytes) return notFound();
   return new Response(bytes, {
     headers: {
-      // The type comes from sniffing at upload, never from the client.
-      'content-type': row.mime as string,
+      // The type comes from sniffing at upload, never from the client (variants are WebP).
+      'content-type': variant ? 'image/webp' : (row.mime as string),
       'content-length': String(bytes.length),
       'x-content-type-options': 'nosniff',
       'content-security-policy': "default-src 'none'; sandbox",
       'content-disposition': `inline; filename="${id}.${extensionOf(row.mime)}"`,
       'cross-origin-resource-policy': 'same-site',
       'referrer-policy': 'no-referrer',
-      etag: `"${row.sha256}"`,
+      etag: variant ? `"${row.sha256}-w${width}"` : `"${row.sha256}"`,
       'cache-control': isPublic ? 'public, max-age=86400' : 'private, no-store',
     },
   });

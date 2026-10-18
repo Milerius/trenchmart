@@ -8,6 +8,7 @@ import { TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared/terminals';
 import { TerminalNames } from '@/components/terminal-logo';
 import { Money, Skeleton, EmptyState, Tag } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
+import { CARD_SIZES, mediaSrcSet } from '@/lib/media';
 
 export type Listing = {
   id?: string;
@@ -170,6 +171,8 @@ function CardCover({
       {listing.cover ? (
         <img
           src={listing.cover.url}
+          srcSet={mediaSrcSet(listing.cover.url)}
+          sizes={CARD_SIZES}
           alt={listing.cover.alt}
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
