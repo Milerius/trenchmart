@@ -529,15 +529,19 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/me/orders', async (c) => {
     const user = requireUser(c);
     const rows = await deps.sql<Record<string, any>[]>`
-      select o.*, l.slug, l.title from orders o join listings l on l.id = o.listing_id
+      select o.*, l.slug, l.title,
+        coalesce(c.live->>'coverImageId', c.live->'gallery'->0->>'imageId') as cover_image_id
+      from orders o join listings l on l.id = o.listing_id
+      left join listing_content c on c.listing_id = l.id
       where o.buyer_id = ${user.id} order by o.created_at desc
     `;
     const price = await solPrice();
     return c.json(
       jsonSafe({
         solUsd: { centsPerSol: price.centsPerSol, source: price.source },
-        orders: rows.map((order) => ({
+        orders: rows.map(({ cover_image_id: coverId, ...order }) => ({
           ...order,
+          cover: coverId ? { url: mediaUrl(coverId as string), alt: '' } : null,
           amount: moneyView(
             order.total as bigint,
             price.centsPerSol,

@@ -167,20 +167,26 @@ test('downloads open once paid in escrow and lock during a dispute', async ({ pa
     },
   });
   await page.goto('/me/purchases');
+  // Active tab: the dispute first, then the paid order. Released orders live under Completed.
+  await expect(page.getByRole('tab', { name: /Active/ })).toContainText('2');
   const buttons = page.getByTestId('download-button');
-  await expect(buttons).toHaveCount(3);
-  await expect(buttons.nth(0)).toHaveAttribute('data-state', 'ready');
-  await expect(buttons.nth(0)).toBeEnabled();
-  await expect(buttons.nth(1)).toHaveAttribute('data-state', 'locked');
-  await expect(buttons.nth(1)).toBeDisabled();
-  await expect(buttons.nth(1)).toContainText('Locked during dispute');
-  await expect(buttons.nth(2)).toHaveAttribute('data-state', 'ready');
-  await expect(buttons.nth(2)).toBeEnabled();
-  await expect(page.getByTestId('escrow-timeline')).toHaveCount(3);
+  await expect(buttons).toHaveCount(2);
+  await expect(buttons.nth(0)).toHaveAttribute('data-state', 'locked');
+  await expect(buttons.nth(0)).toBeDisabled();
+  await expect(buttons.nth(0)).toContainText('Locked during dispute');
+  await expect(buttons.nth(1)).toHaveAttribute('data-state', 'ready');
+  await expect(buttons.nth(1)).toBeEnabled();
+  await expect(page.getByTestId('escrow-timeline')).toHaveCount(2);
+  // Downloads open once paid, so the timeline must not say they are locked.
+  await expect(page.getByTestId('download-state').nth(1)).toContainText('Available');
   await expect(page.locator('[data-testid="status-tag"][data-status="paid"]')).toContainText(
     'PAID · IN ESCROW',
   );
   await expectNoSeriousAxe(page);
+  await page.getByRole('tab', { name: /Completed/ }).click();
+  await expect(page.getByTestId('download-button')).toHaveCount(1);
+  await expect(page.getByTestId('download-button')).toHaveAttribute('data-state', 'ready');
+  await expect(page.getByTestId('download-state')).toContainText('Available');
 });
 
 test('landing marks sample stats and switches to live data', async ({ page }) => {

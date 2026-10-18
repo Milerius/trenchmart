@@ -28,6 +28,7 @@ type Order = {
   slug: string;
   status: string;
   escrow_until: string | null;
+  expires_at?: string | null;
   paid_at?: string | null;
   released_at?: string | null;
   created_at?: string;
@@ -36,8 +37,32 @@ type Order = {
   escrow_address?: string | null;
   release_sig?: string | null;
   refund_sig?: string | null;
+  cover?: { url: string; alt: string } | null;
   amount: { lamports: string; usdCents: string | null };
 };
+
+type TabKey = 'active' | 'completed' | 'closed';
+const TABS: { key: TabKey; label: string; statuses: string[]; empty: string }[] = [
+  {
+    key: 'active',
+    label: 'Active',
+    statuses: ['pending', 'paid', 'disputed'],
+    empty: 'Nothing in escrow right now.',
+  },
+  {
+    key: 'completed',
+    label: 'Completed',
+    statuses: ['released'],
+    empty: 'Released orders show here once the escrow window ends.',
+  },
+  {
+    key: 'closed',
+    label: 'Expired & refunded',
+    statuses: ['expired', 'refunded'],
+    empty: 'No expired or refunded orders.',
+  },
+];
+const ATTENTION: Record<string, number> = { disputed: 0, paid: 1, pending: 2 };
 
 export default function PurchasesPage() {
   const wallet = useWallet();
@@ -46,6 +71,7 @@ export default function PurchasesPage() {
   const [message, setMessage] = useState('');
   const [busyId, setBusyId] = useState('');
   const [now, setNow] = useState(() => Date.now());
+  const [tab, setTab] = useState<TabKey>('active');
 
   function load() {
     setLoadError('');
@@ -97,10 +123,19 @@ export default function PurchasesPage() {
     );
   }
 
-  const inEscrow = (orders ?? []).filter((o) => o.status === 'paid' || o.status === 'disputed');
-  const ready = (orders ?? []).filter((o) => o.status === 'released' || o.status === 'paid');
+  const all = orders ?? [];
+  const inEscrow = all.filter((o) => o.status === 'paid' || o.status === 'disputed');
+  const ready = all.filter((o) => o.status === 'released' || o.status === 'paid');
   const escrowTotal = inEscrow.reduce((sum, o) => sum + BigInt(o.amount.lamports), 0n);
   const centsPerSol = escrowCents(inEscrow);
+  const byTab = Object.fromEntries(
+    TABS.map((item) => [item.key, all.filter((o) => item.statuses.includes(o.status))]),
+  ) as Record<TabKey, Order[]>;
+  const current = TABS.find((item) => item.key === tab)!;
+  const shown =
+    tab === 'active'
+      ? [...byTab.active].sort((a, b) => (ATTENTION[a.status] ?? 3) - (ATTENTION[b.status] ?? 3))
+      : byTab[tab];
 
   return (
     <section data-testid="dashboard" className="space-y-8">
@@ -108,8 +143,8 @@ export default function PurchasesPage() {
         <div>
           <h1 className="m-0 text-[32px] font-semibold tracking-[-0.03em]">Purchases</h1>
           <p className="mt-2 max-w-2xl text-ink-2">
-            Real totals in SOL with USD beside them. Download as soon as payment is confirmed in
-            escrow; the creator is paid only when the escrow window ends with no dispute.
+            Download as soon as payment is confirmed in escrow. The creator is paid only when the
+            escrow window ends with no dispute.
           </p>
         </div>
         <ButtonLink href="/search" variant="secondary">
@@ -155,27 +190,71 @@ export default function PurchasesPage() {
           action={<ButtonLink href="/search">Browse the market</ButtonLink>}
         />
       ) : (
-        <ul className="m-0 space-y-3 p-0">
-          {sortForAttention(orders).map((order) => (
-            <OrderRow
-              key={order.id}
-              order={order}
-              now={now}
-              busy={busyId === order.id}
-              onDownload={() => void download(order.id)}
-            />
-          ))}
-        </ul>
+        <div className="space-y-4">
+          <div
+            role="tablist"
+            aria-label="Orders"
+            data-testid="purchase-tabs"
+            className="flex gap-1 overflow-x-auto border-b border-line-soft"
+          >
+            {TABS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                id={`tab-${item.key}`}
+                aria-selected={tab === item.key}
+                aria-controls="purchase-panel"
+                onClick={() => setTab(item.key)}
+                className={`-mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm transition-colors ${
+                  tab === item.key
+                    ? 'border-accent text-ink'
+                    : 'border-transparent text-muted hover:text-ink'
+                }`}
+              >
+                {item.label}
+                <span
+                  className={`rounded-tag border px-1.5 font-mono text-[11px] ${
+                    tab === item.key ? 'border-accent-line text-accent' : 'border-line text-muted'
+                  }`}
+                >
+                  {byTab[item.key].length}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div id="purchase-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+            {shown.length === 0 ? (
+              <p className="m-0 rounded-card border border-line bg-surface p-5 text-sm text-muted">
+                {current.empty}
+              </p>
+            ) : tab === 'closed' ? (
+              <ul
+                data-testid="closed-orders"
+                className="m-0 overflow-hidden rounded-card border border-line bg-surface p-0"
+              >
+                {shown.map((order) => (
+                  <ClosedRow key={order.id} order={order} />
+                ))}
+              </ul>
+            ) : (
+              <ul className="m-0 space-y-3 p-0">
+                {shown.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    now={now}
+                    busy={busyId === order.id}
+                    onDownload={() => void download(order.id)}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
     </section>
   );
-}
-
-const ATTENTION: Record<string, number> = { paid: 0, disputed: 1, released: 2 };
-
-/** Orders with live escrow first, so countdowns and disputes are seen before history. */
-function sortForAttention(orders: Order[]): Order[] {
-  return [...orders].sort((a, b) => (ATTENTION[a.status] ?? 3) - (ATTENTION[b.status] ?? 3));
 }
 
 function escrowCents(orders: Order[]) {
@@ -198,7 +277,25 @@ function Tile({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function OrderRow({
+function Thumb({ order, size }: { order: Order; size: 'md' | 'sm' }) {
+  const box = size === 'md' ? 'h-[68px] w-[108px]' : 'h-9 w-14';
+  return (
+    <span
+      className={`${box} block shrink-0 overflow-hidden rounded-ctl border border-line bg-inset`}
+      aria-hidden="true"
+    >
+      {order.cover ? (
+        <img src={order.cover.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+      ) : (
+        <span className="grid h-full w-full place-items-center font-mono text-xs text-faint">
+          {order.title.slice(0, 2).toUpperCase()}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function OrderCard({
   order,
   now,
   busy,
@@ -210,47 +307,44 @@ function OrderRow({
   onDownload: () => void;
 }) {
   return (
-    <li className="list-none rounded-card border border-line bg-surface p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusTag status={order.status} />
-            {order.tier_at_purchase && order.tier_at_purchase !== 'none' ? (
-              <span className="text-xs text-muted">
-                bought as {TIER_LABEL[order.tier_at_purchase] ?? order.tier_at_purchase}
-              </span>
-            ) : null}
+    <li
+      data-testid="order-card"
+      className="list-none rounded-card border border-line bg-surface p-4 sm:p-5"
+    >
+      <div className="flex gap-4">
+        <span className="hidden sm:block">
+          <Thumb order={order} size="md" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0">
+              <Link
+                href={`/l/${order.slug}`}
+                className="block text-[17px] font-semibold hover:text-accent-hover"
+              >
+                {order.title}
+              </Link>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <StatusTag status={order.status} />
+                {order.tier_at_purchase && order.tier_at_purchase !== 'none' ? (
+                  <span className="text-xs text-muted">
+                    bought as {TIER_LABEL[order.tier_at_purchase] ?? order.tier_at_purchase}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="text-right">
+              <Money
+                lamports={order.amount.lamports}
+                usdCents={order.amount.usdCents}
+                strong
+                stacked
+              />
+            </div>
           </div>
-          <Link
-            href={`/l/${order.slug}`}
-            className="mt-2 block text-[17px] font-semibold hover:text-accent-hover"
-          >
-            {order.title}
-          </Link>
-          <p className="m-0 mt-1 text-[13px] text-muted">
-            Order {order.id.slice(0, 8)}
-            {order.paid_at ? ` · paid ${utc(order.paid_at)}` : ''}
-            {order.tx_sig ? (
-              <>
-                {' · '}
-                <a
-                  href={`https://explorer.solana.com/tx/${order.tx_sig}?cluster=devnet`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-ink-2 underline-offset-4 hover:underline"
-                >
-                  View transaction
-                </a>
-              </>
-            ) : null}
-          </p>
-        </div>
-        <div className="text-right">
-          <Money lamports={order.amount.lamports} usdCents={order.amount.usdCents} strong stacked />
         </div>
       </div>
       <EscrowTimeline order={order} now={now} />
-      {order.escrow_address ? <OnChainReceipt order={order} /> : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <DownloadButton
           status={order.status}
@@ -259,57 +353,122 @@ function OrderRow({
           onDownload={onDownload}
         />
         {order.status === 'paid' ? (
-          <Link
-            href={`/me/purchases/${order.id}/dispute`}
-            className="text-sm text-ink-2 underline-offset-4 hover:text-ink hover:underline"
-          >
+          <ButtonLink href={`/me/purchases/${order.id}/dispute`} variant="secondary">
             Open a dispute
-          </Link>
+          </ButtonLink>
         ) : null}
         {order.status === 'disputed' ? (
           <span className="text-sm text-ink-2">
             Release is paused. If upheld you are refunded; if rejected the creator is paid.
           </span>
         ) : null}
+        <span className="ml-auto text-[13px] text-muted">
+          Order {order.id.slice(0, 8)}
+          {order.tx_sig ? (
+            <>
+              {' · '}
+              <a
+                href={explorerTx(order.tx_sig)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-ink-2 underline-offset-4 hover:underline"
+              >
+                Payment tx ↗
+              </a>
+            </>
+          ) : null}
+        </span>
       </div>
+      {order.escrow_address ? <OnChainReceipt order={order} /> : null}
     </li>
   );
 }
 
+function ClosedRow({ order }: { order: Order }) {
+  const when =
+    order.status === 'refunded'
+      ? order.released_at
+      : (order.expires_at ?? order.created_at ?? null);
+  return (
+    <li
+      data-testid="closed-order"
+      className="flex list-none flex-wrap items-center gap-x-4 gap-y-2 border-t border-line-soft px-4 py-3 first:border-t-0"
+    >
+      <Thumb order={order} size="sm" />
+      <Link
+        href={`/l/${order.slug}`}
+        className="min-w-0 flex-1 truncate text-sm font-medium hover:text-accent-hover"
+      >
+        {order.title}
+      </Link>
+      <span className="w-28">
+        <StatusTag status={order.status} />
+      </span>
+      <span className="tabular w-28 text-right font-mono text-[13px] text-ink-2">
+        {solText(order.amount.lamports)}
+      </span>
+      <span className="w-36 text-right font-mono text-xs text-muted">{when ? utc(when) : '—'}</span>
+      <span className="w-20 text-right">
+        {order.refund_sig ? (
+          <a
+            href={explorerTx(order.refund_sig)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[13px] text-ink-2 underline-offset-4 hover:underline"
+          >
+            Refund tx ↗
+          </a>
+        ) : null}
+      </span>
+    </li>
+  );
+}
+
+/** Paid → In escrow → Released, with a progress bar for the escrow window. */
 function EscrowTimeline({ order, now }: { order: Order; now: number }) {
-  if (!['paid', 'disputed', 'released', 'refunded'].includes(order.status)) return null;
+  if (!['pending', 'paid', 'disputed', 'released'].includes(order.status)) return null;
   const start = order.paid_at ? new Date(order.paid_at).getTime() : null;
   const end = order.escrow_until ? new Date(order.escrow_until).getTime() : null;
-  const finished = order.status === 'released' || order.status === 'refunded';
+  const released = order.status === 'released';
   const progress =
-    finished || !start || !end ? 1 : Math.min(1, Math.max(0, (now - start) / (end - start)));
-  const steps: [string, string, boolean][] = [
-    ['Paid', order.paid_at ? utc(order.paid_at) : '—', true],
-    [
-      order.status === 'disputed' ? 'Disputed · release paused' : 'In escrow',
-      order.status === 'paid' && order.escrow_until
-        ? `${remaining(order.escrow_until, now)} left · dispute any time`
-        : order.escrow_until
-          ? `until ${utc(order.escrow_until)}`
-          : '—',
-      true,
-    ],
-    [
-      order.status === 'refunded' ? 'Refunded' : 'Released',
-      order.released_at
+    order.status === 'pending'
+      ? 0
+      : released || !start || !end
+        ? 1
+        : Math.min(1, Math.max(0, (now - start) / (end - start)));
+  const download =
+    order.status === 'paid' || released
+      ? 'Available'
+      : order.status === 'disputed'
+        ? 'Paused during the dispute'
+        : 'Once payment is confirmed';
+  const steps: { label: string; detail: string; state: 'done' | 'now' | 'next' }[] = [
+    {
+      label: 'Paid',
+      detail: order.paid_at ? utc(order.paid_at) : 'Awaiting payment',
+      state: order.paid_at ? 'done' : 'now',
+    },
+    {
+      label: order.status === 'disputed' ? 'Disputed · release paused' : 'In escrow',
+      detail:
+        order.status === 'paid' && order.escrow_until
+          ? `${remaining(order.escrow_until, now)} left · dispute any time`
+          : order.escrow_until
+            ? `until ${utc(order.escrow_until)}`
+            : '—',
+      state: released ? 'done' : order.paid_at ? 'now' : 'next',
+    },
+    {
+      label: 'Released',
+      detail: order.released_at
         ? utc(order.released_at)
         : order.status === 'disputed'
           ? 'After the dispute is settled'
           : order.escrow_until
             ? `Scheduled ${utc(order.escrow_until)}`
             : '—',
-      finished,
-    ],
-    [
-      'Download',
-      finished && order.status === 'released' ? 'Unlocked' : 'Locked until release',
-      finished,
-    ],
+      state: released ? 'done' : 'next',
+    },
   ];
   return (
     <div data-testid="escrow-timeline" className="mt-5">
@@ -326,18 +485,37 @@ function EscrowTimeline({ order, now }: { order: Order; now: number }) {
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
-      <ol className="m-0 mt-3 grid grid-cols-2 gap-3 p-0 sm:grid-cols-4">
-        {steps.map(([label, detail, reached]) => (
-          <li key={label} className="list-none">
+      <ol className="m-0 mt-3 grid gap-3 p-0 sm:grid-cols-3">
+        {steps.map((step, index) => (
+          <li key={step.label} className="flex list-none gap-2.5">
             <span
-              className={`block text-[13px] font-medium ${reached ? 'text-ink' : 'text-muted'}`}
+              aria-hidden="true"
+              className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border font-mono text-[10px] ${
+                step.state === 'done'
+                  ? 'border-accent bg-accent text-onaccent'
+                  : step.state === 'now'
+                    ? order.status === 'disputed'
+                      ? 'border-danger text-danger'
+                      : 'border-accent text-accent'
+                    : 'border-line-strong text-muted'
+              }`}
             >
-              {label}
+              {step.state === 'done' ? '✓' : index + 1}
             </span>
-            <span className="block font-mono text-xs text-muted">{detail}</span>
+            <span>
+              <span
+                className={`block text-[13px] font-medium ${step.state === 'next' ? 'text-muted' : 'text-ink'}`}
+              >
+                {step.label}
+              </span>
+              <span className="block font-mono text-xs text-muted">{step.detail}</span>
+            </span>
           </li>
         ))}
       </ol>
+      <p data-testid="download-state" className="m-0 mt-3 text-[13px] text-ink-2">
+        <span className="text-muted">Download:</span> {download}
+      </p>
     </div>
   );
 }
