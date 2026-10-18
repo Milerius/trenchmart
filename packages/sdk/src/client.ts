@@ -672,6 +672,52 @@ export class TrenchmartClient {
     }
   }
 
+  // ---------------------------------------------------------------- featuring
+
+  featuringConfig(): Promise<Json> {
+    return this.request('GET', '/featuring/config');
+  }
+
+  featuringCalendar(kind: 'home' | 'category' | 'band' = 'home', category?: string): Promise<Json> {
+    return this.request('GET', '/featuring/calendar', { query: { kind, category } });
+  }
+
+  /** Your listings with featuring eligibility, your tier and your bookings. */
+  featuring(): Promise<Json> {
+    return this.request('GET', '/studio/featuring');
+  }
+
+  featuringQuote(input: FeatureBookingInput): Promise<Json> {
+    return this.request('POST', '/studio/featuring/quote', { body: input });
+  }
+
+  /**
+   * Books a featured spot: holds the days, checks the unsigned payment locally (payer,
+   * vault, exact total), signs it, broadcasts and confirms it.
+   */
+  async featureListing(
+    signer: AgentSigner,
+    input: FeatureBookingInput,
+    opts: { broadcast?: BroadcastMode } & ConfirmOptions = {},
+  ): Promise<{ bookingId: string; signature: string }> {
+    const res = await this.request<{
+      booking: { id: string; total: string };
+      tx: UnsignedPayment;
+    }>('POST', '/studio/featuring/bookings', { body: input });
+    const paid = await this.payVault(
+      signer,
+      res.tx,
+      res.booking.total,
+      `/studio/featuring/bookings/${res.booking.id}/submitted`,
+      opts,
+    );
+    return { bookingId: res.booking.id, ...paid };
+  }
+
+  cancelFeaturing(bookingId: string): Promise<Json> {
+    return this.request('POST', `/studio/featuring/bookings/${bookingId}/cancel`);
+  }
+
   overview(): Promise<Json> {
     return this.request('GET', '/studio/overview');
   }
@@ -756,3 +802,11 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+export type FeatureBookingInput = {
+  listingId: string;
+  kind: 'home' | 'category' | 'band';
+  /** First day, YYYY-MM-DD (UTC). */
+  startDay: string;
+  days: number;
+};

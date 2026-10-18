@@ -32,6 +32,9 @@
       "name": "Sell"
     },
     {
+      "name": "Featuring"
+    },
+    {
       "name": "Profile"
     },
     {
@@ -3770,6 +3773,411 @@
         ],
         "summary": "Delist a listing",
         "operationId": "postStudioListingsBy_idDelist",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/featuring/config": {
+      "get": {
+        "tags": [
+          "Featuring"
+        ],
+        "summary": "Featured-spot placements (home, category), slots, prices per day and rules",
+        "operationId": "getFeaturingConfig",
+        "x-scope": "read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/featuring/calendar": {
+      "get": {
+        "tags": [
+          "Featuring"
+        ],
+        "summary": "Booked and free days for a placement (query: kind, category)",
+        "operationId": "getFeaturingCalendar",
+        "x-scope": "read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/featuring": {
+      "get": {
+        "tags": [
+          "Featuring"
+        ],
+        "summary": "Your listings with featuring eligibility, your $TRENCH tier and your bookings",
+        "operationId": "getStudioFeaturing",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/studio/featuring/quote": {
+      "post": {
+        "tags": [
+          "Featuring"
+        ],
+        "summary": "Price a featured spot (tier discount applied) and list any eligibility problems",
+        "operationId": "postStudioFeaturingQuote",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "listingId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "home",
+                      "category",
+                      "band"
+                    ]
+                  },
+                  "startDay": {
+                    "type": "string"
+                  },
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 31
+                  }
+                },
+                "required": [
+                  "listingId",
+                  "kind",
+                  "startDay",
+                  "days"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/featuring/bookings": {
+      "post": {
+        "tags": [
+          "Featuring"
+        ],
+        "summary": "Hold the days and get the unsigned SOL payment transaction (sign it, broadcast, then confirm)",
+        "operationId": "postStudioFeaturingBookings",
+        "x-scope": "sell",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "listingId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "home",
+                      "category",
+                      "band"
+                    ]
+                  },
+                  "startDay": {
+                    "type": "string"
+                  },
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 31
+                  }
+                },
+                "required": [
+                  "listingId",
+                  "kind",
+                  "startDay",
+                  "days"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/featuring/bookings/{id}/submitted": {
+      "post": {
+        "tags": [
+          "Featuring"
+        ],
+        "summary": "Confirm the featuring payment by signature",
+        "operationId": "postStudioFeaturingBookingsBy_idSubmitted",
+        "x-scope": "sell",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "txSig": {
+                    "type": "string",
+                    "pattern": "^[1-9A-HJ-NP-Za-km-z]{64,100}$"
+                  }
+                },
+                "required": [
+                  "txSig"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/studio/featuring/bookings/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Featuring"
+        ],
+        "summary": "Cancel a booking (unpaid holds are released; paid future days are refunded per the rules)",
+        "operationId": "postStudioFeaturingBookingsBy_idCancel",
         "x-scope": "sell",
         "parameters": [
           {

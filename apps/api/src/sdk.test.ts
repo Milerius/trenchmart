@@ -175,7 +175,8 @@ describe('SDK against the API', () => {
       truncate table audit_log, ledger, notifications, downloads, listing_reviews, disputes, licenses,
         payouts, orders, scan_checks, scans, ai_reviews, sandbox_jobs, listing_content, listing_media,
         versions, listings, bonds, token_balances, auth_nonces, reports, rate_buckets, update_periods,
-        update_renewals, supplements, verifications, api_keys, agent_challenges, issued_txs, users
+        update_renewals, supplements, verifications, api_keys, agent_challenges, issued_txs,
+        feature_days, feature_bookings, users
       restart identity cascade
     `;
     await restoreConfig();
@@ -352,6 +353,24 @@ describe('SDK against the API', () => {
     await sdk.updateListing(created.id, { priceLamports: '350000000' });
     const quota = await sdk.uploadQuota(created.id);
     expect((quota.listing as { price: string }).price).toBe('350000000');
+    // Featured spot: quote, then book + sign + relay + confirm the SOL payment.
+    // The in-process scan has no AI reviewer; mark the version live as a passing scan would.
+    await sql`update versions set status = 'live' where id = ${result.version.id}`;
+    await sql`update listings set live_version_id = ${result.version.id} where id = ${created.id}`;
+    const feature = {
+      listingId: created.id,
+      kind: 'home' as const,
+      startDay: '2026-06-01',
+      days: 1,
+    };
+    const fq = (await sdk.featuringQuote(feature)) as { problems: unknown[] };
+    expect(fq.problems).toEqual([]);
+    const booked = await sdk.featureListing(signer, feature, { intervalMs: 10 });
+    expect(booked.signature).toBeTruthy();
+    const [booking] = await sql<
+      { status: string; tx_sig: string }[]
+    >`select status, tx_sig from feature_bookings where id = ${booked.bookingId}`;
+    expect(booking).toMatchObject({ status: 'paid', tx_sig: booked.signature });
     expect(await sdk.overview()).toBeTruthy();
     expect(await sdk.payouts()).toBeTruthy();
     expect((await sdk.profile()).displayName ?? (await sdk.profile())).toBeTruthy();

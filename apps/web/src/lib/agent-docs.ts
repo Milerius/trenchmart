@@ -46,6 +46,7 @@ const TAG_ORDER = [
   'Buy',
   'Transactions',
   'Sell',
+  'Featuring',
   'Profile',
   'Reviews',
 ];
@@ -58,6 +59,8 @@ export const TAG_INTRO: Record<string, string> = {
   Buy: 'Quote, checkout (unsigned escrow transaction), confirm, download, dispute, release.',
   Transactions: 'Relay signed transactions through the validated broadcast endpoint.',
   Sell: 'Everything the studio does: bond, listings, media, versions and scans, prices, supplements, sales, subscribers, reviews, payouts.',
+  Featuring:
+    'Paid featured spots for your listings (home, category, band): config, calendar, quote, book (unsigned SOL payment), confirm, cancel.',
   Profile: 'Profile, socials, contact channels, avatar and banner.',
   Reviews: 'Signed verified-buyer reviews, creator replies, helpful votes, reports and upvotes.',
 };
@@ -287,7 +290,10 @@ await tm.updateListing(id, { priceLamports: '120000000', updatePriceLamports: '1
 const { sales } = await tm.sales();
 const { counts } = await tm.subscribers();
 for (const r of (await tm.creatorReviews({ unreplied: true })).reviews)
-  await tm.replyToReview(r.id, 'Thanks for the feedback!');`;
+  await tm.replyToReview(r.id, 'Thanks for the feedback!');
+
+// Feature it on the home page for 3 days (paid in SOL, signed locally).
+await tm.featureListing(signer, { listingId: id, kind: 'home', startDay: '2026-10-20', days: 3 });`;
 
 export const CURL_CHALLENGE = `curl -s ${API_BASE}/agent/auth/challenge \\
   -H 'content-type: application/json' \\
@@ -300,7 +306,6 @@ curl -s ${API_BASE}/agent/auth/key \\
 # -> { "key": "tmk_...", "id": "...", "scopes": [...], "rateLimitPerMin": ${DEFAULT_KEY_RATE} }  (shown once)`;
 
 export const NOT_AVAILABLE = [
-  'Featured spots are not available yet (listings carry `featured: false`); there is no endpoint to buy one.',
   'Webhooks are not available: poll GET /studio/versions/{id} for scan results and GET /orders/{id} for order state.',
   'X verification is a one-time human step in the studio (OAuth in a browser); keys cannot link X.',
   'Mainnet: TrenchMart runs on Solana devnet only. Never send mainnet funds.',

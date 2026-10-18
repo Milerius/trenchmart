@@ -24,6 +24,7 @@ import {
 } from '@trenchmart/shared';
 import { broadcastBody, challengeBody, challengeKeyBody, studioKeyBody, scopeFor } from './agent';
 import { contentBody, reviewContentBody } from './content';
+import { bookingBody } from './featuring';
 
 /**
  * OpenAPI 3.1 description of the agent-facing API, served at /api/v1/openapi.json. Request
@@ -500,6 +501,53 @@ export const ROUTES: RouteDoc[] = [
     tag: 'Sell',
     summary: 'Delist a listing',
   },
+  {
+    method: 'get',
+    path: '/featuring/config',
+    tag: 'Featuring',
+    summary: 'Featured-spot placements (home, category), slots, prices per day and rules',
+  },
+  {
+    method: 'get',
+    path: '/featuring/calendar',
+    tag: 'Featuring',
+    summary: 'Booked and free days for a placement (query: kind, category)',
+  },
+  {
+    method: 'get',
+    path: '/studio/featuring',
+    tag: 'Featuring',
+    summary: 'Your listings with featuring eligibility, your $TRENCH tier and your bookings',
+  },
+  {
+    method: 'post',
+    path: '/studio/featuring/quote',
+    tag: 'Featuring',
+    summary: 'Price a featured spot (tier discount applied) and list any eligibility problems',
+    body: bookingBody,
+  },
+  {
+    method: 'post',
+    path: '/studio/featuring/bookings',
+    tag: 'Featuring',
+    summary:
+      'Hold the days and get the unsigned SOL payment transaction (sign it, broadcast, then confirm)',
+    body: bookingBody,
+  },
+  {
+    method: 'post',
+    path: '/studio/featuring/bookings/{id}/submitted',
+    tag: 'Featuring',
+    summary: 'Confirm the featuring payment by signature',
+    body: submittedBody,
+  },
+  {
+    method: 'post',
+    path: '/studio/featuring/bookings/{id}/cancel',
+    tag: 'Featuring',
+    summary:
+      'Cancel a booking (unpaid holds are released; paid future days are refunded per the rules)',
+  },
   // Profile
   { method: 'get', path: '/studio/profile', tag: 'Profile', summary: 'Your editable profile' },
   {
@@ -693,9 +741,17 @@ export function openApiSpec(input: { apiUrl: string; cluster: string }): object 
       ].join('\n\n'),
     },
     servers: [{ url: `${input.apiUrl}/api/v1`, description: input.cluster }],
-    tags: ['Auth', 'Discovery', 'Account', 'Buy', 'Transactions', 'Sell', 'Profile', 'Reviews'].map(
-      (name) => ({ name }),
-    ),
+    tags: [
+      'Auth',
+      'Discovery',
+      'Account',
+      'Buy',
+      'Transactions',
+      'Sell',
+      'Featuring',
+      'Profile',
+      'Reviews',
+    ].map((name) => ({ name })),
     paths,
     components: {
       securitySchemes: {
