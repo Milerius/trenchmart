@@ -538,3 +538,86 @@ describe('social: upvotes and ranking', () => {
     expect(idle.slug).toBe('rank-idle');
   });
 });
+
+describe('social: leaderboard, paid to creators, activity', () => {
+  beforeEach(async () => {
+    sql ??= createSql(databaseUrl);
+    await migrate(sql);
+    await sql`
+      truncate table audit_log, ledger, notifications, downloads, listing_reviews, review_replies,
+        review_votes, review_reports, wallet_intel, listing_upvotes, creator_rank, disputes, licenses,
+        payouts, orders, versions, listings, auth_nonces, users
+      restart identity cascade
+    `;
+    await sql`delete from config where key in ('rank_config', 'social_rules')`;
+  });
+
+  it('starts empty and honest: zero paid, no leaderboard rows, no activity', async () => {
+    const app = await appFor();
+    const stats = await call(app, '', 'GET', '/stats');
+    expect(stats.body.paidToCreators).toMatchObject({
+      lamports: '0',
+      last24hLamports: '0',
+      orders: 0,
+    });
+    const board = await call(app, '', 'GET', '/creators/leaderboard');
+    expect(board.body).toMatchObject({ tab: 'earners', range: '30d', total: 0, rows: [] });
+    expect(board.body.summary).toMatchObject({ paidLamports: '0', rankedCreators: 0 });
+    const activity = await call(app, '', 'GET', '/activity');
+    expect(activity.body.events).toEqual([]);
+  });
+
+  it('ranks creators by released payouts, rating, rising sales and counted upvotes', async () => {
+    const app = await appFor();
+    await sql`insert into config (key, value) values ('rank_config', ${sql.json({ topRatedMinReviews: 1, risingMinSales: 1 })})`;
+    const alpha = await user(app, { roles: ['buyer', 'creator'] });
+    const beta = await user(app, { roles: ['buyer', 'creator'] });
+    await sql`update users set display_name = 'Alpha Labs' where id = ${alpha.id}`;
+    const a = await listing(alpha.id, 'lb-a');
+    const b = await listing(beta.id, 'lb-b');
+    const buyers = [await user(app), await user(app), await user(app)];
+    for (const buyer of buyers) await order(buyer.id, a);
+    await order(buyers[0]!.id, b);
+    await order(beta.id, b); // self-buy: never counts
+    await order(buyers[1]!.id, b, 'paid'); // still in escrow: not paid out yet
+    const reviewOrder = await order(buyers[2]!.id, b);
+    await postReview(app, buyers[2]!, reviewOrder, b.versionId, 5);
+    await sql`update listings set upvote_weight = 25000, upvote_count = 4 where id = ${b.listingId}`;
+
+    const earners = await call(app, '', 'GET', '/creators/leaderboard?tab=earners&range=30d');
+    expect(earners.body.rows.map((r: any) => [r.creator.wallet, r.sales, r.paidLamports])).toEqual([
+      [alpha.wallet.publicKey, 3, '3000000000'],
+      [beta.wallet.publicKey, 2, '2000000000'],
+    ]);
+    expect(earners.body.rows[0]).toMatchObject({
+      position: 1,
+      creator: { kind: 'pseudonym', name: 'Alpha Labs' },
+      topListing: { slug: 'lb-a' },
+    });
+    expect(earners.body.rows[0].spark).toHaveLength(14);
+    expect(earners.body.summary.paidLamports).toBe('6000000000'); // all released, incl. the self-buy
+
+    const rated = await call(app, '', 'GET', '/creators/leaderboard?tab=rated');
+    expect(rated.body.rows.map((r: any) => r.creator.wallet)).toEqual([beta.wallet.publicKey]);
+    const upvoted = await call(app, '', 'GET', '/creators/leaderboard?tab=upvoted');
+    expect(upvoted.body.rows[0]).toMatchObject({ upvotes: { counted: 2.5, raw: 4 } });
+    const rising = await call(app, '', 'GET', '/creators/leaderboard?tab=rising&range=7d');
+    expect(rising.body.rows[0]).toMatchObject({ rising: { now: 3, prev: 0 } });
+    const verified = await call(app, '', 'GET', '/creators/leaderboard?verified=1');
+    expect(verified.body.rows).toEqual([]);
+    const scoped = await call(app, '', 'GET', '/creators/leaderboard?category=filter');
+    expect(scoped.body.rows).toEqual([]);
+
+    const stats = await call(app, '', 'GET', '/stats');
+    expect(stats.body.paidToCreators).toMatchObject({ lamports: '6000000000', orders: 6 });
+
+    const activity = await call(app, '', 'GET', '/activity?limit=50');
+    const kinds = activity.body.events.map((e: { kind: string }) => e.kind);
+    expect(kinds.filter((k: string) => k === 'sale')).toHaveLength(6); // the self-buy is left out
+    expect(kinds).toContain('review');
+    expect(activity.body.events.find((e: any) => e.kind === 'review')).toMatchObject({
+      rating: 5,
+      listing: { slug: 'lb-b' },
+    });
+  });
+});

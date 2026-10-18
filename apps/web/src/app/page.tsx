@@ -3,8 +3,11 @@
 import { DEFAULT_ESCROW_HOURS, escrowWindowLabel, escrowWindowShort } from '@trenchmart/shared';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { solText } from '@/lib/money';
 import { CATEGORIES } from '@trenchmart/shared';
+import { ActivityBand, useActivity } from '@/components/activity';
 import { TierTable } from '@/components/fees';
+import { type Board, type BoardTab, CreatorCards, TAB_LABEL } from '@/components/leaderboard';
 import { ListingGrid, TERMINALS, type Listing } from '@/components/listings';
 import {
   ButtonLink,
@@ -27,10 +30,16 @@ type Stats = {
   creators: number;
   orders: number;
   volume: { lamports: string; sol: string; usdCents: string | null };
+  paidToCreators?: {
+    lamports: string;
+    usdCents: string | null;
+    last24hLamports: string;
+    orders: number;
+  };
   solUsd: { centsPerSol: string | null };
 };
 
-type Creator = { handle: string | null; wallet: string; volume: string; listings: number };
+const HOME_TABS: BoardTab[] = ['earners', 'rated', 'rising'];
 
 export default function HomePage() {
   const wallet = useWallet();
@@ -39,7 +48,9 @@ export default function HomePage() {
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
-  const [creators, setCreators] = useState<Creator[]>([]);
+  const [creatorTab, setCreatorTab] = useState<BoardTab>('earners');
+  const [board, setBoard] = useState<Board | null | 'error'>(null);
+  const activity = useActivity(24);
 
   useEffect(() => {
     const query =
@@ -53,10 +64,17 @@ export default function HomePage() {
     void api<Stats>('/stats')
       .then(setStats)
       .catch(() => setStatsFailed(true));
-    void api<Creator[]>('/creators/top')
-      .then(setCreators)
-      .catch(() => setCreators([]));
   }, []);
+
+  useEffect(() => {
+    let stop = false;
+    void api<Board>(`/creators/leaderboard?tab=${creatorTab}&range=30d&limit=6`)
+      .then((body) => !stop && setBoard(Array.isArray(body?.rows) ? body : 'error'))
+      .catch(() => !stop && setBoard('error'));
+    return () => {
+      stop = true;
+    };
+  }, [creatorTab]);
 
   const cents = stats?.solUsd.centsPerSol ?? null;
   const escrowHours = config?.escrowHours ?? DEFAULT_ESCROW_HOURS;
@@ -116,7 +134,10 @@ export default function HomePage() {
       </section>
 
       <Reveal>
-        <LandingStats stats={stats} failed={statsFailed} />
+        <div className="space-y-8">
+          <LandingStats stats={stats} failed={statsFailed} />
+          <ActivityBand events={activity} />
+        </div>
       </Reveal>
 
       <Reveal>
@@ -279,33 +300,54 @@ export default function HomePage() {
       </Reveal>
 
       <Reveal>
-        <section aria-labelledby="creators-heading">
-          <SectionHead id="creators-heading" kicker="Creators" title="Top verified creators" />
-          {creators.length === 0 ? (
-            <p className="mt-6 text-muted">No creator volume yet.</p>
-          ) : (
-            <ol className="mt-6 grid gap-2 p-0 md:grid-cols-2">
-              {creators.slice(0, 6).map((creator, index) => (
-                <li key={creator.wallet} className="list-none">
-                  <Link
-                    href={`/u/${creator.handle ?? creator.wallet}`}
-                    className="motion-card flex items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3 hover:border-line-strong"
+        <section aria-labelledby="creators-heading" data-testid="top-creators">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead id="creators-heading" kicker="Creators" title="Top creators this month" />
+            <div className="flex flex-wrap items-center gap-2">
+              <div role="tablist" aria-label="Top creators" className="flex gap-1">
+                {HOME_TABS.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={creatorTab === value}
+                    onClick={() => setCreatorTab(value)}
+                    className={`motion-press h-9 rounded-full border px-3.5 text-[13px] ${
+                      creatorTab === value
+                        ? 'border-accent bg-accent-bg text-accent'
+                        : 'border-line-control text-ink-2 hover:text-ink'
+                    }`}
                   >
-                    <span className="flex items-center gap-3">
-                      <span className="w-5 font-mono text-xs text-muted">{index + 1}</span>
-                      <span className="font-medium">
-                        @{creator.handle ?? creator.wallet.slice(0, 4)}
-                      </span>
-                      <span className="text-xs text-muted">
-                        {creator.listings} listing{creator.listings === 1 ? '' : 's'}
-                      </span>
-                    </span>
-                    <Money lamports={creator.volume} centsPerSol={cents} className="text-sm" />
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
+                    {TAB_LABEL[value]}
+                  </button>
+                ))}
+              </div>
+              <ButtonLink href="/creators" variant="ghost" size="sm">
+                Full leaderboard →
+              </ButtonLink>
+            </div>
+          </div>
+          <div className="mt-6">
+            {board === null ? (
+              <p className="m-0 text-muted">Loading creators…</p>
+            ) : board === 'error' ? (
+              <p className="m-0 text-muted">Creator rankings are unavailable right now.</p>
+            ) : board.rows.length === 0 ? (
+              <p className="m-0 text-muted" data-testid="top-creators-empty">
+                {creatorTab === 'earners'
+                  ? 'No creator payouts in the last 30 days yet. The first released order puts a creator here.'
+                  : creatorTab === 'rated'
+                    ? `No creator has ${board.rules.topRatedMinReviews}+ verified reviews yet.`
+                    : `No creator has ${board.rules.risingMinSales}+ sales this month yet.`}
+              </p>
+            ) : (
+              <CreatorCards rows={board.rows} tab={creatorTab} centsPerSol={cents} />
+            )}
+            <p className="mt-3 text-xs text-muted">
+              Ranked on released sales, verified-buyer reviews and weighted upvotes. Paid featuring
+              never changes a rank.
+            </p>
+          </div>
         </section>
       </Reveal>
 
@@ -412,22 +454,42 @@ function LandingStats({ stats, failed }: { stats: Stats | null; failed: boolean 
             stacked
           />,
         ],
+        [
+          'Paid to creators',
+          stats.paidToCreators ? (
+            <span key="paid" data-testid="paid-to-creators" className="inline-flex flex-col">
+              <Money
+                lamports={stats.paidToCreators.lamports}
+                usdCents={stats.paidToCreators.usdCents}
+                stacked
+              />
+              {BigInt(stats.paidToCreators.last24hLamports) > 0n ? (
+                <span className="mt-1 text-xs font-normal text-accent">
+                  +{solText(stats.paidToCreators.last24hLamports)} in 24h
+                </span>
+              ) : null}
+            </span>
+          ) : (
+            '—'
+          ),
+        ],
       ]
     : [
         ['Live listings', null],
         ['Verified creators', null],
         ['Orders paid', null],
         ['Volume traded', null],
+        ['Paid to creators', null],
       ];
   return (
     <section data-testid="dashboard" aria-label="Marketplace stats">
       <div
         data-testid="landing-stats"
         data-source={stats?.source ?? 'none'}
-        className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line lg:grid-cols-4"
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line lg:grid-cols-5"
       >
         {tiles.map(([label, value]) => (
-          <div key={label} className="bg-surface p-5">
+          <div key={label} className="bg-surface p-5 last:col-span-2 lg:last:col-span-1">
             <Label>{label}</Label>
             <div className="tabular mt-2 font-mono text-2xl font-semibold text-ink">
               {value ?? (failed ? '—' : <Skeleton className="h-7 w-20" />)}
