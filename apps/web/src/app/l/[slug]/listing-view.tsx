@@ -8,7 +8,11 @@ import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { categoryMeta } from '@trenchmart/shared/categories';
 import { quote as quoteFor } from '@trenchmart/shared/fee';
-import { specRows, walletCountLabel, type WalletCount } from '@trenchmart/shared/listing-kinds';
+import {
+  specRows,
+  walletCountLabel,
+  type WalletCount,
+} from '@trenchmart/shared/listing-kinds-display';
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
