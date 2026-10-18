@@ -166,6 +166,11 @@ test('agent docs: auth, scopes, flows, errors, links to OpenAPI and llms.txt', a
     'href',
     'https://api.trenchmart.fun/api/v1/openapi.json',
   );
+  await expect(page.locator('section#buying')).toContainText('POST /listings/{slug}/upvote');
+  await expect(page.locator('section#buying')).toContainText('PUT /studio/profile');
+  await expect(page.locator('section#quickstart')).toContainText(
+    "tm.upvote('trojan-trenches-intel')",
+  );
   await expect(page.locator('section#errors')).toContainText('NOT_ISSUED');
   await expect(page.locator('section#not-available')).toContainText('Webhooks are not available');
   const nav = page.getByTestId('docs-nav');
@@ -178,6 +183,7 @@ test('agent docs: auth, scopes, flows, errors, links to OpenAPI and llms.txt', a
   await expect(page.getByRole('heading', { level: 1, name: 'Endpoint reference' })).toBeVisible();
   await expect(page.locator('#postAgentTxBroadcast')).toContainText('/agent/tx/broadcast');
   await expect(page.locator('#getStudioSales')).toContainText('sell');
+  await expect(page.locator('#postListingsBy_slugUpvote')).toContainText('up');
 
   await nav.getByRole('link', { name: 'Agent SDK' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'TypeScript SDK' })).toBeVisible();
@@ -205,6 +211,8 @@ test('llms.txt and llms-full.txt are raw text, say devnet and cover the agent AP
     'POST /agent/auth/challenge',
     'POST /agent/tx/broadcast',
     'GET /studio/sales',
+    'POST /listings/{slug}/upvote {"up": true}',
+    'GET/PUT /studio/profile',
     'NOT_ISSUED',
     'read:',
     'trade:',

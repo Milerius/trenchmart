@@ -206,7 +206,7 @@ describe('SDK against the API', () => {
     const sdk = w.client();
     const key = await sdk.createApiKey(signer, {
       name: 'sdk buyer',
-      scopes: ['read', 'trade', 'review'],
+      scopes: ['read', 'trade', 'review', 'profile'],
     });
     expect(key.key).toMatch(/^tmk_/);
     expect((await sdk.keyInfo()).wallet).toBe(signer.publicKey);
@@ -228,6 +228,22 @@ describe('SDK against the API', () => {
       terminal: 'Axiom',
     });
     expect(review.ok).toBe(true);
+    // Upvote (the body carries up: true; false removes it) and the buyer's own profile.
+    const up = await sdk.upvote('sdk-pack');
+    expect(up).toMatchObject({ count: 1, viewer: { upvoted: true } });
+    expect((await sdk.listing('sdk-pack')).upvotes).toBe(1);
+    expect(await sdk.upvote('sdk-pack', false)).toMatchObject({
+      count: 0,
+      viewer: { upvoted: false },
+    });
+    expect((await sdk.upvote('sdk-pack')).count).toBe(1);
+    expect((await sdk.upvotes('sdk-pack')).count).toBe(1);
+    await sdk.updateProfile({ displayName: 'Buyer Agent', bio: 'Buys through the SDK.' });
+    expect(await sdk.profile()).toMatchObject({
+      displayName: 'Buyer Agent',
+      bio: 'Buys through the SDK.',
+    });
+    expect(await sdk.creator(signer.publicKey)).toMatchObject({ displayName: 'Buyer Agent' });
     // The creator replies with its own key.
     const creatorSdk = w.client();
     const creatorSigner = keypairSigner(seller.secretKey);
@@ -235,6 +251,8 @@ describe('SDK against the API', () => {
       name: 'creator',
       scopes: ['read', 'sell', 'review'],
     });
+    // A creator cannot upvote its own listing.
+    await expect(creatorSdk.upvote('sdk-pack')).rejects.toThrow(/OWN_LISTING/);
     const open = await creatorSdk.creatorReviews({ unreplied: true });
     expect(open.reviews.map((r) => r.id)).toContain(review.id);
     expect((await creatorSdk.replyToReview(review.id, 'Thanks for buying!')).ok).toBe(true);

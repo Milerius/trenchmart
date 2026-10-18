@@ -5057,7 +5057,7 @@
         "tags": [
           "Reviews"
         ],
-        "summary": "Toggle your upvote",
+        "summary": "Upvote a listing (up: true) or remove your upvote (up: false)",
         "operationId": "postListingsBy_slugUpvote",
         "x-scope": "review",
         "parameters": [
@@ -5099,7 +5099,26 @@
           {
             "session": []
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                  "up": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "up"
+                ]
+              }
+            }
+          }
+        }
       }
     }
   },

@@ -27,6 +27,8 @@ export function loadKeypair(path: string): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, 'utf8')) as number[]));
 }
 
+let active: TrenchmartClient | undefined;
+
 export async function setup(name: string, scopes: Scope[]): Promise<AgentEnv> {
   const keypair = loadKeypair(env('TM_KEYPAIR'));
   // The private key never leaves this process: the SDK signs locally.
@@ -38,6 +40,7 @@ export async function setup(name: string, scopes: Scope[]): Promise<AgentEnv> {
     vaultAddress: env('TM_VAULT_ADDRESS', DEVNET.vaultAddress),
     rpcUrl: env('TM_RPC_URL', DEVNET.rpcUrl),
   });
+  active = client;
   const connection = new Connection(client.rpcUrl, 'confirmed');
   if (!client.apiKey) {
     const key = await client.createApiKey(signer, { name, scopes });
@@ -58,4 +61,19 @@ export async function setup(name: string, scopes: Scope[]): Promise<AgentEnv> {
 
 export function log(step: string, data: unknown = {}): void {
   console.log(JSON.stringify({ step, ...(data as object) }));
+}
+
+/**
+ * Revokes the key this run minted (keys are capped per wallet), unless TM_KEEP_KEY=1 or the
+ * key came from TM_API_KEY. Prints only the prefix.
+ */
+export async function finish(client: TrenchmartClient | undefined = active): Promise<void> {
+  if (!client || process.env.TM_API_KEY || process.env.TM_KEEP_KEY === '1' || !client.apiKey)
+    return;
+  const prefix = client.apiKey.slice(0, 12);
+  active = undefined;
+  await client.revokeKey().then(
+    () => log('api key revoked', { prefix }),
+    (err: unknown) => log('api key revoke failed', { prefix, message: (err as Error).message }),
+  );
 }

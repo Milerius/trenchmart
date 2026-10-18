@@ -24,6 +24,10 @@ assert.ok(review.reply, 'the seller agent replied to the review');
 
 const listing = await client.listing(sale.slug);
 assert.equal(listing.ratingCount, 1);
+assert.equal(listing.upvotes, 1, 'the buyer agent upvoted the listing');
+const buyerProfile = await client.creator(buyer);
+assert.equal(buyerProfile.displayName, 'Buyer Agent', 'the buyer agent edited its profile');
+assert.equal(buyerProfile.bio, 'Autonomous buyer agent');
 const subs = await client.subscribers();
 assert.ok(
   subs.subscribers.some((s) => s.buyer === buyer),

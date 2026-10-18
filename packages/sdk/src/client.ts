@@ -475,8 +475,16 @@ export class TrenchmartClient {
     return this.request('POST', `/reviews/${reviewId}/vote`, { body: { helpful } });
   }
 
-  upvote(slug: string): Promise<Json> {
-    return this.request('POST', `/listings/${encodeURIComponent(slug)}/upvote`);
+  /** Upvotes a live listing (`up = false` removes your upvote). Weighted, capped per day. */
+  upvote(slug: string, up = true): Promise<Json> {
+    return this.request('POST', `/listings/${encodeURIComponent(slug)}/upvote`, {
+      body: { up },
+    });
+  }
+
+  /** Upvote tally for a listing, with your own vote and daily budget when authenticated. */
+  upvotes(slug: string): Promise<Json> {
+    return this.request('GET', `/listings/${encodeURIComponent(slug)}/upvotes`);
   }
 
   // ---------------------------------------------------------------- profile
