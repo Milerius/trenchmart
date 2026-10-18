@@ -1,8 +1,13 @@
 # Hourly: the Hyperdrive config must open fewer origin connections than the Supabase session
 # pooler accepts (pool_size 15). At 20, bursts failed with EMAXCONNSESSION and CI migrations
 # could not connect (2026-10-18). scripts/deploy-api.sh sets 10 on every deploy; this catches
-# a change made anywhere else. A failure fails the run, and GitHub emails the repo owner.
-# Secrets (repo): CLOUDFLARE_API_TOKEN (Hyperdrive read), CLOUDFLARE_ACCOUNT_ID.
+# a change made anywhere else.
+# Alerts go to the owner's chat, not email: the run reports what it read to the API
+# (POST /internal/ops/hyperdrive), and the ops check raises HYPERDRIVE_LIMIT (critical above
+# 10, warn when unreadable or when no report arrived for 3 h), which /internal/ops/alerts
+# serves to the alert relay. So drift does not fail this run (a failed scheduled run emails).
+# Secrets (repo): CLOUDFLARE_API_TOKEN (Hyperdrive read), CLOUDFLARE_ACCOUNT_ID,
+# TM_INTERNAL_TOKEN (the API's INTERNAL_TOKEN).
 name: hyperdrive-limit
 on:
   schedule:
@@ -16,19 +21,32 @@ jobs:
     env:
       HYPERDRIVE_ID: 067fbd6cc9a949e7a62155bf3fd2fe91
       MAX_LIMIT: 10
+      API: https://api.trenchmart.fun/api/v1
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TM_INTERNAL_TOKEN: ${{ secrets.TM_INTERNAL_TOKEN }}
     steps:
-      - name: origin_connection_limit <= MAX_LIMIT
+      - name: read origin_connection_limit and report it to the ops check
         run: |
+          limit=null; error=""
           if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
-            echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets missing" >&2; exit 1
+            error="CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets missing"
+          elif body="$(curl -fsS --max-time 20 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HYPERDRIVE_ID")"; then
+            limit="$(echo "$body" | jq -r '.result.origin_connection_limit // "null"')"
+            [[ "$limit" == "null" ]] && error="origin_connection_limit unset"
+          else
+            error="Cloudflare API read failed"
           fi
-          body="$(curl -fsS --max-time 20 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/hyperdrive/configs/$HYPERDRIVE_ID")"
-          limit="$(echo "$body" | jq -r '.result.origin_connection_limit // "unset"')"
-          echo "origin_connection_limit: $limit (max $MAX_LIMIT)"
-          if [[ "$limit" == "unset" || "$limit" -gt "$MAX_LIMIT" ]]; then
-            echo "::error::Hyperdrive origin_connection_limit is $limit; the Supabase session pooler allows 15. Run: wrangler hyperdrive update $HYPERDRIVE_ID --origin-connection-limit $MAX_LIMIT"
-            exit 1
+          echo "origin_connection_limit: $limit (max $MAX_LIMIT) ${error}"
+          if [[ "$limit" != "null" && "$limit" -gt "$MAX_LIMIT" ]]; then
+            echo "::warning::Hyperdrive origin_connection_limit is $limit; run: wrangler hyperdrive update $HYPERDRIVE_ID --origin-connection-limit $MAX_LIMIT"
           fi
+          payload="$(jq -nc --argjson limit "$limit" --arg error "$error" \
+            '{limit: $limit, source: "check"} + (if $error == "" then {} else {error: $error} end)')"
+          if [[ -z "${TM_INTERNAL_TOKEN:-}" ]]; then
+            echo "::warning::TM_INTERNAL_TOKEN missing; cannot report to the ops check"; exit 0
+          fi
+          curl -fsS --max-time 20 -o /dev/null -X POST "$API/internal/ops/hyperdrive" \
+            -H "Authorization: Bearer $TM_INTERNAL_TOKEN" -H 'content-type: application/json' \
+            --data "$payload" && echo "reported" || echo "::warning::report to the ops check failed"

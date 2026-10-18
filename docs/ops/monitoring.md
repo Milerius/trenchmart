@@ -174,9 +174,19 @@ Critical. 10 or more API 5xx errors in 15 min.
 
 Critical. In the last 15 min, an API request failed with `EMAXCONNSESSION max clients reached in session mode` from the Supabase pooler.
 
-- Hyperdrive (`trenchmart-db`) reaches Supabase through the session pooler, which allows 15 clients in total. Its `origin_connection_limit` must stay well below that. `scripts/deploy-api.sh` sets it to 10 on every deploy, and the hourly `hyperdrive-limit` workflow fails when it is higher.
+- Hyperdrive (`trenchmart-db`) reaches Supabase through the session pooler, which allows 15 clients in total. Its `origin_connection_limit` must stay well below that. `scripts/deploy-api.sh` sets it to 10 on every deploy, and the hourly `hyperdrive-limit` workflow reports it (see HYPERDRIVE_LIMIT).
 - Check it with `wrangler hyperdrive get <id>`. Fix it with `wrangler hyperdrive update <id> --origin-connection-limit 10`.
 - If the limit is fine, look for another client holding pooler connections: `select application_name, count(*) from pg_stat_activity group by 1`.
+
+### HYPERDRIVE_LIMIT
+
+The Worker has no Cloudflare API token, so the Hyperdrive config is read from outside: the hourly `hyperdrive-limit` workflow and `scripts/deploy-api.sh` (when `INTERNAL_TOKEN` is set) POST what they read to `/internal/ops/hyperdrive`. The ops check looks at the latest report:
+
+- Critical: `origin_connection_limit` is above 10. The Supabase session pooler allows 15, and at 20 requests failed with DB_POOL_FULL. Fix it with `wrangler hyperdrive update 067fbd6cc9a949e7a62155bf3fd2fe91 --origin-connection-limit 10`, or redeploy the API.
+- Warn: the limit could not be read or is unset. The message carries the reason, for example missing workflow secrets or a Cloudflare API error.
+- Warn: no report for 3 h, so the workflow is not running or cannot reach the API (check `TM_INTERNAL_TOKEN`).
+
+The workflow does not fail on drift, because a failed scheduled run emails the owner, and alerts go to the assistant chat through `/internal/ops/alerts`.
 
 ### DISPUTE_SPIKE
 
