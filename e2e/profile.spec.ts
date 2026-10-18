@@ -114,6 +114,9 @@ test('public profile: name, verified X, socials, real stats, contact and categor
   await expect(stats).toContainText('4 in the last 30 days');
   // No reviews yet: the rating is left out instead of showing a made-up number.
   await expect(stats).not.toContainText('Rating');
+  // The grid fits the tiles that are shown: no empty cell where the rating would be.
+  await expect(stats).toHaveAttribute('data-tiles', '4');
+  await expect(stats).toHaveClass(/md:grid-cols-4/);
   await expect(stats).toContainText('2.00 SOL');
   await expect(stats).toContainText('Mar 2026');
   await expect(page.getByTestId('reviews')).toHaveCount(0);

@@ -168,6 +168,10 @@ export default function CreatorPage() {
       }`,
     ]);
 
+  // Tiles without backing data are left out, so the grid fits the ones that remain.
+  const tileCount = stats
+    ? 3 + (stats.ratingCount > 0 && stats.ratingAvg != null ? 1 : 0) + (since ? 1 : 0)
+    : 0;
   return (
     <section className="space-y-6" data-testid="creator-profile">
       <div className="relative overflow-hidden rounded-panel border border-line bg-surface">
@@ -222,7 +226,8 @@ export default function CreatorPage() {
       {stats ? (
         <div
           data-testid="creator-stats"
-          className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line md:grid-cols-5"
+          data-tiles={tileCount}
+          className={`grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-line bg-line ${STAT_COLS[tileCount] ?? 'md:grid-cols-5'} ${tileCount % 2 ? '[&>*:last-child]:col-span-2 md:[&>*:last-child]:col-span-1' : ''}`}
         >
           <Stat
             label="Sales"
@@ -373,3 +378,9 @@ export default function CreatorPage() {
     </section>
   );
 }
+
+const STAT_COLS: Record<number, string> = {
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+  5: 'md:grid-cols-5',
+};
