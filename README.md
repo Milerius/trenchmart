@@ -177,15 +177,16 @@ AI agents buy and sell through a non-custodial, versioned API at `https://api.tr
 
 TrenchMart is a **devnet proof of concept**. The site, API, escrow program and Squads vault are live on Solana devnet, with test SOL only.
 
-| Area                              | Status                                                                                                                                                                                                |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Escrow program `trench_escrow` v2 | Live on devnet: freeze on dispute, rotatable resolver, 7-day timeout refund. Internal review only ([security review](docs/security/escrow-review.md)); a third-party audit was declined by the owner. |
-| Verified build                    | CI compares a `solana-verify` build against the deployed program ([verified-build](docs/ops/verified-build.md)).                                                                                      |
-| X sign-in                         | Built (PKCE, verified ids); waiting on the production X app. Until then, devnet handles are labelled unverified.                                                                                      |
-| API hardening                     | Fail-closed secrets, edge rate limiting, security headers, Hyperdrive TLS to Postgres.                                                                                                                |
-| Agent API and SDK                 | Live on devnet: scoped keys, validated broadcast, buyer and creator flows, docs and llms.txt. The SDK is not on npm yet (license and npm token pending).                                              |
-| Monitoring and backups            | 5-minute health checks; nightly encrypted backups ([monitoring](docs/ops/monitoring.md), [backups](docs/ops/backups.md)).                                                                             |
-| Mainnet                           | Not yet. The open items are tracked in [mainnet readiness](docs/mainnet-readiness.md), including the $TRENCH launch and lifting the devnet guard.                                                     |
+| Area                              | Status                                                                                                                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Escrow program `trench_escrow` v2 | Live on devnet: freeze on dispute, rotatable resolver, 7-day timeout refund. Internal review only ([security review](docs/security/escrow-review.md)); a third-party audit was declined by the owner.              |
+| Verified build                    | CI compares a `solana-verify` build against the deployed program ([verified-build](docs/ops/verified-build.md)).                                                                                                   |
+| X sign-in                         | Built (PKCE, verified ids); waiting on the production X app. Until then, devnet handles are labelled unverified.                                                                                                   |
+| API hardening                     | Fail-closed secrets, edge rate limiting, security headers, Hyperdrive TLS to Postgres.                                                                                                                             |
+| Agent API and SDK                 | Live on devnet: scoped keys, validated broadcast, buyer and creator flows, docs and llms.txt. The SDK is not on npm yet (license and npm token pending).                                                           |
+| Monitoring and backups            | 5-minute health checks; nightly encrypted backups ([monitoring](docs/ops/monitoring.md), [backups](docs/ops/backups.md)).                                                                                          |
+| Public status page                | [trenchmart.fun/status](https://trenchmart.fun/status): live state, p50/p95 latency and 90-day uptime per component, plus incident history; JSON at `GET /api/v1/status` ([status page](docs/ops/status-page.md)). |
+| Mainnet                           | Not yet. The open items are tracked in [mainnet readiness](docs/mainnet-readiness.md), including the $TRENCH launch and lifting the devnet guard.                                                                  |
 
 ## Tech stack
 

@@ -21,6 +21,7 @@ const STATIC = [
   '/docs/treasury',
   '/terms',
   '/privacy',
+  '/status',
 ];
 
 export const revalidate = 3600;
