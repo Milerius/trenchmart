@@ -15,7 +15,6 @@ import type { Deps } from './logic';
 import {
   deliverAlerts,
   opsCheck,
-  postNtfy,
   recordHyperdriveReport,
   recordOpsEvent,
   recordScheduledReport,
@@ -57,9 +56,6 @@ async function setup(extra: Record<string, string> = {}) {
     ESCROW_RESOLVER_SECRET: bs58.encode(resolver.secretKey),
     ESCROW_CRANK_SECRET: bs58.encode(crank.secretKey),
     EXPECTED_UPGRADE_AUTHORITY: vaultAuthority,
-    ALERT_NTFY_TOPIC: 'secret-topic',
-    ALERT_EMAIL: 'owner@example.com',
-    ALERT_NTFY_TOKEN: 'tk_test',
     TELEGRAM_BOT_TOKEN: 'tg-token',
     TELEGRAM_CHAT_ID: '42',
     ...extra,
@@ -486,29 +482,5 @@ describe('monitoring and alerts', () => {
     await recordHyperdriveReport(deps, { limit: 10, source: 'check' });
     now = new Date(now.getTime() + 26 * 3_600_000);
     expect(await codes(deps)).toEqual(['BACKUP_FAILED', 'HYPERDRIVE_LIMIT']);
-  });
-
-  it('ntfy: email only with an account token; refused email falls back to push', async () => {
-    const posts: Record<string, string>[] = [];
-    let refuseEmail = true;
-    const f = (async (_url: string, init?: RequestInit) => {
-      const h = init?.headers as Record<string, string>;
-      posts.push(h);
-      if (h.Email && refuseEmail) return new Response('{"code":40053}', { status: 400 });
-      return new Response('{}');
-    }) as typeof fetch;
-    const base = { alertNtfyServer: 'https://ntfy.sh', alertNtfyTopic: 't', alertEmail: 'o@e.com' };
-    expect((await postNtfy(f, { ...base, alertNtfyToken: '' }, { Title: 'x' }, 'b')).ok).toBe(true);
-    expect(posts.map((h) => h.Email ?? null)).toEqual([null]);
-    posts.length = 0;
-    expect((await postNtfy(f, { ...base, alertNtfyToken: 'tk' }, { Title: 'x' }, 'b')).ok).toBe(
-      true,
-    );
-    expect(posts.map((h) => h.Email ?? null)).toEqual(['o@e.com', null]);
-    expect(posts[0]!.Authorization).toBe('Bearer tk');
-    posts.length = 0;
-    refuseEmail = false;
-    await postNtfy(f, { ...base, alertNtfyToken: 'tk' }, { Title: 'x' }, 'b');
-    expect(posts.length).toBe(1);
   });
 });

@@ -1,8 +1,8 @@
 // Monitoring and alerting (docs/ops/monitoring.md).
 // opsCheck() runs on every cron tick (5 min) and on GET /internal/ops. Each alert is logged as
 // `ALERT {...}` (Workers Logs). deliverAlerts() persists open/resolved state in ops_alerts
-// (once on open, again every 6 h while open, once on resolve). Push channels (ntfy/email/
-// Telegram/webhook) are disabled: the owner's assistant polls every 10 min and relays in chat.
+// (once on open, again every 6 h while open, once on resolve). Push channels (Telegram/
+// webhook) are disabled and there is no email or ntfy path: the owner's assistant polls every 10 min and relays in chat.
 import bs58 from 'bs58';
 import { parseSecretKey, publicKeyOf } from '@trenchmart/chain';
 import { pendingMigrations } from '@trenchmart/db';
@@ -433,38 +433,6 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
   return alerts;
 }
 
-/**
- * Legacy ntfy helper (unused by notify — delivery is assistant chat only). Kept for unit tests
- * and optional one-off scripts. Email forwarding needs an ntfy account token; without it, or if
- * email is refused, posts as push only. Does nothing useful in production.
- */
-export async function postNtfy(
-  f: typeof fetch,
-  env: {
-    alertNtfyServer: string;
-    alertNtfyTopic: string;
-    alertEmail: string;
-    alertNtfyToken: string;
-  },
-  headers: Record<string, string>,
-  body: string,
-): Promise<Response> {
-  const url = `${env.alertNtfyServer}/${env.alertNtfyTopic}`;
-  const auth: Record<string, string> = env.alertNtfyToken
-    ? { Authorization: `Bearer ${env.alertNtfyToken}` }
-    : {};
-  if (env.alertEmail && env.alertNtfyToken) {
-    const res = await timed(f, url, {
-      method: 'POST',
-      headers: { ...headers, ...auth, Email: env.alertEmail },
-      body,
-    });
-    if (res.ok) return res;
-    console.error('ALERT_DELIVERY', 'ntfy email refused', res.status);
-  }
-  return timed(f, url, { method: 'POST', headers: { ...headers, ...auth }, body });
-}
-
 export type Notice = {
   title: string;
   body: string;
@@ -474,7 +442,7 @@ export type Notice = {
 
 /**
  * Alert "delivery" for the owner: the assistant polls open alerts every 10 min and relays them
- * in chat. External push (ntfy / email / Telegram / webhook) is intentionally disabled so missing
+ * in chat. There is no email or ntfy path, and Telegram / webhook push is disabled so missing
  * credentials never log ALERT_DELIVERY errors. Returns ["assistant"] so callers treat the notice
  * as acknowledged for renotify bookkeeping.
  */
@@ -586,8 +554,6 @@ export async function opsStatus(deps: Deps) {
     events24h: events,
     channels: {
       assistant: true, // owner assistant polls /internal/ops/alerts every 10 min
-      ntfy: false,
-      email: false,
       telegram: false,
       webhook: false,
     },

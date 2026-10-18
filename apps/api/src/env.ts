@@ -61,12 +61,6 @@ export type Env = {
   xApiUrl: string;
   /** Server-side wasm WebP re-encode at upload (CPU heavy; off unless IMAGE_OPTIMIZE=1). */
   imageOptimize: boolean;
-  /** Alert delivery (ops.ts). ntfy topic is a secret: anyone who knows it can read alerts. */
-  alertNtfyServer: string;
-  alertNtfyTopic: string;
-  alertEmail: string;
-  /** ntfy access token (free ntfy.sh account): required for email forwarding. */
-  alertNtfyToken: string;
   telegramBotToken: string;
   telegramChatId: string;
   alertWebhookUrl: string;
@@ -226,10 +220,6 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     xClientSecret: blank(source.X_CLIENT_SECRET),
     xApiUrl: blank(source.X_API_URL) || 'https://api.x.com',
     imageOptimize: source.IMAGE_OPTIMIZE === '1',
-    alertNtfyServer: blank(source.ALERT_NTFY_SERVER) || 'https://ntfy.sh',
-    alertNtfyTopic: blank(source.ALERT_NTFY_TOPIC),
-    alertEmail: blank(source.ALERT_EMAIL),
-    alertNtfyToken: blank(source.ALERT_NTFY_TOKEN),
     telegramBotToken: blank(source.TELEGRAM_BOT_TOKEN),
     telegramChatId: blank(source.TELEGRAM_CHAT_ID),
     alertWebhookUrl: blank(source.ALERT_WEBHOOK_URL),

@@ -55,7 +55,7 @@ curl -X POST -H "authorization: Bearer $INTERNAL_TOKEN" \
   https://api.trenchmart.fun/api/v1/internal/ops/run
 ```
 
-`ALERT_NTFY_*`, `TELEGRAM_*`, and `ALERT_WEBHOOK_URL` are ignored if set. Leave them unset.
+There is no email or ntfy code path, and no `ALERT_EMAIL` / `ALERT_NTFY_*` setting on the API or the watchdog. `TELEGRAM_*` and `ALERT_WEBHOOK_URL` are ignored if set. Leave them unset.
 
 ## Alerts and runbooks
 
@@ -234,4 +234,4 @@ All times are 2026-10-18 UTC+4 (Dubai).
 - **Healthy baseline.** `GET /internal/ops` → `{"ok":true,"alerts":[]}`. This is the real live state: RPC, web and R2 probes pass, the resolver and crank hold more than 0.05 SOL, the upgrade authority equals the vault `47RLqPda…`, and no order is stuck.
 - **Every other code** (DB, RPC, web, low balance, resolver, upgrade authority, stuck release, scan stuck, disputes, payouts, kill switch) fires and resolves in `apps/api/src/ops.test.ts` against real Postgres with stubbed chain and HTTP. That file also tests the dedup, the 6 h re-send, resolve notices, and retry after failed delivery.
 - **Watchdog.** Live at `https://trenchmart-watchdog.trenchmart.workers.dev/` with a `*/5` cron. It reports web and API ok. Its DOWN-once and UP-once logic is tested in `watchdog.test.ts`.
-- **Delivery: blocked on the ntfy token** (see above). Every live test notice returned `channels: []` because of the ntfy 429 quota. Once `ALERT_NTFY_TOKEN` is set, run `POST /internal/ops/test?code=DELIVERY` and expect `{"channels":["ntfy"]}`.
+- **Delivery: chat only.** `POST /internal/ops/test?code=DELIVERY` returns `{"channels":["assistant"]}`. The ntfy/email paths and the watchdog's `ALERT_EMAIL` / `ALERT_NTFY_TOPIC` secrets were removed (2026-10-18).
