@@ -543,7 +543,9 @@ test.describe('phase 7: listing', () => {
         .filter((name) => /ElectricBorder|DecryptedText/.test(name)),
     );
     expect(chunks).toEqual([]);
-    await expect(page.getByRole('link', { name: 'Review and buy' })).toBeVisible();
+    // The sticky buy bar is in the page (it hides itself while the checkout card is on screen).
+    await expect(page.locator('a[href="#checkout"]')).toBeAttached();
+    await expect(page.getByTestId('checkout').getByTestId('buy')).toBeEnabled();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
     );
