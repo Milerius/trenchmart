@@ -253,7 +253,7 @@ export async function activityFeed(deps: Deps, limit = 24) {
     (select 'featured', greatest(b.start_day::timestamptz, b.paid_at), l.title, l.slug, l.category::text, null, null, b.kind
       from feature_bookings b join listings l on l.id = b.listing_id
       where b.status in ('paid', 'completed') and b.start_day <= ${utcDay(deps.now())}::date and b.start_day > ${utcDay(since)}::date
-        and l.delisted_at is null
+        and l.delisted_at is null and l.paused_at is null and l.live_version_id is not null
       order by b.start_day desc limit ${limit})
     union all
     (select 'update', v.created_at, l.title, l.slug, l.category::text, null, null, v.semver

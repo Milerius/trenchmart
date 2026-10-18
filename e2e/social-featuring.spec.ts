@@ -393,6 +393,105 @@ test('studio: an ineligible listing shows the failing check and cannot be paid',
   ).toBeDisabled();
 });
 
+test('studio: a failed confirmation keeps the signature and offers Confirm payment', async ({
+  page,
+}) => {
+  const who = wallet();
+  const start = addDays(TODAY, 2);
+  let created = false;
+  let confirmed = false;
+  let submits = 0;
+  const pending = () => ({
+    id: BOOKING_ID,
+    listingId: LISTING_ID,
+    title: CARD.title,
+    slug: CARD.slug,
+    kind: 'band',
+    startDay: start,
+    days: 1,
+    subtotal: '200000000',
+    discountBps: 2000,
+    total: '160000000',
+    status: confirmed ? 'paid' : 'pending',
+    txSig: null,
+    refundLamports: '0',
+    refundReason: null,
+  });
+  const calls = await setup(page, who, (call) => {
+    if (call.path === '/studio/featuring') return { json: overview(created ? [pending()] : []) };
+    if (call.path === '/featuring/calendar')
+      return { json: calendar(new URLSearchParams(call.query).get('kind')!) };
+    if (call.path === '/studio/featuring/quote')
+      return {
+        json: {
+          quote: {
+            subtotal: '200000000',
+            discountBps: 2000,
+            discount: '40000000',
+            total: '160000000',
+            tier: 'trencher',
+            days: 1,
+          },
+          problems: [],
+        },
+      };
+    if (call.path === '/studio/featuring/bookings') {
+      created = true;
+      return { json: { booking: pending(), tx: { txBase64: unsignedTx(who.address) } } };
+    }
+    if (call.path.endsWith('/submitted')) {
+      submits += 1;
+      if (submits === 1)
+        return { status: 503, json: { error: { code: 'RPC_DOWN', message: 'RPC unavailable' } } };
+      confirmed = true;
+      return { json: pending() };
+    }
+    return undefined;
+  });
+  await page.goto('/studio/featuring');
+  await page.getByTestId('placement-band').click();
+  await page
+    .getByTestId('feature-calendar')
+    .getByRole('button', { name: /of 6 left/ })
+    .nth(2)
+    .click();
+  await page.getByTestId('feature-quote').getByRole('button', { name: 'Pay 0.16 SOL' }).click();
+  await expect(page.getByRole('status')).toContainText('RPC unavailable');
+  const row = page.getByTestId('feature-booking');
+  await expect(row).toContainText('AWAITING PAYMENT');
+  await row.getByRole('button', { name: 'Confirm payment' }).click();
+  await expect(page.getByRole('status')).toContainText('Payment confirmed');
+  const sigs = calls
+    .filter((c) => c.path.endsWith('/submitted'))
+    .map((c) => (c.body as { txSig: string }).txSig);
+  expect(sigs).toHaveLength(2);
+  expect(sigs[0]).toBe(sigs[1]);
+  await expect(row).toContainText('BOOKED');
+  await expect(row.getByRole('button', { name: 'Confirm payment' })).toHaveCount(0);
+});
+
+test('studio: a failed quote explains itself instead of spinning', async ({ page }) => {
+  const who = wallet();
+  await setup(page, who, (call) => {
+    if (call.path === '/studio/featuring') return { json: overview() };
+    if (call.path === '/featuring/calendar')
+      return { json: calendar(new URLSearchParams(call.query).get('kind')!) };
+    if (call.path === '/studio/featuring/quote')
+      return { status: 500, json: { error: { code: 'INTERNAL', message: 'pricing is down' } } };
+    return undefined;
+  });
+  await page.goto('/studio/featuring');
+  await page
+    .getByTestId('feature-calendar')
+    .getByRole('button', { name: /of 3 left/ })
+    .nth(2)
+    .click();
+  await expect(page.getByTestId('feature-quote-error')).toContainText('pricing is down');
+  await expect(
+    page.getByTestId('feature-quote').getByRole('button', { name: /Pay|Book/ }),
+  ).toBeDisabled();
+});
+
 test('home, category and the activity band show paid slots, always labelled', async ({ page }) => {
   const featured = { ...CARD, sponsored: { bookingId: BOOKING_ID, placement: 'home' } };
   await setup(page, null, (call) => {

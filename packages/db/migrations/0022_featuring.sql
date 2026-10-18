@@ -40,6 +40,8 @@ create table feature_days (
 create index feature_days_slot on feature_days (kind, day, category);
 
 alter table payouts add column if not exists feature_booking_id uuid references feature_bookings(id);
+-- Safety net: one payout per bucket per booking (a refund, or each fee bucket once).
+create unique index payouts_feature_bucket on payouts (feature_booking_id, bucket) where feature_booking_id is not null;
 
 insert into config (key, value) values
   ('feature_slots', '{"home": {"perDay": 3, "lamportsPerDay": "1500000000"}, "category": {"perDay": 2, "lamportsPerDay": "600000000"}, "band": {"perDay": 6, "lamportsPerDay": "200000000"}}'::jsonb),

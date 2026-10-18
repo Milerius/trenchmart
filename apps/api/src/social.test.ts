@@ -822,6 +822,121 @@ describe('social: paid featuring', () => {
     expect((await book(others[2]!, others[2]!.l.listingId)).status).toBe(200);
   });
 
+  it('settles late payments safely: released holds refund, lapsed holds keep or refund their days', async () => {
+    const app = await featureApp();
+    const cron = () =>
+      app.request('/api/v1/internal/cron/featuring', {
+        method: 'POST',
+        headers: { authorization: 'Bearer internal', 'x-internal-token': 'internal' },
+      });
+    const submit = (who: { cookie: string }, id: string, label: string) =>
+      call(app, who.cookie, 'POST', `/studio/featuring/bookings/${id}/submitted`, {
+        txSig: sigOf(label),
+      });
+    const book = (who: { cookie: string; l: { listingId: string } }, startDay = '2026-06-02') =>
+      call(app, who.cookie, 'POST', '/studio/featuring/bookings', {
+        listingId: who.l.listingId,
+        kind: 'home',
+        startDay,
+        days: 1,
+      });
+
+    // 1) Hold released, then the signed payment lands: recorded and refunded in full.
+    const alice = await creator(app, 'late-a');
+    const a = (await book(alice)).body.booking;
+    paidTx('late-a', alice.wallet.publicKey, BigInt(a.total), a.id);
+    await call(app, alice.cookie, 'POST', `/studio/featuring/bookings/${a.id}/cancel`);
+    const refunded = await submit(alice, a.id, 'late-a');
+    expect(refunded.body).toMatchObject({
+      status: 'cancelled',
+      txSig: sigOf('late-a'),
+      refundLamports: a.total,
+      refundReason: 'released_before_payment',
+    });
+    const [ra] =
+      await sql`select count(*)::int as n, sum(amount)::bigint as s from payouts where feature_booking_id = ${a.id} and bucket = 'refund'`;
+    expect(ra).toMatchObject({ n: 1 });
+    expect(BigInt(ra!.s)).toBe(BigInt(a.total));
+
+    // 2) Paid in time, confirmed after the hold lapsed and the cron dropped the days: the
+    //    days come back and the listing is featured.
+    const bob = await creator(app, 'late-b');
+    const b = (await book(bob)).body.booking;
+    paidTx('late-b', bob.wallet.publicKey, BigInt(b.total), b.id);
+    clock = new Date(now.getTime() + 16 * 60_000);
+    await cron();
+    const [expired] = await sql`select status from feature_bookings where id = ${b.id}`;
+    expect(expired!.status).toBe('expired');
+    expect((await submit(bob, b.id, 'late-b')).body.status).toBe('paid');
+    const [days] =
+      await sql`select count(*)::int as n from feature_days where booking_id = ${b.id}`;
+    expect(days!.n).toBe(1);
+
+    // 3) A lapsed hold whose day filled up meanwhile is refunded instead of overselling.
+    clock = now;
+    const carol = await creator(app, 'late-c');
+    const c = (await book(carol, '2026-06-03')).body.booking;
+    paidTx('late-c', carol.wallet.publicKey, BigInt(c.total), c.id);
+    clock = new Date(now.getTime() + 16 * 60_000);
+    for (const slug of ['late-d', 'late-e', 'late-f']) {
+      const who = await creator(app, slug);
+      expect((await book(who, '2026-06-03')).status).toBe(200);
+    }
+    const lost = await submit(carol, c.id, 'late-c');
+    expect(lost.body).toMatchObject({ status: 'cancelled', refundReason: 'slot_taken' });
+    const [full] = await sql`
+      select count(*)::int as n from feature_days d join feature_bookings b on b.id = d.booking_id
+      where d.day = '2026-06-03' and d.kind = 'home' and b.id = ${c.id}
+    `;
+    expect(full!.n).toBe(0);
+
+    // 4) Overlapping maintenance runs never pay a finished run twice.
+    clock = new Date('2026-06-04T01:00:00Z');
+    await Promise.all([cron(), cron()]);
+    await cron();
+    const dup = await sql`
+      select bucket, count(*)::int as n from payouts where feature_booking_id = ${b.id} group by bucket
+    `;
+    expect(dup.length).toBeGreaterThan(0);
+    expect(dup.every((row) => row.n === 1)).toBe(true);
+  });
+
+  it('admins edit featuring config atomically and invalid values are rejected', async () => {
+    const app = await featureApp();
+    const admin = await user(app, { roles: ['admin'] });
+    const valid = {
+      slots: {
+        home: { perDay: 4, lamportsPerDay: '1000000000' },
+        category: { perDay: 2, lamportsPerDay: '600000000' },
+        band: { perDay: 6, lamportsPerDay: '200000000' },
+      },
+      discountBps: { none: 0, scout: 1000, trencher: 2000, og: 3000 },
+      rules: {
+        maxConsecutiveDays: 7,
+        maxDaysAhead: 28,
+        minRatingX10: 40,
+        holdMinutes: 15,
+        cancelHours: 24,
+        homePerCreatorPerDay: 1,
+      },
+    };
+    const bad = { ...valid, slots: { ...valid.slots, home: { perDay: 0, lamportsPerDay: '1' } } };
+    expect((await call(app, admin.cookie, 'PUT', '/admin/featuring/config', bad)).status).toBe(400);
+    const notAdmin = await user(app, { roles: ['creator'] });
+    expect((await call(app, notAdmin.cookie, 'PUT', '/admin/featuring/config', valid)).status).toBe(
+      403,
+    );
+    const ok = await call(app, admin.cookie, 'PUT', '/admin/featuring/config', valid);
+    expect(ok.status).toBe(200);
+    expect(ok.body.slots.home).toMatchObject({ perDay: 4, lamportsPerDay: '1000000000' });
+    const rows = await sql`select key from config where key like 'feature_%' order by key`;
+    expect(rows.map((r) => r.key)).toEqual([
+      'feature_discount_bps',
+      'feature_rules',
+      'feature_slots',
+    ]);
+  });
+
   it('refunds a cancel made early enough, refuses a late one, and refunds unserved days when pulled', async () => {
     const app = await featureApp();
     const alice = await creator(app, 'feat-r');

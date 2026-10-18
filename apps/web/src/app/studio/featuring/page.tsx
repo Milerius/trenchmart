@@ -112,6 +112,25 @@ function shortDay(day: string): string {
   });
 }
 
+const SIG_KEY = 'tm:featuring:pending-sigs';
+
+function readSigs(): Record<string, string> {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(SIG_KEY) ?? '{}') as unknown;
+    return raw && typeof raw === 'object' ? (raw as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function storeSigs(sigs: Record<string, string>) {
+  try {
+    window.localStorage.setItem(SIG_KEY, JSON.stringify(sigs));
+  } catch {
+    /* storage unavailable: the signature stays in memory for this visit */
+  }
+}
+
 function canCancel(booking: Booking, cancelHours: number): boolean {
   if (booking.status === 'pending') return true;
   if (booking.status !== 'paid') return false;
@@ -235,6 +254,8 @@ export default function StudioFeaturingPage() {
   const [days, setDays] = useState(1);
   const [calendars, setCalendars] = useState<Partial<Record<Kind, Calendar>>>({});
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [pendingSigs, setPendingSigs] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'idle' | 'booking' | 'signing' | 'confirming'>('idle');
   const [message, setMessage] = useState<{ tone: Tone; text: string } | null>(null);
 
@@ -245,7 +266,7 @@ export default function StudioFeaturingPage() {
         setOverview(body);
         setListingId(
           (current) =>
-            current ||
+            (body.listings.some((l) => l.id === current) ? current : '') ||
             body.listings.find((l) => !l.problems.length)?.id ||
             body.listings[0]?.id ||
             '',
@@ -257,6 +278,8 @@ export default function StudioFeaturingPage() {
   useEffect(() => {
     if (wallet.session) load();
   }, [wallet.session, load]);
+
+  useEffect(() => setPendingSigs(readSigs()), []);
 
   const listing = overview?.listings.find((l) => l.id === listingId) ?? null;
   const category = listing?.category;
@@ -280,6 +303,7 @@ export default function StudioFeaturingPage() {
 
   useEffect(() => {
     setQuote(null);
+    setQuoteError(null);
     if (!listing || !start) return;
     let stop = false;
     void api<Quote>('/studio/featuring/quote', {
@@ -287,7 +311,11 @@ export default function StudioFeaturingPage() {
       body: JSON.stringify({ listingId: listing.id, kind, startDay: start, days }),
     })
       .then((body) => !stop && setQuote(body))
-      .catch(() => !stop && setQuote(null));
+      .catch((err: unknown) => {
+        if (stop) return;
+        setQuote(null);
+        setQuoteError(err instanceof Error ? err.message : 'Couldn’t price this run.');
+      });
     return () => {
       stop = true;
     };
@@ -312,12 +340,15 @@ export default function StudioFeaturingPage() {
       );
       setStep('signing');
       const signature = await wallet.signAndSend(created.tx.txBase64);
+      // Keep the signature until the API confirms it, so a failed confirmation can be retried.
+      rememberSig(created.booking.id, signature);
       setStep('confirming');
       await submitPayment(
         api,
         `/studio/featuring/bookings/${created.booking.id}/submitted`,
         signature,
       );
+      forgetSig(created.booking.id);
       setMessage({
         tone: 'ok',
         text: 'Paid and booked. Your listing shows as Featured · Sponsored on those days.',
@@ -328,6 +359,43 @@ export default function StudioFeaturingPage() {
     } catch (err) {
       setMessage({ tone: 'danger', text: err instanceof Error ? err.message : 'booking failed' });
       load();
+    } finally {
+      setStep('idle');
+    }
+  }
+
+  function rememberSig(bookingId: string, signature: string) {
+    setPendingSigs((prev) => {
+      const next = { ...prev, [bookingId]: signature };
+      storeSigs(next);
+      return next;
+    });
+  }
+
+  function forgetSig(bookingId: string) {
+    setPendingSigs((prev) => {
+      const next = { ...prev };
+      delete next[bookingId];
+      storeSigs(next);
+      return next;
+    });
+  }
+
+  async function retryConfirm(booking: Booking) {
+    const signature = pendingSigs[booking.id];
+    if (!signature) return;
+    setMessage(null);
+    try {
+      setStep('confirming');
+      await submitPayment(api, `/studio/featuring/bookings/${booking.id}/submitted`, signature);
+      forgetSig(booking.id);
+      setMessage({ tone: 'ok', text: 'Payment confirmed.' });
+      load();
+    } catch (err) {
+      setMessage({
+        tone: 'danger',
+        text: err instanceof Error ? err.message : 'confirmation failed',
+      });
     } finally {
       setStep('idle');
     }
@@ -830,6 +898,15 @@ export default function StudioFeaturingPage() {
               <p className="m-0 mt-1.5 text-[11px] text-muted">
                 $TRENCH discount from your holder tier.
               </p>
+              {quoteError ? (
+                <p
+                  role="alert"
+                  className="m-0 mt-3 text-sm text-danger"
+                  data-testid="feature-quote-error"
+                >
+                  Couldn’t get a price: {quoteError}
+                </p>
+              ) : null}
               {uniqueProblems.length ? (
                 <ul
                   className="m-0 mt-3 space-y-1 pl-4 text-sm text-danger"
@@ -961,6 +1038,16 @@ export default function StudioFeaturingPage() {
                       <Tag tone={STATUS[b.status][1]}>{STATUS[b.status][0]}</Tag>
                     </td>
                     <td className="px-3 py-2.5 text-right">
+                      {b.status === 'pending' && pendingSigs[b.id] ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() => void retryConfirm(b)}
+                        >
+                          Confirm payment
+                        </Button>
+                      ) : null}
                       {canCancel(b, cfg.rules.cancelHours) ? (
                         <Button size="sm" variant="ghost" onClick={() => void cancel(b)}>
                           {b.status === 'pending' ? 'Release hold' : 'Cancel · full refund'}

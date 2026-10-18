@@ -1,5 +1,6 @@
 'use client';
 
+import { featureConfigBody } from '@trenchmart/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Money, Tag } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -92,20 +93,25 @@ export function FeaturingAdmin() {
     for (const k of KINDS) {
       const lamports = solToLamports(prices[k].sol);
       if (lamports === null) return setStatus(`Invalid price for ${k}`);
-      slots[k] = { perDay: Number(prices[k].perDay), lamportsPerDay: lamports };
+      slots[k] = {
+        perDay: prices[k].perDay.trim() === '' ? Number.NaN : Number(prices[k].perDay),
+        lamportsPerDay: lamports,
+      };
     }
     const discountBps = Object.fromEntries(
-      TIERS.map((t) => [t, Math.round(Number(discounts[t] ?? 0) * 100)]),
+      TIERS.map((t) => [t, Math.round(Number(discounts[t] ?? '') * 100)]),
     );
-    const ruleValues = Object.fromEntries(Object.entries(rules).map(([k, v]) => [k, Number(v)]));
+    const ruleValues = Object.fromEntries(
+      Object.entries(rules).map(([k, v]) => [k, v.trim() === '' ? Number.NaN : Number(v)]),
+    );
+    // Same ranges the API enforces; nothing is sent unless every value is valid.
+    const parsed = featureConfigBody.safeParse({ slots, discountBps, rules: ruleValues });
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return setStatus(`Invalid ${issue?.path.join('.') ?? 'value'}: ${issue?.message ?? ''}`);
+    }
     try {
-      for (const [key, value] of [
-        ['feature_slots', slots],
-        ['feature_discount_bps', discountBps],
-        ['feature_rules', ruleValues],
-      ] as const) {
-        await api(`/admin/config/${key}`, { method: 'PUT', body: JSON.stringify({ value }) });
-      }
+      await api('/admin/featuring/config', { method: 'PUT', body: JSON.stringify(parsed.data) });
       setStatus('Saved.');
       load();
     } catch (err) {

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { clampInt } from './social';
 import type { Tier } from './tier';
 
@@ -247,3 +248,28 @@ export function rotateHourly<T>(items: T[], now: Date): T[] {
 export function featureMemo(bookingId: string): string {
   return `tm:feat:${bookingId}`;
 }
+
+/** Admin edit of the featuring config: the same ranges parseFeatureConfig accepts. */
+const intIn = (min: number, max: number) => z.number().int().min(min).max(max);
+const slotBody = z.object({
+  perDay: intIn(1, 50),
+  lamportsPerDay: z.string().regex(/^[1-9][0-9]{0,15}$/),
+});
+export const featureConfigBody = z.object({
+  slots: z.object({ home: slotBody, category: slotBody, band: slotBody }),
+  discountBps: z.object({
+    none: intIn(0, 9000),
+    scout: intIn(0, 9000),
+    trencher: intIn(0, 9000),
+    og: intIn(0, 9000),
+  }),
+  rules: z.object({
+    maxConsecutiveDays: intIn(1, 31),
+    maxDaysAhead: intIn(1, 90),
+    minRatingX10: intIn(0, 50),
+    holdMinutes: intIn(5, 120),
+    cancelHours: intIn(0, 24 * 14),
+    homePerCreatorPerDay: intIn(1, 10),
+  }),
+});
+export type FeatureConfigBody = z.infer<typeof featureConfigBody>;

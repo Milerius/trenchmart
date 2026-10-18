@@ -8,6 +8,7 @@ import {
   dayRange,
   FEATURE_KINDS,
   FEATURE_LABEL,
+  featureConfigBody,
   featureMemo,
   featureRefund,
   jsonSafe,
@@ -337,7 +338,12 @@ export async function settleBooking(deps: Deps, user: Row, bookingId: string, tx
   `;
   if (!booking) throw new HttpError(404, 'NOT_FOUND', 'booking not found');
   if (booking.tx_sig === txSig) return bookingView(booking);
-  if (booking.status !== 'pending' && booking.status !== 'expired')
+  // A hold released before its payment landed still settles, as a full refund.
+  const settleable = (row: Row) =>
+    row.status === 'pending' ||
+    row.status === 'expired' ||
+    (row.status === 'cancelled' && row.tx_sig == null);
+  if (!settleable(booking))
     throw new HttpError(409, 'NOT_PENDING', 'this booking is not waiting for payment');
   const tx = await deps.getTx(txSig);
   if (!tx) throw new HttpError(400, 'TX_NOT_FOUND', 'transaction not found');
@@ -362,15 +368,21 @@ export async function settleBooking(deps: Deps, user: Row, bookingId: string, tx
     const [fresh] = await sql<
       Row[]
     >`select * from feature_bookings where id = ${bookingId} for update`;
-    if (!fresh || (fresh.status !== 'pending' && fresh.status !== 'expired'))
+    if (!fresh || !settleable(fresh))
       throw new HttpError(409, 'NOT_PENDING', 'this booking is not waiting for payment');
-    let slotLost = false;
-    if (fresh.status === 'expired') {
-      // Paid within the grace window after the hold lapsed: keep it only if the days are still free.
+    const releasedFirst = fresh.status === 'cancelled';
+    const lapsed =
+      fresh.status === 'expired' || (fresh.hold_until as Date).getTime() <= deps.now().getTime();
+    let slotLost = releasedFirst;
+    const cat = slotCategory(fresh.kind as FeatureKind, fresh.category as string);
+    const days = dayRange(utcDay(fresh.start_day as Date), fresh.days as number);
+    if (!releasedFirst && lapsed) {
+      // Paid after the hold lapsed: other bookings may have taken the days since. Keep the run
+      // only if every day still has room (counting other bookings only), else refund in full.
       const full = await sql<Row[]>`
         select d.day from feature_days d join feature_bookings b on b.id = d.booking_id
-        where d.kind = ${fresh.kind} and d.category = ${slotCategory(fresh.kind, fresh.category)}
-          and d.day in (select day from feature_days where booking_id = ${bookingId})
+        where d.kind = ${fresh.kind} and d.category = ${cat}
+          and d.day in ${sql(days)}
           and b.id <> ${bookingId}
           and (b.status = 'paid' or (b.status = 'pending' and b.hold_until > ${deps.now()}))
         group by d.day having count(*) >= ${config.slots[fresh.kind as FeatureKind].perDay}
@@ -380,8 +392,9 @@ export async function settleBooking(deps: Deps, user: Row, bookingId: string, tx
     const [row] = await sql<Row[]>`
       update feature_bookings set
         status = ${slotLost ? 'cancelled' : 'paid'}, tx_sig = ${txSig}, paid_at = ${paidAt},
-        refund_lamports = ${slotLost ? fresh.total : 0}, refund_reason = ${slotLost ? 'slot_taken' : null},
-        closed_at = ${slotLost ? deps.now() : null}
+        refund_lamports = ${slotLost ? fresh.total : 0},
+        refund_reason = ${releasedFirst ? 'released_before_payment' : slotLost ? 'slot_taken' : null},
+        closed_at = ${slotLost ? (fresh.closed_at ?? deps.now()) : null}
       where id = ${bookingId} returning *
     `;
     await sql`
@@ -393,6 +406,14 @@ export async function settleBooking(deps: Deps, user: Row, bookingId: string, tx
         insert into payouts (order_id, recipient, bucket, amount, feature_booking_id)
         values (null, ${user.wallet}, 'refund', ${fresh.total}, ${bookingId})
       `;
+    } else {
+      // Maintenance drops the days of a lapsed hold; restore them for the paid run.
+      for (const day of days)
+        await sql`
+          insert into feature_days (booking_id, kind, category, day)
+          values (${bookingId}, ${fresh.kind}, ${cat}, ${day})
+          on conflict (booking_id, day) do nothing
+        `;
     }
     return row!;
   });
@@ -489,21 +510,26 @@ export async function featureMaintenance(deps: Deps) {
       now,
       cancelHours: config.rules.cancelHours,
     });
-    await deps.sql.begin(async (sql) => {
+    const claimed = await deps.sql.begin(async (sql) => {
+      // Compare-and-set: a concurrent run or a creator cancel may have closed it already.
+      const [won] = await sql<Row[]>`
+        update feature_bookings set status = 'pulled', refund_lamports = ${refund}, refund_reason = 'listing_pulled',
+          closed_at = ${now}
+        where id = ${booking.id} and status = 'paid'
+        returning id
+      `;
+      if (!won) return false;
       await sql`delete from feature_days where booking_id = ${booking.id} and day > ${today}::date`;
       if (now.getTime() < Date.parse(`${utcDay(booking.start_day as Date)}T00:00:00Z`))
         await sql`delete from feature_days where booking_id = ${booking.id}`;
-      await sql`
-        update feature_bookings set status = 'pulled', refund_lamports = ${refund}, refund_reason = 'listing_pulled',
-          closed_at = ${now}
-        where id = ${booking.id}
-      `;
       if (refund > 0n)
         await sql`
           insert into payouts (order_id, recipient, bucket, amount, feature_booking_id)
           values (null, ${booking.wallet}, 'refund', ${refund}, ${booking.id})
         `;
+      return true;
     });
+    if (!claimed) continue;
     await audit(deps.sql, null, 'feature_booking', booking.id as string, 'pulled', {
       refund: refund.toString(),
     });
@@ -526,15 +552,29 @@ export async function featureMaintenance(deps: Deps) {
       creatorWallet: '',
       buckets: deps.env.buckets,
     });
-    await deps.sql.begin(async (sql) => {
+    const wrote = await deps.sql.begin(async (sql) => {
+      // Claim the booking first so overlapping runs never pay its buckets twice.
+      if (booking.status === 'paid') {
+        const [won] = await sql<Row[]>`
+          update feature_bookings set status = 'completed', closed_at = ${now}
+          where id = ${booking.id} and status = 'paid' returning id
+        `;
+        if (!won) return false;
+      } else {
+        await sql`select id from feature_bookings where id = ${booking.id} for update`;
+        const [paid] = await sql<Row[]>`
+          select 1 from payouts where feature_booking_id = ${booking.id} and bucket <> 'refund' limit 1
+        `;
+        if (paid) return false;
+      }
       for (const line of lines)
         await sql`
           insert into payouts (order_id, recipient, bucket, amount, feature_booking_id)
           values (null, ${line.recipient}, ${line.bucket}, ${line.amount}, ${booking.id})
         `;
-      if (booking.status === 'paid')
-        await sql`update feature_bookings set status = 'completed', closed_at = ${now} where id = ${booking.id}`;
+      return true;
     });
+    if (!wrote) continue;
     settled += 1;
   }
   return { expired: expired.length, pulled: pulled.length, settled };
@@ -675,6 +715,28 @@ export function registerFeaturingRoutes(
   api.post('/studio/featuring/bookings/:id/cancel', async (c) => {
     const user = signedIn(c);
     return c.json(jsonSafe(await cancelBooking(deps, user, c.req.param('id'))));
+  });
+
+  api.put('/admin/featuring/config', async (c) => {
+    const admin = adminOnly(c);
+    const body = await parseBody(featureConfigBody, c);
+    // One transaction: the three rows change together or not at all.
+    await deps.sql.begin(async (sql) => {
+      for (const [key, value] of [
+        ['feature_slots', body.slots],
+        ['feature_discount_bps', body.discountBps],
+        ['feature_rules', body.rules],
+      ] as const) {
+        await sql`
+          insert into config (key, value) values (${key}, ${sql.json(value as never)})
+          on conflict (key) do update set value = excluded.value
+        `;
+      }
+    });
+    await audit(deps.sql, admin.id as string, 'config', admin.id as string, 'config_put', {
+      keys: ['feature_slots', 'feature_discount_bps', 'feature_rules'],
+    });
+    return c.json(jsonSafe(configView(await loadFeatureConfig(deps))));
   });
 
   api.get('/admin/featuring', async (c) => {
