@@ -498,6 +498,10 @@ test.describe('phase 7: listing', () => {
   };
 
   test.beforeEach(async ({ page }) => {
+    // Opt in to the desktop effects like a real browser (lib/fx.ts keeps automation static).
+    await page.addInitScript(() => {
+      (window as Window & { __TM_FX__?: boolean }).__TM_FX__ = true;
+    });
     await page.route('**/api/v1/**', async (route) => {
       const url = new URL(route.request().url());
       const path = url.pathname.replace('/api/v1', '');
