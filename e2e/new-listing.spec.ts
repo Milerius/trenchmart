@@ -404,8 +404,8 @@ test('review: an unverified creator (no X) with the bond can submit; X is a gent
       key,
       JSON.stringify({ version: 1, step: 7, kind: 'script', terminals: ['Axiom'] }),
     );
-  }, `tm:new-listing:${SESSION.user.wallet}`);
-  await page.goto('/studio/listings/new');
+  }, `tm:new-listing:${SESSION.user.wallet}:review-draft`);
+  await page.goto('/studio/listings/new?draft=review-draft');
   await expect(page.getByTestId('x-required')).toHaveCount(0);
   await expect(page.getByTestId('x-optional')).toContainText('Optional: verify with X');
   await expect(
@@ -434,6 +434,67 @@ test('the draft survives a reload on this device', async ({ page }) => {
   await page.reload();
   await expect(page.getByTestId('wizard')).toHaveAttribute('data-step', '3');
   await expect(page.locator('#title')).toHaveValue('Kept title');
+});
+
+test('a fresh "New listing" starts on step 1 with nothing chosen, even with a saved draft', async ({
+  page,
+}) => {
+  await stub(page);
+  const prefix = `tm:new-listing:${SESSION.user.wallet}`;
+  // An abandoned draft (old single slot) that had picked a filter pack and reached step 2.
+  await page.addInitScript((key) => {
+    if (sessionStorage.getItem('seeded')) return;
+    sessionStorage.setItem('seeded', '1');
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        version: 1,
+        step: 2,
+        kind: 'filter',
+        terminals: [],
+        savedAt: '2026-10-18T07:00:00.000Z',
+      }),
+    );
+  }, prefix);
+  // The studio's "+ New listing" button links here, with no query.
+  await page.goto('/studio/listings/new');
+  await expect(page).toHaveURL(/\/studio\/listings\/new$/);
+  const wizard = page.getByTestId('wizard');
+  await expect(wizard).toHaveAttribute('data-step', '1');
+  await expect(page.locator('[data-testid^="kind-"][aria-checked="true"]')).toHaveCount(0);
+  const stepper = page.getByTestId('stepper');
+  await expect(stepper.getByRole('button').first()).toHaveAttribute('aria-current', 'step');
+  await expect(stepper).not.toContainText('Done');
+  // Opening the page stores nothing new, and the old draft is offered, not opened.
+  const resume = page.getByTestId('resume-draft');
+  await expect(resume).toContainText('Filter');
+  await expect(resume).toContainText('step 2 of');
+  if (process.env.WIZARD_SHOTS)
+    await page.screenshot({ path: `${process.env.WIZARD_SHOTS}/new-listing-fresh-step1.png` });
+  expect(
+    await page.evaluate((p) => Object.keys(localStorage).filter((k) => k.startsWith(p)), prefix),
+  ).toEqual([`${prefix}:legacy`]);
+
+  // Resuming restores that draft (and its step), only on request.
+  await resume.getByRole('link', { name: 'Resume it →' }).click();
+  await expect(page).toHaveURL(/\?draft=legacy$/);
+  await expect(wizard).toHaveAttribute('data-step', '2');
+  await expect(page.getByText('Filter', { exact: false }).first()).toBeVisible();
+
+  // Starting another new listing is clean again; the new one gets its own slot.
+  await page.goto('/studio/listings/new');
+  await expect(wizard).toHaveAttribute('data-step', '1');
+  await expect(page.locator('[data-testid^="kind-"][aria-checked="true"]')).toHaveCount(0);
+  await page.getByTestId('kind-script').click();
+  await expect(page).toHaveURL(/\?draft=[0-9a-f-]{36}$/);
+  const keys = await page.evaluate(
+    (p) => Object.keys(localStorage).filter((k) => k.startsWith(p)),
+    prefix,
+  );
+  expect(keys).toHaveLength(2);
+  await page.goto('/studio/listings/new');
+  await expect(wizard).toHaveAttribute('data-step', '1');
+  await expect(page.locator('[data-testid^="kind-"][aria-checked="true"]')).toHaveCount(0);
 });
 
 test('mobile: progress bar instead of the stepper, two-column type cards, no overflow', async ({

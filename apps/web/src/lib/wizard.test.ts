@@ -6,6 +6,9 @@ import {
   medianLamports,
   placeholdersLeft,
   readDraft,
+  savedDrafts,
+  isPristine,
+  draftKey,
   readUserscriptHeader,
   stepProblem,
   toggleTerminal,
@@ -117,5 +120,47 @@ describe('new-listing wizard', () => {
     expect(matchHosts(header!.matches)).toEqual(['axiom.trade', 'gmgn.ai']);
     expect(uncoveredTerminals(['Axiom', 'GMGN', 'Trojan'], header!.matches)).toEqual(['Trojan']);
     expect(readUserscriptHeader('console.log(1)')).toBeNull();
+  });
+});
+
+describe('draft slots', () => {
+  function memory(init: Record<string, string> = {}) {
+    const m = new Map(Object.entries(init));
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+      removeItem: (k: string) => void m.delete(k),
+      key: (i: number) => [...m.keys()][i] ?? null,
+      get length() {
+        return m.size;
+      },
+      m,
+    };
+  }
+  it('an untouched draft is pristine; picking a type is not', () => {
+    expect(isPristine(emptyDraft())).toBe(true);
+    expect(isPristine({ ...emptyDraft(), step: 3 })).toBe(true);
+    expect(isPristine(withKind(emptyDraft(), 'filter'))).toBe(false);
+  });
+  it('moves the old single slot aside and lists drafts newest first', () => {
+    const w = 'W';
+    const store = memory({
+      'tm:new-listing:W': JSON.stringify({
+        version: 1,
+        step: 2,
+        kind: 'filter',
+        savedAt: '2026-01-01',
+      }),
+      [draftKey(w, 'b')]: JSON.stringify({
+        version: 1,
+        step: 4,
+        kind: 'bot',
+        savedAt: '2026-02-01',
+      }),
+      [draftKey(w, 'empty')]: JSON.stringify({ version: 1, step: 1 }),
+      'tm:new-listing:OTHER:x': JSON.stringify({ version: 1, kind: 'bot' }),
+    });
+    expect(savedDrafts(store, w).map((d) => d.id)).toEqual(['b', 'legacy']);
+    expect(store.m.has('tm:new-listing:W')).toBe(false);
   });
 });

@@ -47,12 +47,15 @@ import { toWebp, uploadCopies } from '@/lib/webp';
 import {
   bytesLabel,
   draftKey,
+  isDraftId,
+  isPristine,
   emptyDraft,
   lamportsOf,
   listingRequest,
   medianLamports,
   placeholdersLeft,
   readDraft,
+  savedDrafts,
   readUserscriptHeader,
   sha256Hex,
   STEP_COUNT,
@@ -93,6 +96,8 @@ export default function NewListingPage() {
   const centsPerSol = useSolUsd();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [restored, setRestored] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [resumable, setResumable] = useState<{ id: string; draft: Draft } | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [reached, setReached] = useState(1);
   const [problem, setProblem] = useState('');
@@ -109,13 +114,25 @@ export default function NewListingPage() {
   const top = useRef<HTMLDivElement>(null);
   const walletAddress = wallet.session?.wallet;
 
-  // Restore the draft for this wallet (text only; images and the file stay on the page).
+  // "New listing" always starts clean on step 1. Only `?draft=<id>` resumes a saved draft
+  // (text only; images and the file stay on the page), and only that draft.
   useEffect(() => {
     if (!walletAddress) return;
-    const saved = readDraft(window.localStorage.getItem(draftKey(walletAddress)));
-    if (saved) {
+    const drafts = savedDrafts(window.localStorage, walletAddress);
+    const wanted = new URLSearchParams(window.location.search).get('draft');
+    const saved = isDraftId(wanted)
+      ? readDraft(window.localStorage.getItem(draftKey(walletAddress, wanted)))
+      : null;
+    if (saved && isDraftId(wanted)) {
+      setDraftId(wanted);
       setDraft(saved);
       setReached(saved.step);
+      setResumable(null);
+    } else {
+      setDraftId(crypto.randomUUID());
+      setDraft(emptyDraft());
+      setReached(1);
+      setResumable(drafts[0] ?? null);
     }
     setRestored(true);
   }, [walletAddress]);
@@ -123,14 +140,17 @@ export default function NewListingPage() {
   const latest = useRef(draft);
   latest.current = draft;
   useEffect(() => {
-    if (!walletAddress || !restored) return;
+    if (!walletAddress || !restored || !draftId || isPristine(draft)) return;
     const save = () => {
       const now = new Date();
       window.localStorage.setItem(
-        draftKey(walletAddress),
+        draftKey(walletAddress, draftId),
         JSON.stringify({ ...latest.current, savedAt: now.toISOString() }),
       );
       setSavedAt(now);
+      // A reload of this tab resumes this draft (and only this one).
+      if (new URLSearchParams(window.location.search).get('draft') !== draftId)
+        window.history.replaceState(null, '', `?draft=${draftId}`);
     };
     const id = setTimeout(save, 300);
     // Leaving or reloading inside the debounce still keeps the last keystrokes.
@@ -139,7 +159,7 @@ export default function NewListingPage() {
       clearTimeout(id);
       window.removeEventListener('pagehide', save);
     };
-  }, [draft, walletAddress, restored]);
+  }, [draft, walletAddress, restored, draftId]);
 
   useEffect(() => {
     if (!wallet.session) return;
@@ -295,7 +315,7 @@ export default function NewListingPage() {
       });
     } catch (err) {
       if (err instanceof ApiError && err.code === 'SUPPLEMENT_REQUIRED') {
-        window.localStorage.removeItem(draftKey(walletAddress!));
+        if (draftId) window.localStorage.removeItem(draftKey(walletAddress!, draftId));
         router.push(`/studio/listings/${created.id}/versions/new`);
         return;
       }
@@ -318,7 +338,7 @@ export default function NewListingPage() {
       credentials: 'include',
     });
     if (!put.ok) throw new Error('upload failed');
-    window.localStorage.removeItem(draftKey(walletAddress!));
+    if (draftId) window.localStorage.removeItem(draftKey(walletAddress!, draftId));
     router.push(`/studio/listings/${created.id}/versions/${version.versionId}`);
   }
 
@@ -420,11 +440,27 @@ export default function NewListingPage() {
   );
   if (step === 1) {
     body = (
-      <TypeStep
-        kind={draft.kind}
-        liveCounts={liveCounts}
-        onPick={(kind) => setDraft((d) => withKind(d, kind))}
-      />
+      <>
+        {resumable ? (
+          <p
+            className="m-0 mb-4 rounded-ctl border border-line bg-surface px-4 py-3 text-[13px] text-ink-2"
+            data-testid="resume-draft"
+          >
+            You have a saved draft
+            {resumable.draft.title ? ` “${resumable.draft.title}”` : ''}
+            {resumable.draft.kind ? ` (${kindMeta(resumable.draft.kind)?.label})` : ''}, step{' '}
+            {resumable.draft.step} of {STEP_COUNT}.{' '}
+            <a href={`?draft=${resumable.id}`} className="text-accent">
+              Resume it →
+            </a>
+          </p>
+        ) : null}
+        <TypeStep
+          kind={draft.kind}
+          liveCounts={liveCounts}
+          onPick={(kind) => setDraft((d) => withKind(d, kind))}
+        />
+      </>
     );
     aside = null;
   } else if (step === 2 && draft.kind) {

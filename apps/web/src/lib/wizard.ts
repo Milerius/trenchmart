@@ -88,7 +88,45 @@ export function emptyDraft(): Draft {
   };
 }
 
-export const draftKey = (wallet: string) => `tm:new-listing:${wallet}`;
+/**
+ * Each draft has its own slot (`tm:new-listing:<wallet>:<draftId>`), so "New listing" always
+ * starts clean on step 1 and only `?draft=<id>` resumes a saved one.
+ */
+export const draftPrefix = (wallet: string) => `tm:new-listing:${wallet}`;
+export const draftKey = (wallet: string, id: string) => `${draftPrefix(wallet)}:${id}`;
+
+const DRAFT_ID = /^[A-Za-z0-9-]{1,64}$/;
+export const isDraftId = (id: string | null | undefined): id is string => !!id && DRAFT_ID.test(id);
+
+/** A draft nobody has touched is never stored (opening the page leaves nothing behind). */
+export function isPristine(draft: Draft): boolean {
+  const strip = ({ savedAt: _s, step: _t, ...rest }: Draft) => rest;
+  return JSON.stringify(strip(draft)) === JSON.stringify(strip(emptyDraft()));
+}
+
+type DraftStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>;
+
+/**
+ * Saved drafts of this wallet, newest first. The old single-slot draft
+ * (`tm:new-listing:<wallet>`) moves to its own slot so it can be resumed, never auto-opened.
+ */
+export function savedDrafts(store: DraftStore, wallet: string): { id: string; draft: Draft }[] {
+  const prefix = draftPrefix(wallet);
+  const legacy = store.getItem(prefix);
+  if (legacy !== null) {
+    if (store.getItem(`${prefix}:legacy`) === null) store.setItem(`${prefix}:legacy`, legacy);
+    store.removeItem(prefix);
+  }
+  const out: { id: string; draft: Draft }[] = [];
+  for (let i = 0; i < store.length; i++) {
+    const key = store.key(i);
+    if (!key?.startsWith(`${prefix}:`)) continue;
+    const id = key.slice(prefix.length + 1);
+    const draft = isDraftId(id) ? readDraft(store.getItem(key)) : null;
+    if (draft && !isPristine(draft)) out.push({ id, draft });
+  }
+  return out.sort((a, b) => (b.draft.savedAt ?? '').localeCompare(a.draft.savedAt ?? ''));
+}
 
 /** Reads a stored draft; anything unreadable or from another shape starts fresh. */
 export function readDraft(raw: string | null): Draft | null {
