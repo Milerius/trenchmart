@@ -96,3 +96,26 @@ test('docs sidebar, diagrams, and config numbers render', async ({ page }) => {
   await expect(page.getByTestId('tier-og')).toContainText('0%');
   await expect(page.getByTestId('tier-scout')).toContainText('3.75%');
 });
+
+test.describe('docs on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  for (const { href } of DOCS_NAV) {
+    test(`${href} fits a 390 px screen; the docs nav scrolls inside its own row`, async ({
+      page,
+    }) => {
+      await page.goto(href);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      const widths = await page.evaluate(() => ({
+        page: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+      }));
+      expect(widths.page).toBeLessThanOrEqual(widths.viewport);
+      const nav = page.getByTestId('docs-nav');
+      const box = await nav.boundingBox();
+      expect(box && box.x + box.width).toBeLessThanOrEqual(390);
+      const list = nav.locator('ul');
+      expect(await list.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+      await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+    });
+  }
+});

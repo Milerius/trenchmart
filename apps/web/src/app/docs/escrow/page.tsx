@@ -76,7 +76,7 @@ export default function EscrowDocsPage() {
           <li className="list-none">
             Program on Solana Explorer:{' '}
             <a
-              className="font-mono text-ink underline"
+              className="break-all font-mono text-ink underline"
               href={`https://explorer.solana.com/address/${protocol.programId}?cluster=${protocol.cluster}`}
               target="_blank"
               rel="noreferrer"
@@ -85,7 +85,7 @@ export default function EscrowDocsPage() {
             </a>{' '}
             (Solana devnet). The IDL is published on chain (Program Metadata, seed{' '}
             <span className="font-mono">idl</span>):{' '}
-            <span className="font-mono text-ink">
+            <span className="font-mono text-ink [overflow-wrap:anywhere]">
               npx @solana-program/program-metadata fetch idl {protocol.programId} --rpc &lt;devnet
               RPC&gt;
             </span>
