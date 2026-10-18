@@ -4,7 +4,7 @@ import { DEFAULT_ESCROW_HOURS, escrowWindowLabel } from '@trenchmart/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { categoryMeta, quote as quoteFor } from '@trenchmart/shared';
+import { categoryMeta, quote as quoteFor, specRows } from '@trenchmart/shared';
 import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
@@ -44,6 +44,9 @@ export type Listing = {
   price: string;
   license: string;
   holderOnly: boolean;
+  /** Wizard kind and its structured specs (null for listings made before the wizard). */
+  kind?: string | null;
+  specs?: Record<string, unknown> | null;
   /** Monthly update price in lamports after the free period; 0 = free updates forever. */
   updatePrice?: string | null;
   sales7d?: number;
@@ -334,7 +337,12 @@ export function ListingView({ initial }: { initial: Listing | null }) {
               </p>
             )
           ) : null}
-          {tab === 'howto' ? <HowToPanel content={listing.content} /> : null}
+          {tab === 'howto' ? (
+            <HowToPanel
+              content={listing.content}
+              specs={specRows(listing.kind, listing.specs, listing.terminals)}
+            />
+          ) : null}
           {tab === 'changelog' ? <ChangelogPanel versions={versions} /> : null}
           {tab === 'reviews' ? (
             <ul className="m-0 space-y-2 p-0">
@@ -586,19 +594,46 @@ function SecurityPanel({ listing }: { listing: Listing }) {
   );
 }
 
-function HowToPanel({ content }: { content: Listing['content'] }) {
+function HowToPanel({
+  content,
+  specs,
+}: {
+  content: Listing['content'];
+  specs: [string, string][];
+}) {
+  const specPanel = specs.length ? (
+    <Panel className="p-4" data-testid="listing-specs">
+      <Label>Specs</Label>
+      <dl className="m-0 mt-2 space-y-1.5 text-[13px]">
+        {specs.map(([a, b]) => (
+          <div key={a} className="flex justify-between gap-3">
+            <dt className="text-ink-2">{a}</dt>
+            <dd className="m-0 text-right font-mono text-ink">{b}</dd>
+          </div>
+        ))}
+      </dl>
+    </Panel>
+  ) : null;
   if (!content?.howto && !content?.requirements) {
-    return <p className="m-0 text-muted">The creator hasn&apos;t added an install guide yet.</p>;
+    return (
+      <div className="space-y-4">
+        {specPanel}
+        <p className="m-0 text-muted">The creator hasn&apos;t added an install guide yet.</p>
+      </div>
+    );
   }
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[1fr_260px]">
       {content.howto ? <Markdown source={content.howto} className="max-w-3xl" /> : <span />}
-      {content.requirements ? (
-        <Panel tone="info" className="p-4">
-          <Label>Requirements</Label>
-          <Markdown source={content.requirements} className="mt-2 text-sm" />
-        </Panel>
-      ) : null}
+      <div className="space-y-4">
+        {specPanel}
+        {content.requirements ? (
+          <Panel tone="info" className="p-4">
+            <Label>Requirements</Label>
+            <Markdown source={content.requirements} className="mt-2 text-sm" />
+          </Panel>
+        ) : null}
+      </div>
     </div>
   );
 }

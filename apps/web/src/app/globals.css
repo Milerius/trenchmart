@@ -73,6 +73,11 @@ body {
   outline-offset: 2px;
 }
 
+/* Inputs inside a field shell: the shell draws the focus ring (focus-within). */
+.field-bare:focus-visible {
+  outline: none;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }

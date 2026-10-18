@@ -409,23 +409,37 @@ test('studio upload: creates the listing, pays the verification fee, uploads the
       };
     }
     if (method === 'POST' && path === '/studio/versions/V1/fee') return { json: { ok: true } };
+    if (path === '/studio/requirements')
+      return {
+        json: { xLinked: true, bondActive: '0', verificationFee: '250000000', feeWaived: false },
+      };
     if (path.startsWith('/studio')) return { json: [] };
     return undefined;
   });
   await page.goto('/studio/listings/new');
+  await page.getByTestId('kind-script').click();
+  await page.getByTestId('continue').click();
+  await page
+    .getByTestId('terminals')
+    .getByRole('button', { name: /Trojan/ })
+    .click();
+  await page.getByTestId('continue').click();
   await page.fill('#title', 'Trojan Trenches Intel');
   await page.fill('#summary', 'Labels copycat coins and finds the OG.');
   await page.fill('#description', 'Userscript for trojan.com that labels copycat coins.');
-  await page.fill('#terminals', 'Trojan, Padre');
+  await page.getByTestId('continue').click();
+  await page.getByTestId('continue').click();
   await page.fill('#price', '0.1');
+  await page.getByTestId('continue').click();
   await page.locator('#file').setInputFiles({
     name: 'intel.user.js',
     mimeType: 'text/javascript',
     buffer: Buffer.from('// ==UserScript==\n// @name Intel\n// ==/UserScript==\n'),
   });
-  await page
-    .locator('form[data-testid="studio"]')
-    .evaluate((form: HTMLFormElement) => form.requestSubmit());
+  await expect(page.getByTestId('file-summary')).toContainText('@name Intel');
+  await page.getByTestId('continue').click();
+  await page.getByText('The file does what this listing says').click();
+  await page.getByTestId('submit').click();
   await page.waitForURL('**/studio/listings/L1/versions/V1');
 
   expect(

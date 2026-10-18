@@ -933,11 +933,12 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const inserted = await deps.sql<{ id: string }[]>`
       insert into listings (
         creator_id, slug, title, summary, description, category, terminals, price, license,
-        sub_period_days, holder_only_hours, holder_only, update_price
+        sub_period_days, holder_only_hours, holder_only, update_price, kind, specs
       ) values (
         ${user.id}, ${slug}, ${body.title}, ${body.summary}, ${body.description}, ${body.category}::category,
         ${deps.sql.array(body.terminals)}, ${BigInt(body.priceLamports)}, ${body.license}::license_kind,
-        ${body.subPeriodDays ?? null}, ${body.holderOnlyHours}, ${body.holderOnly}, ${updatePrice}
+        ${body.subPeriodDays ?? null}, ${body.holderOnlyHours}, ${body.holderOnly}, ${updatePrice},
+        ${body.kind ?? null}, ${deps.sql.json((body.specs ?? {}) as never)}::jsonb
       ) returning id
     `;
     return c.json({ id: inserted[0]?.id, slug });
@@ -1606,6 +1607,8 @@ function publicListing(listing: Record<string, any>) {
     firstLiveAt: listing.first_live_at,
     delistedAt: listing.delisted_at,
     updatePrice: listing.update_price ?? null,
+    kind: listing.kind ?? null,
+    specs: listing.kind ? (listing.specs ?? {}) : null,
     categoryMeta: categoryMeta(listing.category as string),
   };
 }
