@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { cache } from 'react';
 import { publicApi } from '@/lib/server-api';
 import { ListingView, type Listing } from './listing-view';
 
 type Props = { params: Promise<{ slug: string }> };
 
-async function load(slug: string) {
-  return publicApi<Listing>(`/listings/${encodeURIComponent(slug)}`);
-}
+// One read per request, shared by generateMetadata and the page.
+const load = cache(async (slug: string) =>
+  publicApi<Listing>(`/listings/${encodeURIComponent(slug)}`),
+);
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
