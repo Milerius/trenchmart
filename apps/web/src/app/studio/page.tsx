@@ -105,8 +105,13 @@ export default function StudioPage() {
 
   // X linking lives on the profile now; older X callbacks still land here, so forward them.
   useEffect(() => {
-    const result = new URLSearchParams(window.location.search).get('x');
-    if (result) router.replace(`/studio/profile?x=${encodeURIComponent(result)}`);
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('x');
+    if (!result) return;
+    const forward = new URLSearchParams({ x: result });
+    const reason = params.get('reason');
+    if (reason) forward.set('reason', reason);
+    router.replace(`/studio/profile?${forward.toString()}`);
   }, [router]);
 
   async function stakeBond() {

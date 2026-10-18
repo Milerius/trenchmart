@@ -1666,14 +1666,16 @@ describe('owner product decisions', () => {
       app.request(`/api/v1/auth/x/callback?${query}`, { headers: { cookie } });
     // A forged state, or no state cookie, is refused before any call to X.
     const forged = await callback(`code=c&state=other`, `${bobCookie}; ${xCookie}`);
-    expect(forged.headers.get('location')).toBe('http://localhost:3000/studio?x=invalid');
+    expect(forged.headers.get('location')).toBe(
+      'http://localhost:3000/studio/profile?x=invalid&reason=state_mismatch',
+    );
     expect((await callback(`code=c&state=${state}`, bobCookie)).headers.get('location')).toContain(
       'x=invalid',
     );
     expect(calls).toHaveLength(0);
     const ok = await callback(`code=good-code&state=${state}`, `${bobCookie}; ${xCookie}`);
     expect(ok.status).toBe(302);
-    expect(ok.headers.get('location')).toBe('http://localhost:3000/studio?x=linked');
+    expect(ok.headers.get('location')).toBe('http://localhost:3000/studio/profile?x=linked');
     const tokenBody = new URLSearchParams(String(calls[0]!.init.body));
     expect(tokenBody.get('code')).toBe('good-code');
     expect(tokenBody.get('code_verifier')).toHaveLength(64);

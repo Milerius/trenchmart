@@ -383,9 +383,11 @@ test('studio: an old X callback to /studio is forwarded to the profile with its 
 }) => {
   const { secret, address } = wallet();
   await setup(page, address, secret, studioHandler(address, { xLinked: true, bond: '0' }));
-  await page.goto('/studio?x=taken');
-  // The profile editor shows the result (covered in profile.spec.ts).
-  await page.waitForURL('**/studio/profile?x=taken');
+  // The result and its reason are both forwarded (the card text is covered in profile.spec.ts).
+  const forwarded = page.waitForRequest(/\/studio\/profile\?x=failed&reason=code_rejected/);
+  await page.goto('/studio?x=failed&reason=code_rejected');
+  await forwarded;
+  await page.waitForURL('**/studio/profile**');
 });
 
 test('studio upload: creates the listing, pays the verification fee, uploads the file, opens the live review', async ({
