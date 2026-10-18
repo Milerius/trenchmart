@@ -46,6 +46,7 @@ import {
   toBase64,
   TRANSFER_BUDGET,
   type ChainTx,
+  type EscrowAccount,
   type Simulation,
 } from '@trenchmart/chain';
 import { dispatchSandbox, type SandboxQueue } from './dispatch';
@@ -514,7 +515,9 @@ async function verifyEscrowFunding(
   if (order.status !== 'pending')
     return { ok: false, code: 'NOT_PENDING', message: 'order is not pending' };
   if (tx.err != null) return { ok: false, code: 'TX_FAILED', message: 'transaction failed' };
-  if (!tx.memos.some((memo) => memo.includes(order.memo as string)))
+  // Exact match, as assessPayment does for vault payments: a memo that merely contains this
+  // order's short id is not this order's checkout.
+  if (!tx.memos.some((memo) => memo === (order.memo as string)))
     return { ok: false, code: 'WRONG_MEMO', message: 'transaction is not this order checkout' };
   const blockMs = tx.blockTime === null ? null : tx.blockTime * 1000;
   if (blockMs !== null && blockMs > (order.expires_at as Date).getTime())
@@ -658,6 +661,12 @@ export async function releaseOrders(deps: Deps): Promise<string[]> {
   const released: string[] = [];
   for (const order of rows) {
     let releaseSig: string | null = null;
+    // Who the money goes to. For escrow orders this is what the program actually paid: the
+    // recipients and split stored in the escrow account, not today's env or config, so the
+    // ledger stays true even if a bucket wallet or the fee split changes mid-window.
+    let creatorWallet = order.creator_wallet as string;
+    let buckets: Deps['env']['buckets'] = deps.env.buckets;
+    let splitBps = config.fee_split_bps;
     if (order.escrow_address) {
       const outcome = await releaseEscrow(deps, order).catch((err: unknown) => {
         console.error('escrow release failed', order.id, (err as Error).message);
@@ -665,6 +674,20 @@ export async function releaseOrders(deps: Deps): Promise<string[]> {
       });
       if (!outcome) continue;
       releaseSig = outcome.sig;
+      const paid = outcome.account;
+      creatorWallet = paid.seller;
+      buckets = {
+        buyback: paid.buyback,
+        ai_verification: paid.aiVerification,
+        ops: paid.ops,
+        safety: paid.safety,
+      };
+      splitBps = {
+        buyback: paid.splitBuybackBps,
+        ai_verification: paid.splitAiBps,
+        ops: paid.splitOpsBps,
+        safety: paid.splitSafetyBps,
+      };
     } else {
       const tx = order.tx_sig ? await deps.getTx(order.tx_sig as string) : null;
       const due = releaseDue({
@@ -679,9 +702,9 @@ export async function releaseOrders(deps: Deps): Promise<string[]> {
     const lines = releasePayouts({
       price: order.price as bigint,
       netFee: (order.fee as bigint) - (order.rebate as bigint),
-      splitBps: config.fee_split_bps,
-      creatorWallet: order.creator_wallet as string,
-      buckets: deps.env.buckets,
+      splitBps,
+      creatorWallet,
+      buckets,
     });
     await deps.sql`
       update orders set status = 'released', released_at = ${deps.now()}, release_sig = ${releaseSig}
@@ -726,7 +749,10 @@ export async function releaseOrders(deps: Deps): Promise<string[]> {
  * the seller and the four buckets itself. Returns null when the escrow is not releasable
  * (still in window, disputed on chain, or not funded).
  */
-async function releaseEscrow(deps: Deps, order: Row): Promise<{ sig: string | null } | null> {
+async function releaseEscrow(
+  deps: Deps,
+  order: Row,
+): Promise<{ sig: string | null; account: EscrowAccount } | null> {
   const programId = deps.env.escrowProgramId;
   if (!programId) return null;
   const chain = chainOf(deps);
@@ -734,13 +760,13 @@ async function releaseEscrow(deps: Deps, order: Row): Promise<{ sig: string | nu
   const account = await readEscrow(chain, programId, address);
   if (!account) return null;
   // Release is permissionless on chain; someone may already have cranked it.
-  if (account.status === 'released') return { sig: null };
+  if (account.status === 'released') return { sig: null, account };
   if (account.status !== 'paid') return null;
   if (BigInt(Math.floor(deps.now().getTime() / 1000)) < account.escrowUntil) return null;
   const latest = await deps.blockhash();
   const sig = await chain.sendAndConfirm(releaseTx(deps.env, address, account, latest.blockhash));
   await audit(deps.sql, null, 'order', order.id as string, 'escrow_released', { sig });
-  return { sig };
+  return { sig, account };
 }
 
 export async function proposePayouts(
