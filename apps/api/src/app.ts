@@ -1,6 +1,6 @@
 import { pendingMigrations } from '@trenchmart/db';
 import { deliverAlerts, notify, opsAlertRows, opsCheck, opsStatus, recordOpsEvent } from './ops';
-import { statusTick } from './status';
+import { recordExternal, statusTick } from './status';
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { cors } from 'hono/cors';
@@ -158,6 +158,23 @@ type Vars = { user: Record<string, any> | null; apiKey: ApiKeyContext | null };
 /** Expiry (unix seconds) of the session cookie that authenticated each request. */
 const sessionExpiry = new WeakMap<Request, number>();
 type App = Hono<{ Variables: Vars }>;
+
+/** Watchdog push for the status page: exactly its three checks, ok + latency, nothing else. */
+const externalChecksBody = z.object({
+  checks: z
+    .array(
+      z.object({
+        name: z.enum(['web', 'api', 'rpc']),
+        ok: z.boolean(),
+        ms: z.number().int().min(0).max(120_000),
+      }),
+    )
+    .min(1)
+    .max(3)
+    .refine((checks) => new Set(checks.map((c) => c.name)).size === checks.length, {
+      message: 'one check per name',
+    }),
+});
 
 async function bodyOf<T>(schema: z.ZodType<T>, raw: unknown): Promise<T> {
   const parsed = schema.safeParse(raw);
@@ -1833,6 +1850,17 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     assertInternal(c, deps.env);
     const probes = await statusTick(deps, await opsCheck(deps));
     return c.json({ checkedAt: deps.now().toISOString(), probes });
+  });
+
+  // The external watchdog pushes its web/API/RPC checks here every 5 min (status page). Its own
+  // token (STATUS_PUSH_TOKEN), which can do nothing else; off when unset.
+  api.post('/internal/status/external', async (c) => {
+    const token = (c.req.header('authorization') ?? '').replace(/^Bearer\s+/i, '');
+    if (!deps.env.statusPushToken || !safeEqual(token, deps.env.statusPushToken))
+      throw new HttpError(401, 'UNAUTHORIZED', 'status push token required');
+    const body = await bodyOf(externalChecksBody, await c.req.json().catch(() => ({})));
+    const probes = await recordExternal(deps, body.checks);
+    return c.json({ recorded: probes.length });
   });
 
   api.get('/admin/ops', async (c) => {

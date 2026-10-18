@@ -7,6 +7,8 @@ export type Env = {
   siwsUri: string;
   sessionSecret: string;
   internalToken: string;
+  /** Lets the external watchdog push its checks for the status page (status.ts). '' = off. */
+  statusPushToken: string;
   cluster: TestCluster;
   rpcUrl: string;
   webhookSecret: string;
@@ -172,6 +174,12 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     siwsUri: blank(source.APP_URL) || 'http://localhost:3000',
     sessionSecret: source.SESSION_SECRET || 'change-me-32-bytes-min',
     internalToken: source.INTERNAL_TOKEN || 'change-me',
+    // Ignored unless it is a real secret (32+ chars), so a blank or default never opens the route.
+    statusPushToken:
+      (source.STATUS_PUSH_TOKEN?.trim().length ?? 0) >= 32 &&
+      !/change-?me/i.test(source.STATUS_PUSH_TOKEN ?? '')
+        ? source.STATUS_PUSH_TOKEN!.trim()
+        : '',
     cluster,
     rpcUrl,
     webhookSecret: source.HELIUS_WEBHOOK_SECRET || 'change-me',
