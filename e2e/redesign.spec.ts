@@ -231,3 +231,77 @@ test.describe('phase 4: cards', () => {
     await expect(page).toHaveURL(/\/c\/userscript$/);
   });
 });
+
+test.describe('phase 5: header, nav and footer', () => {
+  test('desktop header is sticky glass; nav links are pills; "/" focuses search', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    const header = page.getByTestId('nav');
+    const style = await header.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { position: cs.position, filter: cs.backdropFilter };
+    });
+    expect(style.position).toBe('sticky');
+    expect(style.filter).toContain('blur(18px)');
+    const current = header.getByRole('link', { name: 'Explore', exact: true });
+    await expect(current).toHaveAttribute('aria-current', 'page');
+    expect(
+      parseFloat(await current.evaluate((el) => getComputedStyle(el).borderRadius)),
+    ).toBeGreaterThanOrEqual(999);
+    await page.mouse.wheel(0, 1600);
+    await expect.poll(async () => (await header.boundingBox())?.y).toBe(0);
+    await page.locator('body').click({ position: { x: 5, y: 600 } });
+    await page.keyboard.press('/');
+    await expect(page.getByTestId('search')).toBeFocused();
+    await page.keyboard.type('bundle');
+    await expect(page.getByTestId('search')).toHaveValue('bundle');
+  });
+
+  test('phone header stays in the flow with no backdrop blur', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const header = page.getByTestId('nav');
+    const style = await header.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { position: cs.position, filter: cs.backdropFilter };
+    });
+    expect(style.position).toBe('static');
+    expect(style.filter).toBe('none');
+  });
+
+  test('footer lists the real devnet addresses and every site link', async ({ page }) => {
+    await page.goto('/');
+    const footer = page.getByRole('contentinfo');
+    const explorer = (address: string) =>
+      `https://explorer.solana.com/address/${address}?cluster=devnet`;
+    await expect(footer.getByTestId('footer-program')).toHaveAttribute(
+      'href',
+      explorer('Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw'),
+    );
+    await expect(footer.getByRole('link', { name: /Squads multisig/ })).toHaveAttribute(
+      'href',
+      explorer('CaatcAQaDTEsrSoC3maTP1kgBWEY66hhgBNKa8Aeg55B'),
+    );
+    await expect(footer.getByRole('link', { name: /\$TRENCH mint/ })).toHaveAttribute(
+      'href',
+      explorer('8Gu4hXYypyRrxY6763AdhQnyHma82L3ww9wq3vy2cbq6'),
+    );
+    for (const [name, href] of [
+      ['Explore', '/search'],
+      ['Creators', '/creators'],
+      ['Sell', '/sell'],
+      ['Creator Studio', '/studio'],
+      ['Verify & proof', '/verify'],
+      ['How automated review works', '/sell'],
+      ['Fees & $TRENCH', '/token'],
+      ['Status', '/status'],
+      ['Docs', '/docs'],
+      ['Terms', '/terms'],
+      ['Privacy', '/privacy'],
+    ]) {
+      await expect(footer.getByRole('link', { name, exact: true })).toHaveAttribute('href', href!);
+    }
+  });
+});

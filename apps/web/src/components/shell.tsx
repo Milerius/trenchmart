@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { preload } from 'react-dom';
 import { NetworkBanner } from '@/components/ui';
 import { type ActivityEvent, activityText, type SponsoredChip } from '@/components/activity';
@@ -10,7 +10,12 @@ import { api } from '@/lib/api';
 import { tierChip, usePublicConfig } from '@/lib/config';
 import { useWallet, WalletProvider } from '@/lib/wallet';
 import { WalletMenu } from '@/components/wallet-menu';
-import { ESCROW_PROGRAM_ID, explorerAddress, shortKey } from '@/lib/protocol-facts';
+import {
+  DEVNET_ADDRESSES,
+  ESCROW_PROGRAM_ID,
+  explorerAddress,
+  shortKey,
+} from '@/lib/protocol-facts';
 
 /** Same geometry as brand/logo-mark.svg. */
 export function LogoMark({ className }: { className?: string }) {
@@ -102,6 +107,19 @@ function Nav() {
   const router = useRouter();
   const pathname = usePathname();
   const config = usePublicConfig();
+  const searchRef = useRef<HTMLInputElement>(null);
+  // "/" jumps to search from anywhere that is not already a text field.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -124,7 +142,12 @@ function Nav() {
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header data-testid="nav" className="border-b border-line-soft">
+    // Glass and sticky only from md up: on a phone the header wraps to three rows, and a
+    // backdrop blur over scrolling content is the costliest paint on low-end GPUs.
+    <header
+      data-testid="nav"
+      className="z-40 border-b border-line-soft bg-bg md:sticky md:top-0 md:border-white/[.06] md:bg-[rgba(16,18,16,0.6)] md:backdrop-blur-[18px] md:backdrop-saturate-[1.4]"
+    >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-6 sm:py-4">
         <Logo />
         <nav
@@ -136,7 +159,7 @@ function Nav() {
               key={link.href}
               href={link.href}
               aria-current={active(link.href) ? 'page' : undefined}
-              className={`motion-nav rounded-lg px-3 py-2.5 whitespace-nowrap ${active(link.href) ? 'bg-surface-2 text-ink' : 'text-muted hover:bg-surface-2 hover:text-ink'}`}
+              className={`motion-nav rounded-full px-3.5 py-2.5 whitespace-nowrap ${active(link.href) ? 'bg-white/[.08] text-ink' : 'text-ink-2 hover:bg-white/[.05] hover:text-ink'}`}
             >
               {link.label}
             </Link>
@@ -147,7 +170,7 @@ function Nav() {
           role="search"
           className="order-4 flex min-w-0 flex-1 sm:order-none sm:min-w-56"
         >
-          <label className="flex h-11 w-full items-center gap-2.5 rounded-ctl border border-line-control bg-surface px-3.5">
+          <label className="flex h-11 w-full items-center gap-2.5 rounded-full border border-line-control bg-inset px-4 focus-within:border-accent/60">
             <svg
               width="16"
               height="16"
@@ -162,6 +185,7 @@ function Nav() {
               <path d="M20 20l-3.5-3.5" />
             </svg>
             <input
+              ref={searchRef}
               data-testid="search"
               name="q"
               type="search"
@@ -169,13 +193,19 @@ function Nav() {
               placeholder="Search scripts, wallet lists, filters, creators…"
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
             />
+            <kbd
+              aria-hidden="true"
+              className="hidden rounded border border-line px-1.5 font-mono text-[10px] text-muted lg:inline"
+            >
+              /
+            </kbd>
           </label>
         </form>
         <div className="ml-auto flex items-center gap-2">
           {wallet.session ? (
             <span
               data-testid="tier-pill"
-              className="hidden h-11 items-center rounded-ctl border border-accent-line bg-accent-bg px-3 font-mono text-xs text-accent md:flex"
+              className="hidden h-11 items-center rounded-full border border-accent-line bg-accent-bg px-4 font-mono text-xs text-accent md:flex"
             >
               {tierChip(wallet.session.tier, config)}
             </span>
@@ -205,48 +235,84 @@ function Nav() {
   );
 }
 
+const FOOTER_COLUMNS: { title: string; links: [string, string][] }[] = [
+  {
+    title: 'Market',
+    links: [
+      ['Explore', '/search'],
+      ['Creators', '/creators'],
+      ['Sell', '/sell'],
+      ['Creator Studio', '/studio'],
+    ],
+  },
+  {
+    title: 'Trust',
+    links: [
+      ['Verify & proof', '/verify'],
+      ['How automated review works', '/sell'],
+      ['Fees & $TRENCH', '/token'],
+      ['Status', '/status'],
+    ],
+  },
+  {
+    title: 'Resources',
+    links: [
+      ['Docs', '/docs'],
+      ['Terms', '/terms'],
+      ['Privacy', '/privacy'],
+    ],
+  },
+];
+
 function Footer() {
+  const addresses: [string, string, string | undefined][] = [
+    ['Escrow program (devnet)', ESCROW_PROGRAM_ID, 'footer-program'],
+    ['Squads multisig', DEVNET_ADDRESSES.multisig, undefined],
+    ['$TRENCH mint', DEVNET_ADDRESSES.trenchMint, undefined],
+  ];
   return (
-    <footer className="mt-20 border-t border-line-soft">
-      <div className="mx-auto flex max-w-7xl flex-wrap gap-x-7 gap-y-3 px-6 py-7 text-[13px] text-muted">
-        <span className="flex items-center gap-2 font-bold text-ink">
-          <LogoMark className="h-5 w-5" />
-          trenchmart
-        </span>
-        <Link href="/verify" className="hover:text-ink">
-          Verify &amp; proof
-        </Link>
-        <a
-          href={explorerAddress(ESCROW_PROGRAM_ID)}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono hover:text-ink"
-          data-testid="footer-program"
-        >
-          Escrow program (devnet) {shortKey(ESCROW_PROGRAM_ID)} ↗
-        </a>
-        <Link href="/token" className="hover:text-ink">
-          Fees &amp; $TRENCH
-        </Link>
-        <Link href="/sell" className="hover:text-ink">
-          How automated review works
-        </Link>
-        <Link href="/docs" className="hover:text-ink">
-          Docs
-        </Link>
-        <Link href="/status" className="hover:text-ink">
-          Status
-        </Link>
-        <Link href="/terms" className="hover:text-ink">
-          Terms
-        </Link>
-        <Link href="/privacy" className="hover:text-ink">
-          Privacy
-        </Link>
-        <span className="sm:ml-auto">
-          Devnet POC. Not financial advice. Tools don&apos;t guarantee profits.
-        </span>
+    <footer className="mt-24 border-t border-line">
+      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-14 sm:grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="flex flex-col gap-4">
+          <span className="flex items-center gap-2.5 font-bold tracking-[-0.02em] text-ink">
+            <LogoMark className="h-6 w-6" />
+            trenchmart
+          </span>
+          <p className="m-0 max-w-xs text-sm text-muted">
+            Reviewed trading tools, escrowed on Solana. 0% creator commission.
+          </p>
+          <ul className="m-0 flex flex-col gap-1.5 p-0 font-mono text-xs text-muted">
+            {addresses.map(([label, address, testId]) => (
+              <li key={address} className="list-none">
+                <a
+                  href={explorerAddress(address)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-ink"
+                  data-testid={testId}
+                >
+                  {label} · {shortKey(address)} <span aria-hidden="true">↗</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        {FOOTER_COLUMNS.map((column) => (
+          <nav key={column.title} aria-label={column.title} className="flex flex-col gap-2.5">
+            <span className="font-mono text-xs uppercase tracking-[0.16em] text-muted">
+              {column.title}
+            </span>
+            {column.links.map(([label, href]) => (
+              <Link key={label} href={href} className="text-sm text-ink-2 hover:text-accent">
+                {label}
+              </Link>
+            ))}
+          </nav>
+        ))}
       </div>
+      <p className="m-0 border-t border-line-soft px-6 py-5 text-center font-mono text-xs text-muted">
+        Devnet POC. Test SOL only. Not financial advice. Tools don&apos;t guarantee profits.
+      </p>
     </footer>
   );
 }
