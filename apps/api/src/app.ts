@@ -141,7 +141,13 @@ import {
   verifyQuota,
 } from './versioning';
 
+/** Session lifetime; refreshed (no new signature) once it is a day old. */
+export const SESSION_TTL_S = 30 * 24 * 3600;
+const SESSION_REFRESH_AFTER_S = 24 * 3600;
+
 type Vars = { user: Record<string, any> | null; apiKey: ApiKeyContext | null };
+/** Expiry (unix seconds) of the session cookie that authenticated each request. */
+const sessionExpiry = new WeakMap<Request, number>();
 type App = Hono<{ Variables: Vars }>;
 
 async function bodyOf<T>(schema: z.ZodType<T>, raw: unknown): Promise<T> {
@@ -299,7 +305,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       c.set('user', authed.user);
       c.set('apiKey', authed.key);
     } else if (token) {
-      const payload = await verifyJwt<{ sub?: string }>(
+      const payload = await verifyJwt<{ sub?: string; exp?: number }>(
         token,
         deps.env.sessionSecret,
         deps.now().getTime(),
@@ -308,7 +314,10 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         const rows = await deps.sql<
           Record<string, any>[]
         >`select * from users where id = ${payload.sub}`;
-        if (rows[0]) c.set('user', rows[0]);
+        if (rows[0]) {
+          c.set('user', rows[0]);
+          if (typeof payload.exp === 'number') sessionExpiry.set(c.req.raw, payload.exp);
+        }
       }
     }
     const path = c.req.path;
@@ -376,6 +385,24 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/files', async (c) => serveFile(c, deps, 'GET'));
   api.put('/files', async (c) => serveFile(c, deps, 'PUT'));
 
+  async function issueSession(c: Parameters<typeof setCookie>[0], userId: string): Promise<number> {
+    const exp = Math.floor(deps.now().getTime() / 1000) + SESSION_TTL_S;
+    const token = await signJwt({ sub: userId, exp }, deps.env.sessionSecret);
+    setCookie(c, 'tm_session', token, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_TTL_S,
+    });
+    return exp;
+  }
+
+  function sessionInfo(exp: number) {
+    const expiresAt = new Date(exp * 1000).toISOString();
+    const refreshAfter = new Date((exp - SESSION_TTL_S + SESSION_REFRESH_AFTER_S) * 1000);
+    return { expiresAt, refreshAfter: refreshAfter.toISOString() };
+  }
+
   api.post('/auth/nonce', async (c) => {
     const body = await bodyOf(nonceBody, await c.req.json());
     const nonce = randomNonce();
@@ -432,23 +459,29 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const user = users[0];
     if (!user) throw new HttpError(500, 'INTERNAL', 'could not create user');
     await ensureSnapshot(deps, body.wallet);
-    const token = await signJwt(
-      { sub: user.id, exp: Math.floor(deps.now().getTime() / 1000) + 14 * 24 * 3600 },
-      deps.env.sessionSecret,
-    );
-    setCookie(c, 'tm_session', token, {
-      httpOnly: true,
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: 14 * 24 * 3600,
-    });
-    return c.json(jsonSafe({ user: publicUser(user) }));
+    const exp = await issueSession(c, user.id as string);
+    return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
   });
 
+  // Idempotent: an expired or missing session still gets its cookie cleared, so the
+  // browser never stays half signed in because logout answered 401.
   api.post('/auth/logout', (c) => {
-    requireUser(c);
     setCookie(c, 'tm_session', '', { httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 0 });
     return c.body(null, 204);
+  });
+
+  // One signature per session: a live session slides forward without a new wallet prompt.
+  api.post('/auth/refresh', async (c) => {
+    const user = requireUser(c);
+    const exp = await issueSession(c, user.id as string);
+    return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
+  });
+
+  api.get('/auth/session', (c) => {
+    const user = c.get('user');
+    if (!user) return c.json({ user: null, session: null });
+    const exp = sessionExpiry.get(c.req.raw) ?? 0;
+    return c.json(jsonSafe({ user: publicUser(user), session: sessionInfo(exp) }));
   });
 
   api.get('/me', async (c) => {
@@ -460,6 +493,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         user: publicUser(user),
         roles: user.roles,
         tier: tier.tier,
+        session: sessionExpiry.has(c.req.raw) ? sessionInfo(sessionExpiry.get(c.req.raw)!) : null,
         tierDetail: {
           minBalance: tier.minBalance,
           windowHours: config.tier_window_hours,

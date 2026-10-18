@@ -67,6 +67,10 @@ export type Signer = {
   signTransaction: (transaction: Uint8Array) => Promise<Uint8Array>;
   /** Present when the wallet implements `solana:signIn`. */
   signIn?: (input: SignInInput) => Promise<SignInResult>;
+  /** Fires with the wallet's new active address (null when it disconnected). */
+  onAccountChange?: (listener: (address: string | null) => void) => () => void;
+  /** Ends the dapp connection in the wallet, when it supports `standard:disconnect`. */
+  disconnect?: () => Promise<void>;
 };
 
 export type WalletDiscovery =
@@ -208,7 +212,7 @@ function pickAccount(accounts: readonly StandardAccount[]): StandardAccount | nu
 
 export async function signerFromStandardWallet(
   wallet: StandardWallet,
-  options: { silent?: boolean } = {},
+  options: { silent?: boolean; noPrompt?: boolean } = {},
 ): Promise<Signer> {
   assertDevnetChain(DEVNET_CHAIN);
   const connect = featureMethod<ConnectMethod>(wallet.features['standard:connect'], 'connect');
@@ -227,6 +231,9 @@ export async function signerFromStandardWallet(
   let accounts = wallet.accounts;
   const connected = await connect(options.silent ? { silent: true } : undefined);
   if (connected.accounts.length) accounts = connected.accounts;
+  if (!accounts.length && options.noPrompt) {
+    throw new Error(`${wallet.name} is not connected to this site`);
+  }
   if (!accounts.length && options.silent) {
     const prompted = await connect();
     if (prompted.accounts.length) accounts = prompted.accounts;
@@ -241,9 +248,32 @@ export async function signerFromStandardWallet(
   const current = () =>
     wallet.accounts.find((candidate) => candidate.address === account.address) ?? account;
 
+  type EventsOn = (
+    event: 'change',
+    listener: (props: { accounts?: readonly StandardAccount[] }) => void,
+  ) => () => void;
+  const eventsOn = featureMethod<EventsOn>(wallet.features['standard:events'], 'on');
+  const disconnect = featureMethod<() => Promise<void>>(
+    wallet.features['standard:disconnect'],
+    'disconnect',
+  );
+
   return {
     address: account.address,
     name: wallet.name,
+    ...(eventsOn
+      ? {
+          onAccountChange(listener: (address: string | null) => void) {
+            return eventsOn.call(wallet.features['standard:events'], 'change', (props) => {
+              if (!props.accounts) return;
+              listener(pickAccount(props.accounts)?.address ?? null);
+            });
+          },
+        }
+      : {}),
+    ...(disconnect
+      ? { disconnect: () => disconnect.call(wallet.features['standard:disconnect']) }
+      : {}),
     ...(signIn
       ? {
           async signIn(input: SignInInput) {
