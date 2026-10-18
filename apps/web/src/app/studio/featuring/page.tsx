@@ -707,11 +707,13 @@ export default function StudioFeaturingPage() {
               {calendar === null ? (
                 <Skeleton className="h-48 w-full" />
               ) : (
-                <div className="overflow-x-auto">
-                  <div className="min-w-[560px] overflow-hidden rounded-ctl border border-line">
+                // Seven columns fit a phone (cells ~45px wide, short labels); `relative` keeps
+                // the screen-reader-only labels inside, or they widen the page sideways.
+                <div className="relative overflow-x-auto">
+                  <div className="relative overflow-hidden rounded-ctl border border-line">
                     <div className="grid grid-cols-7 border-b border-line bg-inset font-mono text-[11px] uppercase text-muted">
                       {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-                        <span key={d} className="px-2 py-1.5">
+                        <span key={d} className="px-1 py-1.5 sm:px-2">
                           {d}
                         </span>
                       ))}
@@ -732,7 +734,7 @@ export default function StudioFeaturingPage() {
                               disabled={!inWindow || soldOut || busy}
                               aria-pressed={isSelected}
                               onClick={() => pick(day)}
-                              className={`flex h-14 w-full flex-col items-start justify-between px-2 py-1.5 text-left ${
+                              className={`relative flex h-14 w-full min-w-0 flex-col items-start justify-between px-1 py-1.5 text-left sm:px-2 ${
                                 isSelected
                                   ? 'bg-accent text-onaccent'
                                   : !inWindow || soldOut
@@ -766,12 +768,24 @@ export default function StudioFeaturingPage() {
                               >
                                 {!inWindow ? (
                                   <span className="sr-only">not bookable</span>
-                                ) : isSelected ? (
-                                  'selected'
-                                ) : soldOut ? (
-                                  'sold out'
                                 ) : (
-                                  `${left} of ${calendar.capacity} left`
+                                  <>
+                                    {/* Phones: short visible label; the full one is still read out. */}
+                                    <span aria-hidden="true" className="sm:hidden">
+                                      {isSelected
+                                        ? ''
+                                        : soldOut
+                                          ? 'full'
+                                          : `${left}/${calendar.capacity}`}
+                                    </span>
+                                    <span className="sr-only sm:not-sr-only">
+                                      {isSelected
+                                        ? 'selected'
+                                        : soldOut
+                                          ? 'sold out'
+                                          : `${left} of ${calendar.capacity} left`}
+                                    </span>
+                                  </>
                                 )}
                               </span>
                             </button>
