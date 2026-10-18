@@ -16,14 +16,16 @@ third-party account is needed for the default setup.
 
 Alerts go to every configured channel:
 
-- **ntfy push (default, free, no signup), live now.** Both Workers post to a secret ntfy.sh topic (`ALERT_NTFY_TOPIC`, in `~/.config/trenchmart/alerts.env` on the ops box). Treat it as a secret: anyone who knows the topic can read the alerts. To get push on a phone, install the ntfy app and subscribe to the topic.
-- **Email to rmscastle@gmail.com: needs one free signup by Roman.** ntfy.sh refuses anonymous email (error 40053). Steps:
-  1. Create a free account at https://ntfy.sh/signup.
-  2. Create an access token under Account → Access tokens.
-  3. Run `wrangler secret put ALERT_NTFY_TOKEN` on the API Worker, and on the watchdog with `-c watchdog.wrangler.toml`.
-
-  `ALERT_EMAIL` is already set. Until the token exists, alerts are sent as push only. If ntfy refuses the email, the alert falls back to push, so nothing is lost.
-
+- **ntfy push + email: needs one free signup by Roman.**
+  - Why: anonymous ntfy.sh publishing from Cloudflare Workers hits ntfy's shared daily quota, because all Workers share egress IPs (verified 2026-10-18: HTTP 429, code 42908). ntfy.sh also refuses anonymous email (40053).
+  - Steps:
+    1. Create a free account at https://ntfy.sh/signup.
+    2. Create an access token under Account → Access tokens.
+    3. Run `wrangler secret put ALERT_NTFY_TOKEN` on the API Worker (`-c wrangler.deploy.toml`) and on the watchdog (`-c watchdog.wrangler.toml`).
+    4. Subscribe to the topic in the ntfy phone app for push.
+  - Already set on both Workers: `ALERT_NTFY_TOPIC` (secret, stored in `~/.config/trenchmart/alerts.env` on the ops box; anyone who knows the topic can read the alerts) and `ALERT_EMAIL=rmscastle@gmail.com`.
+  - With the token, every alert is pushed and emailed. If an email is refused, the alert falls back to push.
+  - An alert that could not be delivered on any channel is retried on the next tick.
 - **Telegram (optional).** Create a bot with @BotFather, send it one message, and read the chat id from `https://api.telegram.org/bot<token>/getUpdates`. Then run `wrangler secret put TELEGRAM_BOT_TOKEN` and `wrangler secret put TELEGRAM_CHAT_ID` on the API Worker. For the watchdog, add `-c watchdog.wrangler.toml`.
 - **Generic webhook (optional).** Set `ALERT_WEBHOOK_URL`; it receives a JSON POST `{title, text, level}`.
 
@@ -165,6 +167,14 @@ Warn. The kill switch is on, which is a reminder in case someone left it on.
 
 Resolved and UP notices need no action.
 
-## Verified on devnet (2026-10-18)
+## Verified on devnet (2026-10-18, live deployment)
 
-See the PR description for the run log: each code was fired once against the live devnet deployment, through the real delivery path.
+All times are 2026-10-18 UTC+4 (Dubai).
+
+- **Detection, end to end.** Rows for each error kind were inserted into `ops_events`, then `POST /internal/ops/run` was called.
+  - At 07:01:52 the live API raised `CRON_FAILED`, `WEBHOOK_FAILED`, `SCAN_ERRORS`, `R2_ERROR` and `HTTP_5XX_SPIKE`, and wrote them to `ops_alerts`.
+  - After the rows were deleted, the next run at 07:02:04 produced `RESOLVED …` for all five.
+- **Healthy baseline.** `GET /internal/ops` → `{"ok":true,"alerts":[]}`. This is the real live state: RPC, web and R2 probes pass, the resolver and crank hold more than 0.05 SOL, the upgrade authority equals the vault `47RLqPda…`, and no order is stuck.
+- **Every other code** (DB, RPC, web, low balance, resolver, upgrade authority, stuck release, scan stuck, disputes, payouts, kill switch) fires and resolves in `apps/api/src/ops.test.ts` against real Postgres with stubbed chain and HTTP. That file also tests the dedup, the 6 h re-send, resolve notices, and retry after failed delivery.
+- **Watchdog.** Live at `https://trenchmart-watchdog.trenchmart.workers.dev/` with a `*/5` cron. It reports web and API ok. Its DOWN-once and UP-once logic is tested in `watchdog.test.ts`.
+- **Delivery: blocked on the ntfy token** (see above). Every live test notice returned `channels: []` because of the ntfy 429 quota. Once `ALERT_NTFY_TOKEN` is set, run `POST /internal/ops/test?code=DELIVERY` and expect `{"channels":["ntfy"]}`.

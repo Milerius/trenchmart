@@ -310,4 +310,23 @@ describe('monitoring and alerts', () => {
     await postNtfy(f, { ...base, alertNtfyToken: 'tk' }, { Title: 'x' }, 'b');
     expect(posts.length).toBe(1);
   });
+
+  it('retries an undelivered alert on the next tick', async () => {
+    const { deps, world } = await setup();
+    let down = true;
+    const inner = deps.opsFetch!;
+    deps.opsFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (down && (url.includes('ntfy.sh') || url.includes('telegram')))
+        return new Response('quota', { status: 429 });
+      return inner(input, init);
+    }) as typeof fetch;
+    world.lamports = 1_000n;
+    expect((await deliverAlerts(deps, await opsCheck(deps))).length).toBe(1);
+    down = false;
+    expect((await deliverAlerts(deps, await opsCheck(deps))).map((n) => n.title)).toEqual([
+      'CRITICAL LOW_BALANCE',
+    ]);
+    expect(await deliverAlerts(deps, await opsCheck(deps))).toEqual([]);
+  });
 });
