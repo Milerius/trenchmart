@@ -5,7 +5,7 @@ import { escrowWindowLabel } from '@trenchmart/shared/escrow';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { categoryMeta } from '@trenchmart/shared/categories';
 import { quote as quoteFor } from '@trenchmart/shared/fee';
 import { specRows, walletCountLabel, type WalletCount } from '@trenchmart/shared/listing-kinds';
@@ -150,6 +150,10 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   const [message, setMessage] = useState('');
   const [orderId, setOrderId] = useState('');
   const [related, setRelated] = useState<CardListing[]>([]);
+  // Related listings are far below the fold: fetch them (and their card chunk) only
+  // when the reader gets close, so they never compete with the hero image on load.
+  const relatedRef = useRef<HTMLDivElement>(null);
+  const [relatedNear, setRelatedNear] = useState(false);
 
   function load() {
     setLoadError(null);
@@ -169,7 +173,23 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   // "More from <category>": other live listings in the same category (real data only).
   const relatedCategory = listing?.category;
   useEffect(() => {
-    if (!relatedCategory) return;
+    const node = relatedRef.current;
+    if (relatedNear || !node) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setRelatedNear(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setRelatedNear(true);
+      },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [relatedNear, relatedCategory]);
+  useEffect(() => {
+    if (!relatedCategory || !relatedNear) return;
     let stop = false;
     void api<CardListing[]>(`/listings?category=${encodeURIComponent(relatedCategory)}`)
       .then((rows) => {
@@ -180,7 +200,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
     return () => {
       stop = true;
     };
-  }, [relatedCategory, params.slug]);
+  }, [relatedCategory, relatedNear, params.slug]);
 
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   useEffect(() => {
@@ -638,6 +658,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
           </a>
         </div>
       </article>
+      <div ref={relatedRef} aria-hidden="true" data-testid="related-sentinel" />
       {related.length ? (
         <section aria-labelledby="related-heading" className="mt-16 flex flex-col gap-6">
           <h2 id="related-heading" className="m-0 text-2xl font-semibold tracking-tight">

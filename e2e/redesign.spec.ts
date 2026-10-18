@@ -528,6 +528,7 @@ test.describe('phase 7: listing', () => {
     await expect(checkout.getByTestId('buy')).toBeEnabled();
     // The decrypting hash keeps its readable text for assistive tech.
     await expect(page.getByTestId('security-summary')).toContainText('9f2c4be1…33e41a');
+    await page.getByTestId('related-sentinel').scrollIntoViewIfNeeded();
     const related = page.getByRole('region', { name: 'More from userscripts' });
     await expect(related.getByTestId('listing-card')).toHaveCount(1);
     await expect(related).toContainText('Other Pack');
@@ -535,6 +536,10 @@ test.describe('phase 7: listing', () => {
 
   test('phone: no effect chunks; the buy bar and checkout still work', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    const relatedCalls: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('category=')) relatedCalls.push(request.url());
+    });
     await page.goto(`/l/${LISTING.slug}`);
     await expect(page.getByTestId('checkout')).toBeAttached();
     await page.waitForLoadState('load');
@@ -554,5 +559,10 @@ test.describe('phase 7: listing', () => {
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
     );
     expect(overflow).toBe(true);
+    // Related listings wait until the reader scrolls near them.
+    expect(relatedCalls).toEqual([]);
+    await page.getByTestId('related-sentinel').scrollIntoViewIfNeeded();
+    await expect(page.getByRole('region', { name: 'More from userscripts' })).toBeVisible();
+    expect(relatedCalls.length).toBeGreaterThan(0);
   });
 });
