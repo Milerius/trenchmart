@@ -2,8 +2,9 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { ListingGrid, type Listing } from '@/components/listings';
-import { Label, PreviewNotice, Serif } from '@/components/ui';
+import type { Listing } from '@/components/listings';
+import { MARKET_WRAP, MarketGrid, PageHero } from '@/components/market';
+import { Serif } from '@/components/ui';
 import { api } from '@/lib/api';
 import { usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
@@ -26,11 +27,11 @@ function Results() {
   }, [q, wallet.session?.wallet]);
 
   return (
-    <section className="min-h-[70vh] space-y-6">
-      <div>
-        <Label>Search</Label>
-        <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
-          {q ? (
+    <>
+      <PageHero
+        eyebrow={q ? 'Search' : 'Explore'}
+        title={
+          q ? (
             <>
               Results for <Serif>“{q}”</Serif>
             </>
@@ -38,26 +39,19 @@ function Results() {
             <>
               All live <Serif>listings</Serif>
             </>
-          )}
-        </h1>
-        {/* The line is always there so the grid below does not move when the count arrives. */}
-        <p className="m-0 mt-1 min-h-5 text-sm text-muted">
-          {listings
-            ? `${listings.length} reviewed listing${listings.length === 1 ? '' : 's'}`
-            : '\u00a0'}
-        </p>
-      </div>
-      {!wallet.session ? <PreviewNotice onConnect={() => void wallet.connect()} /> : null}
-      <ListingGrid
-        listings={listings ?? []}
-        loading={listings === null}
+          )
+        }
+        sub="Every listing passed automated review. Filter by category or terminal; prices settle in SOL with a 1-hour escrow."
+      />
+      <MarketGrid
+        listings={listings}
+        query={q || undefined}
         centsPerSol={cents}
         config={config}
         tier={wallet.session?.tier}
-        emptyTitle={q ? `Nothing matches “${q}”` : undefined}
-        emptyBody={q ? 'Try a terminal name, a category, or fewer words.' : undefined}
+        onConnect={wallet.session ? undefined : () => void wallet.connect()}
       />
-    </section>
+    </>
   );
 }
 
@@ -65,7 +59,7 @@ export default function SearchPage() {
   return (
     <Suspense
       fallback={
-        <div aria-busy="true" className="min-h-[70vh] space-y-3">
+        <div aria-busy="true" className={`${MARKET_WRAP} min-h-[70vh] space-y-3 py-14`}>
           <p className="sr-only">Searching…</p>
           <span className="skeleton block h-8 w-48" />
           <span className="skeleton block h-36 w-full" />
