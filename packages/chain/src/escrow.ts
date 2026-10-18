@@ -150,11 +150,20 @@ export function orderIdBytes(orderId: string): Uint8Array {
   return out;
 }
 
-export function escrowAddress(orderId: string, programId: string): string {
-  return findProgramAddress(
-    [new TextEncoder().encode('escrow'), orderIdBytes(orderId)],
-    programId,
-  )[0];
+/**
+ * Escrow PDA. v2 (program upgrade for L-02) seeds `["escrow", buyer, order_id]`; v1 used
+ * `["escrow", order_id]`. Pass `buyer` for v2; omit it only for legacy v1 escrows.
+ */
+export function escrowAddress(orderId: string, programId: string, buyer?: string): string {
+  const seeds: Uint8Array[] = [new TextEncoder().encode('escrow')];
+  if (buyer) seeds.push(key(buyer));
+  seeds.push(orderIdBytes(orderId));
+  return findProgramAddress(seeds, programId)[0];
+}
+
+/** v2 program config PDA (`["config"]`): holds the rotatable dispute resolver. */
+export function configAddress(programId: string): string {
+  return findProgramAddress([new TextEncoder().encode('config')], programId)[0];
 }
 
 class Writer {
@@ -198,6 +207,8 @@ export function initializeIx(input: {
   buyer: string;
   orderId: string;
   args: EscrowInitArgs;
+  /** Program version: 2 derives the PDA with the buyer in the seeds. */
+  version?: 1 | 2;
 }): Instruction {
   const a = input.args;
   const data = new Writer()
@@ -223,7 +234,15 @@ export function initializeIx(input: {
     programId: input.programId,
     keys: [
       { pubkey: input.buyer, isSigner: true, isWritable: true },
-      { pubkey: escrowAddress(input.orderId, input.programId), isSigner: false, isWritable: true },
+      {
+        pubkey: escrowAddress(
+          input.orderId,
+          input.programId,
+          input.version === 2 ? input.buyer : undefined,
+        ),
+        isSigner: false,
+        isWritable: true,
+      },
       { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data,
@@ -266,18 +285,49 @@ export function releaseIx(input: {
   };
 }
 
+/**
+ * v1: signed by the buyer. v2: signed by the buyer or by the config resolver (M-01), and
+ * the config account sits between the signer and the escrow.
+ */
 export function openDisputeIx(input: {
   programId: string;
   buyer: string;
   escrow: string;
+  version?: 1 | 2;
+}): Instruction {
+  const keys: AccountMeta[] = [{ pubkey: input.buyer, isSigner: true, isWritable: false }];
+  if (input.version === 2)
+    keys.push({ pubkey: configAddress(input.programId), isSigner: false, isWritable: false });
+  keys.push({ pubkey: input.escrow, isSigner: false, isWritable: true });
+  return { programId: input.programId, keys, data: discriminator('global:open_dispute') };
+}
+
+/** v2: return a timed-out dispute's deposit to the buyer. Permissionless. */
+export function refundAfterTimeoutIx(input: {
+  programId: string;
+  escrow: string;
+  buyer: string;
 }): Instruction {
   return {
     programId: input.programId,
     keys: [
-      { pubkey: input.buyer, isSigner: true, isWritable: false },
+      { pubkey: configAddress(input.programId), isSigner: false, isWritable: false },
       { pubkey: input.escrow, isSigner: false, isWritable: true },
+      { pubkey: input.buyer, isSigner: false, isWritable: true },
     ],
-    data: discriminator('global:open_dispute'),
+    data: discriminator('global:refund_after_timeout'),
+  };
+}
+
+/** v2: close a terminal escrow; rent goes back to the buyer (L-01). Permissionless. */
+export function closeIx(input: { programId: string; escrow: string; buyer: string }): Instruction {
+  return {
+    programId: input.programId,
+    keys: [
+      { pubkey: input.escrow, isSigner: false, isWritable: true },
+      { pubkey: input.buyer, isSigner: false, isWritable: true },
+    ],
+    data: discriminator('global:close'),
   };
 }
 
@@ -286,11 +336,13 @@ export function refundIx(input: {
   resolver: string;
   escrow: string;
   buyer: string;
+  version?: 1 | 2;
 }): Instruction {
   return {
     programId: input.programId,
     keys: [
       { pubkey: input.resolver, isSigner: true, isWritable: false },
+      ...configMeta(input),
       { pubkey: input.escrow, isSigner: false, isWritable: true },
       { pubkey: input.buyer, isSigner: false, isWritable: true },
     ],
@@ -302,15 +354,23 @@ export function rejectDisputeIx(input: {
   programId: string;
   resolver: string;
   escrow: string;
+  version?: 1 | 2;
 }): Instruction {
   return {
     programId: input.programId,
     keys: [
       { pubkey: input.resolver, isSigner: true, isWritable: false },
+      ...configMeta(input),
       { pubkey: input.escrow, isSigner: false, isWritable: true },
     ],
     data: discriminator('global:reject_dispute'),
   };
+}
+
+function configMeta(input: { programId: string; version?: 1 | 2 }): AccountMeta[] {
+  return input.version === 2
+    ? [{ pubkey: configAddress(input.programId), isSigner: false, isWritable: false }]
+    : [];
 }
 
 export function memoIx(memo: string, signer: string): Instruction {

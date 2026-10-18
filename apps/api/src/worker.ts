@@ -16,7 +16,7 @@ import { r2Blob, unavailableBlob, type R2BucketLike } from './blob';
 import { readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
-import { expireOrders, proposePayouts, releaseOrders } from './logic';
+import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
 
 type Binding = Record<string, unknown> & {
   DATABASE_URL?: string;
@@ -132,6 +132,7 @@ export default {
       expireOrders(deps)
         .then(() => releaseOrders(deps))
         .then(() => proposePayouts(deps))
+        .then(() => escrowHousekeeping(deps))
         .finally(() => deps.sql.end({ timeout: 5 })),
     );
   },

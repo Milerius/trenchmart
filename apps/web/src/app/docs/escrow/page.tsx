@@ -12,9 +12,15 @@ const INSTRUCTION_COPY: Record<(typeof ESCROW_INSTRUCTIONS)[number], string> = {
   release:
     'After escrow_until, price goes to the seller and the net fee is split to the four buckets.',
   expire: 'After expires_at, an unpaid order becomes expired. No funds have been deposited.',
-  open_dispute: 'Buyer moves paid or released to disputed and stores the previous status.',
+  open_dispute:
+    'Buyer (or the resolver, from paid inside the window) moves the order to disputed and stores the previous status.',
   refund: 'Resolver returns the deposit to the buyer, and only when the dispute started from paid.',
   reject_dispute: 'Resolver restores the order to paid or released.',
+  refund_after_timeout:
+    'If a dispute is still open 7 days after escrow_until, anyone can return the deposit to the buyer.',
+  close: 'Closes a refunded, expired, or long-released escrow and returns its rent to the buyer.',
+  init_config: 'Upgrade authority creates the config that names the dispute resolver.',
+  set_config: 'Config admin rotates the resolver or the dispute timeout for every escrow.',
 };
 
 export default function EscrowDocsPage() {
@@ -104,14 +110,16 @@ export default function EscrowDocsPage() {
       </DocSection>
       <DocSection id="resolver" title="Resolver">
         <p>
-          The resolver pubkey is stored at initialize. Refund and reject_dispute require that pubkey
-          as a signer. Refund pays the deposit back only when disputed_from is paid, because a
-          release has already moved the lamports out of the account. The API holds the resolver key:
-          its cron sends release after escrow_until, and resolving a dispute sends refund or
-          reject_dispute. Release only moves funds out of paid, so a disputed escrow cannot be
-          released. A refund after release is funded from the creator bond and then the safety
-          bucket. Release pays every bucket directly, so each bucket wallet must already hold the
-          rent-exempt minimum.
+          The resolver lives in a program config account, so it can be rotated for every open
+          escrow. Refund and reject_dispute require the configured resolver as a signer, and the
+          resolver freezes the escrow on chain as soon as a dispute is filed. If it never acts, the
+          buyer is refunded automatically after the dispute timeout. Refund pays the deposit back
+          only when disputed_from is paid, because a release has already moved the lamports out of
+          the account. The API holds the resolver key: its cron sends release after escrow_until,
+          and resolving a dispute sends refund or reject_dispute. Release only moves funds out of
+          paid, so a disputed escrow cannot be released. A refund after release is funded from the
+          creator bond and then the safety bucket. Release pays every bucket directly, so each
+          bucket wallet must already hold the rent-exempt minimum.
         </p>
       </DocSection>
     </article>
