@@ -95,12 +95,17 @@ export function Stars({ value, className = '' }: { value: number; className?: st
   );
 }
 
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+function dayOf(iso: string): string {
+  return DAY.format(new Date(iso));
+}
+
 function ago(iso: string): string {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m ago`;
   if (s < 86_400) return `${Math.round(s / 3600)}h ago`;
   if (s < 86_400 * 60) return `${Math.round(s / 86_400)}d ago`;
-  return utc(iso).slice(0, 10);
+  return dayOf(iso);
 }
 
 export function IdentityName({ who, testId }: { who: PublicIdentity; testId?: string }) {
@@ -380,16 +385,14 @@ function ReviewCard({ review, onChanged }: { review: ReviewItem; onChanged: () =
           </div>
           <p className="m-0 mt-0.5 font-mono text-[11px] text-muted">
             order {review.order.ref}
-            {review.order.releasedAt
-              ? ` · released ${utc(review.order.releasedAt).slice(0, 10)}`
-              : ''}
+            {review.order.releasedAt ? ` · released ${dayOf(review.order.releasedAt)}` : ''}
             {' · '}
             {who.kind === 'x' ? 'X verified' : who.kind === 'pseudonym' ? 'pseudonym' : 'wallet'}
           </p>
         </div>
-        <div className="text-right">
+        <div className="flex basis-full items-center gap-2 sm:block sm:basis-auto sm:text-right">
           <Stars value={review.rating} className="text-sm" />
-          <p className="m-0 mt-0.5 flex items-center justify-end gap-2 font-mono text-[11px] text-muted">
+          <p className="m-0 flex items-center gap-2 font-mono text-[11px] text-muted sm:mt-0.5 sm:justify-end">
             {review.version ? (
               <Tag tone={review.version.current ? 'info' : 'neutral'}>
                 v{review.version.semver}
@@ -411,7 +414,7 @@ function ReviewCard({ review, onChanged }: { review: ReviewItem; onChanged: () =
             <Tag tone="ok">YOUR REVIEW</Tag>
             {viewer.editableUntil && new Date(viewer.editableUntil).getTime() > Date.now() ? (
               <Link href="/me/purchases" className="text-ink-2 underline-offset-4 hover:underline">
-                Edit · until {utc(viewer.editableUntil).slice(0, 10)}
+                Edit · until {dayOf(viewer.editableUntil)}
               </Link>
             ) : null}
           </>
@@ -750,7 +753,7 @@ export function ReviewDialog({
             title="Order released"
             detail={
               form.order.releasedAt
-                ? `escrow closed ${utc(form.order.releasedAt).slice(0, 10)}`
+                ? `escrow closed ${dayOf(form.order.releasedAt)}`
                 : 'escrow closed'
             }
           />
@@ -760,9 +763,15 @@ export function ReviewDialog({
           />
           <Check title="Signed by buyer" detail={form.poster.name} />
         </div>
-        <fieldset className="m-0 border-0 p-0">
-          <legend className="text-sm font-medium">Your rating</legend>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div>
+          <p id="rating-label" className="m-0 text-sm font-medium">
+            Your rating
+          </p>
+          <div
+            role="group"
+            aria-labelledby="rating-label"
+            className="mt-2 flex flex-wrap items-center gap-2"
+          >
             {[1, 2, 3, 4, 5].map((n) => (
               <button
                 key={n}
@@ -786,12 +795,16 @@ export function ReviewDialog({
               </span>
             ) : null}
           </div>
-        </fieldset>
-        <fieldset className="m-0 border-0 p-0">
-          <legend className="flex w-full justify-between text-sm font-medium">
+        </div>
+        <div>
+          <p id="version-label" className="m-0 text-sm font-medium">
             Version you used
-          </legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          </p>
+          <div
+            role="radiogroup"
+            aria-labelledby="version-label"
+            className="mt-2 grid gap-2 sm:grid-cols-2"
+          >
             {form.versions.map((v) => (
               <label
                 key={v.id}
@@ -802,12 +815,13 @@ export function ReviewDialog({
                 <input
                   type="radio"
                   name="version"
+                  className="accent-[var(--color-accent)]"
                   checked={versionId === v.id}
                   onChange={() => setVersionId(v.id)}
                 />
                 <span className="font-mono text-ink">v{v.semver}</span>
                 <span className="text-muted">
-                  {v.downloadedAt ? `downloaded ${utc(v.downloadedAt).slice(0, 10)}` : 'purchased'}
+                  {v.downloadedAt ? `downloaded ${dayOf(v.downloadedAt)}` : 'purchased'}
                 </span>
               </label>
             ))}
@@ -815,7 +829,7 @@ export function ReviewDialog({
           <p className="m-0 mt-1.5 text-[12px] text-muted">
             Only versions this wallet downloaded are offered. Shown on your review as a tag.
           </p>
-        </fieldset>
+        </div>
         <div>
           <label htmlFor="review-text" className="flex justify-between text-sm font-medium">
             Your review
