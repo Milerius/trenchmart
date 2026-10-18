@@ -267,7 +267,7 @@ const LadderCard: React.FC = () => {
               color: fee < 0.01 ? C.accent : C.text,
             }}
           >
-            {fee < 0.001 ? 'no fee' : `${((0.1 * fee) / 100).toFixed(5).replace(/0+$/, '')} SOL`}
+            {fee < 0.001 ? 'no fee' : `${((0.1 * fee) / 100).toFixed(5)} SOL`}
           </div>
         </div>
       </div>

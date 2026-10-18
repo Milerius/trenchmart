@@ -171,7 +171,7 @@ export const LaunchShell: React.FC<{
         );
       })}
       <TopBar chapters={chapters} opacity={barOpacity} />
-      <Captions data={captions} />
+      <Captions data={captions} cuts={scenes.map((s) => s.from)} />
       {audio ? <Html5Audio src={staticFile(audioFile)} /> : null}
     </AbsoluteFill>
   );

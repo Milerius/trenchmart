@@ -12,41 +12,67 @@ type Chunk = { words: CaptionWord[]; from: number; to: number };
 const LEAD = 3;
 const HOLD = 16;
 
-/** Splits each line into short phrases, breaking at punctuation where possible. */
-export const chunk = (data: CaptionData, maxChars: number): Chunk[] => {
+const text = (words: CaptionWord[]) => words.map((x) => x.w).join(' ');
+
+/** Cuts a clause into the fewest phrases that fit, of roughly equal length (no orphan words). */
+const balance = (words: CaptionWord[], maxChars: number, slack: number): CaptionWord[][] => {
+  const len = text(words).length;
+  if (len <= maxChars + slack) return [words];
+  const target = len / Math.ceil(len / maxChars);
+  const out: CaptionWord[][] = [];
+  let cur: CaptionWord[] = [];
+  for (const word of words) {
+    if (cur.length && text([...cur, word]).length > target + 4) {
+      out.push(cur);
+      cur = [];
+    }
+    cur.push(word);
+  }
+  return [...out, cur];
+};
+
+/**
+ * Splits each line into short phrases at sentence ends and pauses, then balances long clauses.
+ * `slack` lets a clause run a few characters over `maxChars` rather than split. A phrase that is
+ * fully spoken before a scene cut is not held past that cut.
+ */
+export const chunk = (
+  data: CaptionData,
+  maxChars: number,
+  slack: number,
+  cuts: number[] = [],
+): Chunk[] => {
   const chunks: Chunk[] = [];
   for (const line of data.lines) {
-    let cur: CaptionWord[] = [];
-    const flush = () => {
-      if (cur.length) chunks.push({ words: cur, from: cur[0].from, to: cur[cur.length - 1].to });
-      cur = [];
-    };
+    let clause: CaptionWord[] = [];
     line.words.forEach((word, i) => {
-      const len = [...cur, word].map((x) => x.w).join(' ').length;
-      if (cur.length && len > maxChars) flush();
-      cur.push(word);
-      const next = line.words[i + 1];
+      clause.push(word);
+      const rest = text(line.words.slice(i + 1));
       const stop = /[.?!]$/.test(word.w);
-      const pause = /[,:;]$/.test(word.w);
-      const restLen = line.words
-        .slice(i + 1)
-        .map((x) => x.w)
-        .join(' ').length;
-      if (stop || (pause && cur.length >= 3 && restLen > 8) || !next) flush();
+      const pause = /[,:;]$/.test(word.w) && clause.length >= 3 && rest.length > 8;
+      if (!stop && !pause && rest) return;
+      for (const words of balance(clause, maxChars, slack)) {
+        chunks.push({ words, from: words[0].from, to: words[words.length - 1].to });
+      }
+      clause = [];
     });
   }
   return chunks.map((c, i) => {
     const next = chunks[i + 1];
-    const end = Math.min(c.to + HOLD, next ? next.from - LEAD - 1 : Infinity);
+    const cut = cuts.find((f) => f > c.to) ?? Infinity;
+    const end = Math.min(c.to + HOLD, next ? next.from - LEAD - 1 : Infinity, cut);
     return { ...c, from: c.from - LEAD, to: Math.max(end, c.to + 2) };
   });
 };
 
 /** Burned-in captions: one phrase at a time, the spoken word in lime. */
-export const Captions: React.FC<{ data: CaptionData }> = ({ data }) => {
+export const Captions: React.FC<{ data: CaptionData; cuts?: number[] }> = ({ data, cuts }) => {
   const frame = useCurrentFrame();
   const { tall } = useFormat();
-  const chunks = React.useMemo(() => chunk(data, tall ? 30 : 46), [data, tall]);
+  const chunks = React.useMemo(
+    () => (tall ? chunk(data, 30, 3, cuts) : chunk(data, 46, 10, cuts)),
+    [data, tall, cuts],
+  );
   const active = chunks.find((c) => frame >= c.from && frame < c.to);
   if (!active) return null;
   const inP = ease(frame, active.from, active.from + 5);
@@ -67,7 +93,7 @@ export const Captions: React.FC<{ data: CaptionData }> = ({ data }) => {
     >
       <div
         style={{
-          maxWidth: tall ? 940 : 1500,
+          maxWidth: tall ? 1000 : 1500,
           padding: tall ? '16px 30px 18px' : '12px 30px 14px',
           borderRadius: 16,
           background: 'rgba(10,11,10,0.82)',

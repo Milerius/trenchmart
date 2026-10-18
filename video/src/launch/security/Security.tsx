@@ -95,7 +95,7 @@ const Hook: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     label="SECURITY REVIEW"
     wide={[[{ t: 'Nothing' }, { t: 'goes' }, { t: 'live' }], [{ t: 'unchecked.', c: C.accent }]]}
-    tall={[[{ t: 'Nothing' }, { t: 'goes' }], [{ t: 'live' }], [{ t: 'unchecked.', c: C.accent }]]}
+    tall={[[{ t: 'Nothing' }], [{ t: 'goes' }, { t: 'live' }], [{ t: 'unchecked.', c: C.accent }]]}
     backdrop={<CodeBackdrop dur={dur} />}
   />
 );
