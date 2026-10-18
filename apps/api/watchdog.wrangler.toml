@@ -1,0 +1,18 @@
+# External watchdog Worker (src/watchdog.ts). Secrets: ALERT_NTFY_TOPIC, ALERT_EMAIL,
+# optional TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (wrangler secret put -c watchdog.wrangler.toml).
+name = "trenchmart-watchdog"
+main = "src/watchdog.ts"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[vars]
+WEB_URL = "https://trenchmart.fun"
+API_URL = "https://api.trenchmart.fun"
+RPC_URL = "https://api.devnet.solana.com"
+CLUSTER = "devnet"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true

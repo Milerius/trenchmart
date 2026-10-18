@@ -20,10 +20,11 @@ import WEBP_ENC_WASM from '@jsquash/webp/codec/enc/webp_enc_simd.wasm';
 // @ts-expect-error the package's .wasm.d.ts types the instance exports; wrangler imports a WebAssembly.Module
 import RESIZE_WASM from '@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
 import { createImageOptimizer } from './image-optimize';
-import { readEnv, weakSecrets, isLocalAppUrl } from './env';
+import { assertDeployedEnv, readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
 import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
+import { deliverAlerts, opsCheck, recordOpsEvent } from './ops';
 
 type Binding = Record<string, unknown> & {
   DATABASE_URL?: string;
@@ -73,6 +74,7 @@ const optimizeImage = createImageOptimizer(() => ({
 }));
 
 function depsFor(env: Binding, url: string) {
+  assertDeployedEnv(stringEnv(env));
   const parsed = readEnv(stringEnv(env));
   // One request rarely needs more than a few concurrent queries; keep the socket count low.
   const sql = createSql(url, { max: 5 });
@@ -151,12 +153,30 @@ export default {
     const dbUrl = databaseUrl(env);
     if (!dbUrl) return;
     const deps = depsFor(env, dbUrl);
+    // Each job runs even if an earlier one failed, and every failure is logged as an ALERT.
+    const step = async (name: string, job: () => Promise<unknown>) => {
+      try {
+        await job();
+      } catch (err) {
+        console.error(
+          'ALERT',
+          JSON.stringify({
+            level: 'critical',
+            code: 'CRON_FAILED',
+            message: `${name}: ${(err as Error).message}`,
+          }),
+        );
+        await recordOpsEvent(deps, 'cron_failed', `${name}: ${(err as Error).message}`);
+      }
+    };
     ctx.waitUntil(
-      expireOrders(deps)
-        .then(() => releaseOrders(deps))
-        .then(() => proposePayouts(deps))
-        .then(() => escrowHousekeeping(deps))
-        .finally(() => deps.sql.end({ timeout: 5 })),
+      (async () => {
+        await step('expire', () => expireOrders(deps));
+        await step('release', () => releaseOrders(deps));
+        await step('payouts', () => proposePayouts(deps));
+        await step('escrow-housekeeping', () => escrowHousekeeping(deps));
+        await step('ops', async () => deliverAlerts(deps, await opsCheck(deps)));
+      })().finally(() => deps.sql.end({ timeout: 5 })),
     );
   },
 };

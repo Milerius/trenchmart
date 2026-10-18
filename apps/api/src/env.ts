@@ -57,6 +57,15 @@ export type Env = {
   xClientSecret: string;
   /** Server-side wasm WebP re-encode at upload (CPU heavy; off unless IMAGE_OPTIMIZE=1). */
   imageOptimize: boolean;
+  /** Alert delivery (ops.ts). ntfy topic is a secret: anyone who knows it can read alerts. */
+  alertNtfyServer: string;
+  alertNtfyTopic: string;
+  alertEmail: string;
+  telegramBotToken: string;
+  telegramChatId: string;
+  alertWebhookUrl: string;
+  /** Expected escrow program upgrade authority; a change raises UPGRADE_AUTHORITY_CHANGED. */
+  expectedUpgradeAuthority: string;
   r2: { accountId: string; bucket: string; accessKeyId: string; secretAccessKey: string } | null;
 };
 
@@ -86,6 +95,14 @@ const KNOWN_DEFAULTS = new Set([
   'dev',
 ]);
 
+/**
+ * A deployed Worker must name its APP_URL: a missing one would otherwise count as local and
+ * skip the secret checks (CodeRabbit, PR #36). Called by worker.ts before readEnv.
+ */
+export function assertDeployedEnv(source: Record<string, string | undefined>): void {
+  if (!blank(source.APP_URL)) throw new InsecureConfigError(['APP_URL']);
+}
+
 /** True when APP_URL points at a local machine (dev, tests, CI). */
 export function isLocalAppUrl(appUrl: string | undefined): boolean {
   const value = blank(appUrl);
@@ -93,7 +110,11 @@ export function isLocalAppUrl(appUrl: string | undefined): boolean {
   try {
     const host = new URL(value).hostname;
     return (
-      host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '::1' ||
+      host === '[::1]' ||
+      host.endsWith('.localhost')
     );
   } catch {
     return false;
@@ -192,6 +213,13 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     xClientId: blank(source.X_CLIENT_ID),
     xClientSecret: blank(source.X_CLIENT_SECRET),
     imageOptimize: source.IMAGE_OPTIMIZE === '1',
+    alertNtfyServer: blank(source.ALERT_NTFY_SERVER) || 'https://ntfy.sh',
+    alertNtfyTopic: blank(source.ALERT_NTFY_TOPIC),
+    alertEmail: blank(source.ALERT_EMAIL),
+    telegramBotToken: blank(source.TELEGRAM_BOT_TOKEN),
+    telegramChatId: blank(source.TELEGRAM_CHAT_ID),
+    alertWebhookUrl: blank(source.ALERT_WEBHOOK_URL),
+    expectedUpgradeAuthority: blank(source.EXPECTED_UPGRADE_AUTHORITY),
     r2:
       accountId && accessKeyId && secretAccessKey
         ? {

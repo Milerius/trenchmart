@@ -1,0 +1,25 @@
+# Copy to .github/workflows/health-check.yml (needs a token with the `workflow` scope).
+# Sentry-free monitoring: every 10 minutes GitHub checks the public health endpoint and the
+# internal ops check. A failure fails the run, and GitHub emails the repo owner about failed
+# scheduled runs (Settings -> Notifications -> Actions). Add the repository secret
+# TM_INTERNAL_TOKEN (the API's INTERNAL_TOKEN) first.
+name: health-check
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: public health
+        run: curl -fsS --max-time 20 https://api.trenchmart.fun/api/v1/health
+      - name: web
+        run: curl -fsS --max-time 20 -o /dev/null https://trenchmart.fun/
+      - name: ops check (stuck releases, hot-wallet balances, disputes)
+        env:
+          TOKEN: ${{ secrets.TM_INTERNAL_TOKEN }}
+        run: |
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" https://api.trenchmart.fun/api/v1/internal/ops

@@ -1,3 +1,4 @@
+import { deliverAlerts, notify, opsCheck, opsStatus, recordOpsEvent } from './ops';
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { cors } from 'hono/cors';
@@ -67,6 +68,15 @@ import {
 import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
 import { EscrowError } from './escrow';
 import { checkXState, fetchXAccount, startXAuth, X_COOKIE, xVerified } from './x-oauth';
+import {
+  findCreator,
+  loadOwnProfile,
+  profileMediaResponse,
+  publicProfile,
+  removeProfileImage,
+  saveProfile,
+  uploadProfileImage,
+} from './profile';
 import {
   activeBond,
   applyPayment,
@@ -161,6 +171,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return quote;
   }
 
+  // Error events feed the ops check (5xx spike, webhook and scan pipeline failures).
+  const recordErrorEvent = async (path: string, err: unknown) => {
+    const detail = `${path}: ${(err as Error)?.message ?? String(err)}`;
+    await recordOpsEvent(deps, '5xx', detail);
+    if (path.includes('/hooks/')) await recordOpsEvent(deps, 'webhook_error', detail);
+    if (/\/(versions\/[^/]+\/(complete|explain|reupload)|internal\/sandbox)/.test(path))
+      await recordOpsEvent(deps, 'scan_error', detail);
+  };
   const app = new Hono<{ Variables: Vars }>();
   app.onError((err, c) => {
     if (err instanceof HttpDataError) {
@@ -176,9 +194,11 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       return c.json({ error: { code: err.code, message: err.message } }, err.status as 400);
     }
     if (err instanceof BlobUnavailableError) {
+      void recordOpsEvent(deps, 'r2_error', `${c.req.path}: ${err.message}`);
       return c.json({ error: { code: 'STORAGE_UNAVAILABLE', message: err.message } }, 503);
     }
     console.error(err);
+    void recordErrorEvent(c.req.path, err);
     return c.json({ error: { code: 'INTERNAL', message: 'Internal error' } }, 500);
   });
   // Security headers on every API response (mainnet readiness #11).
@@ -445,6 +465,34 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json({ handle: body.handle });
   });
 
+  // Creator profile (studio redesign): editable fields, avatar and banner.
+  api.get('/studio/profile', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await loadOwnProfile(deps, user.id as string)));
+  });
+
+  api.put('/studio/profile', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await saveProfile(deps, user.id as string, await c.req.json())));
+  });
+
+  for (const kind of ['avatar', 'banner'] as const) {
+    api.post(`/studio/profile/${kind}`, async (c) => {
+      const user = requireUser(c);
+      const declared = Number(c.req.header('content-length') ?? '0');
+      if (declared > IMAGE_MAX_BYTES) {
+        throw new HttpError(413, 'IMAGE_TOO_LARGE', 'images are limited to 3 MB');
+      }
+      const bytes = await readCapped(c.req.raw.body, IMAGE_MAX_BYTES);
+      return c.json(await uploadProfileImage(deps, user.id as string, kind, bytes));
+    });
+    api.delete(`/studio/profile/${kind}`, async (c) => {
+      const user = requireUser(c);
+      await removeProfileImage(deps, user.id as string, kind);
+      return c.json({ ok: true });
+    });
+  }
+
   api.get('/categories', async (c) => {
     const counts = await deps.sql<{ category: string; count: number }[]>`
       select category, count(*)::int as count from listings
@@ -554,15 +602,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   api.get('/creators/:handle', async (c) => {
-    const handle = c.req.param('handle').replace(/^@/, '');
-    const users = await deps.sql<Record<string, any>[]>`
-      select id, handle, wallet, x_handle, x_user_id from users
-      where handle = ${handle}
-        or (x_handle = ${handle} and x_user_id is not null and x_user_id not like 'dev:%')
-      order by (handle = ${handle}) desc
-      limit 1
-    `;
-    const creator = users[0];
+    const creator = await findCreator(deps, c.req.param('handle'));
     if (!creator) throw new HttpError(404, 'NOT_FOUND', 'creator not found');
     const listings = await deps.sql<Record<string, any>[]>`
       select l.*, u.handle from listings l join users u on u.id = l.creator_id
@@ -570,18 +610,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         and l.live_version_id is not null
       order by l.created_at desc
     `;
-    const bond = await activeBond(deps.sql, creator.id as string);
+    const viewer = c.get('user');
+    const profile = await publicProfile(deps, creator, (viewer?.id as string | undefined) ?? null);
     return c.json(
-      jsonSafe({
-        handle: creator.handle,
-        wallet: creator.wallet,
-        xHandle: creator.x_handle,
-        xVerified: xVerified(creator),
-        bond,
-        listings: listings.map((listing) => publicListing(listing)),
-      }),
+      jsonSafe({ ...profile, listings: listings.map((listing) => publicListing(listing)) }),
     );
   });
+
+  api.get('/profile-media/:id', (c) => profileMediaResponse(deps, c.req.param('id')));
 
   api.post('/orders/quote', async (c) => {
     const user = requireUser(c);
@@ -1514,6 +1550,39 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     });
   });
 
+  // Monitoring endpoint for an external uptime check: 200 {"ok":true} or 503 with alerts.
+  api.get('/internal/ops', async (c) => {
+    assertInternal(c, deps.env);
+    const alerts = await opsCheck(deps);
+    const critical = alerts.some((a) => a.level === 'critical');
+    return c.json({ ok: !critical, alerts }, critical ? 503 : 200);
+  });
+
+  // Runs the check and delivers notices like the cron does (used to verify alerting).
+  api.post('/internal/ops/run', async (c) => {
+    assertInternal(c, deps.env);
+    const alerts = await opsCheck(deps);
+    const notices = await deliverAlerts(deps, alerts);
+    return c.json({ alerts, notices });
+  });
+
+  // Delivery test: one notice per channel, marked TEST. ?code= sends a sample of that alert.
+  api.post('/internal/ops/test', async (c) => {
+    assertInternal(c, deps.env);
+    const code = c.req.query('code') ?? 'DELIVERY';
+    const channels = await notify(deps, {
+      title: `TEST ${code}`,
+      body: `Test of the ${code} alert path. No action needed.`,
+      level: 'test',
+    });
+    return c.json({ channels });
+  });
+
+  api.get('/admin/ops', async (c) => {
+    requireRole(requireUser(c), 'admin');
+    return c.json(jsonSafe(await opsStatus(deps)));
+  });
+
   api.post('/internal/cron/:job', async (c) => {
     assertInternal(c, deps.env);
     const job = c.req.param('job');
@@ -1583,6 +1652,8 @@ function publicUser(user: Record<string, any>) {
     handle: user.handle,
     xHandle: user.x_handle,
     xVerified: xVerified(user),
+    displayName: user.display_name ?? null,
+    avatarUrl: user.avatar_media_id ? `/api/v1/profile-media/${user.avatar_media_id}` : null,
     roles: user.roles,
   };
 }
