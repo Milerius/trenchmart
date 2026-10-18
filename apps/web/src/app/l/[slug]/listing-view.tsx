@@ -395,7 +395,10 @@ export function ListingView({ initial }: { initial: Listing | null }) {
                   {security.review ? ` · ${security.review.agentId}` : ''}
                 </p>
               </div>
-              <span className="font-mono text-xs text-ink-2" title={security.sha256}>
+              <span
+                className="w-full font-mono text-xs text-ink-2 sm:w-auto"
+                title={security.sha256}
+              >
                 SHA-256{' '}
                 <DecryptHash text={`${security.sha256.slice(0, 8)}…${security.sha256.slice(-6)}`} />
               </span>
