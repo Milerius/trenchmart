@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Wallet as WalletIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useWallet } from '@/lib/wallet';
 import { shortAddress } from '@/lib/wallet-session';
@@ -12,7 +13,7 @@ const PHASE_LABEL = {
 } as const;
 
 const buttonClass =
-  'motion-press h-11 rounded-ctl bg-accent px-4 font-mono text-sm font-semibold text-onaccent hover:bg-accent-hover disabled:opacity-100';
+  'motion-press inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold whitespace-nowrap text-onaccent hover:bg-accent-hover disabled:opacity-100';
 const itemClass =
   'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-ink hover:bg-surface-2 focus:bg-surface-2 focus:outline-none';
 
@@ -73,9 +74,17 @@ export function WalletMenu() {
         type="button"
         className={buttonClass}
         title={connected ? `Sign in as ${connected}` : undefined}
+        aria-label={connected ? undefined : 'Connect wallet'}
         onClick={() => void wallet.connect()}
       >
-        {connected ? 'Sign in' : 'Connect wallet'}
+        {connected ? (
+          'Sign in'
+        ) : (
+          <>
+            <WalletIcon size={15} aria-hidden="true" />
+            Connect<span className="hidden sm:inline"> wallet</span>
+          </>
+        )}
       </button>
     );
   }
@@ -103,7 +112,7 @@ export function WalletMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="wallet-menu"
-        className={`${buttonClass} inline-flex items-center gap-2`}
+        className={`${buttonClass} font-mono`}
         onClick={() => setOpen((value) => !value)}
       >
         <span
