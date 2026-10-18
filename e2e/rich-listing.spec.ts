@@ -168,8 +168,12 @@ test('market cards show the 16:10 cover or the category fallback', async ({ page
   await page.goto('/search');
   const covers = page.getByTestId('card-cover');
   await expect(covers).toHaveCount(2);
-  await expect(covers.first().locator('img')).toHaveAttribute('src', gallery[0]!.url);
-  await expect(covers.nth(1).locator('img')).toHaveCount(0);
+  // The cover image itself (the terminal chip on top of the cover has its own small logo).
+  await expect(covers.first().getByTestId('card-cover-img')).toHaveAttribute(
+    'src',
+    gallery[0]!.url,
+  );
+  await expect(covers.nth(1).getByTestId('card-cover-img')).toHaveCount(0);
   const ratio = await covers.first().evaluate((el) => el.clientWidth / el.clientHeight);
   expect(ratio).toBeCloseTo(1.6, 1);
 });

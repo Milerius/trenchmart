@@ -9,7 +9,7 @@ import { solText } from '@/lib/money';
 import { CATEGORIES } from '@trenchmart/shared/categories';
 import { ActivityBand, useActivity } from '@/components/activity';
 import { FeaturedRow, useFeatured } from '@/components/featured';
-import { TierTable } from '@/components/fees';
+import { TierCards } from '@/components/fees';
 import { type Board, type BoardTab, CreatorCards, TAB_LABEL } from '@/components/leaderboard';
 import { ListingGrid, TERMINALS, type Listing } from '@/components/listings';
 import { TerminalName } from '@/components/terminal-logo';
@@ -405,8 +405,8 @@ export default function HomePage() {
                 Full leaderboard →
               </Link>
             </div>
-            <div className="rounded-panel border border-line bg-surface p-3">
-              <PillGroup role="tablist" aria-label="Top creators">
+            <div className="rounded-[26px] border border-line bg-surface/60 p-2">
+              <PillGroup role="tablist" aria-label="Top creators" className="m-2">
                 {HOME_TABS.map((value) => (
                   <button
                     key={value}
@@ -420,7 +420,7 @@ export default function HomePage() {
                   </button>
                 ))}
               </PillGroup>
-              <div className="mt-3">
+              <div className="mt-1">
                 {board === null ? (
                   <p className="m-0 p-3 text-muted">Loading creators…</p>
                 ) : board === 'error' ? (
@@ -457,12 +457,8 @@ export default function HomePage() {
                 See tiers and savings →
               </Link>
             </div>
-            <p className="mt-4 max-w-xl text-ink-2">
-              Buyers pay a 5% fee on top of the listing price. Your $TRENCH tier cuts it, down to
-              zero for OG holders. Creators keep 100% of the listing price.
-            </p>
-            <div className="mt-8 rounded-panel border border-line bg-surface p-5">
-              <TierTable config={config} current={wallet.session?.tier} />
+            <div className="mt-10">
+              <TierCards config={config} current={wallet.session?.tier} />
             </div>
           </section>
         </Reveal>

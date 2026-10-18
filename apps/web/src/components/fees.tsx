@@ -8,6 +8,14 @@ import { TIER_LABEL, type PublicConfig } from '@/lib/config';
 
 type FeeConfig = Pick<PublicConfig, 'feeBps' | 'tierRebateBps' | 'feeSplitBps'>;
 
+function compactHold(whole: string | undefined): string {
+  const n = Number(whole);
+  if (!whole || !Number.isFinite(n) || n <= 0) return 'any wallet';
+  if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M held`;
+  if (n >= 1e3) return `${+(n / 1e3).toFixed(1)}K held`;
+  return `${n} held`;
+}
+
 /** Display fallback while /config/public loads; values are the seeded defaults. */
 export const DEFAULT_FEES: FeeConfig = {
   feeBps: DEFAULT_CONFIG_JSON.fee_bps,
@@ -90,6 +98,66 @@ export function TierTable({
         })}
       </tbody>
     </table>
+  );
+}
+
+/** Prototype tier cards (home): fee per tier, hold needed, 0% creator commission; OG lit up. */
+export function TierCards({
+  config,
+  current,
+}: {
+  config?: (FeeConfig & Partial<Pick<PublicConfig, 'tierThresholds'>>) | null;
+  current?: string;
+}) {
+  const cfg = config ?? DEFAULT_FEES;
+  const holds: Record<string, string> = {
+    ...DEFAULT_CONFIG_JSON.tier_thresholds,
+    ...(config?.tierThresholds ?? {}),
+  };
+  return (
+    <ul className="m-0 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
+      {TIER_ORDER.map((tier) => {
+        const top = (cfg.tierRebateBps[tier] ?? 0) >= 10_000;
+        const active = current === tier;
+        return (
+          <li
+            key={tier}
+            data-testid="tier-card"
+            aria-current={active ? 'true' : undefined}
+            className={`relative flex list-none flex-col gap-6 overflow-hidden rounded-[22px] border p-6 ${top ? 'border-accent/60 bg-accent-bg' : 'border-line bg-surface/70'}`}
+          >
+            {top ? (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-accent/25 blur-3xl"
+              />
+            ) : null}
+            <span className="relative flex items-center justify-between gap-2">
+              <h3 className={`m-0 text-base font-semibold ${top ? 'text-accent' : ''}`}>
+                {TIER_LABEL[tier]}
+                {active ? (
+                  <Tag tone="ok" className="ml-2">
+                    YOU
+                  </Tag>
+                ) : null}
+              </h3>
+              <span className="font-mono text-xs text-faint">
+                {tier === 'none' ? 'any wallet' : compactHold(holds[tier])}
+              </span>
+            </span>
+            <span className="relative">
+              <span
+                className={`tabular block text-5xl font-semibold tracking-[-0.05em] ${top ? 'text-accent' : ''}`}
+              >
+                {pct(effectiveFeeBps(cfg, tier))}
+              </span>
+              <span className="text-sm text-muted">buyer fee</span>
+            </span>
+            <span className="relative text-sm text-ink-2">0% creator commission</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
