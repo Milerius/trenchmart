@@ -286,3 +286,20 @@ export async function fetchTransaction(url: string, signature: string): Promise<
 }
 
 export { fromBase64 };
+
+/** Sum of `owner`'s token accounts for `mint`, in base units (classic SPL and Token-2022). */
+export async function tokenBalance(url: string, owner: string, mint: string): Promise<bigint> {
+  const result = (await rpc(url, 'getTokenAccountsByOwner', [
+    owner,
+    { mint },
+    { encoding: 'jsonParsed', commitment: 'confirmed' },
+  ])) as {
+    value: { account: { data: { parsed?: { info?: { tokenAmount?: { amount?: string } } } } } }[];
+  };
+  let total = 0n;
+  for (const row of result.value ?? []) {
+    const amount = row.account.data.parsed?.info?.tokenAmount?.amount;
+    if (amount && /^\d+$/.test(amount)) total += BigInt(amount);
+  }
+  return total;
+}

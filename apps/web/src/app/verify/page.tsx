@@ -160,6 +160,12 @@ function Addr({ value, tx }: { value: string | null | undefined; tx?: boolean })
         {shortKey(value, 6, 6)} <span aria-hidden="true">↗</span>
         <span className="sr-only"> (opens Solana Explorer)</span>
       </a>
+      <span
+        data-testid="addr-cluster"
+        className="rounded-tag border border-line-control px-1.5 font-mono text-[10px] uppercase tracking-wide text-muted"
+      >
+        devnet
+      </span>
       <CopyButton value={value} />
     </span>
   );

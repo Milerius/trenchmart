@@ -119,3 +119,28 @@ describe('minBalanceInWindow', () => {
     expect(minBalanceInWindow([], now, 72)).toBe(0n);
   });
 });
+
+describe('real $TRENCH thresholds', () => {
+  it('seeds Scout 100k, Trencher 1M, OG 10M whole tokens and scales by decimals', async () => {
+    const { parseAppConfig, DEFAULT_CONFIG_JSON } = await import('./config');
+    expect(DEFAULT_CONFIG_JSON.tier_thresholds).toEqual({
+      scout: '100000',
+      trencher: '1000000',
+      og: '10000000',
+    });
+    const config = parseAppConfig({});
+    expect(config.tier_thresholds).toEqual({
+      scout: 100_000_000_000n,
+      trencher: 1_000_000_000_000n,
+      og: 10_000_000_000_000n,
+    });
+    expect(tierFor(1_500_000_000_000n, config.tier_thresholds)).toBe('trencher');
+    expect(tierFor(99_999_999_999n, config.tier_thresholds)).toBe('none');
+  });
+
+  it('formats whole tokens for display', async () => {
+    const { formatTrench } = await import('./tier');
+    expect(formatTrench('1000000')).toBe('1,000,000 $TRENCH');
+    expect(formatTrench('off')).toBe('not set');
+  });
+});

@@ -6,6 +6,7 @@ import {
   latestBlockhash,
   simulateUnsigned,
   sendAndConfirm,
+  tokenBalance,
 } from '@trenchmart/chain';
 import { createApp } from './app';
 import { filesystemBlob } from './blob';
@@ -25,6 +26,9 @@ const app = createApp({
   getTx: (signature) => fetchTransaction(env.rpcUrl, signature),
   blockhash: () => latestBlockhash(env.rpcUrl),
   simulate: (tx) => simulateUnsigned(env.rpcUrl, tx),
+  trenchBalance: env.trenchMint
+    ? (wallet) => tokenBalance(env.rpcUrl, wallet, env.trenchMint as string)
+    : undefined,
   escrowChain: {
     account: (address) => accountData(env.rpcUrl, address),
     sendAndConfirm: (tx) => sendAndConfirm(env.rpcUrl, tx),

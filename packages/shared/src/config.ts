@@ -15,7 +15,9 @@ export type AppConfig = {
   fee_bps: number;
   tier_rebate_bps: Record<Tier, number>;
   tier_thresholds_raw: { scout: string; trencher: string; og: string };
+  /** Thresholds in base units (whole tokens × 10^trench_decimals), compared with balances. */
   tier_thresholds: TierThresholds;
+  trench_decimals: number;
   tier_window_hours: number;
   fee_split_bps: Record<'buyback' | 'ai_verification' | 'ops' | 'safety', number>;
   escrow_hours: number;
@@ -34,13 +36,15 @@ export type AppConfig = {
 
 /**
  * Proposed defaults. Handlers read the `config` table; this object is the
- * seed and the typed fallback when a key is missing. Tier thresholds stay
- * disabled ("[X]" / "[Y]" / "[Z]") until the owner sets real integers.
+ * seed and the typed fallback when a key is missing. Tier thresholds are whole
+ * $TRENCH (1B supply, 6 decimals): Scout 100k, Trencher 1M, OG 10M. A value that is
+ * not an integer string disables that tier.
  */
 export const DEFAULT_CONFIG_JSON = {
   fee_bps: 500,
   tier_rebate_bps: { none: 0, scout: 2500, trencher: 6000, og: 10000 },
-  tier_thresholds: { scout: '[X]', trencher: '[Y]', og: '[Z]' },
+  tier_thresholds: { scout: '100000', trencher: '1000000', og: '10000000' },
+  trench_decimals: 6,
   tier_window_hours: 72,
   fee_split_bps: { buyback: 4000, ai_verification: 2500, ops: 2000, safety: 1500 },
   escrow_hours: 48,
@@ -79,6 +83,13 @@ function big(v: unknown, fallback: bigint): bigint {
   }
 }
 
+/** Whole-token thresholds → base units, so they compare with on-chain balances. */
+export function toBaseUnits(t: TierThresholds, decimals: number): TierThresholds {
+  const scale = 10n ** BigInt(Math.max(0, Math.min(18, decimals)));
+  const scaled = (v: bigint | undefined) => (v === undefined ? undefined : v * scale);
+  return { scout: scaled(t.scout), trencher: scaled(t.trencher), og: scaled(t.og) };
+}
+
 export function parseAppConfig(
   rows: Record<string, unknown>,
   escrowHoursOverride?: string,
@@ -89,9 +100,7 @@ export function parseAppConfig(
     ...((rows.tier_rebate_bps as object) ?? {}),
   } as Record<Tier, number>;
   const thresholdsRaw = {
-    scout: '[X]',
-    trencher: '[Y]',
-    og: '[Z]',
+    ...d.tier_thresholds,
     ...((rows.tier_thresholds as object) ?? {}),
   };
   const split = {
@@ -117,6 +126,8 @@ export function parseAppConfig(
     if (Number.isFinite(n) && n >= 0) escrow = n;
   }
 
+  const decimals = Math.trunc(num(rows.trench_decimals, d.trench_decimals));
+
   const free = String(rows.verification_fee_free_from_tier ?? d.verification_fee_free_from_tier);
   const freeTier: Tier =
     free === 'scout' || free === 'trencher' || free === 'og' || free === 'none' ? free : 'trencher';
@@ -134,11 +145,15 @@ export function parseAppConfig(
       trencher: String(thresholdsRaw.trencher),
       og: String(thresholdsRaw.og),
     },
-    tier_thresholds: parseThresholds({
-      scout: thresholdsRaw.scout,
-      trencher: thresholdsRaw.trencher,
-      og: thresholdsRaw.og,
-    }),
+    tier_thresholds: toBaseUnits(
+      parseThresholds({
+        scout: thresholdsRaw.scout,
+        trencher: thresholdsRaw.trencher,
+        og: thresholdsRaw.og,
+      }),
+      decimals,
+    ),
+    trench_decimals: decimals,
     tier_window_hours: num(rows.tier_window_hours, d.tier_window_hours),
     fee_split_bps: {
       buyback: num(split.buyback, 4000),

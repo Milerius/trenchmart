@@ -21,7 +21,7 @@ A working POC on **Solana devnet** with:
 - A version's file is immutable once uploaded. A changed file is a new version and runs the whole pipeline again.
 - Write tests: unit tests for the scanner rules, fee math and tier math; integration tests for the order state machine. Use Vitest.
 - Use placeholder values from `.env.example`. Ask the owner for real keys; don't invent them.
-- Keep the design's copy. Stats marked `[X]`/`[PRICE]` etc. stay as placeholders until real data exists.
+- Keep the design's copy. Show stats only from real data; never render placeholder numbers.
 
 ## Deliver
 

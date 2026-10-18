@@ -76,8 +76,8 @@ export default function EscrowDocsPage() {
               rel="noreferrer"
             >
               {protocol.programId}
-            </a>
-            . The IDL is published on chain (Program Metadata, seed{' '}
+            </a>{' '}
+            (Solana devnet). The IDL is published on chain (Program Metadata, seed{' '}
             <span className="font-mono">idl</span>):{' '}
             <span className="font-mono text-ink">
               npx @solana-program/program-metadata fetch idl {protocol.programId} --rpc &lt;devnet

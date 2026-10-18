@@ -36,7 +36,7 @@ async function stubHome(page: Page) {
         json: {
           feeBps: 500,
           tierRebateBps: { none: 0, scout: 2500, trencher: 6000, og: 10000 },
-          tierThresholds: { scout: '[X]', trencher: '[Y]', og: '[Z]' },
+          tierThresholds: { scout: '100000', trencher: '1000000', og: '10000000' },
           feeSplitBps: { buyback: 4000, ai_verification: 2500, ops: 2000, safety: 1500 },
           escrowHours: 48,
           verificationFeeLamports: '0',
