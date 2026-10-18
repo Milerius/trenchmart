@@ -21,6 +21,7 @@ export const EDGE_RULES: Rule[] = [
   { pattern: /^\/api\/v1\/transparency$/, fresh: 60, stale: 300 },
   { pattern: /^\/api\/v1\/(categories|config\/public|stats|prices\/sol)$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/activity$/, fresh: 30, stale: 120 },
+  { pattern: /^\/api\/v1\/(featured|featuring\/config)$/, fresh: 60, stale: 300 },
   { pattern: /^\/api\/v1\/creators\/(top|[^/]+)$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/listings$/, fresh: 30, stale: 300 },
   {

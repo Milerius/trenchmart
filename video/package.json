@@ -12,7 +12,10 @@
     "render": "npm run render:square && npm run render:square:music-sfx && npm run render:wide && npm run render:wide:music-sfx",
     "stills": "tsx scripts/stills.ts",
     "tts": "audio/.venv/bin/python audio/tts.py",
-    "audio": "tsx audio/build.ts"
+    "audio": "tsx audio/build.ts",
+    "tts:launch": "sh -c 'audio/.venv/bin/python audio/tts.py src/launch/$0/vo.json audio/build/launch/$0/vo && audio/.venv/bin/python audio/captions.py src/launch/$0/vo.json audio/build/launch/$0/vo src/launch/$0/captions.json'",
+    "audio:launch": "tsx audio/launch/build.ts",
+    "render:launch": "tsx scripts/render-launch.ts"
   },
   "dependencies": {
     "@remotion/cli": "4.0.536",

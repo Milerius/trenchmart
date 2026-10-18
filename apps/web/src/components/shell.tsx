@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { NetworkBanner } from '@/components/ui';
-import { type ActivityEvent, activityText } from '@/components/activity';
+import { type ActivityEvent, activityText, type SponsoredChip } from '@/components/activity';
 import { api } from '@/lib/api';
 import { tierChip, usePublicConfig } from '@/lib/config';
 import { useWallet, WalletProvider } from '@/lib/wallet';
@@ -56,11 +56,14 @@ function Ticker() {
         })
         .catch(() => undefined);
     // Real marketplace events first; listing titles only while nothing has happened yet.
-    void api<{ events: ActivityEvent[] }>('/activity?limit=12')
+    void api<{ events: ActivityEvent[]; sponsored?: SponsoredChip[] }>('/activity?limit=12')
       .then((body) => {
         const events = Array.isArray(body?.events) ? body.events : [];
+        const sponsored = Array.isArray(body?.sponsored) ? body.sponsored : [];
         if (stop) return;
-        if (events.length) setItems([...events.map(activityText), ...TICKER_FACTS]);
+        const paid = sponsored.map((chip) => `FEATURED · SPONSORED · ${chip.listing.title}`);
+        if (events.length || paid.length)
+          setItems([...paid, ...events.map(activityText), ...TICKER_FACTS]);
         else void fromListings();
       })
       .catch(() => void fromListings());

@@ -200,6 +200,9 @@ export default function StudioPage() {
           <ButtonLink href="/studio/profile" variant="secondary">
             Edit profile
           </ButtonLink>
+          <ButtonLink href="/studio/featuring" variant="secondary">
+            Feature a listing
+          </ButtonLink>
           <ButtonLink href="/studio/api-keys" variant="secondary">
             API keys
           </ButtonLink>

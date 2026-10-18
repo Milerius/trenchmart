@@ -21,7 +21,7 @@ const range = (a: number, b: number, step: number) => {
 };
 
 /** Filtered noise that tracks the scan beam down the card. */
-const scanHum = (len: number): Float32Array => {
+export const scanHum = (len: number): Float32Array => {
   const r = rng(81);
   const out = mono(len);
   for (let i = 0; i < out.length; i++) {
