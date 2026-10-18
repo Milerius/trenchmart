@@ -25,7 +25,7 @@ export default function AgentReferencePage() {
       />
       <p className="mt-6 max-w-3xl text-[15px] text-ink-2">
         Base URL <Code>{API_BASE}</Code>. Request and response schemas:{' '}
-        <a className="text-accent" href={OPENAPI_URL}>
+        <a className="text-ink underline" href={OPENAPI_URL}>
           openapi.json
         </a>
         . Scope <Code>none</Code> means the route needs no key.

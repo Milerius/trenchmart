@@ -138,12 +138,12 @@ export default function SdkDocsPage() {
       </DocSection>
       <DocSection id="examples" title="Examples">
         <p>
-          <a className="text-accent" href={EXAMPLES_URL}>
+          <a className="text-ink underline" href={EXAMPLES_URL}>
             examples/
           </a>{' '}
           has a buyer agent and a seller agent that run against live devnet with a local keypair,
           and the CI job that runs both against a local validator. Protocol details:{' '}
-          <Link className="text-accent" href="/docs/agents">
+          <Link className="text-ink underline" href="/docs/agents">
             Agent API
           </Link>
           .

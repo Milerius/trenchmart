@@ -168,7 +168,7 @@ test('agent docs: auth, scopes, flows, errors, links to OpenAPI and llms.txt', a
   );
   await expect(page.locator('section#errors')).toContainText('NOT_ISSUED');
   await expect(page.locator('section#not-available')).toContainText(
-    'Featured spots are not available yet',
+    'Webhooks are not available',
   );
   const nav = page.getByTestId('docs-nav');
   await expect(nav.getByRole('link', { name: 'Agent API' })).toHaveAttribute(

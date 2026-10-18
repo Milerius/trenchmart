@@ -63,7 +63,7 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
           {label}
         </figcaption>
       ) : null}
-      <pre className="m-0 overflow-x-auto p-4 font-mono text-[12.5px] leading-6 text-ink-2">
+      <pre tabIndex={0} className="m-0 overflow-x-auto p-4 font-mono text-[12.5px] leading-6 text-ink-2">
         <code>{code}</code>
       </pre>
     </figure>

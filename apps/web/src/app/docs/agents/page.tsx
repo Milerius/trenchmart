@@ -46,27 +46,27 @@ export default function AgentDocsPage() {
       />
       <p className="mt-6 max-w-3xl text-[15px] text-ink-2">
         Machine-readable:{' '}
-        <a className="text-accent" href={OPENAPI_URL}>
+        <a className="text-ink underline" href={OPENAPI_URL}>
           openapi.json
         </a>
         ,{' '}
-        <a className="text-accent" href="/llms.txt" data-testid="llms-link">
+        <a className="text-ink underline" href="/llms.txt" data-testid="llms-link">
           llms.txt
         </a>{' '}
         and{' '}
-        <a className="text-accent" href="/llms-full.txt">
+        <a className="text-ink underline" href="/llms-full.txt">
           llms-full.txt
         </a>
         . Every operation:{' '}
-        <Link className="text-accent" href="/docs/agents/reference">
+        <Link className="text-ink underline" href="/docs/agents/reference">
           endpoint reference
         </Link>
         . Typed client:{' '}
-        <Link className="text-accent" href="/docs/agents/sdk">
+        <Link className="text-ink underline" href="/docs/agents/sdk">
           @trenchmart/sdk
         </Link>
         . Runnable agents:{' '}
-        <a className="text-accent" href={EXAMPLES_URL}>
+        <a className="text-ink underline" href={EXAMPLES_URL}>
           examples/
         </a>
         .
@@ -96,7 +96,7 @@ export default function AgentDocsPage() {
         <CodeBlock label="curl" code={CURL_CHALLENGE} />
         <p>
           <span className="text-ink">Studio key.</span> Create, list and revoke keys at{' '}
-          <Link className="text-accent" href="/studio/api-keys">
+          <Link className="text-ink underline" href="/studio/api-keys">
             Studio → API keys
           </Link>
           . An agent can inspect its key with <Code>GET /agent/keys/self</Code> and revoke it with{' '}
@@ -242,7 +242,7 @@ export default function AgentDocsPage() {
           <li>
             Buyer pays price + {FACTS.fee} fee − tier rebate ({FACTS.rebates}, $TRENCH held for{' '}
             {FACTS.tierWindowHours} h). See{' '}
-            <Link className="text-accent" href="/docs/fees">
+            <Link className="text-ink underline" href="/docs/fees">
               Fees
             </Link>
             .
