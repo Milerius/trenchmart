@@ -69,6 +69,20 @@ Critical. A database query in the ops check failed.
 3. Checkout and releases need the DB. If the outage lasts, turn on the kill switch: set `CHECKOUT_PAUSED=1` as a Worker var and deploy, or set `checkout_paused` in the config table if the DB answers intermittently.
 4. Funds are safe while the DB is down: they sit in escrow PDAs, and buyers can always call `refund_after_timeout` on chain.
 
+### SCHEMA_BEHIND
+
+Critical. The deployed API expects a migration that production has not applied, so every query
+touching the new tables or columns fails (API answers `503 SCHEMA_BEHIND`; Workers Logs show
+`PostgresError: column ... does not exist`). Happened on 2026-10-18: `0020_reviews.sql` and
+`0021_upvotes_ranking.sql` shipped with #54/#57 but were never applied, and `/studio` broke for
+every creator.
+
+1. Read the alert: it names the missing files (the release's `MIGRATIONS` list minus `schema_migrations`).
+2. Apply them: `pnpm db:migrate` with the production `DATABASE_URL` (or run each file and its
+   `insert into schema_migrations` in one query through the Supabase SQL API). Every migration is
+   idempotent (`if not exists`).
+3. Always migrate before `wrangler deploy` when a PR adds a file under `packages/db/migrations`.
+
 ### R2_ERROR
 
 Critical. The file storage probe (write, read, delete `ops/probe`) failed, or API requests hit storage errors.
