@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Sql } from './client';
+import { RENAMED_MIGRATIONS } from './migrations-list';
 
 export async function migrate(sql: Sql): Promise<string[]> {
   await sql`
@@ -10,6 +11,12 @@ export async function migrate(sql: Sql): Promise<string[]> {
       applied_at timestamptz not null default now()
     )
   `;
+  for (const [to, from] of Object.entries(RENAMED_MIGRATIONS)) {
+    await sql`
+      update schema_migrations set id = ${to} where id = ${from}
+        and not exists (select 1 from schema_migrations where id = ${to})
+    `;
+  }
   const dir = join(dirname(fileURLToPath(import.meta.url)), '../migrations');
   const files = (await readdir(dir)).filter((file) => file.endsWith('.sql')).sort();
   const applied: string[] = [];
@@ -17,10 +24,7 @@ export async function migrate(sql: Sql): Promise<string[]> {
     const existing = await sql`select id from schema_migrations where id = ${file}`;
     if (existing.length > 0) continue;
     const body = await readFile(join(dir, file), 'utf8');
-    const statements = body
-      .split(/;\s*\n/)
-      .map((part) => part.trim())
-      .filter((part) => part.replace(/--.*$/gm, '').trim().length > 0);
+    const statements = splitStatements(body);
     for (const statement of statements) {
       await sql.unsafe(statement);
     }
@@ -29,6 +33,14 @@ export async function migrate(sql: Sql): Promise<string[]> {
   }
   await enableRowLevelSecurity(sql);
   return applied;
+}
+
+/** Statements of a migration file (split on `;` at a line end, comment-only parts dropped). */
+export function splitStatements(body: string): string[] {
+  return body
+    .split(/;\s*\n/)
+    .map((part) => part.trim())
+    .filter((part) => part.replace(/--.*$/gm, '').trim().length > 0);
 }
 
 // Supabase exposes the public schema through PostgREST, where the anon key can read and

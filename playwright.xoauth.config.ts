@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Full X OAuth browser flow against the real API and the real web /api/v1 proxy, with X's
+// Real-API browser flows (X OAuth, studio overview) through the real web /api/v1 proxy, with X's
 // API mocked (e2e/x-oauth/mock-x.mjs) and X's authorize page stubbed in the browser.
 // Needs Postgres (DATABASE_URL). Run: pnpm exec playwright test -c playwright.xoauth.config.ts
 

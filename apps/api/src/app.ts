@@ -1,3 +1,4 @@
+import { pendingMigrations } from '@trenchmart/db';
 import { deliverAlerts, notify, opsAlertRows, opsCheck, opsStatus, recordOpsEvent } from './ops';
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
@@ -142,6 +143,12 @@ async function bodyOf<T>(schema: z.ZodType<T>, raw: unknown): Promise<T> {
   return parsed.data;
 }
 
+/** Postgres undefined_column (42703) or undefined_table (42P01): the schema is behind the code. */
+export function isSchemaMismatch(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === '42703' || code === '42P01';
+}
+
 function requireUser(c: { get: (key: 'user') => Record<string, any> | null }): Record<string, any> {
   const user = c.get('user');
   if (!user) throw new HttpError(401, 'UNAUTHORIZED', 'sign in required');
@@ -203,6 +210,23 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     }
     console.error(err);
     void recordErrorEvent(c.req.path, err);
+    if (isSchemaMismatch(err)) {
+      // undefined_column / undefined_table: this release needs a migration the DB lacks.
+      console.error(
+        'ALERT',
+        JSON.stringify({
+          level: 'critical',
+          code: 'SCHEMA_BEHIND',
+          message: `${c.req.path}: ${(err as Error).message}`,
+        }),
+      );
+      return c.json(
+        {
+          error: { code: 'SCHEMA_BEHIND', message: 'Service is being updated, try again shortly' },
+        },
+        503,
+      );
+    }
     return c.json({ error: { code: 'INTERNAL', message: 'Internal error' } }, 500);
   });
   // Security headers on every API response (mainnet readiness #11).
@@ -268,7 +292,15 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   const api = new Hono<{ Variables: Vars }>();
-  api.get('/health', (c) => c.json({ ok: true, cluster: deps.env.cluster }));
+  // Also the release-vs-schema check: a Worker deployed ahead of its migrations answers 503
+  // here, so the health-check workflow and the watchdog alert. One tiny read of
+  // schema_migrations (Hyperdrive caches it); a DB outage is DB_ERROR in the ops check instead.
+  api.get('/health', async (c) => {
+    const pending = await pendingMigrations(deps.sql).catch(() => [] as string[]);
+    if (pending.length > 0)
+      return c.json({ ok: false, cluster: deps.env.cluster, code: 'SCHEMA_BEHIND', pending }, 503);
+    return c.json({ ok: true, cluster: deps.env.cluster });
+  });
 
   api.post('/tx/send', async (c) => {
     requireUser(c);
