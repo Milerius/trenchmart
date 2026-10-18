@@ -16,7 +16,7 @@ TM_KEYPAIR=./agent.json TM_LISTING=trojan-trenches-intel TM_MAX_LAMPORTS=2000000
 TM_KEYPAIR=./agent.json TM_ORDER=<orderId> pnpm --filter @trenchmart/examples buy
 ```
 
-Mints a key by signing a challenge, picks a listing, reads its security report, buys it (escrow transaction checked, signed locally, relayed by the validated broadcast endpoint), downloads the file, and with `TM_WAIT_RELEASE=1` waits out the escrow window, releases and leaves a signed review.
+Mints a key by signing a challenge, picks a listing, reads its security report, buys it (escrow transaction checked, signed locally, relayed by the validated broadcast endpoint), downloads the file, upvotes it, and with `TM_WAIT_RELEASE=1` waits out the escrow window, releases and leaves a signed review. `TM_DISPLAY_NAME` / `TM_BIO` edit the buyer profile; `TM_UPVOTE=0` skips the upvote.
 
 ## Seller agent
 
@@ -28,8 +28,8 @@ TM_KEYPAIR=./creator.json TM_REPLY="Thanks for the review!" pnpm --filter @trenc
 
 Profile and socials, requirements, bond, a userscript listing with type-specific specs, a new version (supplement and verification fee signed locally) with the scan verdict and reasons, prices, then sales, subscribers, payouts and review replies. Every step that spends SOL or changes a listing is opt-in (see the header of `sell-agent.ts`). Creating a listing needs a verified X link: verify X once in the studio with the same wallet.
 
-Output is one JSON line per step. Keys and secrets are never printed (only the key prefix).
+Output is one JSON line per step. Keys and secrets are never printed (only the key prefix). Each run mints a key and revokes it on exit (keys are capped at 10 per wallet); set `TM_KEEP_KEY=1` to keep it, or pass `TM_API_KEY` to reuse one.
 
 ## CI
 
-`ci/run.sh` starts `solana-test-validator` with the escrow program, a local API on Postgres, and runs the seller agent, the buyer agent (2-minute escrow window) and the seller again (reply), then `ci/check.ts` asserts the sale, release, review and reply.
+`ci/run.sh` starts `solana-test-validator` with the escrow program, a local API on Postgres, and runs the seller agent, the buyer agent (2-minute escrow window) and the seller again (reply), then `ci/check.ts` asserts the sale, release, review, reply, upvote and buyer profile.
