@@ -21,4 +21,5 @@ jobs:
       - name: ops check (stuck releases, hot-wallet balances, disputes)
         env:
           TOKEN: ${{ secrets.TM_INTERNAL_TOKEN }}
-        run: curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" https://api.trenchmart.fun/api/v1/internal/ops
+        run: |
+          curl -fsS --max-time 30 -H "Authorization: Bearer $TOKEN" https://api.trenchmart.fun/api/v1/internal/ops
