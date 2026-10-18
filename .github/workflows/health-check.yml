@@ -1,16 +1,14 @@
-# Every 10 minutes: public API health, the web app, and the internal ops check.
-# Alerts go to the owner's chat, not email: the run reports its result to
-# POST /internal/ops/report (check "health-check"), and the ops check raises
-# HEALTH_CHECK_FAILED (critical on a failed probe, warn when no report came for 40 min),
-# which /internal/ops/alerts serves to the alert relay. The ops check's own alerts are
-# already in that feed. So a failed probe does not fail this run (a failed scheduled run
-# emails the repo owner). If the API itself is down the report cannot land; the relay sees
-# /internal/ops/alerts unreachable, and the staleness warning follows once it is back.
+# Manual / backup run: public API health, the web app, and the internal ops check.
+# The primary health check is the trenchmart-watchdog Worker's Cloudflare cron (every 5 min,
+# apps/api/src/watchdog.ts): GitHub's every-10-min schedule fired once in its first hours,
+# so the schedule was removed. This run reports to POST /internal/ops/report with source
+# "github": a failure still raises HEALTH_CHECK_FAILED (critical), but staleness (warn after
+# 20 min) only follows the watchdog's reports, so not running this never alerts.
+# Alerts go to the owner's chat (/internal/ops/alerts), never email; a failed probe does not
+# fail this run.
 # Needs repo secret TM_INTERNAL_TOKEN (= API INTERNAL_TOKEN).
 name: health-check
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   workflow_dispatch:
 permissions: {}
 jobs:
@@ -45,7 +43,7 @@ jobs:
           if [[ -z "${TOKEN:-}" ]]; then
             echo "::warning::TM_INTERNAL_TOKEN missing; cannot report to the ops alerts feed"; exit 0
           fi
-          payload="$(jq -nc --argjson ok "$ok" --arg detail "$detail" '{check: "health-check", ok: $ok, detail: $detail}')"
+          payload="$(jq -nc --argjson ok "$ok" --arg detail "$detail" '{check: "health-check", source: "github", ok: $ok, detail: $detail}')"
           curl -fsS --max-time 20 -o /dev/null -X POST "$API/internal/ops/report" \
             -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' --data "$payload" &&
             echo "reported" || echo "::warning::report to the ops alerts feed failed"

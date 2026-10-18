@@ -1842,7 +1842,13 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   // Scheduled GitHub workflows (health-check, db-backup) report their result here instead of
   // failing the run; the ops check turns a failure or silence into an alert.
   api.post('/internal/ops/report', async (c) => {
-    assertInternal(c, deps.env);
+    // INTERNAL_TOKEN may report any check. The watchdog Worker's STATUS_PUSH_TOKEN (which
+    // otherwise only pushes status probes) may report health-check, always as 'watchdog'.
+    const token = (c.req.header('authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const asWatchdog = Boolean(
+      deps.env.statusPushToken && safeEqual(token, deps.env.statusPushToken),
+    );
+    if (!asWatchdog) assertInternal(c, deps.env);
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     if (typeof raw.check !== 'string' || !(raw.check in SCHEDULED_CHECKS))
       throw new HttpError(
@@ -1850,10 +1856,22 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         'BAD_CHECK',
         `check must be one of ${Object.keys(SCHEDULED_CHECKS).join(', ')}`,
       );
+    if (asWatchdog && raw.check !== 'health-check')
+      throw new HttpError(403, 'FORBIDDEN', 'the status push token may only report health-check');
     if (typeof raw.ok !== 'boolean') throw new HttpError(400, 'BAD_OK', 'ok must be a boolean');
     const detail = typeof raw.detail === 'string' ? raw.detail.slice(0, 300) : '';
-    await recordScheduledReport(deps, { check: raw.check as ScheduledCheck, ok: raw.ok, detail });
-    return c.json({ ok: true });
+    const source = asWatchdog
+      ? 'watchdog'
+      : typeof raw.source === 'string' && /^[a-z-]{1,20}$/.test(raw.source)
+        ? raw.source
+        : 'github';
+    await recordScheduledReport(deps, {
+      check: raw.check as ScheduledCheck,
+      ok: raw.ok,
+      detail,
+      source,
+    });
+    return c.json({ ok: true, source });
   });
 
   // Runs the check and delivers notices like the cron does (used to verify alerting).

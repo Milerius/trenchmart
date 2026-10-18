@@ -6,6 +6,9 @@
 // Each cron tick also pushes the checks (name, ok, ms; never the detail text) to the API's
 // POST /api/v1/internal/status/external for the public status page (status.ts), authenticated
 // with STATUS_PUSH_TOKEN (a Worker secret that can do nothing else). Unset = no push.
+// Each tick also reports the health check (web and API up) to POST /api/v1/internal/ops/report
+// as check "health-check" with the same token, which the API only accepts for that check. The
+// ops check raises HEALTH_CHECK_FAILED on a failure, or when these reports stop for 20 min.
 // Failures are logged as `ALERT {...}` in Workers Logs; there is no ntfy/email/Telegram push.
 
 export type WatchdogEnv = {
@@ -97,10 +100,47 @@ export async function pushStatus(
   }
 }
 
+/**
+ * Reports the health check (web + API; RPC has its own RPC_DOWN alert in the API) to the ops
+ * alerts feed. Never throws. When the API is down the report cannot land; the assistant then
+ * sees /internal/ops/alerts unreachable and this Worker's GET / failing.
+ */
+export async function reportHealth(
+  env: WatchdogEnv,
+  checks: Check[],
+  f: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!env.STATUS_PUSH_TOKEN) return false;
+  const failing = checks.filter((c) => c.name !== 'rpc' && !c.ok);
+  const body = {
+    check: 'health-check',
+    source: 'watchdog',
+    ok: failing.length === 0,
+    detail: failing.length
+      ? failing.map((c) => `${c.name}: ${c.detail}`).join('; ')
+      : 'web, api ok (watchdog)',
+  };
+  try {
+    const res = await timed(f, `${env.API_URL}/api/v1/internal/ops/report`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${env.STATUS_PUSH_TOKEN}`,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) console.error('HEALTH_REPORT', res.status);
+    return res.ok;
+  } catch (err) {
+    console.error('HEALTH_REPORT', (err as Error).message);
+    return false;
+  }
+}
+
 /** Log failing checks; delivery is via the assistant poller, not push. */
 export async function watchdog(env: WatchdogEnv, f: typeof fetch = fetch): Promise<string[]> {
   const checks = await runChecks(env, f);
-  await pushStatus(env, checks, f);
+  await Promise.all([pushStatus(env, checks, f), reportHealth(env, checks, f)]);
   const logged: string[] = [];
   for (const c of checks) {
     if (c.ok) continue;

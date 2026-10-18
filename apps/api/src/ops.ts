@@ -49,8 +49,12 @@ export const OPS_THRESHOLDS = {
   renotifyMs: 6 * 3_600_000,
   /** Hyperdrive origin_connection_limit must stay below the Supabase pooler's pool_size (15). */
   hyperdriveMaxOrigin: 10,
-  /** The hourly hyperdrive-limit workflow reports in; silence this long means it broke. */
-  hyperdriveReportStaleMs: 3 * 3_600_000,
+  /**
+   * Reports come from deploys and a best-effort hourly GitHub schedule (which fired 0 times
+   * in its first 2 h). The Worker cannot read the Hyperdrive config itself (no Cloudflare
+   * API token), and DB_POOL_FULL is the real-time signal, so warn only after a full day.
+   */
+  hyperdriveReportStaleMs: 24 * 3_600_000,
 };
 
 export type OpsEventKind =
@@ -64,29 +68,55 @@ export type OpsEventKind =
 export type HyperdriveReport = { limit: number | null; source: string; error?: string };
 
 /**
- * Scheduled GitHub workflows report here instead of failing (a failed scheduled run emails
- * the owner; alerts belong in the assistant chat via /internal/ops/alerts). Each check has
- * the alert it raises when it reports a failure, and when it stops reporting. Nothing is
- * raised before a check's first report (local dev, tests).
+ * Scheduled checks report here instead of failing a GitHub run (a failed scheduled run
+ * emails the owner; alerts belong in the assistant chat via /internal/ops/alerts). Each
+ * check raises its alert when the latest report (any source) is a failure, and a warning
+ * when its primary source goes quiet for `staleMs`. Other sources (a manual GitHub run)
+ * count for ok/failed but never start or stop the staleness clock. Nothing is raised
+ * before the primary source's first report (local dev, tests).
+ * - health-check: the watchdog Worker's Cloudflare cron, every 5 min (GitHub's every-10-min
+ *   schedule fired once in its first 1.5 h). 20 min = four missed ticks.
+ * - db-backup: a daily GitHub schedule, which runs late or not at all on a quiet repo;
+ *   50 h tolerates one missed night.
  */
 export const SCHEDULED_CHECKS = {
-  'health-check': { code: 'HEALTH_CHECK_FAILED', level: 'critical', staleMs: 40 * 60_000 },
-  'db-backup': { code: 'BACKUP_FAILED', level: 'warn', staleMs: 26 * 3_600_000 },
-} as const satisfies Record<string, { code: string; level: OpsLevel; staleMs: number }>;
+  'health-check': {
+    code: 'HEALTH_CHECK_FAILED',
+    level: 'critical',
+    staleMs: 20 * 60_000,
+    primary: 'watchdog',
+  },
+  'db-backup': { code: 'BACKUP_FAILED', level: 'warn', staleMs: 50 * 3_600_000, primary: 'github' },
+} as const satisfies Record<
+  string,
+  { code: string; level: OpsLevel; staleMs: number; primary: string }
+>;
 export type ScheduledCheck = keyof typeof SCHEDULED_CHECKS;
-export type ScheduledReport = { check: ScheduledCheck; ok: boolean; detail: string };
+export type ScheduledReport = {
+  check: ScheduledCheck;
+  ok: boolean;
+  detail: string;
+  /** 'watchdog' (Cloudflare cron) or 'github' (scheduled or manual workflow run). */
+  source?: string;
+};
 
-export async function recordScheduledReport(deps: Pick<Deps, 'sql'>, report: ScheduledReport) {
+export async function recordScheduledReport(
+  deps: Pick<Deps, 'sql' | 'now'>,
+  report: ScheduledReport,
+) {
   await deps.sql`
-    insert into ops_events (kind, detail)
-    values ('scheduled_check', ${JSON.stringify(report).slice(0, 500)})
+    insert into ops_events (kind, detail, created_at)
+    values ('scheduled_check', ${JSON.stringify(report).slice(0, 500)}, ${deps.now()})
   `;
 }
 
-export async function recordHyperdriveReport(deps: Pick<Deps, 'sql'>, report: HyperdriveReport) {
+export async function recordHyperdriveReport(
+  deps: Pick<Deps, 'sql' | 'now'>,
+  report: HyperdriveReport,
+) {
   await deps.sql`
-    insert into ops_events (kind, detail)
-    values ('hyperdrive_limit', ${JSON.stringify(report).slice(0, 500)})
+    insert into ops_events (kind, detail, created_at)
+    values ('hyperdrive_limit', ${JSON.stringify(report).slice(0, 500)}, ${deps.now()})
   `;
 }
 
@@ -293,7 +323,7 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
       );
     const [hd] = await deps.sql<{ detail: string; created_at: Date }[]>`
       select detail, created_at from ops_events where kind = 'hyperdrive_limit'
-      order by created_at desc limit 1
+      order by created_at desc, id desc limit 1
     `;
     if (hd) {
       let report: Partial<HyperdriveReport> = {};
@@ -320,31 +350,51 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
         add(
           'warn',
           'HYPERDRIVE_LIMIT',
-          `No Hyperdrive limit report for ${Math.round(age / 3_600_000)} h; the hourly hyperdrive-limit workflow may be failing`,
+          `No Hyperdrive limit report for ${Math.round(age / 3_600_000)} h; no deploy or hyperdrive-limit run reported it (redeploy, or run the workflow by hand)`,
         );
     }
-    const reports = await deps.sql<{ detail: string; created_at: Date }[]>`
-      select distinct on (detail::jsonb ->> 'check') detail, created_at from ops_events
+    // Latest report per (check, source); reports from before `source` existed are GitHub's.
+    const reports = await deps.sql<{ id: string; detail: string; created_at: Date }[]>`
+      select distinct on (detail::jsonb ->> 'check', coalesce(detail::jsonb ->> 'source', 'github'))
+        id, detail, created_at
+      from ops_events
       where kind = 'scheduled_check' and detail like '{%'
-      order by detail::jsonb ->> 'check', created_at desc
+      order by detail::jsonb ->> 'check', coalesce(detail::jsonb ->> 'source', 'github'), created_at desc, id desc
     `;
+    const byCheck = new Map<
+      ScheduledCheck,
+      { latest?: [ScheduledReport, Date, bigint]; primary?: Date }
+    >();
     for (const row of reports) {
-      let report: Partial<ScheduledReport> = {};
+      let report: ScheduledReport;
       try {
         report = JSON.parse(row.detail) as ScheduledReport;
       } catch {
         continue;
       }
-      const spec = SCHEDULED_CHECKS[report.check as ScheduledCheck];
+      const spec = SCHEDULED_CHECKS[report.check];
       if (!spec) continue;
-      const age = now.getTime() - new Date(row.created_at).getTime();
-      if (report.ok === false)
-        add(spec.level, spec.code, `${report.check} failed: ${report.detail || 'no detail'}`);
-      else if (age > spec.staleMs)
+      const at = new Date(row.created_at);
+      const entry = byCheck.get(report.check) ?? {};
+      const id = BigInt(row.id);
+      if (
+        !entry.latest ||
+        at > entry.latest[1] ||
+        (at.getTime() === entry.latest[1].getTime() && id > entry.latest[2])
+      )
+        entry.latest = [report, at, id];
+      if ((report.source ?? 'github') === spec.primary) entry.primary = at;
+      byCheck.set(report.check, entry);
+    }
+    for (const [check, { latest, primary }] of byCheck) {
+      const spec = SCHEDULED_CHECKS[check];
+      if (latest && latest[0].ok === false)
+        add(spec.level, spec.code, `${check} failed: ${latest[0].detail || 'no detail'}`);
+      else if (primary && now.getTime() - primary.getTime() > spec.staleMs)
         add(
           'warn',
           spec.code,
-          `${report.check} has not reported for ${Math.round(age / 60_000)} min; the scheduled workflow may not be running`,
+          `${check} has not reported from ${spec.primary} for ${Math.round((now.getTime() - primary.getTime()) / 60_000)} min; its ${spec.primary === 'watchdog' ? 'watchdog Worker cron' : 'scheduled workflow'} may not be running`,
         );
     }
     const errors = await count(deps, '5xx', since);

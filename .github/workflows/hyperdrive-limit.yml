@@ -1,11 +1,14 @@
-# Hourly: the Hyperdrive config must open fewer origin connections than the Supabase session
+# Hourly (best effort): the Hyperdrive config must open fewer origin connections than the Supabase session
 # pooler accepts (pool_size 15). At 20, bursts failed with EMAXCONNSESSION and CI migrations
 # could not connect (2026-10-18). scripts/deploy-api.sh sets 10 on every deploy; this catches
 # a change made anywhere else.
 # Alerts go to the owner's chat, not email: the run reports what it read to the API
 # (POST /internal/ops/hyperdrive), and the ops check raises HYPERDRIVE_LIMIT (critical above
-# 10, warn when unreadable or when no report arrived for 3 h), which /internal/ops/alerts
+# 10, warn when unreadable or when no report arrived for 24 h), which /internal/ops/alerts
 # serves to the alert relay. So drift does not fail this run (a failed scheduled run emails).
+# GitHub's schedule is unreliable here (no scheduled run in its first hours), so every API
+# deploy also reports the limit and the staleness window is 24 h. A Worker cron cannot read
+# the config (needs a Cloudflare API token); DB_POOL_FULL is the real-time pool signal.
 # Secrets (repo): CLOUDFLARE_API_TOKEN (Hyperdrive read), CLOUDFLARE_ACCOUNT_ID,
 # TM_INTERNAL_TOKEN (the API's INTERNAL_TOKEN).
 name: hyperdrive-limit
