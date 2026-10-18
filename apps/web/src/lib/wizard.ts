@@ -20,12 +20,13 @@ export const STEPS = [
 ] as const;
 export const STEP_COUNT = STEPS.length;
 
+/** Each terminal's own logo, taken from its site's favicon and served from /public (never hotlinked). */
 export const TERMINAL_TILES = [
-  { name: 'Axiom', host: 'axiom.trade' },
-  { name: 'GMGN', host: 'gmgn.ai' },
-  { name: 'Photon', host: 'photon-sol.tinyastro.io' },
-  { name: 'Terminal', host: 'trade.padre.gg' },
-  { name: 'Trojan', host: 'trojan.com' },
+  { name: 'Axiom', host: 'axiom.trade', logo: '/terminals/axiom.svg' },
+  { name: 'GMGN', host: 'gmgn.ai', logo: '/terminals/gmgn.png' },
+  { name: 'Photon', host: 'photon-sol.tinyastro.io', logo: '/terminals/photon.png' },
+  { name: 'Terminal', host: 'trade.padre.gg', logo: '/terminals/terminal.svg' },
+  { name: 'Trojan', host: 'trojan.com', logo: '/terminals/trojan.png' },
 ] as const;
 
 export const DEFAULT_SPECS: ListingSpecs = {
