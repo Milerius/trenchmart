@@ -129,7 +129,7 @@ export function TierCards({
             {top ? (
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-accent/25 blur-3xl"
+                className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-accent/15 blur-3xl"
               />
             ) : null}
             <span className="relative flex items-center justify-between gap-2">
@@ -141,7 +141,7 @@ export function TierCards({
                   </Tag>
                 ) : null}
               </h3>
-              <span className="font-mono text-xs text-faint">
+              <span className={`font-mono text-xs ${top ? 'text-ink' : 'text-faint'}`}>
                 {tier === 'none' ? 'any wallet' : compactHold(holds[tier])}
               </span>
             </span>
