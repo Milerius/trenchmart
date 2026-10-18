@@ -105,6 +105,14 @@ export type Deps = {
   opsFetch?: typeof fetch;
   /** On-chain $TRENCH balance of a wallet in base units. Optional: tiers fall back to stored rows. */
   trenchBalance?: (wallet: string) => Promise<bigint>;
+  /**
+   * Anti-sybil chain read (social.ts): the wallet's oldest activity and who sent it SOL
+   * since `sinceMs`. Optional: without it, wallets count by TrenchMart account age only.
+   */
+  walletHistory?: (
+    wallet: string,
+    sinceMs: number,
+  ) => Promise<{ oldestAt: Date | null; funders: { wallet: string; at: string }[] }>;
 };
 
 /** How often a quote may re-read a wallet's on-chain balance. */

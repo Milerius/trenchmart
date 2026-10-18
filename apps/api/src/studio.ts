@@ -65,7 +65,7 @@ export async function studioOverview(deps: Deps, user: Row) {
 
   const ratings = await deps.sql<Row[]>`
     select r.rating, count(*)::int as n from listing_reviews r join listings l on l.id = r.listing_id
-    where l.creator_id = ${creatorId} group by r.rating
+    where l.creator_id = ${creatorId} and r.hidden_at is null group by r.rating
   `;
   const distribution = [5, 4, 3, 2, 1].map(
     (stars) => ratings.find((r) => r.rating === stars)?.n ?? 0,
@@ -102,8 +102,8 @@ export async function studioOverview(deps: Deps, user: Row) {
         and o.paid_at > ${new Date(now.getTime() - 7 * DAY_MS)}) as sales_7d,
       (select count(distinct r.order_id)::int from update_renewals r join orders o on o.id = r.order_id
         where o.listing_id = l.id and r.status = 'paid' and r.ends_at > ${now}) as subscribers,
-      (select count(*)::int from listing_reviews r where r.listing_id = l.id) as rating_count,
-      (select avg(r.rating)::float from listing_reviews r where r.listing_id = l.id) as rating_avg
+      (select count(*)::int from listing_reviews r where r.listing_id = l.id and r.hidden_at is null) as rating_count,
+      (select avg(r.rating)::float from listing_reviews r where r.listing_id = l.id and r.hidden_at is null) as rating_avg
     from listings l
     left join versions lv on lv.id = l.live_version_id
     left join listing_content c on c.listing_id = l.id

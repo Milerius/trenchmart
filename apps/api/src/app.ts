@@ -33,7 +33,6 @@ import {
   quoteBody,
   reportBody,
   resolveDisputeBody,
-  reviewBody,
   roleBody,
   submittedBody,
   verifyBody,
@@ -78,6 +77,8 @@ import {
   uploadProfileImage,
 } from './profile';
 import { studioOverview } from './studio';
+import { registerReviewRoutes } from './reviews';
+import { scanWalletIntel } from './social';
 import {
   activeBond,
   applyPayment,
@@ -580,14 +581,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json(jsonSafe(rows));
   });
 
-  api.get('/listings/:slug/reviews', async (c) => {
-    const rows = await deps.sql<Record<string, any>[]>`
-      select r.rating, r.body, r.created_at from listing_reviews r
-      join listings l on l.id = r.listing_id where l.slug = ${c.req.param('slug')}
-      order by r.created_at desc limit 20
-    `;
-    return c.json(jsonSafe(rows));
-  });
+  // Reviews, creator replies, helpful votes, reports, moderation (reviews.ts).
+  registerReviewRoutes(api, deps);
 
   api.get('/creators/top', async (c) => {
     const rows = await deps.sql<Record<string, any>[]>`
@@ -836,25 +831,6 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (!result.ok) throw new HttpError(400, result.code, result.message);
     const order = await ownOrder(deps, c.req.param('id'), user.id as string);
     return c.json(jsonSafe({ ok: true, updatesUntil: order.updates_until }));
-  });
-
-  api.post('/orders/:id/review', async (c) => {
-    const user = requireUser(c);
-    const body = await bodyOf(reviewBody, await c.req.json());
-    const order = await ownOrder(deps, c.req.param('id'), user.id as string);
-    if (!['paid', 'released'].includes(order.status as string))
-      throw new HttpError(400, 'UNPAID', 'review after purchase');
-    await deps.sql`
-      insert into listing_reviews (order_id, listing_id, rating, body)
-      values (${order.id}, ${order.listing_id}, ${body.rating}, ${body.body})
-    `;
-    await deps.sql`
-      update listings set
-        rating_count = (select count(*) from listing_reviews where listing_id = ${order.listing_id}),
-        rating_avg = (select round(avg(rating), 2) from listing_reviews where listing_id = ${order.listing_id})
-      where id = ${order.listing_id}
-    `;
-    return c.json({ ok: true });
   });
 
   api.post('/orders/:id/dispute', async (c) => {
@@ -1614,6 +1590,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (job === 'release') return c.json({ released: await releaseOrders(deps) });
     if (job === 'payouts') return c.json({ batch: await proposePayouts(deps) });
     if (job === 'ledger') return c.json(jsonSafe({ vault: await ledgerVault(deps.sql) }));
+    if (job === 'wallet-intel') return c.json({ scanned: await scanWalletIntel(deps) });
     if (job === 'optimize-media') return c.json({ optimized: await optimizeStoredImages(deps) });
     throw new HttpError(404, 'NOT_FOUND', 'unknown job');
   });
