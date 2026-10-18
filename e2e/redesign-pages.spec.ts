@@ -3,7 +3,10 @@ import { expect, test } from '@playwright/test';
 // Redesign phase 10+: pages that use the prototype's full-width PageHero. The hero spans the
 // viewport on desktop, the title uses the large display size, and phones never scroll sideways.
 
-const PAGES: [path: string, title: string][] = [['/creators', 'Creator leaderboard']];
+const PAGES: [path: string, title: string][] = [
+  ['/creators', 'Creator leaderboard'],
+  ['/token', 'Fees fund the token. The token cuts your fees.'],
+];
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/**', (route) =>
@@ -31,3 +34,16 @@ for (const [path, title] of PAGES) {
     expect(width).toBeLessThanOrEqual(390);
   });
 }
+
+test('/token: tier cards, calculator tier radios and the fee split', async ({ page }) => {
+  await page.goto('/token');
+  await expect(page.getByTestId('tier-card')).toHaveCount(4);
+  const calc = page.getByTestId('savings-calculator');
+  const og = calc.getByRole('radio', { name: 'OG' });
+  await og.click();
+  await expect(og).toHaveAttribute('aria-checked', 'true');
+  await calc.getByRole('textbox').fill('abc');
+  await expect(calc.getByText('Enter a SOL amount with up to 9 decimals.')).toBeVisible();
+  await expect(page.getByTestId('fee-split')).toHaveCount(4);
+  await expect(page.locator('[data-fx="gradient-text"]')).toHaveCount(0);
+});

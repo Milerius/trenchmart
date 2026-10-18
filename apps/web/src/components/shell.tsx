@@ -360,7 +360,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   // Pages that draw their own full-width hero and content column.
   const fullBleed =
-    path === '/' || path === '/search' || path === '/creators' || path.startsWith('/c/');
+    path === '/' ||
+    path === '/search' ||
+    path === '/creators' ||
+    path === '/token' ||
+    path.startsWith('/c/');
   for (const href of PRELOADED_READS)
     preload(href, { as: 'fetch', crossOrigin: 'use-credentials' });
   return (

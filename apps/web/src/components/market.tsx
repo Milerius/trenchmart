@@ -8,42 +8,18 @@ import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
 import { escrowWindowShort } from '@trenchmart/shared/escrow';
 import { TERMINALS } from '@trenchmart/shared/terminals';
 import { ListingGrid, type Listing } from '@/components/listings';
+import { GradientWords } from '@/components/gradient-words';
 import { TerminalMark } from '@/components/terminal-logo';
 import { PreviewNotice } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
-import { useFxModule } from '@/lib/fx';
 import { solExact } from '@/lib/money';
 
 export { MARKET_WRAP, PageHero } from '@/components/page-hero';
 import { MARKET_WRAP } from '@/components/page-hero';
 
-const loadGradient = () => import('@/components/rb/GradientText');
-
-/** Category title: animated React Bits GradientText on desktop, a static gradient elsewhere. */
+/** Category title: animated GradientText on desktop, a static gradient elsewhere. */
 function CategoryTitle({ meta }: { meta: CategoryMeta }) {
-  const GradientText = useFxModule(loadGradient);
-  if (!GradientText)
-    return (
-      <span
-        className="bg-clip-text text-transparent [-webkit-background-clip:text]"
-        style={{
-          backgroundImage: `linear-gradient(90deg, ${meta.color}, #ffffff 55%, ${meta.color})`,
-        }}
-      >
-        {meta.label}
-      </span>
-    );
-  return (
-    <span data-fx="gradient-text">
-      <GradientText
-        colors={[meta.color, '#ffffff', meta.color]}
-        animationSpeed={6}
-        className="!mx-0"
-      >
-        {meta.label}
-      </GradientText>
-    </span>
-  );
+  return <GradientWords colors={[meta.color, '#ffffff', meta.color]}>{meta.label}</GradientWords>;
 }
 
 /** Prototype category hero: tinted radial, "0N / SHORT" eyebrow, gradient title, facts, siblings. */
