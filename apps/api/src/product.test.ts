@@ -1591,4 +1591,91 @@ describe('owner product decisions', () => {
     >`select amount::text as amount from token_balances where wallet = ${wallet}`;
     expect(rows).toEqual([{ amount: '42' }]);
   });
+  it('M-04: X OAuth PKCE verifies the account; dev-linked handles stay unverified', async () => {
+    // Without X OAuth configured: dev link works but is marked unverified and cannot be
+    // used to reach a creator page by X handle.
+    const devApp = await appFor();
+    const alice = keypair();
+    const aliceCookie = await login(devApp, alice);
+    expect(
+      (await devApp.request('/api/v1/auth/x/start', { headers: { cookie: aliceCookie } })).status,
+    ).toBe(501);
+    const linked = await devApp.request('/api/v1/studio/x', {
+      method: 'POST',
+      headers: { cookie: aliceCookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ handle: 'famoustrader' }),
+    });
+    expect(linked.status).toBe(200);
+    const me = (await (
+      await devApp.request('/api/v1/me', { headers: { cookie: aliceCookie } })
+    ).json()) as {
+      user: { xHandle: string; xVerified: boolean };
+    };
+    expect(me.user).toMatchObject({ xHandle: 'famoustrader', xVerified: false });
+    expect((await devApp.request('/api/v1/creators/famoustrader')).status).toBe(404);
+
+    // With X OAuth configured.
+    const calls: { url: string; init: RequestInit }[] = [];
+    const xFetch = (async (url: string, init: RequestInit = {}) => {
+      calls.push({ url, init });
+      if (url.endsWith('/oauth2/token'))
+        return Response.json({ access_token: 'at-1', token_type: 'bearer' });
+      if (url.endsWith('/users/me'))
+        return Response.json({ data: { id: '44196397', username: 'famoustrader' } });
+      return new Response('nf', { status: 404 });
+    }) as typeof fetch;
+    const app = await appFor({ X_CLIENT_ID: 'client-1', X_CLIENT_SECRET: 'secret-1' }, { xFetch });
+    const bob = keypair();
+    const bobCookie = await login(app, bob);
+    // The dev link is closed once OAuth is configured.
+    const closed = await app.request('/api/v1/studio/x', {
+      method: 'POST',
+      headers: { cookie: bobCookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ handle: 'someone' }),
+    });
+    expect(closed.status).toBe(410);
+    const start = await app.request('/api/v1/auth/x/start', { headers: { cookie: bobCookie } });
+    expect(start.status).toBe(200);
+    const { url } = (await start.json()) as { url: string };
+    const authorize = new URL(url);
+    expect(authorize.origin + authorize.pathname).toBe('https://x.com/i/oauth2/authorize');
+    expect(authorize.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(authorize.searchParams.get('redirect_uri')).toBe(
+      'http://localhost:3000/api/v1/auth/x/callback',
+    );
+    const state = authorize.searchParams.get('state')!;
+    const xCookie = (start.headers.get('set-cookie') ?? '').split(';')[0]!;
+    expect(xCookie).toMatch(/^tm_x_oauth=/);
+    const callback = (query: string, cookie: string) =>
+      app.request(`/api/v1/auth/x/callback?${query}`, { headers: { cookie } });
+    // A forged state, or no state cookie, is refused before any call to X.
+    const forged = await callback(`code=c&state=other`, `${bobCookie}; ${xCookie}`);
+    expect(forged.headers.get('location')).toBe('http://localhost:3000/studio?x=invalid');
+    expect((await callback(`code=c&state=${state}`, bobCookie)).headers.get('location')).toContain(
+      'x=invalid',
+    );
+    expect(calls).toHaveLength(0);
+    const ok = await callback(`code=good-code&state=${state}`, `${bobCookie}; ${xCookie}`);
+    expect(ok.status).toBe(302);
+    expect(ok.headers.get('location')).toBe('http://localhost:3000/studio?x=linked');
+    const tokenBody = new URLSearchParams(String(calls[0]!.init.body));
+    expect(tokenBody.get('code')).toBe('good-code');
+    expect(tokenBody.get('code_verifier')).toHaveLength(64);
+    expect((calls[0]!.init.headers as Record<string, string>).authorization).toMatch(/^Basic /);
+    const rows = await sql<{ wallet: string; x_handle: string | null; x_user_id: string | null }[]>`
+      select wallet, x_handle, x_user_id from users where wallet in (${alice.publicKey}, ${bob.publicKey})
+    `;
+    const byWallet = Object.fromEntries(rows.map((r) => [r.wallet, r]));
+    expect(byWallet[bob.publicKey]).toMatchObject({
+      x_handle: 'famoustrader',
+      x_user_id: '44196397',
+    });
+    // Alice's unverified claim on the same handle was released.
+    expect(byWallet[alice.publicKey]).toMatchObject({ x_handle: null, x_user_id: null });
+    const creator = (await (await app.request('/api/v1/creators/famoustrader')).json()) as {
+      wallet: string;
+      xVerified: boolean;
+    };
+    expect(creator).toMatchObject({ wallet: bob.publicKey, xVerified: true });
+  });
 });

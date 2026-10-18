@@ -17,7 +17,7 @@ import {
   StatusTag,
   utc,
 } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { submitPayment } from '@/lib/studio';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
@@ -90,10 +90,32 @@ export default function StudioPage() {
   }, [wallet.session]);
 
   async function linkX() {
+    // M-04: real X sign-in (OAuth) when the API has an X app; the devnet fallback links the
+    // typed handle as unverified.
+    try {
+      const started = await api<{ url: string }>('/auth/x/start');
+      window.location.assign(started.url);
+      return;
+    } catch (err) {
+      if (!(err instanceof ApiError) || err.code !== 'X_UNCONFIGURED') throw err;
+    }
     await api('/studio/x', { method: 'POST', body: JSON.stringify({ handle }) });
-    setMessage('X handle linked for dev.');
+    setMessage('X handle linked for devnet (unverified: X sign-in is not configured yet).');
     await load();
   }
+
+  useEffect(() => {
+    const result = new URLSearchParams(window.location.search).get('x');
+    if (!result) return;
+    const text: Record<string, string> = {
+      linked: 'X account verified and linked.',
+      denied: 'X sign-in was cancelled.',
+      taken: 'That X account is already linked to another wallet.',
+      invalid: 'The X sign-in expired. Try again.',
+      failed: 'X sign-in failed. Try again.',
+    };
+    setMessage(text[result] ?? 'X sign-in did not complete.');
+  }, []);
 
   async function stakeBond() {
     const lamports = solToLamports(bond).toString();

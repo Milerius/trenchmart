@@ -309,6 +309,12 @@ function studioHandler(address: string, state: { xLinked: boolean; bond: string 
       };
     }
     if (path === '/studio/listings' && method === 'GET') return { json: [] };
+    // Devnet without an X app: the studio falls back to the unverified handle link (M-04).
+    if (path === '/auth/x/start')
+      return {
+        status: 501,
+        json: { error: { code: 'X_UNCONFIGURED', message: 'X OAuth is not configured.' } },
+      };
     if (path === '/studio/payouts')
       return { json: { total: { lamports: '0', usdCents: null }, payouts: [] } };
     if (method === 'POST' && path === '/studio/x') {
@@ -384,6 +390,40 @@ test('studio: a rejected X link shows the reason', async ({ page }) => {
   await page.getByRole('button', { name: 'Link X' }).click();
   await expect(page.getByTestId('studio').getByRole('status')).toHaveText(
     'That X handle is not valid.',
+  );
+});
+
+test('studio: with an X app configured, Link X goes to X sign-in (OAuth PKCE)', async ({
+  page,
+}) => {
+  const { secret, address } = wallet();
+  const base = studioHandler(address, { xLinked: false, bond: '0' });
+  const authorize =
+    'https://x.com/i/oauth2/authorize?response_type=code&client_id=c&state=s&code_challenge=x&code_challenge_method=S256';
+  const calls = await setup(page, address, secret, (call) =>
+    call.path === '/auth/x/start' ? { json: { url: authorize } } : base(call),
+  );
+  await page.route('https://x.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<title>X sign-in</title>' }),
+  );
+  await page.goto('/studio');
+  await page.getByRole('button', { name: 'Link X' }).click();
+  await page.waitForURL(/x\.com\/i\/oauth2\/authorize/);
+  expect(new URL(page.url()).searchParams.get('code_challenge_method')).toBe('S256');
+  // The typed handle is never sent: the account comes from X itself.
+  expect(calls.some((c) => c.path === '/studio/x')).toBe(false);
+});
+
+test('studio: the X sign-in result is shown after the callback', async ({ page }) => {
+  const { secret, address } = wallet();
+  await setup(page, address, secret, studioHandler(address, { xLinked: true, bond: '0' }));
+  await page.goto('/studio?x=linked');
+  await expect(page.getByTestId('studio').getByRole('status')).toHaveText(
+    'X account verified and linked.',
+  );
+  await page.goto('/studio?x=taken');
+  await expect(page.getByTestId('studio').getByRole('status')).toHaveText(
+    'That X account is already linked to another wallet.',
   );
 });
 

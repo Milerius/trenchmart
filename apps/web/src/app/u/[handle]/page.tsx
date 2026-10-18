@@ -12,6 +12,7 @@ type Profile = {
   handle: string | null;
   wallet: string;
   xHandle: string | null;
+  xVerified?: boolean;
   bond: string;
   listings: Listing[];
 };
@@ -59,6 +60,11 @@ export default function CreatorPage() {
           <p className="m-0 mt-1 font-mono text-xs text-muted">
             {profile.wallet.slice(0, 4)}…{profile.wallet.slice(-4)}
             {profile.xHandle ? ` · X @${profile.xHandle}` : ''}
+            {profile.xHandle && !profile.xVerified ? (
+              <span data-testid="x-unverified" className="ml-1 text-warn">
+                (unverified)
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="text-right">
