@@ -44,7 +44,6 @@ export const DEFAULT_SPECS: ListingSpecs = {
   wallet: {
     chain: 'solana',
     formats: ['csv'],
-    walletCount: 100,
     cadence: 'weekly',
     columns: ['address', 'label'],
   },
@@ -188,7 +187,6 @@ function specMessage(error: string): string {
   const nice: Record<string, string> = {
     bots: 'Pick the bot this config is for.',
     formats: 'Pick at least one file format.',
-    walletCount: 'Wallet count must be between 1 and 100,000.',
     what: 'Say in a few words what it is.',
   };
   const key = path?.split('.')[0] ?? '';

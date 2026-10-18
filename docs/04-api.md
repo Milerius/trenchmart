@@ -49,9 +49,41 @@ Expiration Time: <iso +10m>
   passed: number, total: number,
   checks: { ruleId, result, title, detail }[],
   declared: { match: string[], grant: string[], connect: string[], require: string[] },
-  review: { verifierHandle, decision, signedAt, signature, attestation } | null
+  review: { verifierHandle, decision, signedAt, signature, attestation } | null,
+  walletCount: WalletCount | null   // wallet lists only, see below
 }
 ```
+
+Wallet lists (`kind: 'wallet'`) carry a **verified wallet count**. Sellers never type it: the
+static scan parses the uploaded file and counts the unique valid Solana addresses (base58,
+32–44 characters, decoding to 32 bytes), and each version stores its own count, so a new
+version is recounted. `specs.walletCount` is not part of the wallet specs any more; a value sent
+by an older client is dropped. `GET /listings/:slug` returns it at the top level and in
+`security`, and `GET /listings/:slug/versions` returns `walletCount` per version:
+
+```ts
+type WalletCount = {
+  count: number; // unique valid Solana addresses in the live version's file
+  versionId: string;
+  semver: string;
+  source: 'file';
+  facts: {
+    format: 'standard' | 'json' | 'csv' | 'txt';
+    rows: number;
+    duplicates: number;
+    invalid: number;
+    named?: number; // standard export: wallets with a name
+    alertTypes?: string[]; // standard export: alert types subscribed in the list
+  } | null;
+};
+```
+
+Formats the scan reads, in order: the wallet-tracker standard export (a JSON array of
+`{ chain, address, name, emoji, alertSubscriptions, groupIds, fundingInfo, … }`; only top-level
+`address` with `chain: "solana"` counts, never `fundingInfo` addresses), a JSON array of
+addresses or `{ address | wallet | walletAddress | pubkey }` objects (also `{ wallets: [...] }`
+or an object keyed by address), CSV with an `address`/`wallet` column, and TXT with one address
+per line (`#` and `//` comments skipped). Upload the standard export as `.txt` or `.json`.
 
 ## Checkout & orders
 
@@ -68,19 +100,19 @@ Expiration Time: <iso +10m>
 
 ## Creator studio
 
-| Method | Path                            | Who | Notes                                                                                                                                                |
-| ------ | ------------------------------- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/studio/requirements`          | 👤  | `{walletSigned, xLinked, bondRequired, bondActive, verificationFee, feeWaived}`                                                                      |
-| POST   | `/studio/bond`                  | 👤  | `{amount}` → unsigned tx to vault with memo `bond:<id>`                                                                                              |
-| POST   | `/studio/bond/:id/submitted`    | 👤  | `{txSig}`                                                                                                                                            |
-| POST   | `/studio/listings`              | 🛠   | create draft listing                                                                                                                                 |
-| PATCH  | `/studio/listings/:id`          | 🛠   | edit metadata (price changes apply to new orders only)                                                                                               |
-| POST   | `/studio/listings/:id/versions` | 🛠   | `{semver, changelog, fileName, fileSize}` → `{versionId, uploadUrl}` (presigned R2 PUT to `uploads/<versionId>`) + verification fee tx if not waived |
-| POST   | `/studio/versions/:id/complete` | 🛠   | server reads `uploads/<versionId>`, computes sha256, copies to `blobs/<sha256>`, deletes temp, status → scanning, enqueue `scan-static`              |
-| GET    | `/studio/versions/:id`          | 🛠   | pipeline status + checks                                                                                                                             |
-| POST   | `/studio/versions/:id/explain`  | 🛠   | `{note}` → needs_creator → in_review                                                                                                                 |
-| GET    | `/studio/payouts`               | 🛠   | history                                                                                                                                              |
-| POST   | `/studio/listings/:id/delist`   | 🛠   | self-delist                                                                                                                                          |
+| Method | Path                            | Who | Notes                                                                                                                                                                             |
+| ------ | ------------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/studio/requirements`          | 👤  | `{walletSigned, xLinked, bondRequired, bondActive, verificationFee, feeWaived}`                                                                                                   |
+| POST   | `/studio/bond`                  | 👤  | `{amount}` → unsigned tx to vault with memo `bond:<id>`                                                                                                                           |
+| POST   | `/studio/bond/:id/submitted`    | 👤  | `{txSig}`                                                                                                                                                                         |
+| POST   | `/studio/listings`              | 🛠   | create draft listing                                                                                                                                                              |
+| PATCH  | `/studio/listings/:id`          | 🛠   | edit metadata (price changes apply to new orders only)                                                                                                                            |
+| POST   | `/studio/listings/:id/versions` | 🛠   | `{semver, changelog, fileName, fileSize}` → `{versionId, uploadUrl}` (presigned R2 PUT to `uploads/<versionId>`) + verification fee tx if not waived                              |
+| POST   | `/studio/versions/:id/complete` | 🛠   | server reads `uploads/<versionId>`, computes sha256, copies to `blobs/<sha256>`, deletes temp, status → scanning, enqueue `scan-static`. Wallet lists: response has `walletCount` |
+| GET    | `/studio/versions/:id`          | 🛠   | pipeline status + checks                                                                                                                                                          |
+| POST   | `/studio/versions/:id/explain`  | 🛠   | `{note}` → needs_creator → in_review                                                                                                                                              |
+| GET    | `/studio/payouts`               | 🛠   | history                                                                                                                                                                           |
+| POST   | `/studio/listings/:id/delist`   | 🛠   | self-delist                                                                                                                                                                       |
 
 ## Verifier
 

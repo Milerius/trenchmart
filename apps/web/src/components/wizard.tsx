@@ -723,38 +723,17 @@ export function WalletSpecs({ specs, set }: SpecProps<'wallet'>) {
           </div>
         </Section>
         <Section
-          title="Wallet count"
-          sub="How many wallets the file holds. Say it exactly: buyers compare."
+          title="Wallets"
+          sub="No count to type. The security scan counts the unique Solana addresses in your file."
         >
-          <div className="flex items-center gap-3">
-            <div className="flex h-14 flex-1 items-center rounded-ctl border border-line-control bg-inset">
-              <button
-                type="button"
-                aria-label="Fewer wallets"
-                className="grid h-full w-12 place-items-center border-r border-line text-lg text-muted hover:text-ink"
-                onClick={() => set({ walletCount: Math.max(1, specs.walletCount - 1) })}
-              >
-                −
-              </button>
-              <input
-                aria-label="Wallet count"
-                inputMode="numeric"
-                value={String(specs.walletCount)}
-                onChange={(e) =>
-                  set({ walletCount: Number(e.target.value.replace(/\D/g, '')) || 0 })
-                }
-                className="tabular w-full flex-1 bg-transparent text-center font-mono text-2xl font-semibold focus:outline-none"
-              />
-              <button
-                type="button"
-                aria-label="More wallets"
-                className="grid h-full w-12 place-items-center border-l border-line text-lg text-muted hover:text-ink"
-                onClick={() => set({ walletCount: specs.walletCount + 1 })}
-              >
-                +
-              </button>
-            </div>
-            <span className="text-[13px] text-muted">wallets</span>
+          <div
+            data-testid="wallet-count-auto"
+            className="flex h-14 items-center gap-3 rounded-ctl border border-line bg-inset px-4"
+          >
+            <CheckBadge on />
+            <span className="text-[13px] text-ink-2">
+              Buyers see the verified count, recounted on every new version.
+            </span>
           </div>
         </Section>
       </div>

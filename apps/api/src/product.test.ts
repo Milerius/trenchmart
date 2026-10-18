@@ -2556,7 +2556,6 @@ describe('listing wizard: kind and specs', () => {
     const specs = {
       chain: 'solana',
       formats: ['csv', 'json'],
-      walletCount: 412,
       cadence: 'weekly',
       columns: ['address', 'label'],
     };
@@ -2569,7 +2568,7 @@ describe('listing wizard: kind and specs', () => {
           ...base,
           category: 'wallet_list',
           kind: 'wallet',
-          specs: { ...specs, walletCount: 0 },
+          specs: { ...specs, formats: [] },
         })
       ).status,
     ).toBe(400);
@@ -2581,7 +2580,8 @@ describe('listing wizard: kind and specs', () => {
     >`
       select kind, specs, terminals from listings where id = ${id}
     `;
-    expect(row).toMatchObject({ kind: 'wallet', specs: { walletCount: 412, cadence: 'weekly' } });
+    expect(row).toMatchObject({ kind: 'wallet', specs: { cadence: 'weekly' } });
+    expect(row!.specs).not.toHaveProperty('walletCount');
     expect(row!.terminals).toEqual(['Axiom', 'GMGN']);
 
     const versionId = randomUUID();
@@ -2595,11 +2595,138 @@ describe('listing wizard: kind and specs', () => {
       specs: Record<string, unknown>;
     };
     expect(pub.kind).toBe('wallet');
-    expect(pub.specs).toMatchObject({ formats: ['csv', 'json'], walletCount: 412 });
+    expect(pub.specs).toMatchObject({ formats: ['csv', 'json'] });
+    expect(pub.specs).not.toHaveProperty('walletCount');
 
     // The legacy body without a kind still works and carries no specs.
     const legacy = await create({ ...base, title: 'Legacy pack', category: 'userscript' });
     expect(legacy.status).toBe(200);
+  });
+
+  it('counts the wallets from the uploaded file, per version, and serves the verified count', async () => {
+    const app = await appFor();
+    const creator = keypair();
+    const cookie = await login(app, creator);
+    await sql`
+      update users set roles = roles || '{creator}'::user_role[], x_handle = 'lists', x_user_id = 'dev:lists'
+      where wallet = ${creator.publicKey}
+    `;
+    const [user] = await sql<
+      { id: string }[]
+    >`select id from users where wallet = ${creator.publicKey}`;
+    await sql`
+      insert into bonds (user_id, amount, tx_sig, status)
+      values (${user!.id}, ${5_000_000_000n}, ${bs58.encode(nacl.randomBytes(64))}, 'active')
+    `;
+    await sql`update config set value = '0'::jsonb where key = 'verification_fee_lamports'`;
+    // Three uploads of one listing today: lift the free-update limit for this test only.
+    await sql`update config set value = '5'::jsonb where key = 'update_limit_per_listing_day'`;
+    // An older client still sending a typed count: accepted, but the number is dropped.
+    const created = await app.request('/api/v1/studio/listings', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Tracker Whales',
+        summary: 'Wallet tracker export of whales.',
+        description: 'Import into your wallet tracker.',
+        category: 'wallet_list',
+        priceLamports: '500000000',
+        terminals: ['Axiom'],
+        kind: 'wallet',
+        specs: {
+          chain: 'solana',
+          formats: ['json'],
+          walletCount: 9999,
+          cadence: 'weekly',
+          columns: [],
+        },
+      }),
+    });
+    expect(created.status).toBe(200);
+    const { id, slug } = (await created.json()) as { id: string; slug: string };
+    const upload = async (semver: string, fileName: string, body: string) => {
+      const res = await app.request(`/api/v1/studio/listings/${id}/versions`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ semver, changelog: 'refresh', fileName, fileSize: body.length }),
+      });
+      expect(res.status).toBe(200);
+      const issued = (await res.json()) as { versionId: string; uploadUrl: string };
+      const target = new URL(issued.uploadUrl);
+      await app.request(`${target.pathname}${target.search}`, {
+        method: 'PUT',
+        body: new TextEncoder().encode(body),
+      });
+      const done = await app.request(`/api/v1/studio/versions/${issued.versionId}/complete`, {
+        method: 'POST',
+        headers: { cookie },
+      });
+      expect(done.status).toBe(200);
+      return { versionId: issued.versionId, done: (await done.json()) as Record<string, unknown> };
+    };
+
+    // v1: the wallet-tracker standard export (anonymized fixture), uploaded as .txt.
+    const standard = readFileSync(
+      new URL(
+        '../../../packages/scanner/src/__fixtures__/wallet-tracker-standard.json',
+        import.meta.url,
+      ),
+      'utf8',
+    );
+    const v1 = await upload('1.0.0', 'whales.txt', standard);
+    expect(v1.done).toMatchObject({ status: 'live', walletCount: 767 });
+    const [stored] = await sql<{ wallet_count: number; wallet_facts: Record<string, unknown> }[]>`
+      select wallet_count, wallet_facts from versions where id = ${v1.versionId}
+    `;
+    expect(stored).toMatchObject({
+      wallet_count: 767,
+      wallet_facts: { format: 'standard', rows: 767, duplicates: 0, invalid: 0, named: 767 },
+    });
+    expect(JSON.stringify(stored!.wallet_facts)).not.toContain(JSON.parse(standard)[0].address);
+    type Pub = {
+      specs: Record<string, unknown>;
+      walletCount: {
+        count: number;
+        semver: string;
+        source: string;
+        facts: { format: string };
+      } | null;
+      security: { walletCount: { count: number } | null };
+    };
+    const first = (await (await app.request(`/api/v1/listings/${slug}`)).json()) as Pub;
+    expect(first.specs).not.toHaveProperty('walletCount');
+    expect(first.walletCount).toMatchObject({
+      count: 767,
+      semver: '1.0.0',
+      source: 'file',
+      facts: { format: 'standard' },
+    });
+    expect(first.security.walletCount?.count).toBe(767);
+
+    // v2: a plain TXT list with a duplicate. The new version carries its own count.
+    const addr = (n: number) =>
+      bs58.encode(Uint8Array.from({ length: 32 }, (_, i) => (i + n) % 256));
+    const txt = `# refreshed\n${addr(1)}\n${addr(2)}\n${addr(1)}\n${addr(3)} kol\n`;
+    const v2 = await upload('1.1.0', 'whales-v2.txt', txt);
+    expect(v2.done).toMatchObject({ status: 'live', walletCount: 3 });
+    const second = (await (await app.request(`/api/v1/listings/${slug}`)).json()) as Pub;
+    expect(second.walletCount).toMatchObject({ count: 3, semver: '1.1.0' });
+    const versions = (await (await app.request(`/api/v1/listings/${slug}/versions`)).json()) as {
+      semver: string;
+      walletCount: number | null;
+    }[];
+    // The test clock is frozen, so both versions share created_at: compare by semver.
+    expect(Object.fromEntries(versions.map((v) => [v.semver, v.walletCount]))).toEqual({
+      '1.0.0': 767,
+      '1.1.0': 3,
+    });
+
+    // A file with no Solana addresses fails the scan and never goes live.
+    const v3 = await upload('1.2.0', 'empty.txt', 'nothing here\n');
+    expect(v3.done.status).not.toBe('live');
+    const still = (await (await app.request(`/api/v1/listings/${slug}`)).json()) as Pub;
+    expect(still.walletCount?.count).toBe(3);
+    await sql`update config set value = '1'::jsonb where key = 'update_limit_per_listing_day'`;
   });
 });
 

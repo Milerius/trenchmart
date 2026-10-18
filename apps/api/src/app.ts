@@ -592,6 +592,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         ...publicListing(listing),
         creator: creatorCard(listing, bond),
         security,
+        // Wallet lists: unique Solana addresses the scan counted in the live version's file.
+        walletCount: security?.walletCount ?? null,
         preview: await previewOf(deps, security?.r2Key),
         content: await publicContent(deps, listing.id as string),
       }),
@@ -606,7 +608,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.get('/listings/:slug/versions', async (c) => {
     const rows = await deps.sql<Record<string, any>[]>`
-      select v.semver, v.changelog, v.created_at, v.status from versions v
+      select v.semver, v.changelog, v.created_at, v.status, v.wallet_count as "walletCount" from versions v
       join listings l on l.id = v.listing_id
       where l.slug = ${c.req.param('slug')} and v.status in ('live', 'superseded')
       order by v.created_at desc
@@ -1257,7 +1259,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     const last = await finishVersion(deps, version.id as string);
     const fresh = await deps.sql<
       Record<string, any>[]
-    >`select status, r2_key, sha256 from versions where id = ${version.id}`;
+    >`select status, r2_key, sha256, wallet_count as "walletCount" from versions where id = ${version.id}`;
     return c.json({ ...(fresh[0] ?? {}), review: last });
   });
 
@@ -1929,6 +1931,16 @@ async function securityBlock(deps: Deps, versionId: string) {
     total: checks.length,
     checks,
     declared: version.declared,
+    walletCount:
+      typeof version.wallet_count === 'number'
+        ? {
+            count: version.wallet_count,
+            versionId,
+            semver: version.semver,
+            source: 'file' as const,
+            facts: version.wallet_facts ?? null,
+          }
+        : null,
     review: review
       ? {
           verifierHandle: review.agent_id,

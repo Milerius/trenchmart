@@ -94,6 +94,8 @@ create table versions (
   status        version_status not null default 'uploading',
   declared      jsonb not null default '{}',          -- parsed @match/@grant/@connect/@require
   creator_note  text,                                 -- explanation of warnings
+  wallet_count  int,                                  -- wallet lists: unique Solana addresses counted from the file by the scan
+  wallet_facts  jsonb,                                -- wallet lists: {format, rows, duplicates, invalid, named?, alertTypes?}; counts only
   created_at    timestamptz not null default now(),
   unique (listing_id, semver)
 );

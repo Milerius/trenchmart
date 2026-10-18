@@ -1,4 +1,6 @@
 export { ENGINE_VER, scan, isPubkey, KNOWN_PROGRAM_IDS, markSymlink } from './scan';
+export { parseWalletList, isSolanaAddress, walletListFacts } from './wallets';
+export type { WalletListParse, WalletListFacts, WalletListFormat } from './wallets';
 export {
   runIsolatedSandbox,
   sandboxPage,
