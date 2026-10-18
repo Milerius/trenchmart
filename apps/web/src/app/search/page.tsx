@@ -41,7 +41,7 @@ function Results() {
             </>
           )
         }
-        sub="Every listing passed automated review. Filter by category or terminal; prices settle in SOL with a 1-hour escrow."
+        sub="Every listing passed a static scan and an AI review before it showed up here; scripts also ran in a sandbox."
       />
       <MarketGrid
         listings={listings}

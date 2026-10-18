@@ -12,7 +12,7 @@ import { TerminalMark } from '@/components/terminal-logo';
 import { PreviewNotice } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
 import { useFxModule } from '@/lib/fx';
-import { solText } from '@/lib/money';
+import { solExact } from '@/lib/money';
 
 /** Content column for the full-bleed market pages (same width as the shell's column). */
 export const MARKET_WRAP = 'mx-auto max-w-7xl px-4 sm:px-6';
@@ -87,10 +87,9 @@ export function CategoryHero({
   meta: CategoryMeta;
   config?: PublicConfig | null;
 }) {
-  const index = CATEGORIES.findIndex((c) => c.code === meta.code);
   const bond = config?.bondLamportsByCategory?.[meta.code];
   const facts = [
-    bond ? `Creator bond ${solText(bond)}` : null,
+    bond ? `Creator bond ${solExact(bond).replace(/\.0+$|(\.\d*?)0+$/, '$1')} SOL` : null,
     '0% creator commission',
     `${escrowWindowShort(config?.escrowHours ?? DEFAULT_ESCROW_HOURS)} escrow`,
   ].filter(Boolean) as string[];
@@ -108,7 +107,7 @@ export function CategoryHero({
       />
       <div className={`${MARKET_WRAP} relative flex flex-col gap-5 py-14 sm:py-16`}>
         <span className="font-mono text-xs tracking-[.18em]" style={{ color: meta.color }}>
-          {String(index + 1).padStart(2, '0')} / {meta.short.toUpperCase()}
+          {meta.short}
         </span>
         <h1 className="m-0 text-[clamp(44px,6vw,84px)] leading-none font-semibold tracking-[-0.05em]">
           <CategoryTitle meta={meta} />
@@ -139,6 +138,12 @@ export function CategoryHero({
       </div>
     </section>
   );
+}
+
+/** "01 / SCRIPTS" -> "Scripts" for the filter pills. */
+function pillLabel(short: string): string {
+  const word = short.split(' / ').pop() ?? short;
+  return word.charAt(0) + word.slice(1).toLowerCase();
 }
 
 type Sort = 'trending' | 'rating' | 'price';
@@ -197,7 +202,7 @@ export function MarketGrid({
       >
         {fixedCategory ? null : (
           <div className="flex flex-wrap gap-2" role="group" aria-label="Category">
-            {[{ code: 'all', short: 'All', color: '#EEF0EA' }, ...CATEGORIES].map((c) => {
+            {[{ code: 'all', short: 'ALL', color: '#EEF0EA' }, ...CATEGORIES].map((c) => {
               const on = category === c.code;
               return (
                 <button
@@ -208,7 +213,7 @@ export function MarketGrid({
                   className={`motion-press min-h-9 rounded-full border px-4 text-sm font-medium ${on ? 'border-transparent text-bg' : 'border-line text-ink-2 hover:text-ink'}`}
                   style={on ? { background: c.color } : undefined}
                 >
-                  {c.short}
+                  {pillLabel(c.short)}
                 </button>
               );
             })}
