@@ -1,7 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { categoryMeta, quote, rankBadge, TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared';
+import { categoryMeta } from '@trenchmart/shared/categories';
+import { quote } from '@trenchmart/shared/fee';
+import { rankBadge } from '@trenchmart/shared/ranking';
+import { TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared/terminals';
 import { TerminalNames } from '@/components/terminal-logo';
 import { Money, Skeleton, EmptyState, Tag } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';

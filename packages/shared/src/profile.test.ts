@@ -8,12 +8,12 @@ import {
   normalizeContact,
   normalizeProfile,
   normalizeSocial,
-  profileBody,
   profileStrength,
   socialLabel,
   socialUrl,
   visibleContact,
 } from './profile';
+import { profileBody } from './profile-schema';
 
 describe('handles', () => {
   it('accepts lowercase handles and refuses reserved or malformed ones', () => {

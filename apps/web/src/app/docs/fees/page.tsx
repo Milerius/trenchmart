@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection, FactGrid } from '@/components/doc';
 import { FeeFlowDiagram } from '@/components/diagrams';
-import { formatTrench } from '@trenchmart/shared';
+import { formatTrench } from '@trenchmart/shared/tier';
 import { bonds, feeSplit, protocol, tierRows } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Fees · TrenchMart docs' };

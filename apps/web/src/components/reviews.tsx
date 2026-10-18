@@ -8,7 +8,7 @@ import {
   reviewTextProblem,
   SOCIAL_DEFAULTS,
   type PublicIdentity,
-} from '@trenchmart/shared';
+} from '@trenchmart/shared/social';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Avatar, VerifiedBadge } from '@/components/profile';

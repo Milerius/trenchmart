@@ -19,10 +19,14 @@ export const EDGE_RULES: Rule[] = [
   { pattern: /^\/api\/v1\/media\/[0-9a-f-]{36}$/i, fresh: 30 * DAY, stale: DAY, immutable: true },
   // On-chain proof for /verify: chain reads are cached about a minute.
   { pattern: /^\/api\/v1\/transparency$/, fresh: 60, stale: 300 },
-  { pattern: /^\/api\/v1\/(categories|config\/public|stats|prices\/sol)$/, fresh: 60, stale: 600 },
+  // Aggregates (home stats, categories, top creators) change slowly and are the reads that
+  // went cold (stats MISS 0.8 s after 10 min idle): keep a stale copy a day so the first
+  // visitor after a quiet spell gets it at once while the refresh runs in the background.
+  { pattern: /^\/api\/v1\/(categories|stats|creators\/top)$/, fresh: 60, stale: DAY },
+  { pattern: /^\/api\/v1\/(config\/public|prices\/sol)$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/activity$/, fresh: 30, stale: 120 },
   { pattern: /^\/api\/v1\/(featured|featuring\/config)$/, fresh: 60, stale: 300 },
-  { pattern: /^\/api\/v1\/creators\/(top|[^/]+)$/, fresh: 60, stale: 600 },
+  { pattern: /^\/api\/v1\/creators\/[^/]+$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/listings$/, fresh: 30, stale: 300 },
   {
     pattern: /^\/api\/v1\/listings\/[^/]+(\/(versions|reviews|report|upvotes))?$/,
@@ -46,9 +50,16 @@ function publicHeaders(rule: Rule): string {
     : `public, max-age=0, s-maxage=${rule.fresh}, stale-while-revalidate=${rule.stale}`;
 }
 
+/**
+ * Bumped when stored entries must not be served any more. 2: listing images were re-encoded
+ * to WebP in place, but colos kept serving the old PNG bytes (354 KB) for the immutable window.
+ */
+export const EDGE_CACHE_VERSION = '2';
+
 /** Cache key: path + query + Origin (never cookies), so anonymous readers share it. */
-function keyFor(request: Request): Request {
+export function keyFor(request: Request): Request {
   const url = new URL(request.url);
+  url.searchParams.set('__v', EDGE_CACHE_VERSION);
   // CORS headers depend on the Origin, so it is part of the key.
   url.searchParams.set('__origin', request.headers.get('origin') ?? '');
   url.searchParams.sort();

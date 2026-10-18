@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { clampInt } from './num';
 import { cleanText } from './profile';
 import { TIERS, tierAtLeast, type Tier } from './tier';
 
@@ -37,11 +37,8 @@ export const SOCIAL_DEFAULTS: SocialConfig = {
   reviewAutoHideReports: 3,
 };
 
-export function clampInt(value: unknown, fallback: number, min: number, max: number): number {
-  const n = typeof value === 'string' && value.trim() ? Number(value) : value;
-  if (typeof n !== 'number' || !Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(n)));
-}
+// Lives in ./num so zod-free modules (ranking) can use it without pulling zod into the web bundle.
+export { clampInt };
 
 /** Reads the `social_rules` config row (an object); unknown or invalid fields keep defaults. */
 export function parseSocialConfig(raw: unknown): SocialConfig {
@@ -198,17 +195,6 @@ export const REVIEW_REPORT_REASONS = [
   'contact_info',
   'other',
 ] as const;
-
-export const reviewPostBody = z.object({
-  rating: z.number().int().min(1).max(5),
-  body: z.string().min(1).max(5000),
-  versionId: z.string().uuid(),
-  terminal: z.string().max(40).nullable().optional(),
-  signature: z.string().min(64).max(120),
-});
-export const replyBody = z.object({ body: z.string().min(1).max(2000) });
-export const reviewVoteBody = z.object({ helpful: z.boolean().nullable() });
-export const reviewReportBody = z.object({ reason: z.enum(REVIEW_REPORT_REASONS) });
 
 /** Rating summary from visible reviews: count, average and the 5→1 histogram. */
 export function ratingSummary(ratings: number[]): {

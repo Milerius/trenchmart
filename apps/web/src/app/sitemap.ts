@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { CATEGORY_CODES } from '@trenchmart/shared';
+import { CATEGORY_CODES } from '@trenchmart/shared/config';
 import { publicApi } from '@/lib/server-api';
 
 const SITE = 'https://trenchmart.fun';

@@ -119,7 +119,13 @@ export function Lightbox({
                   : 'border-transparent opacity-60 hover:opacity-100'
               }`}
             >
-              <img src={thumb.url} alt="" className="h-full w-full object-cover" />
+              <img
+                src={thumb.url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
             </button>
           </li>
         ))}

@@ -1,9 +1,8 @@
 'use client';
 
 import { getWallets } from '@wallet-standard/app';
-import { fromBase64, signLegacyTransaction, toBase64 } from '@trenchmart/chain';
+import { fromBase64, toBase64 } from './base64';
 import bs58 from 'bs58';
-import nacl from 'tweetnacl';
 import {
   createContext,
   useContext,
@@ -89,7 +88,12 @@ function e2eSecret(): Uint8Array | null {
   return bs58.decode(window.__TRENCHMART_E2E_SECRET__);
 }
 
-function signerFromSecret(secret: Uint8Array): Signer {
+// Test-only signer. Crypto libs load on demand so they stay out of the shared bundle.
+async function signerFromSecret(secret: Uint8Array): Promise<Signer> {
+  const [{ default: nacl }, { signLegacyTransaction }] = await Promise.all([
+    import('tweetnacl'),
+    import('@trenchmart/chain'),
+  ]);
   const address = bs58.encode(nacl.sign.keyPair.fromSecretKey(secret).publicKey);
   return {
     address,
@@ -305,7 +309,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setError('');
     try {
-      const signer = signerFromSecret(secret);
+      const signer = await signerFromSecret(secret);
       await commitAfterSignIn({
         finish: () => finishSignIn(signer),
         commit: () => {
@@ -355,7 +359,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     let signer = signerRef.current;
     if (!signer) {
       const secret = e2eSecret();
-      if (secret) signer = signerFromSecret(secret);
+      if (secret) signer = await signerFromSecret(secret);
     }
     if (!signer) {
       const last = readLastWallet(safeLocalStorage(window));

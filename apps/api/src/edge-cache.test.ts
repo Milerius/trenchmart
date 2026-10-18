@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ruleFor, withEdgeCache } from './edge-cache';
+import { EDGE_CACHE_VERSION, keyFor, ruleFor, withEdgeCache } from './edge-cache';
 
 function memoryCache() {
   const store = new Map<string, Response>();
@@ -76,5 +76,26 @@ describe('edge cache', () => {
     await Promise.all(flush);
     expect(res.headers.get('cache-control')).toBe('private, no-store');
     expect(cache.store.size).toBe(0);
+  });
+
+  it('keys entries by version and origin, never by cookie', () => {
+    const a = keyFor(new Request('https://api.trenchmart.fun/api/v1/stats'));
+    expect(new URL(a.url).searchParams.get('__v')).toBe(EDGE_CACHE_VERSION);
+    const withOrigin = keyFor(
+      new Request('https://api.trenchmart.fun/api/v1/stats', {
+        headers: { origin: 'https://trenchmart.fun', cookie: 'x=1' },
+      }),
+    );
+    expect(withOrigin.url).not.toBe(a.url);
+    expect(withOrigin.headers.get('cookie')).toBeNull();
+  });
+
+  it('keeps aggregates stale-while-revalidate for a day, prices only ten minutes', () => {
+    const rule = (path: string) => ruleFor(new Request(`https://api.trenchmart.fun/api/v1${path}`));
+    expect(rule('/stats')?.stale).toBe(86_400);
+    expect(rule('/creators/top')?.stale).toBe(86_400);
+    expect(rule('/prices/sol')?.stale).toBe(600);
+    expect(rule('/config/public')?.stale).toBe(600);
+    expect(rule('/creators/alice')?.stale).toBe(600);
   });
 });
