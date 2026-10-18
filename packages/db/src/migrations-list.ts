@@ -24,6 +24,7 @@ export const MIGRATIONS = [
   '0022_featuring.sql',
   '0023_wallet_count.sql',
   '0030_agent_api.sql',
+  '0031_status.sql',
 ] as const;
 
 /**

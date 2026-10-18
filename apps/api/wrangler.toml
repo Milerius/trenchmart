@@ -28,6 +28,12 @@ queue = "scan-static"
 binding = "HYPERDRIVE"
 id = "067fbd6cc9a949e7a62155bf3fd2fe91"
 
+# Public status page (status.ts): the cron reads web, API and RPC latency from the external
+# watchdog Worker (deployed with watchdog.wrangler.toml). Keep the same block in wrangler.deploy.toml.
+[[services]]
+binding = "WATCHDOG"
+service = "trenchmart-watchdog"
+
 # M-03: edge rate limit for writes, keyed per client IP + method (see clientIp in app.ts).
 [[ratelimits]]
 name = "RATE_LIMITER"

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Real-API browser flows (X OAuth, studio overview) through the real web /api/v1 proxy, with X's
+// Real-API browser flows (X OAuth, studio overview, status page) through the real web /api/v1 proxy, with X's
 // API mocked (e2e/x-oauth/mock-x.mjs) and X's authorize page stubbed in the browser.
 // Needs Postgres (DATABASE_URL). Run: pnpm exec playwright test -c playwright.xoauth.config.ts
 
@@ -47,6 +47,9 @@ export default defineConfig({
         SESSION_SECRET: 'e2e-session-secret-e2e-session-secret',
         RATE_LIMIT_PER_MIN: '1000',
         SOL_USD_OVERRIDE: '100',
+        // status-probes.flow.ts calls POST /internal/status/run with it.
+        INTERNAL_TOKEN:
+          process.env.XO_INTERNAL_TOKEN ?? 'e2e-internal-token-e2e-internal-token-0001',
         X_API_URL: `http://127.0.0.1:${X_PORT}`,
       },
     },

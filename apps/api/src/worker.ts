@@ -28,7 +28,8 @@ import { assertDeployedEnv, readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
 import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
-import { deliverAlerts, opsCheck, recordOpsEvent } from './ops';
+import { deliverAlerts, opsCheck, recordOpsEvent, type OpsAlert } from './ops';
+import { statusTick } from './status';
 
 type Binding = Record<string, unknown> & {
   DATABASE_URL?: string;
@@ -42,6 +43,8 @@ type Binding = Record<string, unknown> & {
   FILES?: R2BucketLike;
   // Workers Rate Limiting binding (M-03): edge counter, no database write per request.
   RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
+  // Service binding to the external watchdog Worker (status page probes, status.ts).
+  WATCHDOG?: { fetch(input: string): Promise<Response> };
 };
 
 type Ctx = { waitUntil: (p: Promise<unknown>) => void };
@@ -138,7 +141,12 @@ export default {
     const run = async (): Promise<Response> => {
       const deps = depsFor(env, dbUrl);
       const app = createApp(
-        { ...deps, sandboxQueue: env.SCAN_QUEUE, rateLimiter: env.RATE_LIMITER },
+        {
+          ...deps,
+          sandboxQueue: env.SCAN_QUEUE,
+          rateLimiter: env.RATE_LIMITER,
+          watchdog: env.WATCHDOG,
+        },
         priceCache,
       );
       const close = () => deps.sql.end({ timeout: 5 });
@@ -158,7 +166,7 @@ export default {
   async scheduled(_event: unknown, env: Binding, ctx: Ctx): Promise<void> {
     const dbUrl = databaseUrl(env);
     if (!dbUrl) return;
-    const deps = depsFor(env, dbUrl);
+    const deps = { ...depsFor(env, dbUrl), watchdog: env.WATCHDOG };
     // Each job runs even if an earlier one failed, and every failure is logged as an ALERT.
     const step = async (name: string, job: () => Promise<unknown>) => {
       try {
@@ -184,7 +192,13 @@ export default {
         await step('escrow-housekeeping', () => escrowHousekeeping(deps));
         await step('wallet-intel', () => scanWalletIntel(deps));
         await step('ranking', () => computeRanks(deps));
-        await step('ops', async () => deliverAlerts(deps, await opsCheck(deps)));
+        let alerts: OpsAlert[] = [];
+        await step('ops', async () => {
+          alerts = await opsCheck(deps);
+          await deliverAlerts(deps, alerts);
+        });
+        // Public status page: probes, incidents and the daily roll-up (status.ts).
+        await step('status', () => statusTick(deps, alerts));
       })().finally(() => deps.sql.end({ timeout: 5 })),
     );
   },

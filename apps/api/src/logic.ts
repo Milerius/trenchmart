@@ -107,6 +107,11 @@ export type Deps = {
   xFetch?: typeof fetch;
   /** Fetch used by monitoring checks and alert delivery (ops.ts). Defaults to the global fetch. */
   opsFetch?: typeof fetch;
+  /**
+   * External watchdog Worker (service binding WATCHDOG). The status cron reads its web, API and
+   * RPC checks from it (status.ts). Optional: without it those three are probed directly.
+   */
+  watchdog?: { fetch(input: string): Promise<Response> };
   /** On-chain $TRENCH balance of a wallet in base units. Optional: tiers fall back to stored rows. */
   trenchBalance?: (wallet: string) => Promise<bigint>;
   /**
