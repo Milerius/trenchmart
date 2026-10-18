@@ -83,6 +83,14 @@ const KNOWN_DEFAULTS = new Set([
   'dev',
 ]);
 
+/**
+ * A deployed Worker must name its APP_URL: a missing one would otherwise count as local and
+ * skip the secret checks (CodeRabbit, PR #36). Called by worker.ts before readEnv.
+ */
+export function assertDeployedEnv(source: Record<string, string | undefined>): void {
+  if (!blank(source.APP_URL)) throw new InsecureConfigError(['APP_URL']);
+}
+
 /** True when APP_URL points at a local machine (dev, tests, CI). */
 export function isLocalAppUrl(appUrl: string | undefined): boolean {
   const value = blank(appUrl);
@@ -90,7 +98,11 @@ export function isLocalAppUrl(appUrl: string | undefined): boolean {
   try {
     const host = new URL(value).hostname;
     return (
-      host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '::1' ||
+      host === '[::1]' ||
+      host.endsWith('.localhost')
     );
   } catch {
     return false;

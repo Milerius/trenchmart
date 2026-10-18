@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InsecureConfigError, isLocalAppUrl, readEnv, weakSecrets } from './env';
+import { assertDeployedEnv, InsecureConfigError, isLocalAppUrl, readEnv, weakSecrets } from './env';
 
 const strong = 'a'.repeat(64);
 const good = {
@@ -14,6 +14,9 @@ describe('H-01 fail-closed secrets', () => {
   it('treats localhost as local and real domains as production', () => {
     expect(isLocalAppUrl(undefined)).toBe(true);
     expect(isLocalAppUrl('http://localhost:3000')).toBe(true);
+    expect(isLocalAppUrl('http://[::1]:3000')).toBe(true);
+    expect(() => assertDeployedEnv({})).toThrow(InsecureConfigError);
+    expect(() => assertDeployedEnv({ APP_URL: 'https://trenchmart.fun' })).not.toThrow();
     expect(isLocalAppUrl('http://127.0.0.1:3000')).toBe(true);
     expect(isLocalAppUrl('https://trenchmart.fun')).toBe(false);
   });
