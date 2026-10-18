@@ -16,9 +16,14 @@ third-party account is needed for the default setup.
 
 Alerts go to every configured channel:
 
-- **ntfy push + email (default, free, no signup).** The Workers post to a secret ntfy.sh topic. The `Email:` header makes ntfy forward each alert to `rmscastle@gmail.com`.
-  - Push to a phone: install the ntfy app and subscribe to the topic. The topic is in `~/.config/trenchmart/alerts.env` on the ops box; treat it as a secret, because anyone who knows it can read the alerts.
-  - Secrets on both Workers: `ALERT_NTFY_TOPIC` and `ALERT_EMAIL`. `ALERT_NTFY_SERVER` is optional and defaults to `https://ntfy.sh`.
+- **ntfy push (default, free, no signup), live now.** Both Workers post to a secret ntfy.sh topic (`ALERT_NTFY_TOPIC`, in `~/.config/trenchmart/alerts.env` on the ops box). Treat it as a secret: anyone who knows the topic can read the alerts. To get push on a phone, install the ntfy app and subscribe to the topic.
+- **Email to rmscastle@gmail.com: needs one free signup by Roman.** ntfy.sh refuses anonymous email (error 40053). Steps:
+  1. Create a free account at https://ntfy.sh/signup.
+  2. Create an access token under Account → Access tokens.
+  3. Run `wrangler secret put ALERT_NTFY_TOKEN` on the API Worker, and on the watchdog with `-c watchdog.wrangler.toml`.
+
+  `ALERT_EMAIL` is already set. Until the token exists, alerts are sent as push only. If ntfy refuses the email, the alert falls back to push, so nothing is lost.
+
 - **Telegram (optional).** Create a bot with @BotFather, send it one message, and read the chat id from `https://api.telegram.org/bot<token>/getUpdates`. Then run `wrangler secret put TELEGRAM_BOT_TOKEN` and `wrangler secret put TELEGRAM_CHAT_ID` on the API Worker. For the watchdog, add `-c watchdog.wrangler.toml`.
 - **Generic webhook (optional).** Set `ALERT_WEBHOOK_URL`; it receives a JSON POST `{title, text, level}`.
 

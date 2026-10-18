@@ -4,6 +4,8 @@
 // Deployed with `wrangler deploy -c watchdog.wrangler.toml`. Stateless: it reads its own recent
 // ntfy messages to send DOWN once per 6 h per target and UP once on recovery.
 
+import { postNtfy } from './ops';
+
 export type WatchdogEnv = {
   WEB_URL: string;
   API_URL: string;
@@ -11,6 +13,7 @@ export type WatchdogEnv = {
   ALERT_NTFY_SERVER?: string;
   ALERT_NTFY_TOPIC?: string;
   ALERT_EMAIL?: string;
+  ALERT_NTFY_TOKEN?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
   CLUSTER?: string;
@@ -100,11 +103,17 @@ export async function watchdog(env: WatchdogEnv, f: typeof fetch = fetch): Promi
       Priority: verdict === 'DOWN' ? 'urgent' : 'default',
       Tags: verdict === 'DOWN' ? 'rotating_light' : 'white_check_mark',
     };
-    if (env.ALERT_EMAIL) headers.Email = env.ALERT_EMAIL;
-    const server = env.ALERT_NTFY_SERVER || 'https://ntfy.sh';
-    await timed(f, `${server}/${env.ALERT_NTFY_TOPIC}`, { method: 'POST', headers, body }).catch(
-      () => null,
-    );
+    await postNtfy(
+      f,
+      {
+        alertNtfyServer: env.ALERT_NTFY_SERVER || 'https://ntfy.sh',
+        alertNtfyTopic: env.ALERT_NTFY_TOPIC,
+        alertEmail: env.ALERT_EMAIL ?? '',
+        alertNtfyToken: env.ALERT_NTFY_TOKEN ?? '',
+      },
+      headers,
+      body,
+    ).catch(() => null);
     if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
       await timed(f, `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: 'POST',

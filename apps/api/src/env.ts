@@ -58,6 +58,8 @@ export type Env = {
   alertNtfyServer: string;
   alertNtfyTopic: string;
   alertEmail: string;
+  /** ntfy access token (free ntfy.sh account): required for email forwarding. */
+  alertNtfyToken: string;
   telegramBotToken: string;
   telegramChatId: string;
   alertWebhookUrl: string;
@@ -199,6 +201,7 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     alertNtfyServer: blank(source.ALERT_NTFY_SERVER) || 'https://ntfy.sh',
     alertNtfyTopic: blank(source.ALERT_NTFY_TOPIC),
     alertEmail: blank(source.ALERT_EMAIL),
+    alertNtfyToken: blank(source.ALERT_NTFY_TOKEN),
     telegramBotToken: blank(source.TELEGRAM_BOT_TOKEN),
     telegramChatId: blank(source.TELEGRAM_CHAT_ID),
     alertWebhookUrl: blank(source.ALERT_WEBHOOK_URL),
