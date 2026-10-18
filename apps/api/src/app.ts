@@ -469,7 +469,15 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   // Creator profile (studio redesign): editable fields, avatar and banner.
   api.get('/studio/profile', async (c) => {
     const user = requireUser(c);
-    return c.json(jsonSafe(await loadOwnProfile(deps, user.id as string)));
+    return c.json(
+      jsonSafe({
+        ...(await loadOwnProfile(deps, user.id as string)),
+        // What this deployment can do, so the editor never offers a flow that would fail.
+        // xOAuth: "Verify with X" works (X_CLIENT_ID is set). Without it the button is shown
+        // as unavailable and /auth/x/start answers 501 X_UNCONFIGURED.
+        capabilities: { xOAuth: Boolean(deps.env.xClientId) },
+      }),
+    );
   });
 
   api.put('/studio/profile', async (c) => {

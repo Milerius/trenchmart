@@ -35,6 +35,8 @@ type OwnProfile = {
   contact: { enabled: boolean; channels: ContactChannel[] };
   xHandle: string | null;
   xVerified: boolean;
+  /** What this deployment can do. xOAuth: "Verify with X" works (X app configured). */
+  capabilities?: { xOAuth?: boolean };
 };
 
 type ContactRow = {
@@ -175,11 +177,15 @@ export default function EditProfilePage() {
   const [busy, setBusy] = useState('');
   const [devHandle, setDevHandle] = useState('');
   const [devLink, setDevLink] = useState(false);
+  // Read once from GET /studio/profile; PUT responses do not carry it.
+  const [xOAuth, setXOAuth] = useState<boolean | null>(null);
+  const [xError, setXError] = useState('');
   const avatarInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
 
   async function load() {
     const profile = await api<OwnProfile>('/studio/profile');
+    setXOAuth(profile.capabilities?.xOAuth === true);
     setSaved(profile);
     setForm(formOf(profile));
   }
@@ -295,29 +301,34 @@ export default function EditProfilePage() {
   }
 
   async function connectX() {
-    setMessage('');
+    setXError('');
+    setBusy('x-start');
     try {
       const started = await api<{ url: string }>('/auth/x/start');
+      if (!/^https:\/\/(x|twitter)\.com\//.test(started.url))
+        throw new Error('X sign-in could not start. Try again.');
+      // Full-page redirect to X's authorize page (OAuth 2.0 + PKCE). Busy stays set.
       window.location.assign(started.url);
     } catch (err) {
+      setBusy('');
       if (err instanceof ApiError && err.code === 'X_UNCONFIGURED') {
-        setDevLink(true);
-        setMessage(
-          'X sign-in is not configured on this deployment yet. Link a handle as unverified (devnet).',
-        );
-      } else setMessage((err as Error).message);
+        // The deployment lost its X app since the page loaded: switch to the unavailable state.
+        setXOAuth(false);
+        setXError('X verification is not available on this deployment yet.');
+      } else setXError((err as Error).message || 'X sign-in could not start. Try again.');
     }
   }
 
   async function linkDevHandle() {
+    setXError('');
     setBusy('x');
     try {
       await api('/studio/x', { method: 'POST', body: JSON.stringify({ handle: devHandle }) });
       setDevLink(false);
-      setMessage('X handle linked for devnet (unverified: X sign-in is not configured yet).');
+      setMessage('X handle linked for devnet (unverified: X verification is coming soon).');
       await load();
     } catch (err) {
-      setMessage((err as Error).message);
+      setXError((err as Error).message);
     } finally {
       setBusy('');
     }
@@ -517,7 +528,11 @@ export default function EditProfilePage() {
           <Section
             id="socials"
             title="Socials & verification"
-            sub="X is verified by signing in with X. Other links are shown as you typed them."
+            sub={
+              xOAuth === false
+                ? 'X verification is coming soon. Other links are shown as you typed them.'
+                : 'X is verified by signing in with X. Other links are shown as you typed them.'
+            }
           >
             <div
               data-testid="x-card"
@@ -540,24 +555,66 @@ export default function EditProfilePage() {
                       <Tag tone="warn">NOT VERIFIED</Tag>
                     )
                   ) : null}
+                  {xOAuth === false ? (
+                    <Tag data-testid="x-soon">VERIFICATION COMING SOON</Tag>
+                  ) : null}
                 </div>
                 <p className="m-0 mt-0.5 text-[13px] text-ink-2">
-                  {saved.xVerified
-                    ? 'Read-only sign-in. We never post for you.'
-                    : saved.xHandle
-                      ? 'Linked without X sign-in, so buyers see it as unverified.'
-                      : 'Required to publish listings. Read-only sign-in, we never post for you.'}
+                  {xOAuth === false
+                    ? saved.xHandle
+                      ? 'Sign-in with X is not available yet, so buyers see this handle as unverified.'
+                      : 'Sign-in with X is not available yet. On devnet you can link a handle now; buyers see it as unverified.'
+                    : saved.xVerified
+                      ? 'Read-only sign-in. We never post for you.'
+                      : saved.xHandle
+                        ? 'Linked without X sign-in, so buyers see it as unverified.'
+                        : 'Required to publish listings. Read-only sign-in, we never post for you.'}
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant={saved.xVerified ? 'ghost' : 'primary'}
-                onClick={() => void connectX()}
-              >
-                {saved.xVerified ? 'Reconnect' : saved.xHandle ? 'Verify with X' : 'Connect X'}
-              </Button>
+              {xOAuth === false ? (
+                <div className="flex flex-wrap gap-2">
+                  {!devLink ? (
+                    <Button size="sm" variant="secondary" onClick={() => setDevLink(true)}>
+                      {saved.xHandle ? 'Change handle' : 'Link handle (unverified)'}
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled
+                    aria-disabled="true"
+                    title="X verification is coming soon"
+                  >
+                    X verification coming soon
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant={saved.xVerified ? 'ghost' : 'primary'}
+                  disabled={xOAuth === null || busy === 'x-start'}
+                  onClick={() => void connectX()}
+                >
+                  {busy === 'x-start'
+                    ? 'Opening X…'
+                    : saved.xVerified
+                      ? 'Reconnect'
+                      : saved.xHandle
+                        ? 'Verify with X'
+                        : 'Connect X'}
+                </Button>
+              )}
+              {xError ? (
+                <p
+                  role="alert"
+                  data-testid="x-error"
+                  className="m-0 w-full text-[13px] text-danger"
+                >
+                  {xError}
+                </p>
+              ) : null}
             </div>
-            {devLink ? (
+            {devLink && xOAuth === false ? (
               <div className="flex flex-wrap items-end gap-3 rounded-card border border-warn-line bg-warn-bg p-4">
                 <label className="block min-w-[200px] flex-1">
                   <span className="text-sm font-medium">X handle (unverified, devnet)</span>

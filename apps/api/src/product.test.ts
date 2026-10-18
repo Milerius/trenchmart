@@ -1639,6 +1639,10 @@ describe('owner product decisions', () => {
       body: JSON.stringify({ handle: 'someone' }),
     });
     expect(closed.status).toBe(410);
+    const bobProfile = (await (
+      await app.request('/api/v1/studio/profile', { headers: { cookie: bobCookie } })
+    ).json()) as { capabilities: { xOAuth: boolean } };
+    expect(bobProfile.capabilities).toEqual({ xOAuth: true });
     // A handle dev-linked before OAuth was configured does not count as linked: the studio
     // shows the verify button again and new listings require the verified link.
     const aliceOnOauth = await login(app, alice);
@@ -2307,6 +2311,8 @@ describe('creator profiles', () => {
       avatar: null,
       xVerified: false,
       contact: { enabled: false, channels: [] },
+      // No X_CLIENT_ID here: the editor must show X verification as unavailable.
+      capabilities: { xOAuth: false },
     });
 
     const saved = await put(app, cookie, {
