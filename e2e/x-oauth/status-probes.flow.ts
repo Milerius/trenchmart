@@ -3,7 +3,8 @@ import { createSql } from '@trenchmart/db';
 
 // Status page probes end to end: the real API (Node, real Postgres) runs one cron-equivalent
 // tick through POST /internal/status/run and stores what the public page will read. The local
-// web dev server and the local API are the probed web and API (no watchdog binding locally).
+// web dev server and the local API are the probed web and API (no STATUS_PUSH_TOKEN locally, so
+// the API probes them itself instead of waiting for the watchdog's push).
 
 const API = `http://127.0.0.1:${process.env.XO_API_PORT ?? '8817'}`;
 const TOKEN = process.env.XO_INTERNAL_TOKEN ?? 'e2e-internal-token-e2e-internal-token-0001';
@@ -53,6 +54,14 @@ test('a status tick needs the internal token and records every component with it
     where component = 'db' and day = (now() at time zone 'UTC')::date
   `;
   expect(daily[0]!.samples).toBeGreaterThanOrEqual(1);
+  // The watchdog push route is off without STATUS_PUSH_TOKEN, and the internal token does not open it.
+  for (const authorization of ['', `Bearer ${TOKEN}`]) {
+    const push = await request.post(`${API}/api/v1/internal/status/external`, {
+      headers: { authorization },
+      data: { checks: [{ name: 'api', ok: false, ms: 1 }] },
+    });
+    expect(push.status()).toBe(401);
+  }
   // The sign-in probe cleans up after itself.
   expect(await sql`select 1 from auth_nonces where wallet = 'status-probe'`).toHaveLength(0);
 });

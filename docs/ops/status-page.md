@@ -7,9 +7,9 @@ Everything runs on the existing free tiers: no new service, no new cron, no new 
 
 | id        | Shown as                  | Probe (every 5 min, API cron)                                                            | Slow above |
 | --------- | ------------------------- | ---------------------------------------------------------------------------------------- | ---------- |
-| `web`     | Website                   | external watchdog: `GET https://trenchmart.fun` (5xx or no answer = down)                | 2500 ms    |
-| `api`     | API                       | external watchdog: `GET https://api.trenchmart.fun/api/v1/health`                        | 1500 ms    |
-| `rpc`     | Solana RPC                | external watchdog: `getHealth` on the RPC (429 counts as up)                             | 2000 ms    |
+| `web`     | Website                   | external watchdog push: `GET https://trenchmart.fun` (5xx or no answer = down)           | 2500 ms    |
+| `api`     | API                       | external watchdog push: `GET https://api.trenchmart.fun/api/v1/health`                   | 1500 ms    |
+| `rpc`     | Solana RPC                | external watchdog push: `getHealth` on the RPC (429 counts as up)                        | 2000 ms    |
 | `escrow`  | Escrow program & resolver | read of the escrow program account from the API Worker                                   | 2000 ms    |
 | `db`      | Database                  | `select 1` through Hyperdrive                                                            | 750 ms     |
 | `uploads` | Uploads & scanning        | file storage write, read back, delete (`status/probe`)                                   | 2500 ms    |
@@ -32,10 +32,26 @@ Only the component and the state cross over (`ALERT_COMPONENT` in `apps/api/src/
 Disputes, payouts and every other internal code never touch the public page. Alert messages (which
 can name wallets, balances, files and URLs) are never copied into the status tables.
 
-Web, API and RPC are measured **outside** the API Worker: the API cron calls the watchdog Worker
-through the service binding `WATCHDOG` (`[[services]]` in `apps/api/wrangler.toml`; keep it in
-`wrangler.deploy.toml`), and the watchdog reports each check's `ms`. Without the binding (local
-runs, or the watchdog not answering) the API probes the same three URLs itself.
+Web, API and RPC are measured **outside** the API Worker. Every 5 minutes the watchdog Worker
+(`apps/api/src/watchdog.ts`) runs its checks and pushes `{ name, ok, ms }` for each (never the
+detail text) to `POST /api/v1/internal/status/external`, authenticated with its own secret
+`STATUS_PUSH_TOKEN` (set on both Workers; it can do nothing else, and a blank, short or default
+value keeps the route closed). The API applies any open ops alerts for those components (codes
+only) and stores them as probes. If the API is unreachable the push fails and those minutes have
+no data: they are not invented afterwards.
+
+The API cannot pull these checks itself: when the API asks the watchdog (service binding), the
+watchdog's fetch back to the API is a loop that Cloudflare refuses, so the API row read `down` on
+every tick (seen live on 2026-10-18). Without `STATUS_PUSH_TOKEN` (local runs, CI) the API cron
+probes the three URLs directly instead.
+
+Set it up (once per environment, never printed):
+
+```bash
+token="$(openssl rand -hex 32)"
+printf %s "$token" | wrangler secret put STATUS_PUSH_TOKEN -c apps/api/wrangler.deploy.toml
+printf %s "$token" | wrangler secret put STATUS_PUSH_TOKEN -c apps/api/watchdog.wrangler.toml
+```
 
 ## Storage (migration `0031_status.sql`)
 

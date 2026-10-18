@@ -1,5 +1,6 @@
 // Test harness for the status page (status.test.ts, status-public.test.ts): a real Postgres
-// database with a stubbed watchdog, RPC, web, file storage and escrow chain.
+// database with stubbed RPC, web, API health, file storage and escrow chain. Pass
+// STATUS_PUSH_TOKEN in `extra` for the production shape (web/API/RPC pushed by the watchdog).
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,16 +13,13 @@ import { readEnv } from './env';
 import type { Deps } from './logic';
 
 export const STATUS_TOKEN = 'internal-token-internal-token-internal-token-0123';
+export const STATUS_PUSH = 'push-token-push-token-push-token-0001';
 export const STATUS_PROGRAM = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
 
 export type StatusWorld = {
-  /** null: the watchdog binding is absent (direct probes). */
-  watchdog: 'ok' | 'broken' | null;
   web: number;
   api: boolean;
   rpc: boolean;
-  /** Added latency (ms) reported by the watchdog for each of its checks. */
-  watchdogMs: { web: number; api: number; rpc: number };
   program: boolean;
   blobBroken: boolean;
   direct: string[];
@@ -48,11 +46,9 @@ export async function statusSetup(
     ...extra,
   });
   const world: StatusWorld = {
-    watchdog: 'ok',
     web: 200,
     api: true,
     rpc: true,
-    watchdogMs: { web: 120, api: 80, rpc: 150 },
     program: true,
     blobBroken: false,
     direct: [],
@@ -79,33 +75,6 @@ export async function statusSetup(
       return Response.json({ ok: world.api }, { status: world.api ? 200 : 503 });
     return new Response('{}');
   }) as typeof fetch;
-  const watchdog = {
-    fetch: async () => {
-      if (world.watchdog === 'broken') throw new Error('service binding unavailable');
-      // Same shape as watchdog.ts GET /, including the detail text the API must not copy.
-      const checks = [
-        {
-          name: 'web',
-          ok: world.web < 500,
-          detail: world.web < 500 ? 'ok' : `https://web.example HTTP ${world.web}`,
-          ms: world.watchdogMs.web,
-        },
-        {
-          name: 'api',
-          ok: world.api,
-          detail: world.api ? 'ok' : 'https://api.example/api/v1/health HTTP 503',
-          ms: world.watchdogMs.api,
-        },
-        {
-          name: 'rpc',
-          ok: world.rpc,
-          detail: world.rpc ? 'ok' : 'RPC getHealth HTTP 200 behind',
-          ms: world.watchdogMs.rpc,
-        },
-      ];
-      return Response.json({ ok: checks.every((c) => c.ok), checks });
-    },
-  };
   const deps: Deps = {
     sql,
     blob,
@@ -136,9 +105,5 @@ export async function statusSetup(
       sendAndConfirm: async () => '',
     },
   };
-  Object.defineProperty(deps, 'watchdog', {
-    enumerable: true,
-    get: () => (world.watchdog === null ? undefined : watchdog),
-  });
   return { deps, world };
 }

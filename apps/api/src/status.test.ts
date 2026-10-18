@@ -9,7 +9,7 @@ import {
   runStatusProbes,
   statusTick,
 } from './status';
-import { STATUS_TOKEN, statusSetup } from './status-fixtures';
+import { STATUS_PUSH, STATUS_TOKEN, statusSetup } from './status-fixtures';
 
 // Status page probes against real Postgres (docs/ops/status-page.md).
 const databaseUrl =
@@ -37,15 +37,8 @@ describe('status page probes', () => {
     expect(probes.map((p) => p.component).sort()).toEqual([...ids].sort());
     expect(probes.every((p) => p.state === 'operational')).toBe(true);
     expect(probes.every((p) => Number.isInteger(p.latencyMs) && p.latencyMs! >= 0)).toBe(true);
-    // Web, API and RPC come from the watchdog (its reported latency), not from direct fetches.
-    expect(
-      byId(probes.map((p) => ({ component: p.component, state: String(p.latencyMs) }))),
-    ).toMatchObject({
-      web: '120',
-      api: '80',
-      rpc: '150',
-    });
-    expect(world.direct).toEqual([]);
+    // No push token (local runs): web, API and RPC are probed directly.
+    expect(world.direct.sort()).toEqual(['api.example', 'rpc.example', 'web.example']);
     const rows = await sql<{ component: string; state: string }[]>`
       select component, state from status_probes order by component
     `;
@@ -55,16 +48,75 @@ describe('status page probes', () => {
     expect(await sql`select 1 from status_incidents`).toHaveLength(0);
   });
 
-  it('probes web, API and RPC directly when the watchdog binding is absent or broken', async () => {
-    const { deps, world } = await statusSetup(sql, clock);
-    world.watchdog = null;
-    expect(Object.values(byId(await runStatusProbes(deps)))).toEqual(ids.map(() => 'operational'));
-    expect(world.direct.sort()).toEqual(['api.example', 'rpc.example', 'web.example']);
-    world.direct = [];
-    world.watchdog = 'broken';
-    world.api = false;
-    expect(byId(await runStatusProbes(deps)).api).toBe('down');
-    expect(world.direct).toContain('api.example');
+  it('with a push token the cron leaves web, API and RPC to the watchdog push', async () => {
+    const { deps, world } = await statusSetup(sql, clock, { STATUS_PUSH_TOKEN: STATUS_PUSH });
+    const probes = await statusTick(deps);
+    expect(probes.map((p) => p.component).sort()).toEqual(['auth', 'db', 'escrow', 'uploads']);
+    expect(world.direct).toEqual([]);
+    const app = createApp(deps);
+    const push = (auth: string, body: unknown) =>
+      app.request('/api/v1/internal/status/external', {
+        method: 'POST',
+        headers: { authorization: auth, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    const checks = [
+      { name: 'web', ok: true, ms: 120 },
+      { name: 'api', ok: true, ms: 4000 },
+      { name: 'rpc', ok: false, ms: 10000 },
+    ];
+    expect((await push('', { checks })).status).toBe(401);
+    expect((await push(`Bearer ${STATUS_TOKEN}`, { checks })).status).toBe(401);
+    expect(
+      (await push(`Bearer ${STATUS_PUSH}`, { checks: [{ name: 'db', ok: true, ms: 1 }] })).status,
+    ).toBe(400);
+    expect(
+      (
+        await push(`Bearer ${STATUS_PUSH}`, {
+          checks: [
+            { name: 'web', ok: true, ms: 1, detail: 'x' },
+            { name: 'web', ok: true, ms: 2 },
+          ],
+        })
+      ).status,
+    ).toBe(400);
+    const ok = await push(`Bearer ${STATUS_PUSH}`, { checks });
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ recorded: 3 });
+    const rows = await sql<{ component: string; state: string; latency_ms: number }[]>`
+      select component, state, latency_ms from status_probes
+      where component in ('web', 'api', 'rpc') order by component
+    `;
+    expect(rows).toEqual([
+      { component: 'api', state: 'degraded', latency_ms: 4000 },
+      { component: 'rpc', state: 'down', latency_ms: 10000 },
+      { component: 'web', state: 'operational', latency_ms: 120 },
+    ]);
+    // An open alert for a pushed component applies too (code only).
+    await sql`
+      insert into ops_alerts (code, level, message, first_at, last_at)
+      values ('HTTP_5XX_SPIKE', 'critical', '12 API 5xx responses', now(), now())
+      on conflict (code) do update set resolved_at = null
+    `;
+    await push(`Bearer ${STATUS_PUSH}`, { checks: [{ name: 'api', ok: true, ms: 50 }] });
+    const [api] = await sql<{ state: string }[]>`
+      select state from status_probes where component = 'api' order by id desc limit 1
+    `;
+    expect(api!.state).toBe('degraded');
+    await sql`delete from ops_alerts where code = 'HTTP_5XX_SPIKE'`;
+  });
+
+  it('a short or default push token never opens the push route', async () => {
+    for (const token of ['short', 'change-me-change-me-change-me-change-me']) {
+      const { deps } = await statusSetup(sql, clock, { STATUS_PUSH_TOKEN: token });
+      expect(deps.env.statusPushToken).toBe('');
+      const res = await createApp(deps).request('/api/v1/internal/status/external', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ checks: [{ name: 'web', ok: true, ms: 1 }] }),
+      });
+      expect(res.status).toBe(401);
+    }
   });
 
   it('marks failures down, slow answers degraded', async () => {
@@ -73,14 +125,14 @@ describe('status page probes', () => {
     world.rpc = false;
     world.program = false;
     world.blobBroken = true;
-    world.watchdogMs.api = 4000;
+    world.api = false;
     const states = byId(await runStatusProbes(deps));
     expect(states).toMatchObject({
       web: 'down',
       rpc: 'down',
       escrow: 'down',
       uploads: 'down',
-      api: 'degraded',
+      api: 'down',
       db: 'operational',
       auth: 'operational',
     });
@@ -130,14 +182,13 @@ describe('status page probes', () => {
 
   it('opens one incident per component, escalates it, and resolves it on recovery', async () => {
     const { deps, world } = await statusSetup(sql, clock);
-    world.watchdogMs.rpc = 5000;
-    await statusTick(deps);
+    // Degraded first (a slow pushed check), then down, then recovered.
+    await recordStatus(deps, [{ component: 'rpc', state: 'degraded', latencyMs: 5000 }]);
     clock.now = new Date(clock.now.getTime() + 5 * 60_000);
     world.rpc = false;
     await statusTick(deps);
     clock.now = new Date(clock.now.getTime() + 5 * 60_000);
     world.rpc = true;
-    world.watchdogMs.rpc = 150;
     await statusTick(deps);
     const incidents = await sql<
       {
