@@ -178,3 +178,43 @@ test('purchases fit a phone screen', async ({ page }) => {
   await expect(page.getByTestId('order-card').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test('prototype layout: large title, three stat tiles, rounded order cards in a 5xl column', async ({
+  page,
+}) => {
+  await stub(page, orders(Date.now()));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/me/purchases');
+  const h1 = page.getByRole('heading', { level: 1, name: 'Purchases' });
+  await expect(h1).toBeVisible();
+  await expect(page.getByTestId('purchase-stats')).toBeVisible();
+  await expect.poll(() => h1.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBe(48);
+  const stats = page.getByTestId('purchase-stats');
+  await expect(stats.locator(':scope > div')).toHaveCount(3);
+  await expect(stats).toContainText('2.10 SOL');
+  await expect(stats).toContainText('2 orders · ≈ $378.00');
+  expect((await page.getByTestId('dashboard').boundingBox())!.width).toBeLessThanOrEqual(1024);
+  const card = page.getByTestId('order-card').first();
+  expect(await card.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('24px');
+});
+
+test('dispute page: prototype layout with reasons in two columns and a danger submit', async ({
+  page,
+}) => {
+  await stub(page, orders(Date.now()));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/me/purchases/aaaaaaaa-0000-4000-8000-000000000001/dispute');
+  const h1 = page.getByRole('heading', { level: 1, name: 'Open a dispute' });
+  await expect(h1).toBeVisible();
+  await expect.poll(() => h1.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBe(48);
+  const reasons = page.getByTestId('dispute-reasons').locator('label');
+  const [first, second] = await Promise.all([
+    reasons.nth(0).boundingBox(),
+    reasons.nth(1).boundingBox(),
+  ]);
+  expect(Math.abs(first!.y - second!.y)).toBeLessThan(2);
+  await reasons.nth(1).click();
+  await expect(reasons.nth(1).locator('input')).toBeChecked();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
