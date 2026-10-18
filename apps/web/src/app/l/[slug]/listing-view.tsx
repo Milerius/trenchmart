@@ -9,6 +9,7 @@ import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import { Markdown } from '@/components/markdown';
 import { ReviewsPanel } from '@/components/reviews';
+import { RankPanel, UpvoteChip, UpvotePanel, useUpvotes } from '@/components/upvotes';
 import {
   Button,
   ButtonLink,
@@ -107,6 +108,7 @@ export function ListingView({ initial }: { initial: Listing | null }) {
   const [tab, setTab] = useState<Tab>('overview');
   const [versions, setVersions] = useState<VersionNote[]>([]);
   const [reviewCount, setReviewCount] = useState<number | null>(null);
+  const upvotes = useUpvotes(params.slug);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [step, setStep] = useState<Step>('idle');
   const [message, setMessage] = useState('');
@@ -252,10 +254,20 @@ export function ListingView({ initial }: { initial: Listing | null }) {
           </span>
           {verified ? <StatusTag status="live" /> : <Tag tone="warn">NOT VERIFIED</Tag>}
           {listing.holderOnly ? <Tag tone="info">HOLDER-ONLY</Tag> : null}
+          {upvotes.state?.rank?.category && upvotes.state.rank.category <= 10 ? (
+            <Tag tone="info">
+              #{upvotes.state.rank.category} in {meta.label}
+            </Tag>
+          ) : null}
         </div>
-        <h1 className="mt-3 text-[34px] font-semibold leading-tight tracking-[-0.03em]">
-          {listing.title}
-        </h1>
+        <div className="mt-3 flex items-start justify-between gap-4">
+          <h1 className="m-0 text-[34px] font-semibold leading-tight tracking-[-0.03em]">
+            {listing.title}
+          </h1>
+          <span className="mt-1.5 shrink-0">
+            <UpvoteChip upvotes={upvotes} />
+          </span>
+        </div>
         <p className="mt-2 text-[17px] text-ink-2">{listing.summary}</p>
         <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
           <CreatorLink creator={listing.creator} />
@@ -361,131 +373,136 @@ export function ListingView({ initial }: { initial: Listing | null }) {
         </div>
       </div>
 
-      <aside
-        id="checkout"
-        data-testid="checkout"
-        aria-label="Checkout"
-        className="rounded-panel border border-line bg-surface lg:sticky lg:top-6"
-      >
-        <div className="border-b border-line-soft p-5">
-          <Label>Price</Label>
-          <div className="mt-1 text-2xl font-semibold">
-            <Money lamports={listing.price} centsPerSol={centsPerSol} strong />
+      <div className="space-y-4">
+        <aside
+          id="checkout"
+          data-testid="checkout"
+          aria-label="Checkout"
+          className="rounded-panel border border-line bg-surface"
+        >
+          <div className="border-b border-line-soft p-5">
+            <Label>Price</Label>
+            <div className="mt-1 text-2xl font-semibold">
+              <Money lamports={listing.price} centsPerSol={centsPerSol} strong />
+            </div>
+            {tier ? (
+              <p className="mt-1 text-[13px] text-ink-2">
+                Your tier: <span className="text-accent">{TIER_LABEL[tier] ?? tier}</span>
+              </p>
+            ) : null}
           </div>
-          {tier ? (
-            <p className="mt-1 text-[13px] text-ink-2">
-              Your tier: <span className="text-accent">{TIER_LABEL[tier] ?? tier}</span>
-            </p>
-          ) : null}
-        </div>
-        <div className="space-y-4 p-5">
-          {!wallet.session ? <PreviewNotice compact /> : null}
-          <FeeBreakdown
-            price={listing.price}
-            config={config}
-            tier={tier}
-            centsPerSol={centsPerSol}
-            quoted={quote}
-          />
-          {quote ? (
-            <p data-testid="tier-pill" className="m-0 text-xs text-muted">
-              Quote locked for tier {TIER_LABEL[quote.tier] ?? quote.tier}
-            </p>
-          ) : null}
-          {step !== 'idle' ? <CheckoutProgress step={step} /> : null}
-          {step === 'done' ? (
-            <div
-              data-testid="escrow-success"
-              className="escrow-success rounded-ctl border border-accent-line bg-accent-bg p-4"
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  aria-hidden="true"
-                  className="escrow-check grid h-9 w-9 place-items-center rounded-full bg-accent font-mono text-sm font-bold text-onaccent"
-                >
-                  ✓
-                </span>
-                <div>
-                  <p className="m-0 font-semibold text-ink">Paid · in escrow</p>
-                  <p role="status" className="m-0 mt-1 text-sm text-ink-2">
-                    {message ||
-                      `Your SOL is in escrow for ${escrowWindowLabel(escrowHours)}. Your download is ready in Purchases now.`}
-                  </p>
+          <div className="space-y-4 p-5">
+            {!wallet.session ? <PreviewNotice compact /> : null}
+            <FeeBreakdown
+              price={listing.price}
+              config={config}
+              tier={tier}
+              centsPerSol={centsPerSol}
+              quoted={quote}
+            />
+            {quote ? (
+              <p data-testid="tier-pill" className="m-0 text-xs text-muted">
+                Quote locked for tier {TIER_LABEL[quote.tier] ?? quote.tier}
+              </p>
+            ) : null}
+            {step !== 'idle' ? <CheckoutProgress step={step} /> : null}
+            {step === 'done' ? (
+              <div
+                data-testid="escrow-success"
+                className="escrow-success rounded-ctl border border-accent-line bg-accent-bg p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="escrow-check grid h-9 w-9 place-items-center rounded-full bg-accent font-mono text-sm font-bold text-onaccent"
+                  >
+                    ✓
+                  </span>
+                  <div>
+                    <p className="m-0 font-semibold text-ink">Paid · in escrow</p>
+                    <p role="status" className="m-0 mt-1 text-sm text-ink-2">
+                      {message ||
+                        `Your SOL is in escrow for ${escrowWindowLabel(escrowHours)}. Your download is ready in Purchases now.`}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : null}
-          {step === 'done' ? (
-            <ButtonLink href="/me/purchases" variant="secondary" className="w-full">
-              View order {orderId.slice(0, 8)} in Purchases
-            </ButtonLink>
-          ) : (
-            <Button
-              data-testid="buy"
-              size="lg"
-              className="w-full"
-              disabled={busy || wallet.busy}
-              aria-busy={busy || undefined}
-              onClick={() => void buy()}
-            >
-              {buyLabel(step, !!wallet.session, wallet.busy)}
-            </Button>
-          )}
-          {message && step === 'failed' ? (
-            <p role="alert" data-testid="toast" className="toast m-0 text-sm text-danger">
-              {message}
+            ) : null}
+            {step === 'done' ? (
+              <ButtonLink href="/me/purchases" variant="secondary" className="w-full">
+                View order {orderId.slice(0, 8)} in Purchases
+              </ButtonLink>
+            ) : (
+              <Button
+                data-testid="buy"
+                size="lg"
+                className="w-full"
+                disabled={busy || wallet.busy}
+                aria-busy={busy || undefined}
+                onClick={() => void buy()}
+              >
+                {buyLabel(step, !!wallet.session, wallet.busy)}
+              </Button>
+            )}
+            {message && step === 'failed' ? (
+              <p role="alert" data-testid="toast" className="toast m-0 text-sm text-danger">
+                {message}
+              </p>
+            ) : null}
+            <ul className="m-0 space-y-2 p-0 text-[13px] text-ink-2">
+              <li className="flex list-none gap-2">
+                <ShieldIcon className="h-4 w-4 shrink-0 text-accent" />
+                Held in escrow for {escrowWindowLabel(escrowHours)}. Dispute any time in that
+                window.
+              </li>
+              <li className="flex list-none gap-2">
+                <span className="shrink-0 text-muted">
+                  <LockIcon />
+                </span>
+                Download once payment is confirmed in escrow. Watermarked to your wallet.
+              </li>
+              <li data-testid="update-policy" className="flex list-none gap-2">
+                <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
+                  ↻
+                </span>
+                <span>
+                  {updatePolicyText(listing.updatePrice, config?.updateFreeDays ?? 30)}. Every
+                  version you were entitled to stays downloadable.
+                </span>
+              </li>
+              <li data-testid="escrow-program" className="flex list-none gap-2">
+                <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
+                  ⛓
+                </span>
+                <span>
+                  Escrow program{' '}
+                  <a
+                    href={explorerAddress(ESCROW_PROGRAM_ID)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-ink-2 underline decoration-line-control underline-offset-2 hover:text-ink"
+                  >
+                    {shortKey(ESCROW_PROGRAM_ID)} ↗
+                  </a>{' '}
+                  on devnet. Your receipt shows the escrow account and its on-chain release time.
+                </span>
+              </li>
+              <li data-testid="devnet-hint" className="flex list-none gap-2">
+                <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
+                  ◎
+                </span>
+                Devnet only. Switch your wallet to Solana Devnet before paying (Phantom: Settings →
+                Developer Settings → Testnet Mode).
+              </li>
+            </ul>
+            <p className="m-0 border-t border-line-soft pt-3 text-xs text-muted">
+              License: {listing.license} · creator bond {solText(listing.creator.bondLamports)}
             </p>
-          ) : null}
-          <ul className="m-0 space-y-2 p-0 text-[13px] text-ink-2">
-            <li className="flex list-none gap-2">
-              <ShieldIcon className="h-4 w-4 shrink-0 text-accent" />
-              Held in escrow for {escrowWindowLabel(escrowHours)}. Dispute any time in that window.
-            </li>
-            <li className="flex list-none gap-2">
-              <span className="shrink-0 text-muted">
-                <LockIcon />
-              </span>
-              Download once payment is confirmed in escrow. Watermarked to your wallet.
-            </li>
-            <li data-testid="update-policy" className="flex list-none gap-2">
-              <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
-                ↻
-              </span>
-              <span>
-                {updatePolicyText(listing.updatePrice, config?.updateFreeDays ?? 30)}. Every version
-                you were entitled to stays downloadable.
-              </span>
-            </li>
-            <li data-testid="escrow-program" className="flex list-none gap-2">
-              <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
-                ⛓
-              </span>
-              <span>
-                Escrow program{' '}
-                <a
-                  href={explorerAddress(ESCROW_PROGRAM_ID)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-ink-2 underline decoration-line-control underline-offset-2 hover:text-ink"
-                >
-                  {shortKey(ESCROW_PROGRAM_ID)} ↗
-                </a>{' '}
-                on devnet. Your receipt shows the escrow account and its on-chain release time.
-              </span>
-            </li>
-            <li data-testid="devnet-hint" className="flex list-none gap-2">
-              <span aria-hidden="true" className="w-4 shrink-0 text-center text-muted">
-                ◎
-              </span>
-              Devnet only. Switch your wallet to Solana Devnet before paying (Phantom: Settings →
-              Developer Settings → Testnet Mode).
-            </li>
-          </ul>
-          <p className="m-0 border-t border-line-soft pt-3 text-xs text-muted">
-            License: {listing.license} · creator bond {solText(listing.creator.bondLamports)}
-          </p>
-        </div>
-      </aside>
+          </div>
+        </aside>
+        <UpvotePanel upvotes={upvotes} />
+        <RankPanel upvotes={upvotes} />
+      </div>
 
       <div
         hidden={checkoutVisible}

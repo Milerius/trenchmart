@@ -10,6 +10,7 @@ import {
   type WeightReason,
 } from '@trenchmart/shared';
 import { HttpError, loadConfig, tierForWallet, type Deps } from './logic';
+import { reweighUpvotesOf } from './ranking';
 import { xVerified } from './x-oauth';
 
 /** Shared plumbing for the social routes (reviews, votes, ranking, featuring). */
@@ -195,7 +196,7 @@ export async function scanWalletIntel(deps: Deps, limit = 4): Promise<number> {
   return done;
 }
 
-/** Recomputes the stored weight of every helpful vote and report cast by this wallet. */
+/** Recomputes the stored weight of every helpful vote and upvote cast by this wallet. */
 export async function reweighVotesOf(deps: Deps, wallet: string, config: SocialConfig) {
   const users = await deps.sql<Row[]>`select * from users where wallet = ${wallet}`;
   const user = users[0];
@@ -213,6 +214,7 @@ export async function reweighVotesOf(deps: Deps, wallet: string, config: SocialC
     `;
     await tallyReviewVotes(deps, vote.review_id as string);
   }
+  await reweighUpvotesOf(deps, user);
 }
 
 export async function tallyReviewVotes(deps: Deps, reviewId: string): Promise<void> {

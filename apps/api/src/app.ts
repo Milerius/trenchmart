@@ -78,6 +78,7 @@ import {
 } from './profile';
 import { studioOverview } from './studio';
 import { registerReviewRoutes } from './reviews';
+import { computeRanks, registerUpvoteRoutes } from './ranking';
 import { scanWalletIntel } from './social';
 import {
   activeBond,
@@ -591,6 +592,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   // Reviews, creator replies, helpful votes, reports, moderation (reviews.ts).
   registerReviewRoutes(api, deps);
+  // Weighted listing upvotes (ranking.ts).
+  registerUpvoteRoutes(api, deps);
 
   api.get('/creators/top', async (c) => {
     const rows = await deps.sql<Record<string, any>[]>`
@@ -1598,6 +1601,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (job === 'release') return c.json({ released: await releaseOrders(deps) });
     if (job === 'payouts') return c.json({ batch: await proposePayouts(deps) });
     if (job === 'ledger') return c.json(jsonSafe({ vault: await ledgerVault(deps.sql) }));
+    if (job === 'ranking')
+      return c.json(jsonSafe({ ranks: await computeRanks(deps, { force: true }) }));
     if (job === 'wallet-intel') return c.json({ scanned: await scanWalletIntel(deps) });
     if (job === 'optimize-media') return c.json({ optimized: await optimizeStoredImages(deps) });
     throw new HttpError(404, 'NOT_FOUND', 'unknown job');
@@ -1684,6 +1689,11 @@ function publicListing(listing: Record<string, any>) {
     sales7d: listing.sales_7d,
     ratingAvg: listing.rating_avg,
     ratingCount: listing.rating_count,
+    upvotes: listing.upvote_count ?? 0,
+    rank:
+      listing.rank_category || listing.rank_overall
+        ? { category: listing.rank_category ?? null, overall: listing.rank_overall ?? null }
+        : null,
     firstLiveAt: listing.first_live_at,
     delistedAt: listing.delisted_at,
     updatePrice: listing.update_price ?? null,
@@ -1814,7 +1824,9 @@ async function searchListings(
           ? 'l.price desc'
           : sort === 'rating'
             ? 'l.rating_avg desc nulls last'
-            : 'l.sales_7d desc';
+            : sort === 'top'
+              ? 'l.rank_overall asc nulls last, l.sales_7d desc'
+              : 'l.sales_7d desc';
   // Padre links resolve to Terminal; matching ignores case (the Trojan listing stored 'trojan').
   const terminalFilter = query.terminal
     ? (canonicalTerminal(query.terminal) ?? query.terminal)

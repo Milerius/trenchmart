@@ -22,7 +22,11 @@ export const EDGE_RULES: Rule[] = [
   { pattern: /^\/api\/v1\/(categories|config\/public|stats|prices\/sol)$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/creators\/(top|[^/]+)$/, fresh: 60, stale: 600 },
   { pattern: /^\/api\/v1\/listings$/, fresh: 30, stale: 300 },
-  { pattern: /^\/api\/v1\/listings\/[^/]+(\/(versions|reviews|report))?$/, fresh: 60, stale: 600 },
+  {
+    pattern: /^\/api\/v1\/listings\/[^/]+(\/(versions|reviews|report|upvotes))?$/,
+    fresh: 60,
+    stale: 600,
+  },
 ];
 
 export function ruleFor(request: Request): Rule | null {

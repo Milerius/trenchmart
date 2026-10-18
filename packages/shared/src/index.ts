@@ -20,3 +20,4 @@ export * from './versioning';
 export * from './profile';
 export * from './listing-kinds';
 export * from './social';
+export * from './ranking';
