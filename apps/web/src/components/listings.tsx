@@ -6,6 +6,7 @@ import { quote } from '@trenchmart/shared/fee';
 import { rankBadge } from '@trenchmart/shared/ranking';
 import { TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared/terminals';
 import { TerminalNames } from '@/components/terminal-logo';
+import { Spot } from '@/components/spot';
 import { Money, Skeleton, EmptyState, Tag } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
 import { CARD_SIZES, mediaSrcSet } from '@/lib/media';
@@ -61,92 +62,96 @@ export function ListingCard({
     : null;
   const rating = listing.ratingAvg ? Number(listing.ratingAvg) : null;
   return (
-    <Link
-      data-testid="listing-card"
-      href={`/l/${listing.slug}`}
-      className="motion-card group flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface hover:border-line-strong"
-    >
-      <CardCover
-        listing={listing}
-        color={meta.color}
-        bg={meta.bg}
-        tag={meta.tag}
-        priority={priority}
-      />
-      <div
-        className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3"
-        style={{ background: meta.bg }}
+    <Spot color={meta.color} className="motion-card group h-full">
+      <Link
+        data-testid="listing-card"
+        href={`/l/${listing.slug}`}
+        className="flex h-full flex-col overflow-hidden rounded-[inherit]"
       >
-        <span
-          className="font-mono text-[11px] font-semibold tracking-wide"
-          style={{ color: meta.color }}
+        <CardCover
+          listing={listing}
+          color={meta.color}
+          bg={meta.bg}
+          tag={meta.tag}
+          priority={priority}
+        />
+        <div
+          className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3"
+          style={{ background: meta.bg }}
         >
-          {meta.tag}
-        </span>
-        <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-          {listing.sponsored ? (
-            <Tag
-              tone="warn"
-              data-testid="sponsored-tag"
-              title="Paid placement. Never affects ranking."
-            >
-              <span aria-hidden="true">★</span> FEATURED · SPONSORED
+          <span
+            className="font-mono text-[11px] font-semibold tracking-wide"
+            style={{ color: meta.color }}
+          >
+            {meta.tag}
+          </span>
+          <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+            {listing.sponsored ? (
+              <Tag
+                tone="warn"
+                data-testid="sponsored-tag"
+                title="Paid placement. Never affects ranking."
+              >
+                <span aria-hidden="true">★</span> FEATURED · SPONSORED
+              </Tag>
+            ) : null}
+            {!listing.sponsored && rankBadge(listing.rank?.category, meta.label) ? (
+              <Tag tone="info" data-testid="rank-badge">
+                {rankBadge(listing.rank?.category, meta.label)}
+              </Tag>
+            ) : null}
+            <Tag tone="ok">
+              <span aria-hidden="true">✓</span> REVIEWED
             </Tag>
-          ) : null}
-          {!listing.sponsored && rankBadge(listing.rank?.category, meta.label) ? (
-            <Tag tone="info" data-testid="rank-badge">
-              {rankBadge(listing.rank?.category, meta.label)}
-            </Tag>
-          ) : null}
-          <Tag tone="ok">
-            <span aria-hidden="true">✓</span> REVIEWED
-          </Tag>
-        </span>
-      </div>
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="m-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-accent-hover">
-          {listing.title}
-        </h3>
-        <p className="m-0 line-clamp-2 text-sm text-ink-2">{listing.summary}</p>
-        {listing.terminals.length ? (
-          <p className="m-0 font-mono text-[11px] text-muted" data-testid="card-terminals">
-            <TerminalNames names={listing.terminals} />
-          </p>
-        ) : null}
-        <div className="mt-auto flex items-center gap-3 pt-2 text-[13px] text-muted">
-          {listing.handle ? <span className="text-ink-2">@{listing.handle}</span> : null}
-          {listing.sales7d ? <span>{listing.sales7d} sold this week</span> : null}
-          {rating ? (
-            <span>
-              <span aria-hidden="true">★</span> {rating.toFixed(1)}
-              <span className="sr-only"> out of 5</span>
-            </span>
-          ) : null}
-          {listing.upvotes ? (
-            <span data-testid="card-upvotes" className="ml-auto font-mono text-xs">
-              <span aria-hidden="true">▲</span> {listing.upvotes}
-              <span className="sr-only"> upvotes</span>
-            </span>
-          ) : null}
+          </span>
         </div>
-      </div>
-      <div className="flex items-end justify-between gap-3 border-t border-line-soft bg-inset px-4 py-3">
-        {total !== null ? (
-          <div className="min-w-0">
-            <p className="m-0 font-mono text-[11px] uppercase tracking-wide text-muted">You pay</p>
-            <Money lamports={total} centsPerSol={pricing.centsPerSol} strong />
+        <div className="flex flex-1 flex-col gap-2 p-4">
+          <h3 className="m-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-accent-hover">
+            {listing.title}
+          </h3>
+          <p className="m-0 line-clamp-2 text-sm text-ink-2">{listing.summary}</p>
+          {listing.terminals.length ? (
+            <p className="m-0 font-mono text-[11px] text-muted" data-testid="card-terminals">
+              <TerminalNames names={listing.terminals} />
+            </p>
+          ) : null}
+          <div className="mt-auto flex items-center gap-3 pt-2 text-[13px] text-muted">
+            {listing.handle ? <span className="text-ink-2">@{listing.handle}</span> : null}
+            {listing.sales7d ? <span>{listing.sales7d} sold this week</span> : null}
+            {rating ? (
+              <span>
+                <span aria-hidden="true">★</span> {rating.toFixed(1)}
+                <span className="sr-only"> out of 5</span>
+              </span>
+            ) : null}
+            {listing.upvotes ? (
+              <span data-testid="card-upvotes" className="ml-auto font-mono text-xs">
+                <span aria-hidden="true">▲</span> {listing.upvotes}
+                <span className="sr-only"> upvotes</span>
+              </span>
+            ) : null}
           </div>
-        ) : (
-          <div className="min-w-0">
-            <Money lamports={listing.price} centsPerSol={pricing.centsPerSol} strong />
-            <p className="m-0 text-xs text-muted">+ 5% buyer fee · your tier can cut it</p>
-          </div>
-        )}
-        <span className="shrink-0 font-mono text-xs text-accent" aria-hidden="true">
-          View →
-        </span>
-      </div>
-    </Link>
+        </div>
+        <div className="flex items-end justify-between gap-3 border-t border-line-soft bg-inset px-4 py-3">
+          {total !== null ? (
+            <div className="min-w-0">
+              <p className="m-0 font-mono text-[11px] uppercase tracking-wide text-muted">
+                You pay
+              </p>
+              <Money lamports={total} centsPerSol={pricing.centsPerSol} strong />
+            </div>
+          ) : (
+            <div className="min-w-0">
+              <Money lamports={listing.price} centsPerSol={pricing.centsPerSol} strong />
+              <p className="m-0 text-xs text-muted">+ 5% buyer fee · your tier can cut it</p>
+            </div>
+          )}
+          <span className="shrink-0 font-mono text-xs text-accent" aria-hidden="true">
+            View →
+          </span>
+        </div>
+      </Link>
+    </Spot>
   );
 }
 

@@ -146,3 +146,88 @@ test.describe('phase 3: buttons and pills', () => {
     );
   });
 });
+
+test.describe('phase 4: cards', () => {
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const CARD_LISTING = {
+    id: 'listing-1',
+    slug: 'bundle-detector-overlay',
+    title: 'Bundle Detector Overlay',
+    summary: 'Overlay that flags bundled launches on Axiom.',
+    category: 'userscript',
+    terminals: ['Axiom'],
+    price: '1200000000',
+    handle: 'rugradar',
+    sales7d: 3,
+    ratingAvg: '4.90',
+    cover: { url: 'https://media.trenchmart.test/cover.png', alt: 'Overlay on an Axiom chart' },
+    imageCount: 2,
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await page.route('https://media.trenchmart.test/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: PNG }),
+    );
+    await page.route('**/api/v1/**', async (route) => {
+      const path = new URL(route.request().url()).pathname.replace('/api/v1', '');
+      if (path === '/listings') return route.fulfill({ status: 200, json: [CARD_LISTING] });
+      return route.fulfill({ status: 404, json: { error: { code: 'NOT_FOUND', message: 'x' } } });
+    });
+  });
+
+  test('listing cards are SpotlightCards that keep the real cover and light up on hover', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const card = page.getByTestId('listing-card').first();
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('img', { name: 'Overlay on an Axiom chart' })).toBeVisible();
+    await expect(card.getByRole('heading', { name: 'Bundle Detector Overlay' })).toBeVisible();
+    const spot = card.locator('xpath=..');
+    expect(await spot.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('16px');
+    // The light layer is the first aria-hidden span; it fades in while the pointer is over the card.
+    const light = spot.locator(':scope > span').first();
+    expect(Number(await light.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
+    await card.hover();
+    await expect
+      .poll(async () => Number(await light.evaluate((el) => getComputedStyle(el).opacity)))
+      .toBeGreaterThan(0.05);
+    await card.click();
+    await expect(page).toHaveURL(/\/l\/bundle-detector-overlay$/);
+  });
+
+  test('a card far from the pointer stays dark; reduced motion still lights the hovered card', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const card = page.getByTestId('listing-card').first();
+    await expect(card).toBeVisible();
+    const light = card.locator('xpath=..').locator(':scope > span').first();
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(400);
+    expect(Number(await light.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await card.hover();
+    await expect
+      .poll(async () => Number(await light.evaluate((el) => getComputedStyle(el).opacity)))
+      .toBeGreaterThan(0.05);
+  });
+
+  test('category and trust cards keep their names and links', async ({ page }) => {
+    await page.goto('/');
+    const categories = page.getByRole('region', { name: 'Find your edge' });
+    const userscripts = categories.getByRole('link', { name: /Userscripts/i }).first();
+    await userscripts.scrollIntoViewIfNeeded();
+    expect(
+      await userscripts.evaluate((el) => getComputedStyle(el.parentElement!).borderRadius),
+    ).toBe('16px');
+    await expect(
+      page.getByRole('heading', { name: 'Escrow on every order', exact: true }),
+    ).toBeAttached();
+    await userscripts.click();
+    await expect(page).toHaveURL(/\/c\/userscript$/);
+  });
+});

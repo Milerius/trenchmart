@@ -4,6 +4,7 @@ import type { PublicIdentity } from '@trenchmart/shared/social';
 import Link from 'next/link';
 import { XIcon } from '@/components/icons';
 import { Avatar, VerifiedBadge } from '@/components/profile';
+import { Spot } from '@/components/spot';
 import { Money, Tag } from '@/components/ui';
 
 /** Creator leaderboard rows (API: GET /creators/leaderboard) and their small visuals. */
@@ -228,38 +229,44 @@ export function CreatorCards({
     <ol className="m-0 grid grid-cols-2 gap-3 p-0 md:grid-cols-3 xl:grid-cols-6">
       {rows.map((row) => (
         <li key={row.creator.wallet} className="list-none">
-          <Link
-            href={profileHref(row.creator)}
-            data-testid="creator-card"
-            className="motion-card flex h-full flex-col items-center gap-2 rounded-card border border-line bg-surface p-4 text-center hover:border-line-strong"
+          <Spot
+            color={row.position === 1 ? '#C6F432' : '#7CC4FF'}
+            alpha="30"
+            className="motion-card h-full"
           >
-            <span className="flex h-5 w-full items-center justify-between font-mono text-[11px] text-muted">
-              #{row.position}
-              <Movement row={row} />
-            </span>
-            <CreatorAvatar who={row.creator} className="h-14 w-14 text-base" />
-            <CreatorName who={row.creator} className="max-w-full justify-center text-sm" />
-            <span className="text-[11px] text-muted">
-              <KindLabel who={row.creator} />
-            </span>
-            <span className="mt-1 text-sm">
-              <Headline row={row} tab={tab} centsPerSol={centsPerSol} />
-            </span>
-            <span className="mt-auto grid w-full grid-cols-3 gap-1 border-t border-line-soft pt-2 font-mono text-[11px] text-ink-2">
-              <span>
-                {row.sales}
-                <span className="block text-muted">sales</span>
+            <Link
+              href={profileHref(row.creator)}
+              data-testid="creator-card"
+              className="flex h-full flex-col items-center gap-2 rounded-[inherit] p-4 text-center"
+            >
+              <span className="flex h-5 w-full items-center justify-between font-mono text-[11px] text-muted">
+                #{row.position}
+                <Movement row={row} />
               </span>
-              <span>
-                {row.rating ? `★ ${row.rating.avg.toFixed(1)}` : '–'}
-                <span className="block text-muted">rating</span>
+              <CreatorAvatar who={row.creator} className="h-14 w-14 text-base" />
+              <CreatorName who={row.creator} className="max-w-full justify-center text-sm" />
+              <span className="text-[11px] text-muted">
+                <KindLabel who={row.creator} />
               </span>
-              <span>
-                {row.upvotes.raw}
-                <span className="block text-muted">upvotes</span>
+              <span className="mt-1 text-sm">
+                <Headline row={row} tab={tab} centsPerSol={centsPerSol} />
               </span>
-            </span>
-          </Link>
+              <span className="mt-auto grid w-full grid-cols-3 gap-1 border-t border-line-soft pt-2 font-mono text-[11px] text-ink-2">
+                <span>
+                  {row.sales}
+                  <span className="block text-muted">sales</span>
+                </span>
+                <span>
+                  {row.rating ? `★ ${row.rating.avg.toFixed(1)}` : '–'}
+                  <span className="block text-muted">rating</span>
+                </span>
+                <span>
+                  {row.upvotes.raw}
+                  <span className="block text-muted">upvotes</span>
+                </span>
+              </span>
+            </Link>
+          </Spot>
         </li>
       ))}
     </ol>

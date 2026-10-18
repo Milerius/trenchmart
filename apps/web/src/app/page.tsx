@@ -27,6 +27,7 @@ import {
 } from '@/components/ui';
 import { CountUp, HeroField, Reveal } from '@/components/motion';
 import { PrimaryCta } from '@/components/cta';
+import { Spot } from '@/components/spot';
 import { api } from '@/lib/api';
 import { recentRead, rememberRead } from '@/lib/recent';
 import { usePublicConfig } from '@/lib/config';
@@ -312,19 +313,21 @@ export default function HomePage() {
           <ul className="mt-8 grid gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
             {CATEGORIES.map((cat) => (
               <li key={cat.code} className="list-none">
-                <Link
-                  href={`/c/${cat.code}`}
-                  className="motion-card flex h-full flex-col gap-2 rounded-card border border-line bg-surface p-5 hover:border-line-strong"
-                >
-                  <span
-                    className="font-mono text-[11px] tracking-wide"
-                    style={{ color: cat.color }}
+                <Spot color={cat.color} alpha="40" shape="beam" className="motion-card h-full">
+                  <Link
+                    href={`/c/${cat.code}`}
+                    className="flex h-full flex-col gap-2 rounded-[inherit] p-5"
                   >
-                    {cat.short}
-                  </span>
-                  <span className="text-base font-semibold">{cat.label}</span>
-                  <span className="text-sm text-ink-2">{cat.desc}</span>
-                </Link>
+                    <span
+                      className="font-mono text-[11px] tracking-wide"
+                      style={{ color: cat.color }}
+                    >
+                      {cat.short}
+                    </span>
+                    <span className="text-base font-semibold">{cat.label}</span>
+                    <span className="text-sm text-ink-2">{cat.desc}</span>
+                  </Link>
+                </Spot>
               </li>
             ))}
           </ul>
@@ -372,14 +375,13 @@ export default function HomePage() {
                 'Each file is statically scanned; scripts also run in an isolated sandbox with logged network calls. A rules engine and an LLM then review it; the stricter verdict wins.',
               ],
             ].map(([title, body]) => (
-              <div
-                key={title}
-                className="motion-card rounded-card border border-line bg-surface p-5"
-              >
-                <ShieldIcon className="text-accent" />
-                <h3 className="mt-3 text-base font-semibold">{title}</h3>
-                <p className="mt-2 text-sm text-ink-2">{body}</p>
-              </div>
+              <Spot key={title} alpha="33" className="motion-card">
+                <div className="p-5">
+                  <ShieldIcon className="text-accent" />
+                  <h3 className="mt-3 text-base font-semibold">{title}</h3>
+                  <p className="mt-2 text-sm text-ink-2">{body}</p>
+                </div>
+              </Spot>
             ))}
           </div>
         </section>
