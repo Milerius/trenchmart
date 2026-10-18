@@ -1,5 +1,4 @@
-# External watchdog Worker (src/watchdog.ts). Secrets: ALERT_NTFY_TOPIC, ALERT_EMAIL,
-# optional TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (wrangler secret put -c watchdog.wrangler.toml).
+# External watchdog Worker (src/watchdog.ts). No alert-push secrets: the assistant polls GET /.
 name = "trenchmart-watchdog"
 main = "src/watchdog.ts"
 compatibility_date = "2026-09-01"

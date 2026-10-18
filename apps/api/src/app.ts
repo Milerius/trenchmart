@@ -1,4 +1,4 @@
-import { deliverAlerts, notify, opsCheck, opsStatus, recordOpsEvent } from './ops';
+import { deliverAlerts, notify, opsAlertRows, opsCheck, opsStatus, recordOpsEvent } from './ops';
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { cors } from 'hono/cors';
@@ -1577,6 +1577,23 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       level: 'test',
     });
     return c.json({ channels });
+  });
+
+  // Machine-readable open + recent resolved alerts for the assistant poller (Bearer INTERNAL_TOKEN).
+  api.get('/internal/ops/alerts', async (c) => {
+    assertInternal(c, deps.env);
+    const live = await opsCheck(deps);
+    const rows = await opsAlertRows(deps);
+    return c.json(
+      jsonSafe({
+        checkedAt: deps.now().toISOString(),
+        ok: !live.some((a) => a.level === 'critical'),
+        live,
+        open: rows.open,
+        resolved: rows.resolved,
+        delivery: 'assistant',
+      }),
+    );
   });
 
   api.get('/admin/ops', async (c) => {

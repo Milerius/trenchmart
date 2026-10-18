@@ -1,0 +1,66 @@
+# Nightly encrypted export of critical Supabase tables to R2 (free-tier backup).
+# Secrets (repo): TM_DATABASE_URL, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+# Decrypt locally: age -d -i ~/.config/trenchmart/backup-age.key backup.jsonl.age
+name: db-backup
+
+on:
+  schedule:
+    - cron: '17 2 * * *' # 02:17 UTC daily
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+env:
+  R2_BUCKET: trenchmart-files
+  AGE_RECIPIENT: age1apufn2nv4enzfazcrp2ekx94d6tawxz30zj27lkxs32epwev3q8ssd3w0y
+
+jobs:
+  backup:
+    name: export critical tables
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Install tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client age
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared || true
+          npm install -g wrangler@4
+
+      - name: Dump + encrypt + upload
+        env:
+          DATABASE_URL: ${{ secrets.TM_DATABASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATABASE_URL:-}" ]]; then
+            echo "TM_DATABASE_URL secret missing; skip." >&2
+            exit 0
+          fi
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+            echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID secrets missing; skip." >&2
+            exit 0
+          fi
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          OUT=/tmp/tm-backup-$STAMP.jsonl
+          # Critical tables only (no blob payloads). Never echo DATABASE_URL.
+          for table in users listings versions orders licenses disputes payouts ops_alerts config; do
+            echo "exporting $table" >&2
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c               "select json_build_object('table','$table','row', row_to_json(t)) from $table t"               >> "$OUT" || echo "{\"table\":\"$table\",\"error\":\"query_failed\"}" >> "$OUT"
+          done
+          ROWS=$(wc -l < "$OUT" | tr -d ' ')
+          age -r "$AGE_RECIPIENT" -o "$OUT.age" "$OUT"
+          rm -f "$OUT"
+          KEY="ops/backups/$STAMP.jsonl.age"
+          npx wrangler r2 object put "$R2_BUCKET/$KEY" --file="$OUT.age" --remote --content-type application/octet-stream
+          rm -f "$OUT.age"
+          echo "uploaded r2://$R2_BUCKET/$KEY rows=$ROWS" >> "$GITHUB_STEP_SUMMARY"
+          # Do not print connection strings, tokens, or plaintext rows.

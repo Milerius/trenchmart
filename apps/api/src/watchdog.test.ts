@@ -5,9 +5,7 @@ const env: WatchdogEnv = {
   WEB_URL: 'https://web.example',
   API_URL: 'https://api.example',
   RPC_URL: 'https://rpc.example',
-  ALERT_NTFY_TOPIC: 'topic',
-  ALERT_EMAIL: 'owner@example.com',
-  ALERT_NTFY_TOKEN: 'tk',
+  CLUSTER: 'devnet',
 };
 
 function world() {
@@ -15,10 +13,8 @@ function world() {
     api: 200,
     rpc: 'ok',
     web: 200,
-    log: [] as string[],
-    posted: [] as Record<string, string>[],
   };
-  const f = (async (input: string | URL | Request, init?: RequestInit) => {
+  const f = (async (input: string | URL | Request, _init?: RequestInit) => {
     const url = String(input);
     if (url.startsWith('https://web.example')) return new Response('', { status: state.web });
     if (url.startsWith('https://api.example'))
@@ -27,13 +23,6 @@ function world() {
       return state.rpc === '429'
         ? new Response('rate limited', { status: 429 })
         : Response.json({ result: state.rpc });
-    if (url.includes('/json?poll=1')) return new Response(state.log.join('\n'));
-    if (url === 'https://ntfy.sh/topic') {
-      const headers = init?.headers as Record<string, string>;
-      state.posted.push(headers);
-      state.log.push(JSON.stringify({ title: headers.Title }));
-      return new Response('{}');
-    }
     throw new Error(`unexpected ${url}`);
   }) as typeof fetch;
   return { state, f };
@@ -51,16 +40,13 @@ describe('external watchdog', () => {
     expect(bad.filter((c) => !c.ok).map((c) => c.name)).toEqual(['api', 'rpc']);
   });
 
-  it('sends DOWN once, nothing while still down, UP once on recovery, by email through ntfy', async () => {
+  it('logs DOWN targets without push delivery (assistant polls GET /)', async () => {
     const { state, f } = world();
     expect(await watchdog(env, f)).toEqual([]);
     state.api = 502;
     expect(await watchdog(env, f)).toEqual(['[TrenchMart devnet] watchdog DOWN api']);
-    expect(state.posted[0]!.Email).toBe('owner@example.com');
-    expect(state.posted[0]!.Priority).toBe('urgent');
-    expect(await watchdog(env, f)).toEqual([]);
+    expect(await watchdog(env, f)).toEqual(['[TrenchMart devnet] watchdog DOWN api']);
     state.api = 200;
-    expect(await watchdog(env, f)).toEqual(['[TrenchMart devnet] watchdog UP api']);
     expect(await watchdog(env, f)).toEqual([]);
   });
 });

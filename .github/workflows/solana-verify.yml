@@ -1,0 +1,112 @@
+# Reproducible (solana-verify) build of trench_escrow.
+# Builds in Docker, prints the executable hash, compares it to the on-chain
+# devnet program Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw, and uploads the .so.
+# OtterSec remote verification is mainnet-only — see docs/ops/verified-build.md.
+name: solana-verify
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'programs/trench_escrow/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Anchor.toml'
+      - '.github/workflows/solana-verify.yml'
+  pull_request:
+    paths:
+      - 'programs/trench_escrow/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'Anchor.toml'
+      - '.github/workflows/solana-verify.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: solana-verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROGRAM_ID: Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw
+  LIBRARY_NAME: trench_escrow
+  # Onfinality public devnet (api.devnet.solana.com is flaky from Actions).
+  DEVNET_RPC: https://solana-devnet.api.onfinality.io/public
+  # Pin solana-verify CLI; Docker base image comes from [workspace.metadata.cli] solana = "4.3.2".
+  SOLANA_VERIFY_VERSION: 0.4.15
+
+jobs:
+  verify-build:
+    name: solana-verify build + compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install solana-verify + Solana CLI
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL \
+            "https://github.com/Ellipsis-Labs/solana-verifiable-build/releases/download/v${SOLANA_VERIFY_VERSION}/solana-verify-${SOLANA_VERIFY_VERSION}-linux" \
+            -o "$HOME/.local/bin/solana-verify"
+          chmod +x "$HOME/.local/bin/solana-verify"
+          curl -fsSL https://release.anza.xyz/v4.3.2/install | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          solana-verify --version
+          solana --version
+
+      - name: Reproducible Docker build
+        run: |
+          set -euo pipefail
+          # Anchor 1.2.1 workspace; library name matches programs/trench_escrow.
+          solana-verify build --library-name "$LIBRARY_NAME"
+          test -f "target/deploy/${LIBRARY_NAME}.so"
+
+      - name: Hash + compare to on-chain devnet
+        id: compare
+        run: |
+          set -euo pipefail
+          EXEC_HASH=$(solana-verify get-executable-hash "target/deploy/${LIBRARY_NAME}.so")
+          echo "executable_hash=${EXEC_HASH}" >> "$GITHUB_OUTPUT"
+          echo "executable_hash=${EXEC_HASH}"
+          mkdir -p /tmp/verify
+          solana program dump "$PROGRAM_ID" /tmp/verify/onchain.so --url "$DEVNET_RPC"
+          ONCHAIN_HASH=$(solana-verify get-executable-hash /tmp/verify/onchain.so)
+          echo "onchain_hash=${ONCHAIN_HASH}" >> "$GITHUB_OUTPUT"
+          echo "onchain_hash=${ONCHAIN_HASH}"
+          {
+            echo "## solana-verify"
+            echo ""
+            echo "- commit: \`${GITHUB_SHA}\`"
+            echo "- library: \`${LIBRARY_NAME}\`"
+            echo "- program: \`${PROGRAM_ID}\` (devnet)"
+            echo "- executable hash: \`${EXEC_HASH}\`"
+            echo "- on-chain hash: \`${ONCHAIN_HASH}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$EXEC_HASH" == "$ONCHAIN_HASH" ]]; then
+            echo "match=true" >> "$GITHUB_OUTPUT"
+            echo "- **match:** yes" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "match=false" >> "$GITHUB_OUTPUT"
+            echo "- **match:** NO — deploy was not from this verified build" >> "$GITHUB_STEP_SUMMARY"
+            echo "HASH_MISMATCH: rebuild hash != on-chain. Redeploy the verified .so via Squads (see docs/ops/verified-build.md)." >&2
+            # Do not fail the job on mismatch: source may have moved past the last deploy.
+            # Fail only when explicitly required (e.g. release tags).
+            if [[ "${{ github.ref }}" == refs/tags/escrow-v* ]]; then
+              exit 1
+            fi
+          fi
+
+      - name: Upload verified .so
+        uses: actions/upload-artifact@v4
+        with:
+          name: trench_escrow-verified-${{ github.sha }}
+          path: target/deploy/trench_escrow.so
+          if-no-files-found: error
+          retention-days: 30

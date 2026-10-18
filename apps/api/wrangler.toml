@@ -20,11 +20,11 @@ bucket_name = "trenchmart-files"
 binding = "SCAN_QUEUE"
 queue = "scan-static"
 
-# Encrypted, pooled Postgres. Create the config and uncomment (see docs/DEPLOY_DATABASE.md).
-# Without it the Worker falls back to the DATABASE_URL secret.
-# [[hyperdrive]]
-# binding = "HYPERDRIVE"
-# id = "<hyperdrive config id>"
+# Encrypted, pooled Postgres via Hyperdrive (TLS to Supabase). Created 2026-10-18 as trenchmart-db.
+# Without the binding the Worker falls back to the DATABASE_URL secret (local/CI).
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "067fbd6cc9a949e7a62155bf3fd2fe91"
 
 # M-03: edge rate limit for writes, keyed per client IP + method (see clientIp in app.ts).
 [[ratelimits]]
