@@ -73,6 +73,32 @@ export default function SellersDocsPage() {
           {protocol.allowHosts.join(', ')}.
         </p>
       </DocSection>
+      <DocSection id="updates" title="New versions and daily limits">
+        <p>
+          A live listing shows <span className="text-ink">Upload new version</span> in your studio
+          and on its listing page editor. The form suggests the next patch version (you can edit it;
+          it must be higher than the live one) and needs a changelog, which buyers see next to the
+          update. The new file goes through the same upload, verification fee, scan and review. When
+          it is approved it becomes the live version and the previous one is superseded.
+        </p>
+        <p data-testid="seller-limits">
+          Each UTC day you get {protocol.updatesPerListingPerDay} free update per listing and{' '}
+          {protocol.uploadsPerCreatorPerDay} free file uploads across all your listings, first
+          versions included. Beyond that, each upload costs a supplement of{' '}
+          <span data-testid="seller-upload-supplement">{protocol.uploadSupplement}</span>, shown
+          before you pay and sent to the vault with memo{' '}
+          <span className="font-mono text-ink">sup:</span>. The API enforces the limits; a version
+          cannot be scanned until its supplement is recorded. The supplement is split across the fee
+          buckets like the marketplace fee. Fix re-uploads during a review do not count.
+        </p>
+        <p>
+          You set a monthly update price per listing (suggested {protocol.updatePriceDefault} of the
+          list price, editable, 0 for free updates forever). Buyers get updates free for{' '}
+          {protocol.updateFreeDays} days after purchase; after that a renewal at your price, plus
+          the marketplace fee, extends their updates by {protocol.updatePeriodDays} days. You
+          receive the update price; the fee is split like a sale&apos;s.
+        </p>
+      </DocSection>
       <DocSection id="scan" title="Scanning and verdicts">
         <p>
           The static scanner ({protocol.scannerEngine}) is the malware screen. Any failing check

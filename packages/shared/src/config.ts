@@ -32,6 +32,22 @@ export type AppConfig = {
   blocklist_hosts: string[];
   require_allow_hosts: string[];
   sandbox_targets: string[];
+  /** Buyers get new versions free for this many days after purchase. */
+  update_free_days: number;
+  /** One paid renewal extends updates by this many days. */
+  update_period_days: number;
+  /** Suggested monthly update price as a share of the listing price. */
+  update_price_default_bps: number;
+  /** Free updates (new versions) per listing per UTC day. */
+  update_limit_per_listing_day: number;
+  /** Free file uploads per creator per UTC day, across listings. */
+  upload_limit_per_creator_day: number;
+  /** SOL supplement for an upload beyond the daily limits. */
+  upload_supplement_lamports: bigint;
+  /** Free standalone file verifications per wallet (and network) per UTC day. */
+  verify_free_per_day: number;
+  /** SOL supplement for a verification beyond the free one. */
+  verify_supplement_lamports: bigint;
 };
 
 /**
@@ -71,6 +87,14 @@ export const DEFAULT_CONFIG_JSON = {
   blocklist_hosts: [],
   require_allow_hosts: ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'unpkg.com'],
   sandbox_targets: ['https://axiom.trade/pulse', 'https://gmgn.ai/?chain=sol'],
+  update_free_days: 30,
+  update_period_days: 30,
+  update_price_default_bps: 1000,
+  update_limit_per_listing_day: 1,
+  upload_limit_per_creator_day: 5,
+  upload_supplement_lamports: 50000000,
+  verify_free_per_day: 1,
+  verify_supplement_lamports: 10000000,
 } as const;
 
 function num(v: unknown, fallback: number): number {
@@ -191,5 +215,28 @@ export function parseAppConfig(
     sandbox_targets: Array.isArray(rows.sandbox_targets)
       ? (rows.sandbox_targets as string[])
       : [...d.sandbox_targets],
+    update_free_days: Math.max(0, num(rows.update_free_days, d.update_free_days)),
+    update_period_days: Math.max(1, num(rows.update_period_days, d.update_period_days)),
+    update_price_default_bps: Math.max(
+      0,
+      num(rows.update_price_default_bps, d.update_price_default_bps),
+    ),
+    update_limit_per_listing_day: Math.max(
+      0,
+      num(rows.update_limit_per_listing_day, d.update_limit_per_listing_day),
+    ),
+    upload_limit_per_creator_day: Math.max(
+      0,
+      num(rows.upload_limit_per_creator_day, d.upload_limit_per_creator_day),
+    ),
+    upload_supplement_lamports: big(
+      rows.upload_supplement_lamports,
+      BigInt(d.upload_supplement_lamports),
+    ),
+    verify_free_per_day: Math.max(0, num(rows.verify_free_per_day, d.verify_free_per_day)),
+    verify_supplement_lamports: big(
+      rows.verify_supplement_lamports,
+      BigInt(d.verify_supplement_lamports),
+    ),
   };
 }

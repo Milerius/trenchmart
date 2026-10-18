@@ -20,6 +20,8 @@ import { ApiError, api } from '@/lib/api';
 import { TIER_LABEL } from '@/lib/config';
 import { solText } from '@/lib/money';
 import { explorerAddress, explorerTx, shortKey } from '@/lib/protocol-facts';
+import { submitPayment } from '@/lib/studio';
+import { updateBanner, updatesStatus, type OrderUpdates } from '@/lib/updates';
 import { useWallet } from '@/lib/wallet';
 
 type Order = {
@@ -39,6 +41,7 @@ type Order = {
   refund_sig?: string | null;
   cover?: { url: string; alt: string } | null;
   amount: { lamports: string; usdCents: string | null };
+  updates?: OrderUpdates | null;
 };
 
 type TabKey = 'active' | 'completed' | 'closed';
@@ -89,11 +92,14 @@ export default function PurchasesPage() {
     return () => clearInterval(timer);
   }, []);
 
-  async function download(id: string) {
+  async function download(id: string, versionId?: string) {
     setMessage('');
     setBusyId(id);
     try {
-      const result = await api<{ url: string }>(`/orders/${id}/download`, { method: 'POST' });
+      const result = await api<{ url: string }>(`/orders/${id}/download`, {
+        method: 'POST',
+        ...(versionId ? { body: JSON.stringify({ versionId }) } : {}),
+      });
       window.location.href = result.url;
     } catch (err) {
       setMessage(
@@ -103,6 +109,26 @@ export default function PurchasesPage() {
             ? err.message
             : 'Download failed',
       );
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  /** Renew updates: quote, then a vault transfer the wallet signs, verified by the API. */
+  async function renew(id: string) {
+    setMessage('');
+    setBusyId(`renew:${id}`);
+    try {
+      const created = await api<{ renewalId: string; txBase64: string }>(
+        `/orders/${id}/updates/renew`,
+        { method: 'POST' },
+      );
+      const signature = await wallet.signAndSend(created.txBase64);
+      await submitPayment(api, `/orders/${id}/updates/${created.renewalId}/submitted`, signature);
+      setMessage('Updates renewed. The latest version is ready to download.');
+      load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Renewal failed');
     } finally {
       setBusyId('');
     }
@@ -245,7 +271,9 @@ export default function PurchasesPage() {
                     order={order}
                     now={now}
                     busy={busyId === order.id}
-                    onDownload={() => void download(order.id)}
+                    renewing={busyId === `renew:${order.id}`}
+                    onDownload={(versionId) => void download(order.id, versionId)}
+                    onRenew={() => void renew(order.id)}
                   />
                 ))}
               </ul>
@@ -299,12 +327,16 @@ function OrderCard({
   order,
   now,
   busy,
+  renewing,
   onDownload,
+  onRenew,
 }: {
   order: Order;
   now: number;
   busy: boolean;
-  onDownload: () => void;
+  renewing: boolean;
+  onDownload: (versionId?: string) => void;
+  onRenew: () => void;
 }) {
   return (
     <li
@@ -350,7 +382,7 @@ function OrderCard({
           status={order.status}
           escrowUntil={order.escrow_until}
           busy={busy}
-          onDownload={onDownload}
+          onDownload={() => onDownload()}
         />
         {order.status === 'paid' ? (
           <ButtonLink href={`/me/purchases/${order.id}/dispute`} variant="secondary">
@@ -379,8 +411,123 @@ function OrderCard({
           ) : null}
         </span>
       </div>
+      {order.updates && (order.status === 'paid' || order.status === 'released') ? (
+        <UpdatesBlock
+          updates={order.updates}
+          now={now}
+          busy={busy}
+          renewing={renewing}
+          onDownload={onDownload}
+          onRenew={onRenew}
+        />
+      ) : null}
       {order.escrow_address ? <OnChainReceipt order={order} /> : null}
     </li>
+  );
+}
+
+/** "Update available vX → vY" with its changelog, the renewal offer, and older downloads. */
+function UpdatesBlock({
+  updates,
+  now,
+  busy,
+  renewing,
+  onDownload,
+  onRenew,
+}: {
+  updates: OrderUpdates;
+  now: number;
+  busy: boolean;
+  renewing: boolean;
+  onDownload: (versionId?: string) => void;
+  onRenew: () => void;
+}) {
+  const banner = updateBanner(updates);
+  const latestEntitled = updates.latestEntitled;
+  const purchased = updates.purchased;
+  return (
+    <div data-testid="order-updates" className="mt-4 space-y-3">
+      {banner.kind !== 'none' ? (
+        <Panel
+          tone={banner.kind === 'included' ? 'info' : 'warn'}
+          data-testid="update-available"
+          data-state={banner.kind}
+          className="p-3 text-sm sm:p-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 font-semibold">
+              Update available{' '}
+              <span className="font-mono">
+                v{banner.from} → v{banner.to}
+              </span>
+            </p>
+            {banner.kind === 'included' ? (
+              <Button
+                size="sm"
+                data-testid="download-latest"
+                disabled={busy}
+                onClick={() => onDownload(updates.latest?.id)}
+              >
+                Download v{banner.to}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                data-testid="renew-updates"
+                disabled={renewing}
+                aria-busy={renewing || undefined}
+                onClick={onRenew}
+              >
+                {renewing
+                  ? 'Check your wallet…'
+                  : `Renew updates for ${solText(banner.price)}/month`}
+              </Button>
+            )}
+          </div>
+          {updates.changes.length ? (
+            <ul
+              data-testid="update-changelog"
+              className="m-0 mt-2 space-y-1 p-0 text-[13px] text-ink-2"
+            >
+              {updates.changes.map((change) => (
+                <li key={change.semver} className="list-none">
+                  <span className="font-mono text-ink">v{change.semver}</span>{' '}
+                  <span className="whitespace-pre-line">{change.changelog}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {banner.kind === 'renew' ? (
+            <p className="m-0 mt-2 text-[13px] text-ink-2">
+              Your free updates ended. Renewing adds {updates.periodDays} days of updates; the
+              platform fee is included and your $TRENCH tier discount applies.
+            </p>
+          ) : null}
+        </Panel>
+      ) : null}
+      <p
+        data-testid="updates-status"
+        className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-2"
+      >
+        <span>
+          <span className="text-muted">Updates:</span> {updatesStatus(updates, now)}
+          {latestEntitled ? (
+            <span className="font-mono text-muted"> · yours up to v{latestEntitled.semver}</span>
+          ) : null}
+        </span>
+        {purchased && latestEntitled && purchased.id !== latestEntitled.id ? (
+          <button
+            type="button"
+            data-testid="download-purchased"
+            disabled={busy}
+            onClick={() => onDownload(purchased.id)}
+            className="text-ink-2 underline underline-offset-4 hover:text-ink"
+          >
+            Download purchased v{purchased.semver}
+          </button>
+        ) : null}
+      </p>
+    </div>
   );
 }
 

@@ -196,3 +196,30 @@ test('mobile: Write / Preview tabs and no horizontal overflow', async ({ page })
   await expect(editor(page)).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+// Uploads are re-encoded to WebP by the API (perf: a 354 KB PNG cover made LCP 7.1 s).
+// The media the README points at is served as image/webp and must render in the page.
+const WEBP_1PX = Buffer.from(
+  'UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=',
+  'base64',
+);
+
+test('inserted images are served as WebP and render in the preview', async ({ page }) => {
+  await stub(page);
+  await page.route('**/api/v1/media/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/webp', body: WEBP_1PX }),
+  );
+  await page.goto('/studio/listings/new');
+  await page.locator('#images').setInputFiles([png('one.png')]);
+  await editor(page).fill('Intro\n\n');
+  await editor(page).evaluate((el: HTMLTextAreaElement) =>
+    el.setSelectionRange(el.value.length, el.value.length),
+  );
+  await page.getByRole('button', { name: /Image/ }).click();
+  await page.getByRole('menuitem', { name: 'Insert image 1' }).click();
+  const img = preview(page).locator('img');
+  await expect(img).toHaveCount(1);
+  await expect
+    .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth))
+    .toBe(1);
+});
