@@ -182,6 +182,20 @@ test.describe('phase 4: cards', () => {
     });
   });
 
+  test('listing card: category tag and terminal chip on the cover, price on the right', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const card = page.getByTestId('listing-card').first();
+    await expect(card).toBeVisible();
+    const cover = card.getByTestId('card-cover');
+    await expect(cover).toContainText('USERSCRIPT');
+    await expect(cover.getByTestId('card-terminal-chip')).toBeVisible();
+    expect(await card.locator('xpath=..').evaluate((el) => getComputedStyle(el).borderRadius)).toBe(
+      '22px',
+    );
+  });
+
   test('listing cards are SpotlightCards that keep the real cover and light up on hover', async ({
     page,
   }) => {
@@ -191,7 +205,7 @@ test.describe('phase 4: cards', () => {
     await expect(card.getByRole('img', { name: 'Overlay on an Axiom chart' })).toBeVisible();
     await expect(card.getByRole('heading', { name: 'Bundle Detector Overlay' })).toBeVisible();
     const spot = card.locator('xpath=..');
-    expect(await spot.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('16px');
+    expect(await spot.evaluate((el) => getComputedStyle(el).borderRadius)).toBe('22px');
     // The light layer is the first aria-hidden span; it fades in while the pointer is over the card.
     const light = spot.locator(':scope > span').first();
     expect(Number(await light.evaluate((el) => getComputedStyle(el).opacity))).toBe(0);
@@ -430,5 +444,18 @@ test.describe('phase 6: home', () => {
     ];
     const seen = order.filter((entry): entry is string => !!entry && want.includes(entry));
     expect([...new Set(seen)]).toEqual(want);
+  });
+});
+
+test.describe('phase 6b: home cards', () => {
+  test('tier cards show each buyer fee with OG at 0%', async ({ page }) => {
+    await page.goto('/');
+    const cards = page.getByTestId('tier-card');
+    await expect(cards).toHaveCount(4);
+    await expect(cards.first()).toContainText('No tier');
+    await expect(cards.first()).toContainText('5%');
+    await expect(cards.last()).toContainText('OG');
+    await expect(cards.last()).toContainText('0%');
+    await expect(cards.last()).toContainText('0% creator commission');
   });
 });

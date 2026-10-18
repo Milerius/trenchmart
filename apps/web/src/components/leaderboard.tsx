@@ -4,7 +4,6 @@ import type { PublicIdentity } from '@trenchmart/shared/social';
 import Link from 'next/link';
 import { XIcon } from '@/components/icons';
 import { Avatar, VerifiedBadge } from '@/components/profile';
-import { Spot } from '@/components/spot';
 import { Money, Tag } from '@/components/ui';
 
 /** Creator leaderboard rows (API: GET /creators/leaderboard) and their small visuals. */
@@ -215,7 +214,7 @@ export function Headline({
   return <Money lamports={row.paidLamports} centsPerSol={centsPerSol} strong stacked />;
 }
 
-/** Home strip: six creator cards for the chosen tab. */
+/** Home leaderboard: the prototype's ranked list (rank, avatar, name, stats, headline figure). */
 export function CreatorCards({
   rows,
   tab,
@@ -226,47 +225,38 @@ export function CreatorCards({
   centsPerSol: string | null;
 }) {
   return (
-    <ol className="m-0 grid grid-cols-2 gap-3 p-0 md:grid-cols-3 xl:grid-cols-6">
+    <ol className="m-0 list-none p-0">
       {rows.map((row) => (
-        <li key={row.creator.wallet} className="list-none">
-          <Spot
-            color={row.position === 1 ? '#C6F432' : '#7CC4FF'}
-            alpha="30"
-            className="motion-card h-full"
+        <li key={row.creator.wallet}>
+          <Link
+            href={profileHref(row.creator)}
+            data-testid="creator-card"
+            className="flex items-center gap-4 rounded-2xl px-4 py-3.5 transition-colors hover:bg-white/[.04]"
           >
-            <Link
-              href={profileHref(row.creator)}
-              data-testid="creator-card"
-              className="flex h-full flex-col items-center gap-2 rounded-[inherit] p-4 text-center"
-            >
-              <span className="flex h-5 w-full items-center justify-between font-mono text-[11px] text-muted">
-                #{row.position}
-                <Movement row={row} />
+            <span className="w-6 shrink-0 font-mono text-sm text-faint">{row.position}</span>
+            <CreatorAvatar who={row.creator} className="h-10 w-10 shrink-0 text-sm" />
+            <span className="min-w-0 flex-1">
+              <CreatorName who={row.creator} className="max-w-full font-semibold" />
+              <span className="block truncate text-sm text-muted">
+                <KindLabel who={row.creator} /> · {row.listings}{' '}
+                {row.listings === 1 ? 'listing' : 'listings'}
+                {row.rating ? ` · ★ ${row.rating.avg.toFixed(1)}` : ''}
               </span>
-              <CreatorAvatar who={row.creator} className="h-14 w-14 text-base" />
-              <CreatorName who={row.creator} className="max-w-full justify-center text-sm" />
-              <span className="text-[11px] text-muted">
-                <KindLabel who={row.creator} />
-              </span>
-              <span className="mt-1 text-sm">
+            </span>
+            <span className="shrink-0 text-right text-sm">
+              {tab === 'earners' ? (
+                <Money
+                  lamports={row.paidLamports}
+                  centsPerSol={centsPerSol}
+                  stacked
+                  className="items-end font-semibold text-accent [&>[data-testid=usd-amount]]:text-xs [&>[data-testid=usd-amount]]:text-faint"
+                />
+              ) : (
                 <Headline row={row} tab={tab} centsPerSol={centsPerSol} />
-              </span>
-              <span className="mt-auto grid w-full grid-cols-3 gap-1 border-t border-line-soft pt-2 font-mono text-[11px] text-ink-2">
-                <span>
-                  {row.sales}
-                  <span className="block text-muted">sales</span>
-                </span>
-                <span>
-                  {row.rating ? `★ ${row.rating.avg.toFixed(1)}` : '–'}
-                  <span className="block text-muted">rating</span>
-                </span>
-                <span>
-                  {row.upvotes.raw}
-                  <span className="block text-muted">upvotes</span>
-                </span>
-              </span>
-            </Link>
-          </Spot>
+              )}
+              <span className="block font-mono text-xs text-faint">{row.sales} sales</span>
+            </span>
+          </Link>
         </li>
       ))}
     </ol>

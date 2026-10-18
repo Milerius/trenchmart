@@ -5,7 +5,8 @@ import { categoryMeta } from '@trenchmart/shared/categories';
 import { quote } from '@trenchmart/shared/fee';
 import { rankBadge } from '@trenchmart/shared/ranking';
 import { TERMINALS as TERMINAL_NAMES } from '@trenchmart/shared/terminals';
-import { TerminalNames } from '@/components/terminal-logo';
+import { Star } from 'lucide-react';
+import { TerminalMark, TerminalNames } from '@/components/terminal-logo';
 import { Spot } from '@/components/spot';
 import { Money, Skeleton, EmptyState, Tag } from '@/components/ui';
 import type { PublicConfig } from '@/lib/config';
@@ -61,8 +62,9 @@ export function ListingCard({
       ).total
     : null;
   const rating = listing.ratingAvg ? Number(listing.ratingAvg) : null;
+  const sold = listing.sales7d ?? 0;
   return (
-    <Spot color={meta.color} className="motion-card group h-full">
+    <Spot color={meta.color} surface="#0f110f" className="motion-card group h-full !rounded-panel">
       <Link
         data-testid="listing-card"
         href={`/l/${listing.slug}`}
@@ -75,80 +77,72 @@ export function ListingCard({
           tag={meta.tag}
           priority={priority}
         />
-        <div
-          className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3"
-          style={{ background: meta.bg }}
-        >
-          <span
-            className="font-mono text-[11px] font-semibold tracking-wide"
-            style={{ color: meta.color }}
-          >
-            {meta.tag}
-          </span>
-          <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-            {listing.sponsored ? (
-              <Tag
-                tone="warn"
-                data-testid="sponsored-tag"
-                title="Paid placement. Never affects ranking."
-              >
-                <span aria-hidden="true">★</span> FEATURED · SPONSORED
-              </Tag>
-            ) : null}
-            {!listing.sponsored && rankBadge(listing.rank?.category, meta.label) ? (
-              <Tag tone="info" data-testid="rank-badge">
-                {rankBadge(listing.rank?.category, meta.label)}
-              </Tag>
-            ) : null}
-            <Tag tone="ok">
-              <span aria-hidden="true">✓</span> REVIEWED
-            </Tag>
-          </span>
-        </div>
-        <div className="flex flex-1 flex-col gap-2 p-4">
-          <h3 className="m-0 text-[17px] font-semibold leading-snug tracking-[-0.01em] group-hover:text-accent-hover">
+        <div className="flex flex-1 flex-col gap-3 p-5">
+          {listing.sponsored || rankBadge(listing.rank?.category, meta.label) ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              {listing.sponsored ? (
+                <Tag
+                  tone="warn"
+                  data-testid="sponsored-tag"
+                  title="Paid placement. Never affects ranking."
+                >
+                  <span aria-hidden="true">★</span> FEATURED · SPONSORED
+                </Tag>
+              ) : (
+                <Tag tone="info" data-testid="rank-badge">
+                  {rankBadge(listing.rank?.category, meta.label)}
+                </Tag>
+              )}
+            </span>
+          ) : null}
+          <h3 className="m-0 text-[17px] font-semibold leading-snug tracking-tight group-hover:text-accent-hover">
             {listing.title}
           </h3>
-          <p className="m-0 line-clamp-2 text-sm text-ink-2">{listing.summary}</p>
-          {listing.terminals.length ? (
-            <p className="m-0 font-mono text-[11px] text-muted" data-testid="card-terminals">
+          <p className="m-0 line-clamp-2 text-sm text-muted">{listing.summary}</p>
+          {listing.terminals.length > 1 ? (
+            <p className="m-0 font-mono text-[11px] text-faint" data-testid="card-terminals">
               <TerminalNames names={listing.terminals} />
             </p>
           ) : null}
-          <div className="mt-auto flex items-center gap-3 pt-2 text-[13px] text-muted">
-            {listing.handle ? <span className="text-ink-2">@{listing.handle}</span> : null}
-            {listing.sales7d ? <span>{listing.sales7d} sold this week</span> : null}
-            {rating ? (
-              <span>
-                <span aria-hidden="true">★</span> {rating.toFixed(1)}
-                <span className="sr-only"> out of 5</span>
+          <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-3.5">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
+              {rating ? (
+                <span className="inline-flex items-center gap-1">
+                  <Star size={14} className="fill-accent text-accent" aria-hidden="true" />
+                  {rating.toFixed(1)}
+                  <span className="sr-only"> out of 5</span>
+                </span>
+              ) : null}
+              <span className="text-faint">
+                {rating ? '· ' : ''}
+                {sold ? `${sold} sold this week` : listing.handle ? `@${listing.handle}` : 'New'}
               </span>
-            ) : null}
-            {listing.upvotes ? (
-              <span data-testid="card-upvotes" className="ml-auto font-mono text-xs">
-                <span aria-hidden="true">▲</span> {listing.upvotes}
-                <span className="sr-only"> upvotes</span>
-              </span>
-            ) : null}
+              {listing.upvotes ? (
+                <span data-testid="card-upvotes" className="font-mono text-xs text-faint">
+                  <span aria-hidden="true">▲</span> {listing.upvotes}
+                  <span className="sr-only"> upvotes</span>
+                </span>
+              ) : null}
+            </span>
+            <span className="shrink-0 text-right">
+              {total !== null ? (
+                <span className="block font-mono text-[10px] uppercase tracking-wide text-faint">
+                  You pay
+                </span>
+              ) : null}
+              <Money
+                lamports={total ?? listing.price}
+                centsPerSol={pricing.centsPerSol}
+                stacked
+                className="items-end text-[15px] font-semibold text-accent [&>[data-testid=usd-amount]]:text-[11px] [&>[data-testid=usd-amount]]:text-faint"
+              />
+            </span>
           </div>
-        </div>
-        <div className="flex items-end justify-between gap-3 border-t border-line-soft bg-inset px-4 py-3">
-          {total !== null ? (
-            <div className="min-w-0">
-              <p className="m-0 font-mono text-[11px] uppercase tracking-wide text-muted">
-                You pay
-              </p>
-              <Money lamports={total} centsPerSol={pricing.centsPerSol} strong />
-            </div>
-          ) : (
-            <div className="min-w-0">
-              <Money lamports={listing.price} centsPerSol={pricing.centsPerSol} strong />
-              <p className="m-0 text-xs text-muted">+ 5% buyer fee · your tier can cut it</p>
-            </div>
-          )}
-          <span className="shrink-0 font-mono text-xs text-accent" aria-hidden="true">
-            View →
-          </span>
+          {total === null ? (
+            <p className="-mt-1 m-0 text-right font-mono text-[10px] text-faint">
+              + 5% buyer fee · your tier can cut it
+            </p>
+          ) : null}
         </div>
       </Link>
     </Spot>
@@ -175,6 +169,7 @@ function CardCover({
     >
       {listing.cover ? (
         <img
+          data-testid="card-cover-img"
           src={listing.cover.url}
           srcSet={mediaSrcSet(listing.cover.url)}
           sizes={CARD_SIZES}
@@ -190,11 +185,31 @@ function CardCover({
           className="grid h-full w-full place-items-center"
           style={{ background: `radial-gradient(120% 90% at 20% 0%, ${bg} 0%, transparent 60%)` }}
         >
-          <span className="font-mono text-[13px] font-semibold tracking-[0.2em]" style={{ color }}>
+          <span
+            className="font-mono text-[13px] font-semibold tracking-[0.2em] opacity-40"
+            style={{ color }}
+          >
             {tag}
           </span>
         </div>
       )}
+      <div className="pointer-events-none absolute inset-x-4 top-4 flex items-center justify-between gap-2">
+        <span
+          className="inline-flex items-center rounded-md px-2 py-1 font-mono text-[11px] font-semibold tracking-wider"
+          style={{ color, background: bg, boxShadow: `inset 0 0 0 1px ${color}33` }}
+        >
+          {tag}
+        </span>
+        {listing.terminals[0] ? (
+          <span
+            data-testid="card-terminal-chip"
+            className="flex items-center gap-1.5 rounded-md bg-black/60 py-1 pr-2 pl-1 font-mono text-[11px] font-medium text-ink"
+          >
+            <TerminalMark name={listing.terminals[0]} className="h-4 w-4 rounded" />
+            {listing.terminals[0]}
+          </span>
+        ) : null}
+      </div>
       {listing.imageCount && listing.imageCount > 1 ? (
         <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-tag border border-line bg-bg/80 px-2 py-0.5 font-mono text-[11px] text-ink-2 backdrop-blur">
           <span aria-hidden="true">▦</span> {listing.imageCount}
@@ -230,7 +245,7 @@ export function ListingGrid({
     return (
       <ul className={grid} aria-busy="true">
         {[0, 1, 2].map((key) => (
-          <li key={key} className="overflow-hidden rounded-card border border-line bg-surface">
+          <li key={key} className="overflow-hidden rounded-[22px] border border-line bg-surface">
             {/* Same shape as a real card (16:10 cover + body) so nothing shifts on load. */}
             <div className="aspect-[16/10] border-b border-line-soft bg-inset" />
             <div className="p-4">
