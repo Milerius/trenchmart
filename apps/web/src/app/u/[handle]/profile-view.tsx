@@ -16,7 +16,17 @@ import {
   VerifiedBadge,
   type ProfileImage,
 } from '@/components/profile';
-import { Button, ButtonLink, EmptyState, Label, Skeleton, Square, Tag } from '@/components/ui';
+import {
+  Button,
+  ButtonLink,
+  EmptyState,
+  Label,
+  PillGroup,
+  pillClass,
+  Skeleton,
+  Square,
+  Tag,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import { usePublicConfig, useSolUsd } from '@/lib/config';
 import { solText } from '@/lib/money';
@@ -276,7 +286,7 @@ export function ProfileView({ initial }: { initial: PublicProfile | null }) {
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">
           {tabs.length > 1 ? (
-            <div role="tablist" className="mb-4 flex flex-wrap items-center gap-1 text-sm">
+            <PillGroup role="tablist" className="mb-4 w-fit">
               {[{ code: 'all', label: 'All', count: profile.listings.length }, ...tabs].map(
                 (tab) => (
                   <button
@@ -285,14 +295,14 @@ export function ProfileView({ initial }: { initial: PublicProfile | null }) {
                     role="tab"
                     aria-selected={category === tab.code}
                     onClick={() => setCategory(tab.code)}
-                    className={`rounded-lg px-3 py-2 ${category === tab.code ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'}`}
+                    className={pillClass(category === tab.code)}
                   >
                     {tab.label}{' '}
-                    <span className="font-mono text-[11px] text-muted">{tab.count}</span>
+                    <span className="font-mono text-[11px] opacity-70">{tab.count}</span>
                   </button>
                 ),
               )}
-            </div>
+            </PillGroup>
           ) : null}
           <ListingGrid
             listings={shown}

@@ -1,4 +1,5 @@
-import { ButtonLink, Label, Serif } from '@/components/ui';
+import { PrimaryCta } from '@/components/cta';
+import { Label, Serif } from '@/components/ui';
 
 const STEPS: [string, string][] = [
   ['Connect and sign in', 'Sign a message with your wallet. No transaction is needed to sign in.'],
@@ -25,9 +26,9 @@ export default function SellPage() {
           0% creator commission. Buyers pay the fee, and every version you upload goes through
           automated review live, so buyers trust it on sight.
         </p>
-        <ButtonLink href="/studio" size="lg" className="mt-6">
-          Open creator studio
-        </ButtonLink>
+        <PrimaryCta href="/studio" className="mt-6">
+          Open creator studio <span aria-hidden="true">→</span>
+        </PrimaryCta>
       </header>
       <ol className="m-0 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map(([title, body], index) => (

@@ -23,7 +23,7 @@ const DISABLED =
   'disabled:cursor-not-allowed disabled:border disabled:border-line disabled:bg-surface-2 disabled:text-faint disabled:hover:bg-surface-2';
 
 export function buttonClass(variant: Variant = 'primary', size: Size = 'md', extra = ''): string {
-  return `motion-press inline-flex items-center justify-center gap-2 rounded-ctl whitespace-nowrap ${VARIANT[variant]} ${SIZE[size]} ${DISABLED} ${extra}`;
+  return `motion-press inline-flex items-center justify-center gap-2 rounded-full whitespace-nowrap ${VARIANT[variant]} ${SIZE[size]} ${DISABLED} ${extra}`;
 }
 
 export function Button({
@@ -42,6 +42,23 @@ export function ButtonLink({
   ...props
 }: ComponentProps<typeof Link> & { variant?: Variant; size?: Size }) {
   return <Link className={buttonClass(variant, size, className)} {...props} />;
+}
+
+/** A toggle or tab inside a PillGroup: the selected one is solid ink, the rest are quiet. */
+export function pillClass(on: boolean, extra = ''): string {
+  return `motion-press inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium ${
+    on ? 'bg-ink text-bg' : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
+  } ${extra}`;
+}
+
+/** Segmented pill track for filters and tabs. Scrolls sideways on narrow screens instead of wrapping. */
+export function PillGroup({ className = '', ...props }: ComponentProps<'div'>) {
+  return (
+    <div
+      className={`flex max-w-full gap-1 overflow-x-auto rounded-full border border-line bg-inset p-1 [scrollbar-width:none] ${className}`}
+      {...props}
+    />
+  );
 }
 
 export type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';

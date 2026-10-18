@@ -17,6 +17,8 @@ import {
   ButtonLink,
   Label,
   Money,
+  PillGroup,
+  pillClass,
   PreviewNotice,
   Serif,
   ShieldIcon,
@@ -24,6 +26,7 @@ import {
   Tag,
 } from '@/components/ui';
 import { CountUp, HeroField, Reveal } from '@/components/motion';
+import { PrimaryCta } from '@/components/cta';
 import { api } from '@/lib/api';
 import { recentRead, rememberRead } from '@/lib/recent';
 import { usePublicConfig } from '@/lib/config';
@@ -134,9 +137,9 @@ export default function HomePage() {
             decides in under a minute. Your SOL waits in escrow until the trade is done.
           </p>
           <div className="rise mt-8 flex flex-wrap gap-3" style={{ animationDelay: '210ms' }}>
-            <ButtonLink href="#market" size="lg">
-              Browse the market
-            </ButtonLink>
+            <PrimaryCta href="#market">
+              Browse the market <span aria-hidden="true">→</span>
+            </PrimaryCta>
             <ButtonLink href="/sell" variant="secondary" size="lg">
               Sell your tooling
             </ButtonLink>
@@ -187,7 +190,7 @@ export default function HomePage() {
               accent="this month"
             />
             <div className="flex flex-wrap items-center gap-2">
-              <div role="tablist" aria-label="Top creators" className="flex gap-1">
+              <PillGroup role="tablist" aria-label="Top creators">
                 {HOME_TABS.map((value) => (
                   <button
                     key={value}
@@ -195,16 +198,12 @@ export default function HomePage() {
                     role="tab"
                     aria-selected={creatorTab === value}
                     onClick={() => setCreatorTab(value)}
-                    className={`motion-press h-9 rounded-full border px-3.5 text-[13px] ${
-                      creatorTab === value
-                        ? 'border-accent bg-accent-bg text-accent'
-                        : 'border-line-control text-ink-2 hover:text-ink'
-                    }`}
+                    className={pillClass(creatorTab === value)}
                   >
                     {TAB_LABEL[value]}
                   </button>
                 ))}
-              </div>
+              </PillGroup>
               <ButtonLink href="/creators" variant="ghost" size="sm">
                 Full leaderboard →
               </ButtonLink>
@@ -237,28 +236,19 @@ export default function HomePage() {
       <section id="market" aria-labelledby="market-heading" className="scroll-mt-24">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <SectionHead id="market-heading" kicker="Market" title="Trending" accent="this week" />
-          <div
-            data-testid="terminal-filter"
-            role="group"
-            aria-label="Filter by terminal"
-            className="flex flex-wrap gap-2"
-          >
+          <PillGroup data-testid="terminal-filter" role="group" aria-label="Filter by terminal">
             {TERMINALS.map((name) => (
               <button
                 key={name}
                 type="button"
                 aria-pressed={terminal === name}
-                className={`motion-press h-9 rounded-full border px-3.5 text-[13px] ${
-                  terminal === name
-                    ? 'border-accent bg-accent-bg text-accent'
-                    : 'border-line-control text-ink-2 hover:text-ink'
-                }`}
+                className={pillClass(terminal === name)}
                 onClick={() => setTerminal(name)}
               >
                 {name === 'All' ? name : <TerminalName name={name} logoClassName="h-4 w-4" />}
               </button>
             ))}
-          </div>
+          </PillGroup>
         </div>
         {!wallet.session ? (
           <div className="mt-6">
@@ -405,9 +395,9 @@ export default function HomePage() {
               Upload a file and watch the automated review run live. 0% commission, payouts in SOL.
             </p>
           </div>
-          <ButtonLink href="/sell" size="lg">
-            Start selling
-          </ButtonLink>
+          <PrimaryCta href="/sell">
+            Start selling <span aria-hidden="true">→</span>
+          </PrimaryCta>
         </section>
       </Reveal>
     </div>
