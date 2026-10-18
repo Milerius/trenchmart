@@ -272,6 +272,11 @@ const StarBorder = <T extends React.ElementType = 'button'>({
     if (!root || !canvas || !ctx) return undefined;
 
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    // TrenchMart: on phones and touch screens the stars rest instead of cruising (no per-frame
+    // canvas work while the page hydrates), and the loop only starts once the browser is idle.
+    const calm =
+      reduce || (window.matchMedia?.('(pointer: coarse), (max-width: 767px)').matches ?? false);
+    let started = false;
     const point: Point = { x: 0, y: 0, nx: 0, ny: -1 };
     const state = {
       width: 0,
@@ -532,7 +537,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       const total = shape.total;
       const spacing = total / s.stars;
       const engaged = state.hovered || state.focused;
-      const cruise = reduce ? 0 : (s.direction * total) / s.duration;
+      const cruise = calm ? 0 : (s.direction * total) / s.duration;
 
       const revealTarget = s.hover === 'reveal' && !engaged ? 0 : 1;
       state.reveal +=
@@ -556,7 +561,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       state.phase = wrap(state.phase + state.velocity * dt + extra, total);
 
       const pace = Math.abs(state.motion) / Math.max(1, Math.abs(total / s.duration));
-      if (s.sparkle && !reduce && state.reveal > 0.05) {
+      if (s.sparkle && !calm && state.reveal > 0.05) {
         state.emit += dt * (2 + 6 * Math.min(2, pace)) * s.stars;
         while (state.emit > 1) {
           state.emit -= 1;
@@ -593,13 +598,14 @@ const StarBorder = <T extends React.ElementType = 'button'>({
     };
 
     const wake = () => {
-      if (raf || !alive || !state.visible) return;
+      if (raf || !alive || !state.visible || !started) return;
       last = performance.now();
       raf = requestAnimationFrame(frame);
     };
     wakeRef.current = wake;
 
     const onEnter = (event: PointerEvent) => {
+      started = true;
       const s = settingsRef.current;
       [state.pointerX, state.pointerY] = local(event);
       state.hovered = true;
@@ -626,6 +632,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       wake();
     };
     const onDown = (event: PointerEvent) => {
+      started = true;
       if (event.button !== 0 && event.pointerType === 'mouse') return;
       const s = settingsRef.current;
       const [x, y] = local(event);
@@ -635,6 +642,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       if (event.detail === 0) pulse(state.phase);
     };
     const onFocus = () => {
+      started = true;
       state.focused = root.matches(':focus-visible');
       if (state.focused && settingsRef.current.hover === 'lap' && state.lap < 0 && !reduce)
         state.lap = 0;
@@ -652,6 +660,13 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       if (state.visible) wake();
     });
     visibility.observe(root);
+    const start = () => {
+      started = true;
+      wake();
+    };
+    const idle = window.requestIdleCallback
+      ? window.requestIdleCallback(start, { timeout: 2500 })
+      : window.setTimeout(start, 1200);
     root.addEventListener('pointerenter', onEnter);
     root.addEventListener('pointerleave', onLeave);
     root.addEventListener('pointerdown', onDown);
@@ -664,6 +679,8 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       alive = false;
       wakeRef.current = null;
       cancelAnimationFrame(raf);
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
       resizeObserver.disconnect();
       visibility.disconnect();
       root.removeEventListener('pointerenter', onEnter);

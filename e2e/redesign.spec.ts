@@ -305,3 +305,42 @@ test.describe('phase 5: header, nav and footer', () => {
     }
   });
 });
+
+test.describe('perf: StarBorder on phones', () => {
+  const countFrames = async (page: import('@playwright/test').Page) => {
+    await page.waitForTimeout(3500); // past the idle start
+    return page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          const w = window as unknown as { __raf: number };
+          const before = w.__raf;
+          setTimeout(() => resolve(w.__raf - before), 1000);
+        }),
+    );
+  };
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { __raf: number };
+      w.__raf = 0;
+      const raf = window.requestAnimationFrame.bind(window);
+      window.requestAnimationFrame = (cb) => {
+        w.__raf += 1;
+        return raf(cb);
+      };
+    });
+  });
+
+  test('the CTA stars rest on a phone (no per-frame loop) but still cruise on desktop', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: /Browse the market/ })).toBeVisible();
+    expect(await countFrames(page)).toBeLessThan(10);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: /Browse the market/ })).toBeVisible();
+    expect(await countFrames(page)).toBeGreaterThan(20);
+  });
+});
