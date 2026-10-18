@@ -21,6 +21,7 @@ export const MIGRATIONS = [
   '0013_profiles.sql',
   '0020_reviews.sql',
   '0021_upvotes_ranking.sql',
+  '0022_featuring.sql',
 ] as const;
 
 /**
