@@ -105,6 +105,14 @@ jobs:
       - run: pnpm exec playwright test
         env:
           NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: 9e9aab84f03d9799c7a3dc4ee77fa93b
+      # Traces of failed first attempts (flaky tests included), for diagnosis.
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # "Verify with X" in a real browser: web /api/v1 proxy -> real API (Postgres) -> mock X API.
   e2e-x-oauth:

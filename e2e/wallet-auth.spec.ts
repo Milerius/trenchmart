@@ -284,26 +284,51 @@ test('a rejected signature leaves the wallet connected and retries in one click'
   context,
   page,
 }) => {
+  // Steps name the phase if CI ever times out here again (it timed out twice in the dev
+  // server with no step named; see the e2e-results artifact for the trace).
   const auth = await setup(context, page);
-  await page.evaluate(() => (window.__mockWallet.reject = true));
-  await button(page).click();
-  await page.getByTestId('wallet-option-phantom').click();
-  await expect(page.getByTestId('connect-modal')).toContainText('You declined the sign-in request');
-  await page.keyboard.press('Escape');
-  await expect(button(page)).toHaveText('Sign in');
-  await expect(button(page)).toHaveAttribute('data-auth', 'wallet-connected');
-  await expect(page.getByTestId('toast')).toContainText('declined');
-  await page.screenshot({ path: 'test-results/wallet-auth/04-rejected.png' });
-  expect(auth.calls.verify).toBe(0);
-  await page.evaluate(() => {
-    window.__mockWallet.reject = false;
-    window.__mockWallet.signDelayMs = 300;
+  await test.step('reject the first signature; Escape closes the picker at once', async () => {
+    // Hydrated, with the mock wallet registered, before the first click.
+    await expect(button(page)).toHaveAttribute('data-auth', 'signed-out');
+    await page.evaluate(() => (window.__mockWallet.reject = true));
+    await button(page).click();
+    // Press Escape in the same task the decline message is rendered, before React runs its
+    // effects: an Escape handler that still saw the old busy state used to ignore it, leaving
+    // the picker over the page (CI flake: the retry click below then never landed).
+    await page.evaluate(() => {
+      (window as unknown as { __escaped: Promise<void> }).__escaped = new Promise((resolve) => {
+        const observer = new MutationObserver(() => {
+          const modal = document.querySelector('[data-testid=connect-modal]');
+          if (!modal?.textContent?.includes('You declined the sign-in request')) return;
+          observer.disconnect();
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          resolve();
+        });
+        observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+      });
+    });
+    await page.getByTestId('wallet-option-phantom').click();
+    await page.evaluate(() => (window as unknown as { __escaped: Promise<void> }).__escaped);
+    await expect(page.getByTestId('connect-modal')).toHaveCount(0);
   });
-  await button(page).dblclick();
-  await expect(button(page)).toHaveText(short(A));
-  await expect(page.getByTestId('toast')).toHaveCount(0);
-  expect(await signCount(page)).toBe(2);
-  expect(auth.calls.verify).toBe(1);
+  await test.step('still connected, one click away from signing in', async () => {
+    await expect(button(page)).toHaveText('Sign in');
+    await expect(button(page)).toHaveAttribute('data-auth', 'wallet-connected');
+    await expect(page.getByTestId('toast')).toContainText('declined');
+    await page.screenshot({ path: 'test-results/wallet-auth/04-rejected.png' });
+    expect(auth.calls.verify).toBe(0);
+  });
+  await test.step('a double click signs once', async () => {
+    await page.evaluate(() => {
+      window.__mockWallet.reject = false;
+      window.__mockWallet.signDelayMs = 300;
+    });
+    await button(page).dblclick();
+    await expect(button(page)).toHaveText(short(A));
+    await expect(page.getByTestId('toast')).toHaveCount(0);
+    expect(await signCount(page)).toBe(2);
+    expect(auth.calls.verify).toBe(1);
+  });
 });
 
 test('an expired session signs out with a clear message', async ({ context, page }) => {
