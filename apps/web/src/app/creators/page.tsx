@@ -22,7 +22,6 @@ import { XIcon } from '@/components/icons';
 import {
   Button,
   EmptyState,
-  Label,
   Money,
   PillGroup,
   pillClass,
@@ -30,6 +29,7 @@ import {
   Skeleton,
   Tag,
 } from '@/components/ui';
+import { MARKET_WRAP, PageHero } from '@/components/page-hero';
 import { api } from '@/lib/api';
 import { useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
@@ -134,46 +134,38 @@ function Leaderboard() {
   const rangeLabel = range === '7d' ? 'last 7 days' : range === '30d' ? 'last 30 days' : 'all time';
 
   return (
-    <section className="space-y-6" data-testid="creator-leaderboard">
-      <div className="flex flex-wrap items-end justify-between gap-6">
-        <div className="max-w-xl">
-          <Label>Creators</Label>
-          <h1 className="m-0 mt-1 text-[32px] font-semibold tracking-[-0.03em]">
+    <div data-testid="creator-leaderboard">
+      <PageHero
+        eyebrow="Creators"
+        title={
+          <>
             Creator <Serif>leaderboard</Serif>
-          </h1>
-          <p className="m-0 mt-1 text-ink-2">
-            Built from released escrow orders and verified-buyer reviews. Featured placements can’t
-            buy a spot here.
-          </p>
-        </div>
+          </>
+        }
+        sub="Built from released escrow orders and verified-buyer reviews. Featured placements can’t buy a spot here."
+      >
         {board ? (
           <dl
-            className="m-0 grid w-full grid-cols-3 divide-x divide-line overflow-hidden rounded-card border border-line bg-surface sm:w-auto"
+            className="m-0 mt-3 grid max-w-3xl gap-3 sm:grid-cols-3"
             data-testid="leaderboard-summary"
           >
-            <div className="min-w-0 px-3 py-3 sm:px-4">
-              <dt className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
-                Paid to creators
-              </dt>
-              <dd className="m-0 mt-1 text-lg text-accent">
+            <div className="glass min-w-0 rounded-2xl border border-white/10 p-4">
+              <dt className="text-sm text-muted">Paid to creators</dt>
+              <dd className="m-0 mt-1 text-3xl font-semibold tracking-[-0.04em] text-accent">
                 <Money lamports={board.summary.paidLamports} centsPerSol={cents} strong stacked />
               </dd>
               <dd className="m-0 font-mono text-[11px] text-muted">all time</dd>
             </div>
-            <div className="min-w-0 px-3 py-3 sm:px-4">
-              <dt className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
-                Paid · 30 days
-              </dt>
-              <dd className="m-0 mt-1 text-lg">
+            <div className="glass min-w-0 rounded-2xl border border-white/10 p-4">
+              <dt className="text-sm text-muted">Paid · 30 days</dt>
+              <dd className="m-0 mt-1 text-3xl font-semibold tracking-[-0.04em]">
                 <Money lamports={board.summary.paid30dLamports} centsPerSol={null} strong />
               </dd>
               <dd className="m-0 font-mono text-[11px] text-accent">{change ?? ' '}</dd>
             </div>
-            <div className="min-w-0 px-3 py-3 sm:px-4">
-              <dt className="font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
-                Ranked creators
-              </dt>
-              <dd className="m-0 mt-1 font-mono text-lg font-semibold text-ink">
+            <div className="glass min-w-0 rounded-2xl border border-white/10 p-4">
+              <dt className="text-sm text-muted">Ranked creators</dt>
+              <dd className="m-0 mt-1 text-3xl font-semibold tracking-[-0.04em] text-ink">
                 {board.summary.rankedCreators}
               </dd>
               <dd className="m-0 inline-flex items-center gap-1 font-mono text-[11px] text-muted">
@@ -182,349 +174,355 @@ function Leaderboard() {
             </div>
           </dl>
         ) : null}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 border-b border-line">
-        <div role="tablist" aria-label="Leaderboard" className="flex flex-wrap gap-1">
-          {TABS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={tab === value}
-              onClick={() => set('tab', value === 'earners' ? null : value)}
-              className={`-mb-px border-b-2 px-3 py-2.5 text-sm ${
-                tab === value
-                  ? 'border-accent font-semibold text-ink'
-                  : 'border-transparent text-ink-2 hover:text-ink'
-              }`}
-            >
-              {TAB_LABEL[value]}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2 pb-2">
-          <PillGroup role="group" aria-label="Time range">
-            {RANGES.map((option) => (
+      </PageHero>
+      <section className={`${MARKET_WRAP} space-y-8 py-10`}>
+        <div className="flex flex-wrap items-center gap-3">
+          <div
+            role="tablist"
+            aria-label="Leaderboard"
+            className="flex flex-wrap gap-1 rounded-full border border-line bg-inset p-1"
+          >
+            {TABS.map((value) => (
               <button
-                key={option.value}
+                key={value}
                 type="button"
-                aria-pressed={range === option.value}
-                onClick={() => set('range', option.value === '30d' ? null : option.value)}
-                className={pillClass(range === option.value, 'h-8 font-mono text-[12px]')}
+                role="tab"
+                aria-selected={tab === value}
+                onClick={() => set('tab', value === 'earners' ? null : value)}
+                className={`min-h-9 rounded-full px-4 text-sm font-medium ${
+                  tab === value ? 'bg-ink text-bg' : 'text-ink-2 hover:text-ink'
+                }`}
               >
-                {option.label}
+                {TAB_LABEL[value]}
               </button>
             ))}
-          </PillGroup>
-          <label className="sr-only" htmlFor="lb-category">
-            Category
-          </label>
-          <select
-            id="lb-category"
-            value={category}
-            onChange={(event) => set('category', event.target.value || null)}
-            className="rounded-ctl border border-line bg-surface px-2 py-1 text-sm text-ink"
-          >
-            <option value="">All categories</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat.code} value={cat.code}>
-                {cat.label}
-              </option>
-            ))}
-          </select>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2">
-            <XIcon className="h-3.5 w-3.5" />
-            <span>verified only</span>
-            <input
-              type="checkbox"
-              role="switch"
-              aria-label="X verified only"
-              className="peer sr-only"
-              checked={verified}
-              onChange={(event) => set('verified', event.target.checked ? '1' : null)}
-            />
-            <span
-              aria-hidden="true"
-              className="relative h-5 w-9 rounded-full border border-line bg-surface-2 transition-colors peer-checked:border-accent-line peer-checked:bg-accent after:absolute after:left-0.5 after:top-0.5 after:h-3.5 after:w-3.5 after:rounded-full after:bg-ink after:transition-transform peer-checked:after:translate-x-4 peer-checked:after:bg-onaccent peer-focus-visible:ring-2 peer-focus-visible:ring-accent"
-            />
-          </label>
-        </div>
-      </div>
-
-      {failed ? (
-        <EmptyState title="Couldn’t load the leaderboard." body="Refresh to try again." />
-      ) : board === null ? (
-        <div className="space-y-2" aria-busy="true">
-          {[0, 1, 2, 3].map((key) => (
-            <Skeleton key={key} className="h-14 w-full" />
-          ))}
-        </div>
-      ) : rows.length === 0 ? (
-        <EmptyState title={EMPTY_COPY[tab].title} body={EMPTY_COPY[tab].body} />
-      ) : (
-        <ol
-          className="m-0 grid items-end gap-3 p-0 md:grid-cols-3"
-          data-testid="leaderboard-podium"
-        >
-          {podiumOrder.map((row) => {
-            const first = row.position === 1;
-            return (
-              <li
-                key={row.creator.wallet}
-                className={`list-none ${first ? 'order-first md:order-none' : ''}`}
-              >
-                <Link
-                  href={profileHref(row.creator)}
-                  data-testid="podium-card"
-                  className={`relative flex h-full flex-col items-center gap-2 overflow-hidden rounded-card border px-4 text-center hover:border-line-strong ${
-                    first
-                      ? 'border-accent-line bg-[radial-gradient(ellipse_at_top,rgba(200,255,61,0.16),transparent_65%)] py-7'
-                      : 'border-line bg-surface py-5'
-                  }`}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PillGroup role="group" aria-label="Time range">
+              {RANGES.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={range === option.value}
+                  onClick={() => set('range', option.value === '30d' ? null : option.value)}
+                  className={pillClass(range === option.value, 'h-8 font-mono text-[12px]')}
                 >
-                  <span className="absolute inset-x-3 top-3 flex items-center justify-between font-mono text-[11px] text-muted">
-                    <span className={first ? 'text-accent' : ''}>#{row.position}</span>
-                    <Movement row={row} />
-                  </span>
-                  <CreatorAvatar
-                    who={row.creator}
-                    className={`${first ? 'h-24 w-24 text-2xl' : 'h-16 w-16 text-lg'} mt-3`}
-                  />
-                  <CreatorName who={row.creator} className="max-w-full justify-center text-base" />
-                  <span className="rounded-ctl border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em]">
-                    <KindLabel who={row.creator} />
-                  </span>
-                  <span className={`mt-1 ${first ? 'text-2xl text-accent' : 'text-xl'}`}>
-                    <Headline row={row} tab={tab} centsPerSol={null} />
-                  </span>
-                  <span className="font-mono text-[11px] text-muted">
-                    {tab === 'earners' ? `paid out · ${rangeLabel}` : TAB_LABEL[tab]}
-                  </span>
-                  <span className="mt-2 grid w-full grid-cols-3 gap-2 font-mono text-[12px]">
-                    <span className="rounded-ctl border border-line-soft bg-inset py-1.5 text-ink">
-                      {row.sales}
-                      <span className="block text-[10px] text-muted">sales</span>
-                    </span>
-                    <span className="rounded-ctl border border-line-soft bg-inset py-1.5 text-ink">
-                      {row.rating ? `★ ${row.rating.avg.toFixed(1)}` : '–'}
-                      <span className="block text-[10px] text-muted">
-                        {row.rating?.count ?? 0} reviews
-                      </span>
-                    </span>
-                    <span className="rounded-ctl border border-line-soft bg-inset py-1.5 text-ink">
-                      {row.upvotes.raw}
-                      <span className="block text-[10px] text-muted">upvotes</span>
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-
-      {board ? (
-        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-          {rows.length ? (
-            <div className="space-y-3">
-              <div className="overflow-x-auto rounded-card border border-line bg-surface">
-                <table
-                  className="w-full min-w-[720px] border-collapse text-sm"
-                  data-testid="leaderboard-table"
-                >
-                  <thead>
-                    <tr className="border-b border-line text-left font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
-                      <th className="px-3 py-2 font-medium">#</th>
-                      <th className="px-3 py-2 font-medium">Creator</th>
-                      <th className="px-3 py-2 font-medium">Top listing</th>
-                      <th className="px-3 py-2 text-right font-medium">Sales</th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        {tab === 'earners' ? 'Paid out ▾' : TAB_LABEL[tab]}
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium">Rating</th>
-                      <th className="px-3 py-2 text-right font-medium">Upvotes</th>
-                      <th className="px-3 py-2 font-medium">14d</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => {
-                      const mine = session?.wallet === row.creator.wallet;
-                      return (
-                        <tr
-                          key={row.creator.wallet}
-                          className={`border-b border-line-soft last:border-0 ${mine ? 'bg-accent-bg' : ''}`}
-                          data-testid="leaderboard-row"
-                        >
-                          <td className="px-3 py-2.5 align-middle">
-                            <span className="flex flex-col font-mono leading-tight">
-                              <span className="text-ink">{row.position}</span>
-                              <Movement row={row} />
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <Link
-                              href={profileHref(row.creator)}
-                              className="flex items-center gap-2.5"
-                            >
-                              <CreatorAvatar who={row.creator} className="h-8 w-8 text-[11px]" />
-                              <span className="min-w-0">
-                                <span className="flex items-center gap-2">
-                                  <CreatorName who={row.creator} className="max-w-[160px]" />
-                                  {mine ? <Tag tone="ok">YOU</Tag> : null}
-                                </span>
-                                <span className="block text-[11px] text-muted">
-                                  {row.creator.handle ? `@${row.creator.handle} · ` : ''}
-                                  <KindLabel who={row.creator} />
-                                </span>
-                              </span>
-                            </Link>
-                          </td>
-                          <td className="max-w-[180px] truncate px-3 py-2.5">
-                            {row.topListing ? (
-                              <Link
-                                href={`/l/${row.topListing.slug}`}
-                                className="text-ink-2 hover:text-ink"
-                              >
-                                {row.topListing.title}
-                              </Link>
-                            ) : (
-                              '–'
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono">{row.sales}</td>
-                          <td className="px-3 py-2.5 text-right">
-                            <Headline row={row} tab={tab} centsPerSol={null} />
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono">
-                            {row.rating ? (
-                              <>
-                                ★ {row.rating.avg.toFixed(1)}
-                                <span className="block text-[11px] text-muted">
-                                  {row.rating.count} reviews
-                                </span>
-                              </>
-                            ) : (
-                              '–'
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono">
-                            ↑ {row.upvotes.counted}
-                            <span className="block text-[11px] text-muted">
-                              {row.upvotes.raw} raw
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <Spark values={row.spark} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex items-center justify-between gap-3 font-mono text-[12px] text-muted">
-                <span data-testid="leaderboard-count">
-                  Showing {rows.length} of {board.total}
-                </span>
-                {rows.length < board.total ? (
-                  <Button variant="secondary" onClick={() => void loadMore()}>
-                    Show more ({board.total - rows.length} left)
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <div />
-          )}
-
-          <aside className="space-y-4">
-            <div
-              className="rounded-card border border-line bg-surface p-4"
-              data-testid="ranking-rules"
+                  {option.label}
+                </button>
+              ))}
+            </PillGroup>
+            <label className="sr-only" htmlFor="lb-category">
+              Category
+            </label>
+            <select
+              id="lb-category"
+              value={category}
+              onChange={(event) => set('category', event.target.value || null)}
+              className="min-h-10 rounded-full border border-line bg-inset px-4 text-sm text-ink"
             >
-              <h2 className="m-0 text-base font-semibold">How ranking works</h2>
-              <div className="mt-3 space-y-2">
-                {RULE_CARDS(board.rules).map((card) => (
-                  <div
-                    key={card.tab}
-                    className={`rounded-ctl border p-3 text-[13px] ${
-                      tab === card.tab ? 'border-accent-line bg-accent-bg' : 'border-line-soft'
+              <option value="">All categories</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat.code} value={cat.code}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+            <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line px-4 text-sm text-ink-2">
+              <XIcon className="h-3.5 w-3.5" />
+              <span>verified only</span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="X verified only"
+                className="peer sr-only"
+                checked={verified}
+                onChange={(event) => set('verified', event.target.checked ? '1' : null)}
+              />
+              <span
+                aria-hidden="true"
+                className="relative h-5 w-9 rounded-full border border-line bg-surface-2 transition-colors peer-checked:border-accent-line peer-checked:bg-accent after:absolute after:left-0.5 after:top-0.5 after:h-3.5 after:w-3.5 after:rounded-full after:bg-ink after:transition-transform peer-checked:after:translate-x-4 peer-checked:after:bg-onaccent peer-focus-visible:ring-2 peer-focus-visible:ring-accent"
+              />
+            </label>
+          </div>
+        </div>
+
+        {failed ? (
+          <EmptyState title="Couldn’t load the leaderboard." body="Refresh to try again." />
+        ) : board === null ? (
+          <div className="space-y-2" aria-busy="true">
+            {[0, 1, 2, 3].map((key) => (
+              <Skeleton key={key} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState title={EMPTY_COPY[tab].title} body={EMPTY_COPY[tab].body} />
+        ) : (
+          <ol
+            className="m-0 grid items-end gap-3 p-0 md:grid-cols-3"
+            data-testid="leaderboard-podium"
+          >
+            {podiumOrder.map((row) => {
+              const first = row.position === 1;
+              return (
+                <li
+                  key={row.creator.wallet}
+                  className={`list-none ${first ? 'order-first md:order-none' : ''}`}
+                >
+                  <Link
+                    href={profileHref(row.creator)}
+                    data-testid="podium-card"
+                    className={`relative flex h-full flex-col items-center gap-2 overflow-hidden rounded-card border px-4 text-center hover:border-line-strong ${
+                      first
+                        ? 'border-accent-line bg-[radial-gradient(ellipse_at_top,rgba(200,255,61,0.16),transparent_65%)] py-7'
+                        : 'border-line bg-surface py-5'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <b className={tab === card.tab ? 'text-accent' : 'text-ink'}>
-                        {TAB_LABEL[card.tab]}
-                      </b>
-                      {tab === card.tab ? (
-                        <span className="font-mono text-[10px] text-accent">SHOWING</span>
-                      ) : null}
-                    </div>
-                    <p className="m-0 mt-1 font-mono text-[12px] text-ink">{card.formula}</p>
-                    <p className="m-0 mt-1 text-ink-2">{card.note}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div
-              className="rounded-card border border-line bg-surface p-4"
-              data-testid="ranking-never"
-            >
-              <h2 className="m-0 text-base font-semibold">What never counts</h2>
-              <ul className="m-0 mt-3 space-y-2 p-0 text-[13px] text-ink-2">
-                {[
-                  'A creator buying, reviewing or upvoting their own listing.',
-                  `Wallets funded by the creator in the last ${board.rules.funderWindowDays} days; clusters of them pause the listing’s rank for review.`,
-                  'Orders still in escrow, refunded or disputed.',
-                  `Wallets younger than ${board.rules.minWalletAgeDays} days.`,
-                  'Paid featuring or sponsorship.',
-                ].map((item) => (
-                  <li key={item} className="flex list-none gap-2">
-                    <span
-                      aria-hidden="true"
-                      className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded bg-danger-bg text-[10px] text-danger"
-                    >
-                      ✕
+                    <span className="absolute inset-x-3 top-3 flex items-center justify-between font-mono text-[11px] text-muted">
+                      <span className={first ? 'text-accent' : ''}>#{row.position}</span>
+                      <Movement row={row} />
                     </span>
-                    {item}
+                    <CreatorAvatar
+                      who={row.creator}
+                      className={`${first ? 'h-24 w-24 text-2xl' : 'h-16 w-16 text-lg'} mt-3`}
+                    />
+                    <CreatorName
+                      who={row.creator}
+                      className="max-w-full justify-center text-base"
+                    />
+                    <span className="rounded-ctl border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.06em]">
+                      <KindLabel who={row.creator} />
+                    </span>
+                    <span className={`mt-1 ${first ? 'text-2xl text-accent' : 'text-xl'}`}>
+                      <Headline row={row} tab={tab} centsPerSol={null} />
+                    </span>
+                    <span className="font-mono text-[11px] text-muted">
+                      {tab === 'earners' ? `paid out · ${rangeLabel}` : TAB_LABEL[tab]}
+                    </span>
+                    <span className="mt-2 grid w-full grid-cols-3 gap-2 font-mono text-[12px]">
+                      <span className="rounded-ctl border border-line-soft bg-inset py-1.5 text-ink">
+                        {row.sales}
+                        <span className="block text-[10px] text-muted">sales</span>
+                      </span>
+                      <span className="rounded-ctl border border-line-soft bg-inset py-1.5 text-ink">
+                        {row.rating ? `★ ${row.rating.avg.toFixed(1)}` : '–'}
+                        <span className="block text-[10px] text-muted">
+                          {row.rating?.count ?? 0} reviews
+                        </span>
+                      </span>
+                      <span className="rounded-ctl border border-line-soft bg-inset py-1.5 text-ink">
+                        {row.upvotes.raw}
+                        <span className="block text-[10px] text-muted">upvotes</span>
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+        {board ? (
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+            {rows.length ? (
+              <div className="space-y-3">
+                <div className="overflow-x-auto rounded-card border border-line bg-surface">
+                  <table
+                    className="w-full min-w-[720px] border-collapse text-sm"
+                    data-testid="leaderboard-table"
+                  >
+                    <thead>
+                      <tr className="border-b border-line text-left font-mono text-[11px] uppercase tracking-[0.06em] text-muted">
+                        <th className="px-3 py-2 font-medium">#</th>
+                        <th className="px-3 py-2 font-medium">Creator</th>
+                        <th className="px-3 py-2 font-medium">Top listing</th>
+                        <th className="px-3 py-2 text-right font-medium">Sales</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          {tab === 'earners' ? 'Paid out ▾' : TAB_LABEL[tab]}
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">Rating</th>
+                        <th className="px-3 py-2 text-right font-medium">Upvotes</th>
+                        <th className="px-3 py-2 font-medium">14d</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => {
+                        const mine = session?.wallet === row.creator.wallet;
+                        return (
+                          <tr
+                            key={row.creator.wallet}
+                            className={`border-b border-line-soft last:border-0 ${mine ? 'bg-accent-bg' : ''}`}
+                            data-testid="leaderboard-row"
+                          >
+                            <td className="px-3 py-2.5 align-middle">
+                              <span className="flex flex-col font-mono leading-tight">
+                                <span className="text-ink">{row.position}</span>
+                                <Movement row={row} />
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Link
+                                href={profileHref(row.creator)}
+                                className="flex items-center gap-2.5"
+                              >
+                                <CreatorAvatar who={row.creator} className="h-8 w-8 text-[11px]" />
+                                <span className="min-w-0">
+                                  <span className="flex items-center gap-2">
+                                    <CreatorName who={row.creator} className="max-w-[160px]" />
+                                    {mine ? <Tag tone="ok">YOU</Tag> : null}
+                                  </span>
+                                  <span className="block text-[11px] text-muted">
+                                    {row.creator.handle ? `@${row.creator.handle} · ` : ''}
+                                    <KindLabel who={row.creator} />
+                                  </span>
+                                </span>
+                              </Link>
+                            </td>
+                            <td className="max-w-[180px] truncate px-3 py-2.5">
+                              {row.topListing ? (
+                                <Link
+                                  href={`/l/${row.topListing.slug}`}
+                                  className="text-ink-2 hover:text-ink"
+                                >
+                                  {row.topListing.title}
+                                </Link>
+                              ) : (
+                                '–'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-mono">{row.sales}</td>
+                            <td className="px-3 py-2.5 text-right">
+                              <Headline row={row} tab={tab} centsPerSol={null} />
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-mono">
+                              {row.rating ? (
+                                <>
+                                  ★ {row.rating.avg.toFixed(1)}
+                                  <span className="block text-[11px] text-muted">
+                                    {row.rating.count} reviews
+                                  </span>
+                                </>
+                              ) : (
+                                '–'
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-mono">
+                              ↑ {row.upvotes.counted}
+                              <span className="block text-[11px] text-muted">
+                                {row.upvotes.raw} raw
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <Spark values={row.spark} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between gap-3 font-mono text-[12px] text-muted">
+                  <span data-testid="leaderboard-count">
+                    Showing {rows.length} of {board.total}
+                  </span>
+                  {rows.length < board.total ? (
+                    <Button variant="secondary" onClick={() => void loadMore()}>
+                      Show more ({board.total - rows.length} left)
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <div />
+            )}
+
+            <aside className="space-y-4">
+              <div
+                className="rounded-card border border-line bg-surface p-4"
+                data-testid="ranking-rules"
+              >
+                <h2 className="m-0 text-base font-semibold">How ranking works</h2>
+                <div className="mt-3 space-y-2">
+                  {RULE_CARDS(board.rules).map((card) => (
+                    <div
+                      key={card.tab}
+                      className={`rounded-ctl border p-3 text-[13px] ${
+                        tab === card.tab ? 'border-accent-line bg-accent-bg' : 'border-line-soft'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <b className={tab === card.tab ? 'text-accent' : 'text-ink'}>
+                          {TAB_LABEL[card.tab]}
+                        </b>
+                        {tab === card.tab ? (
+                          <span className="font-mono text-[10px] text-accent">SHOWING</span>
+                        ) : null}
+                      </div>
+                      <p className="m-0 mt-1 font-mono text-[12px] text-ink">{card.formula}</p>
+                      <p className="m-0 mt-1 text-ink-2">{card.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div
+                className="rounded-card border border-line bg-surface p-4"
+                data-testid="ranking-never"
+              >
+                <h2 className="m-0 text-base font-semibold">What never counts</h2>
+                <ul className="m-0 mt-3 space-y-2 p-0 text-[13px] text-ink-2">
+                  {[
+                    'A creator buying, reviewing or upvoting their own listing.',
+                    `Wallets funded by the creator in the last ${board.rules.funderWindowDays} days; clusters of them pause the listing’s rank for review.`,
+                    'Orders still in escrow, refunded or disputed.',
+                    `Wallets younger than ${board.rules.minWalletAgeDays} days.`,
+                    'Paid featuring or sponsorship.',
+                  ].map((item) => (
+                    <li key={item} className="flex list-none gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded bg-danger-bg text-[10px] text-danger"
+                      >
+                        ✕
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <p className="m-0 mt-3 text-[12px] text-muted">
+                  Recomputed every {board.rules.recomputeMinutes} minutes. Each row links to the
+                  on-chain payouts behind it.
+                </p>
+              </div>
+              <div
+                className="rounded-card border border-line bg-surface p-4"
+                data-testid="ranking-names"
+              >
+                <h2 className="m-0 text-base font-semibold">Names on this page</h2>
+                <ul className="m-0 mt-3 space-y-2 p-0 text-[13px] text-ink-2">
+                  <li className="flex list-none items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-ctl border border-line px-1.5 py-0.5 font-mono text-[10px] text-accent">
+                      <XIcon className="h-3 w-3" /> VERIFIED
+                    </span>
+                    Signed in with X. Handle is proven.
                   </li>
-                ))}
-              </ul>
-              <p className="m-0 mt-3 text-[12px] text-muted">
-                Recomputed every {board.rules.recomputeMinutes} minutes. Each row links to the
-                on-chain payouts behind it.
-              </p>
-            </div>
-            <div
-              className="rounded-card border border-line bg-surface p-4"
-              data-testid="ranking-names"
-            >
-              <h2 className="m-0 text-base font-semibold">Names on this page</h2>
-              <ul className="m-0 mt-3 space-y-2 p-0 text-[13px] text-ink-2">
-                <li className="flex list-none items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-ctl border border-line px-1.5 py-0.5 font-mono text-[10px] text-accent">
-                    <XIcon className="h-3 w-3" /> VERIFIED
-                  </span>
-                  Signed in with X. Handle is proven.
-                </li>
-                <li className="flex list-none items-center gap-2">
-                  <span className="rounded-ctl border border-line px-1.5 py-0.5 font-mono text-[10px]">
-                    PSEUDONYM
-                  </span>
-                  Chosen name, not linked to X.
-                </li>
-                <li className="flex list-none items-center gap-2">
-                  <span className="rounded-ctl border border-line px-1.5 py-0.5 font-mono text-[10px]">
-                    WALLET
-                  </span>
-                  No profile. Shown as an address.
-                </li>
-              </ul>
-            </div>
-          </aside>
-        </div>
-      ) : null}
-    </section>
+                  <li className="flex list-none items-center gap-2">
+                    <span className="rounded-ctl border border-line px-1.5 py-0.5 font-mono text-[10px]">
+                      PSEUDONYM
+                    </span>
+                    Chosen name, not linked to X.
+                  </li>
+                  <li className="flex list-none items-center gap-2">
+                    <span className="rounded-ctl border border-line px-1.5 py-0.5 font-mono text-[10px]">
+                      WALLET
+                    </span>
+                    No profile. Shown as an address.
+                  </li>
+                </ul>
+              </div>
+            </aside>
+          </div>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
@@ -555,7 +553,7 @@ function RULE_CARDS(rules: Board['rules']): { tab: BoardTab; formula: string; no
 
 export default function CreatorsPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+    <Suspense fallback={<Skeleton className={`${MARKET_WRAP} my-14 block h-40 w-full`} />}>
       <Leaderboard />
     </Suspense>
   );
