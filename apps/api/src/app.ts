@@ -1,6 +1,7 @@
 import { pendingMigrations } from '@trenchmart/db';
 import { deliverAlerts, notify, opsAlertRows, opsCheck, opsStatus, recordOpsEvent } from './ops';
 import { recordExternal, statusTick } from './status';
+import { publicStatus } from './status-public';
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { cors } from 'hono/cors';
@@ -382,6 +383,11 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (pending.length > 0)
       return c.json({ ok: false, cluster: deps.env.cluster, code: 'SCHEMA_BEHIND', pending }, 503);
     return c.json({ ok: true, cluster: deps.env.cluster });
+  });
+  // Public status page data (sanitized; docs/ops/status-page.md). Edge-cached 60 s, shared.
+  api.get('/status', async (c) => {
+    c.header('access-control-allow-origin', '*');
+    return c.json(await publicStatus(deps));
   });
   api.get('/openapi.json', (c) => {
     c.header('access-control-allow-origin', '*');
