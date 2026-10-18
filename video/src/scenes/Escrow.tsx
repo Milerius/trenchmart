@@ -180,7 +180,7 @@ export const EscrowCard: React.FC = () => {
           }}
         >
           <Shield size={15} color={C.accent} />
-          Held in escrow for 48h. Dispute any time.
+          Held in escrow for 1h. Dispute any time.
         </div>
       </Card>
 

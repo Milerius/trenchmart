@@ -13,6 +13,7 @@ import {
   type OrderStatus,
   type Tier,
   type VersionStatus,
+  escrowWindowLabel,
 } from '@trenchmart/shared';
 
 /** Devnet program id from programs/trench_escrow/src/lib.rs. */
@@ -155,6 +156,7 @@ export const protocol = {
   marketplaceFeeLabel,
   creatorCommission: bpsPercent(CREATOR_COMMISSION_BPS),
   escrowHours: DEFAULT_CONFIG_JSON.escrow_hours,
+  escrowWindow: escrowWindowLabel(DEFAULT_CONFIG_JSON.escrow_hours),
   orderTtlMinutes: DEFAULT_CONFIG_JSON.order_ttl_minutes,
   paymentGraceMinutes: PAYMENT_GRACE_MS / 60_000,
   maliciousDisputeDays: MALICIOUS_DISPUTE_MS / DAY_MS,

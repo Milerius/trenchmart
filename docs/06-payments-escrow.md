@@ -51,7 +51,7 @@ Tests: zero price, OG (total == price), rounding never makes `sum(split) != netF
  Sign & send ────────────────────────────────────────▶ confirmed
  POST /orders/:id/submitted {txSig}
                           verify (see 04-api) ◀── also Helius webhook
-                          PAID · escrow_until = +48h · license created
+                          PAID · escrow_until = +1h · license created
           ◀──── download button enabled (signed URL, watermarked)
 ```
 
@@ -62,7 +62,7 @@ Build the tx server-side with `@solana/web3.js` (or `@solana/kit`), return base6
 With `ESCROW_PROGRAM_ID` set, `POST /orders` returns one transaction for the buyer to sign:
 `initialize` (creates the PDA `["escrow", order uuid bytes]` with seller, resolver, the four
 bucket wallets, price, fee and rebate bps, split bps, `expires_at` and `escrow_until =
-expires_at + escrow_hours`), `fund` (moves the quoted total into the PDA) and a `tm:<id8>` memo.
+checkout build time + escrow_hours`, i.e. at most 1h after the payment confirms), `fund` (moves the quoted total into the PDA) and a `tm:<id8>` memo.
 `/orders/:id/submitted` marks the order paid only when the tx succeeded with that memo and the
 account is owned by the program, is `Paid`, holds the full total and carries exactly those
 terms. The buyer can download at once; the funds stay in the PDA.

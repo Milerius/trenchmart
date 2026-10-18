@@ -1,5 +1,6 @@
 'use client';
 
+import { DEFAULT_ESCROW_HOURS, escrowWindowLabel } from '@trenchmart/shared';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { solToLamports } from '@trenchmart/shared';
@@ -295,8 +296,9 @@ export default function StudioPage() {
             </div>
             {rows.length === 0 ? (
               <p className="m-0 px-5 py-4 text-sm text-muted">
-                No payouts yet. A sale pays out after its {config?.escrowHours ?? 48}h escrow
-                releases with no dispute.
+                No payouts yet. A sale pays out after its{' '}
+                {escrowWindowLabel(config?.escrowHours ?? DEFAULT_ESCROW_HOURS)} escrow releases
+                with no dispute.
               </p>
             ) : (
               <ul className="m-0 p-0">

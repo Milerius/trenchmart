@@ -25,7 +25,7 @@ export default function BuyersDocsPage() {
           {
             testId: 'buyer-escrow-hours',
             label: 'Escrow window',
-            text: `${protocol.escrowHours} hours`,
+            text: protocol.escrowWindow,
           },
           {
             testId: 'buyer-order-ttl',
@@ -67,11 +67,11 @@ export default function BuyersDocsPage() {
       <DocSection id="window" title="Escrow window">
         <p>
           A settled order is paid. Release waits until escrow_until, which the escrow account stores
-          ({protocol.escrowHours} hours from the order&apos;s payment deadline, so at least{' '}
-          {protocol.escrowHours} hours after you pay); the program rejects an earlier release, and
-          none happens while a dispute is open. Your purchases page reads escrow_until from the
-          account. The seller receives the list price. The net fee is split across buyback,
-          verification, ops, and safety.
+          (set when you sign the checkout, so it ends at most {protocol.escrowWindow} after your
+          payment is confirmed); release runs within about five minutes after that. The program
+          rejects an earlier release, and none happens while a dispute is open. Your purchases page
+          reads escrow_until from the account. The seller receives the list price. The net fee is
+          split across buyback, verification, ops, and safety.
         </p>
       </DocSection>
       <DocSection id="disputes" title="Refunds and disputes">

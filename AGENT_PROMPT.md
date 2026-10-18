@@ -8,7 +8,7 @@ A working POC on **Solana devnet** with:
 
 1. A pnpm + Turborepo monorepo: `apps/web` (Next.js on Cloudflare Workers via OpenNext), `apps/api` (Hono on Cloudflare Workers), `apps/sandbox` (Node + Playwright runner for a VPS), `packages/shared` (zod schemas, types, fee math, tier math), `packages/scanner` (static scanner, pure TS, runs in a Worker), `packages/db` (Drizzle schema + migrations for Supabase Postgres).
 2. The four designed screens (`design/` + `docs/09-screens.md`) implemented faithfully with React + Tailwind using the tokens in `docs/08-design-system.md`, plus the extra screens listed in `docs/09-screens.md` (reviewer queue, my purchases, creator dashboard, dispute form).
-3. Every backend flow in `docs/04`–`docs/07`: Sign-In With Solana, listings, versioned uploads to R2 with sha256 pinning, the scan pipeline, human review, checkout with a payment to the escrow vault, payment verification, signed downloads with a watermark, 48h escrow and payout cron, disputes, holder tiers from Helius webhooks.
+3. Every backend flow in `docs/04`–`docs/07`: Sign-In With Solana, listings, versioned uploads to R2 with sha256 pinning, the scan pipeline, human review, checkout with a payment to the escrow vault, payment verification, signed downloads with a watermark, 1h escrow and payout cron, disputes, holder tiers from Helius webhooks.
 
 ## Rules
 

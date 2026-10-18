@@ -3,6 +3,8 @@ import {
   assessPayment,
   canOpenDispute,
   escrowUntilFrom,
+  escrowWindowLabel,
+  escrowWindowShort,
   paymentIsTimely,
   releaseDue,
 } from './escrow';
@@ -132,5 +134,16 @@ describe('release and disputes', () => {
 
   it('adds escrow hours to the paid timestamp', () => {
     expect(escrowUntilFrom(now, 48).toISOString()).toBe('2026-01-03T00:00:00.000Z');
+  });
+});
+
+describe('escrow window labels', () => {
+  it('formats hours and minutes', () => {
+    expect(escrowWindowLabel(1)).toBe('1 hour');
+    expect(escrowWindowLabel(2)).toBe('2 hours');
+    expect(escrowWindowLabel(0.5)).toBe('30 minutes');
+    expect(escrowWindowLabel(1 / 60)).toBe('1 minute');
+    expect(escrowWindowShort(1)).toBe('1h');
+    expect(escrowWindowShort(0.25)).toBe('15m');
   });
 });

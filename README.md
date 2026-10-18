@@ -35,7 +35,7 @@ Trading tooling is sold in DMs and Discord threads today: no proof the script is
 
 **Escrowed on Solana**
 
-Your SOL is held in escrow for 48 hours before the creator is paid. Open a dispute at any point in that window and release is paused.
+Your SOL is held in escrow for 1 hour before the creator is paid. Open a dispute at any point in that window and release is paused.
 
 </td>
 <td width="33%" valign="top">
@@ -68,7 +68,7 @@ Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission.
 
 1. **Pick a verified tool.** Filter by terminal (Axiom, GMGN, Photon, Terminal, Trojan) or category.
 2. **See your exact price.** Connect your wallet and your $TRENCH tier is applied to the receipt before anything is signed.
-3. **Pay into escrow.** One transaction. Your SOL is held for 48 hours, and you can dispute at any time in that window.
+3. **Pay into escrow.** One transaction. Your SOL is held for 1 hour, and you can dispute at any time in that window.
 4. **Download on release.** When escrow releases, the download unlocks. Check any file against its pinned hash on the Verify page.
 
 <table>
@@ -107,7 +107,7 @@ Your tier is based on your lowest $TRENCH balance over the last 72 hours, so it 
 
 ## Trust and security
 
-**Escrow on every order.** Payment goes to escrow, not to the creator. The creator is paid only after 48 hours with no dispute. A dispute pauses release until it is settled: upheld means a refund, rejected means the order returns to payout.
+**Escrow on every order.** Payment goes to escrow, not to the creator. The creator is paid only after 1 hour with no dispute. A dispute pauses release until it is settled: upheld means a refund, rejected means the order returns to payout.
 
 **On-chain escrow program.** Every order is held by [`trench_escrow`](programs/trench_escrow) on devnet (`Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw`): the buyer signs one transaction that creates the order's escrow PDA and funds it; the program releases to the creator and fee buckets after `escrow_until`, or the resolver refunds during a dispute. The program embeds a security.txt and its IDL is published on chain. It is not audited, and no reproducible (solana-verify) build is published yet. [/verify](https://trenchmart.fun/verify#proof) reads the program hash, upgrade authority, multisig and recent escrows live from devnet.
 

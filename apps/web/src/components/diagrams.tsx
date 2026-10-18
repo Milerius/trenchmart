@@ -78,7 +78,7 @@ export function PurchaseDiagram() {
         'Buyer opens a live listing',
         `API quotes the fee and opens a pending order for ${protocol.orderTtlMinutes} minutes`,
         'Buyer signs one transaction that creates and funds the order escrow',
-        `Order is paid and held for ${protocol.escrowHours} hours`,
+        `Order is paid and held for ${protocol.escrowWindow}`,
         'Release pays the seller, or a dispute can refund the buyer',
       ]}
     />

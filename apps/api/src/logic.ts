@@ -362,10 +362,12 @@ export async function createOrder(deps: Deps, userId: string, listingId: string)
   const memo = orderMemo(id);
   const expires = new Date(deps.now().getTime() + quoted.config.order_ttl_minutes * 60_000);
   if (escrowEnabled(deps.env)) {
-    // The buyer funds a per-order escrow PDA. The window is fixed when the escrow is
-    // created, so it runs from the order's payment deadline, not from the block time.
+    // The buyer funds a per-order escrow PDA. The window is fixed on chain when the
+    // escrow is created. The checkout transaction (initialize + fund) carries a recent
+    // blockhash, so it lands within ~90 s of being built: starting the window now makes it
+    // end at most escrow_hours after the payment is confirmed (never later).
     const seller = await userById(deps.sql, listing.creator_id as string);
-    const escrowUntil = escrowUntilFrom(expires, quoted.config.escrow_hours);
+    const escrowUntil = escrowUntilFrom(deps.now(), quoted.config.escrow_hours);
     const args = orderEscrowArgs({
       env: deps.env,
       config: quoted.config,

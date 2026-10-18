@@ -70,7 +70,7 @@ test('docs sidebar, diagrams, and config numbers render', async ({ page }) => {
 
   await nav.getByRole('link', { name: 'Buyers' }).click();
   await expect(page).toHaveURL('/docs/buyers');
-  await expect(page.getByTestId('buyer-escrow-hours')).toHaveText(`${protocol.escrowHours} hours`);
+  await expect(page.getByTestId('buyer-escrow-hours')).toHaveText(protocol.escrowWindow);
   await expect(page.getByTestId('diagram-purchase')).toBeVisible();
 
   await page.goto('/docs/sellers');

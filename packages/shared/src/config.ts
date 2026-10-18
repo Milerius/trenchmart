@@ -40,6 +40,10 @@ export type AppConfig = {
  * $TRENCH (1B supply, 6 decimals): Scout 100k, Trencher 1M, OG 10M. A value that is
  * not an integer string disables that tier.
  */
+/** Owner decision: buyers' SOL is held for at most one hour before release. */
+export const MAX_ESCROW_HOURS = 1;
+export const DEFAULT_ESCROW_HOURS = 1;
+
 export const DEFAULT_CONFIG_JSON = {
   fee_bps: 500,
   tier_rebate_bps: { none: 0, scout: 2500, trencher: 6000, og: 10000 },
@@ -47,7 +51,8 @@ export const DEFAULT_CONFIG_JSON = {
   trench_decimals: 6,
   tier_window_hours: 72,
   fee_split_bps: { buyback: 4000, ai_verification: 2500, ops: 2000, safety: 1500 },
-  escrow_hours: 48,
+  // Escrow window: 1 hour at most (owner decision 2026-10-18).
+  escrow_hours: 1,
   order_ttl_minutes: 20,
   verification_fee_lamports: 250000000,
   verification_fee_free_from_tier: 'trencher',
@@ -120,7 +125,8 @@ export function parseAppConfig(
     ...((rows.max_file_bytes as object) ?? {}),
   } as { default?: unknown; setup?: unknown };
 
-  let escrow = num(rows.escrow_hours, d.escrow_hours);
+  // The window is capped at MAX_ESCROW_HOURS whatever the config row says.
+  let escrow = Math.min(num(rows.escrow_hours, d.escrow_hours), MAX_ESCROW_HOURS);
   if (escrowHoursOverride && escrowHoursOverride.trim()) {
     const n = Number(escrowHoursOverride);
     if (Number.isFinite(n) && n >= 0) escrow = n;

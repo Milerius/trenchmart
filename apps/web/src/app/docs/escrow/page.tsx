@@ -30,7 +30,7 @@ export default function EscrowDocsPage() {
           { testId: 'escrow-cluster', label: 'Cluster', text: protocol.cluster },
           { testId: 'escrow-program-id', label: 'Program id', text: protocol.programId },
           { testId: 'escrow-seeds', label: 'PDA seeds', text: protocol.pdaSeeds },
-          { testId: 'escrow-hours', label: 'Escrow window', text: `${protocol.escrowHours} hours` },
+          { testId: 'escrow-hours', label: 'Escrow window', text: protocol.escrowWindow },
         ]}
       />
       <DocSection id="accounts" title="Accounts">

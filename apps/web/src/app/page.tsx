@@ -1,5 +1,6 @@
 'use client';
 
+import { DEFAULT_ESCROW_HOURS, escrowWindowLabel, escrowWindowShort } from '@trenchmart/shared';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { CATEGORIES } from '@trenchmart/shared';
@@ -58,7 +59,7 @@ export default function HomePage() {
   }, []);
 
   const cents = stats?.solUsd.centsPerSol ?? null;
-  const escrowHours = config?.escrowHours ?? 48;
+  const escrowHours = config?.escrowHours ?? DEFAULT_ESCROW_HOURS;
 
   return (
     <div className="space-y-20">
@@ -105,7 +106,7 @@ export default function HomePage() {
               <Check /> 0% creator commission
             </li>
             <li className="flex items-center gap-2">
-              <Check /> {escrowHours}h escrow on every order
+              <Check /> {escrowWindowShort(escrowHours)} escrow on every order
             </li>
           </ul>
         </div>
@@ -137,7 +138,7 @@ export default function HomePage() {
               ],
               [
                 'Pay into escrow',
-                `Your SOL is held in escrow for ${escrowHours} hours. Open a dispute any time in that window.`,
+                `Your SOL is held in escrow for ${escrowWindowLabel(escrowHours)}. Open a dispute any time in that window.`,
               ],
               [
                 'Download on release',
@@ -253,7 +254,7 @@ export default function HomePage() {
             {[
               [
                 'Escrow on every order',
-                `The creator is paid only after ${escrowHours} hours with no dispute. A dispute freezes the funds until it is settled.`,
+                `The creator is paid only after ${escrowWindowLabel(escrowHours)} with no dispute. A dispute freezes the funds until it is settled.`,
               ],
               [
                 'On-chain escrow program',
@@ -384,7 +385,9 @@ function ReviewReceipt() {
         </div>
         <div className="bg-surface px-5 py-3">
           <span className="block text-muted">Escrow</span>
-          <span className="text-ink-2">48h · download on release</span>
+          <span className="text-ink-2">
+            {escrowWindowShort(DEFAULT_ESCROW_HOURS)} · download once paid
+          </span>
         </div>
       </div>
       <figcaption className="border-t border-line-soft px-5 py-2.5 text-xs text-muted">
