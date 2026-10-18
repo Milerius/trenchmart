@@ -44,23 +44,26 @@ describe('listing kinds', () => {
   it('requires the essentials per kind', () => {
     expect(parseSpecs('bot', { bots: [], settings: [] })).toMatchObject({ ok: false });
     expect(
-      parseSpecs('wallet', {
-        chain: 'solana',
-        formats: ['csv'],
-        walletCount: 0,
-        cadence: 'weekly',
-        columns: [],
-      }).ok,
+      parseSpecs('wallet', { chain: 'solana', formats: [], cadence: 'weekly', columns: [] }).ok,
     ).toBe(false);
     expect(
-      parseSpecs('wallet', {
-        chain: 'base',
-        formats: ['csv'],
-        walletCount: 5,
-        cadence: 'weekly',
-        columns: [],
-      }).ok,
+      parseSpecs('wallet', { chain: 'base', formats: ['csv'], cadence: 'weekly', columns: [] }).ok,
     ).toBe(false);
+  });
+
+  it('wallet specs carry no wallet count: the scan counts the file', () => {
+    const wallet = { chain: 'solana', formats: ['csv'], cadence: 'weekly', columns: [] };
+    expect(parseSpecs('wallet', wallet)).toEqual({ ok: true, specs: wallet });
+    // An older client's typed count is dropped, never stored.
+    expect(parseSpecs('wallet', { ...wallet, walletCount: 0 })).toEqual({
+      ok: true,
+      specs: wallet,
+    });
+    expect(parseSpecs('wallet', { ...wallet, walletCount: 412 })).toEqual({
+      ok: true,
+      specs: wallet,
+    });
+    expect(parseSpecs('wallet', { ...wallet, extra: 1 }).ok).toBe(false);
     expect(parseSpecs('other', { what: 'ab' }).ok).toBe(false);
     expect(parseSpecs('indicator', { platform: 'TradingView', language: 'Pine Script' }).ok).toBe(
       true,
@@ -94,19 +97,24 @@ describe('listing kinds', () => {
       {
         chain: 'solana',
         formats: ['csv', 'json'],
-        walletCount: 4120,
+        walletCount: 9999,
         cadence: 'weekly',
         columns: [],
       },
       ['Axiom', 'GMGN'],
+      4120,
     );
     expect(rows).toEqual([
       ['Chain', 'Solana'],
-      ['Wallets', '4,120'],
+      ['Wallets', '4,120 wallets, counted from the file'],
       ['Formats', 'CSV, JSON'],
       ['Refresh', 'Weekly'],
       ['Imports into', 'Axiom, GMGN'],
     ]);
+    // A seller-typed count from an older listing is never shown; only the scan's count is.
+    expect(
+      specRows('wallet', { chain: 'solana', formats: ['csv'], walletCount: 9999 }).map(([k]) => k),
+    ).not.toContain('Wallets');
     expect(specRows('script', SCRIPT, ['Axiom'])).toContainEqual(['Keys and signing', 'Never']);
     expect(specRows(null, SCRIPT)).toEqual([]);
     expect(specRows('script', null)).toEqual([]);

@@ -1511,6 +1511,15 @@ async function storeStaticScan(
   const hash = await sha256Hex(bytes);
   version.sha256 = hash;
   await deps.sql`update versions set declared = ${deps.sql.json(output.declared as never)}, sha256 = ${hash} where id = ${versionId}`;
+  // Wallet lists: the verified count comes from the file, never from the seller. Recounted on
+  // every static scan, so each version (and each reupload) carries its own count.
+  if (output.wallets) {
+    const { count, ...facts } = output.wallets;
+    await deps.sql`
+      update versions set wallet_count = ${count}, wallet_facts = ${deps.sql.json(facts as never)}
+      where id = ${versionId}
+    `;
+  }
   return {
     summary: output.summary,
     checks: output.checks.map((check) => ({

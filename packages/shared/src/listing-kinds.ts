@@ -55,7 +55,7 @@ export const LISTING_KINDS: readonly ListingKindMeta[] = [
     label: 'Wallet tracker list',
     blurb: 'Labelled wallets to import into a tracker or terminal watchlist.',
     examples: 'smart money · KOLs · insiders',
-    files: '.csv · .json',
+    files: '.txt · .json · .csv',
     category: 'wallet_list',
     specificsLabel: 'List details',
     terminals: 'import',
@@ -205,15 +205,46 @@ export const botSpecs = z
   })
   .strict();
 
-export const walletSpecs = z
-  .object({
-    chain: z.literal('solana'),
-    formats: set(WALLET_FORMATS, 1, 'Pick a format'),
-    walletCount: z.number().int().min(1).max(100_000),
-    cadence: z.enum(CADENCES),
-    columns: set(WALLET_COLUMNS),
-  })
-  .strict();
+// No wallet count here: the scan counts the wallets in the uploaded file and stores the
+// verified count on the version (versions.wallet_count). A walletCount sent by an older client
+// is dropped, never stored or shown.
+export const walletSpecs = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+    const { walletCount: _ignored, ...rest } = value as Record<string, unknown>;
+    return rest;
+  },
+  z
+    .object({
+      chain: z.literal('solana'),
+      formats: set(WALLET_FORMATS, 1, 'Pick a format'),
+      cadence: z.enum(CADENCES),
+      columns: set(WALLET_COLUMNS),
+    })
+    .strict(),
+);
+
+/** Verified wallet count of a wallet list version, counted from its file by the scan. */
+export type WalletCount = {
+  /** Unique valid Solana addresses in the file. */
+  count: number;
+  versionId: string;
+  semver: string;
+  source: 'file';
+  facts: {
+    format: 'standard' | 'json' | 'csv' | 'txt';
+    rows: number;
+    duplicates: number;
+    invalid: number;
+    named?: number;
+    alertTypes?: string[];
+  } | null;
+};
+
+/** "767 wallets, counted from the file". */
+export function walletCountLabel(count: number): string {
+  return `${count.toLocaleString('en-US')} wallet${count === 1 ? '' : 's'}, counted from the file`;
+}
 
 export const filterSpecs = z.object({ filterTypes: set(FILTER_TYPES) }).strict();
 
@@ -281,6 +312,8 @@ export function specRows(
   kind: string | null | undefined,
   specs: unknown,
   terminals: readonly string[] = [],
+  /** Wallet lists: the count the scan took from the live version's file. */
+  walletCount: number | null = null,
 ): [string, string][] {
   const meta = kindMeta(kind);
   if (!meta || !specs || typeof specs !== 'object') return [];
@@ -306,10 +339,8 @@ export function specRows(
     rows.push(['Settings included', list(s.settings)]);
   } else if (meta.code === 'wallet') {
     rows.push(['Chain', 'Solana']);
-    rows.push([
-      'Wallets',
-      typeof s.walletCount === 'number' ? s.walletCount.toLocaleString('en-US') : null,
-    ]);
+    // Only the scan's count is shown; a seller-typed number (older listings) never is.
+    rows.push(['Wallets', typeof walletCount === 'number' ? walletCountLabel(walletCount) : null]);
     rows.push(['Formats', list((s.formats as string[] | undefined)?.map((f) => f.toUpperCase()))]);
     rows.push(['Refresh', CADENCE_LABEL[s.cadence as keyof typeof CADENCE_LABEL] ?? null]);
     rows.push(['Imports into', terms]);

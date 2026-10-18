@@ -197,7 +197,9 @@ test("terminal cards show each terminal's own logo, served locally", async ({ pa
   expect(res.headers()['content-type']).toContain('image/svg+xml');
 });
 
-test('wallet lists ask for format, count, cadence and imports', async ({ page }) => {
+test('wallet lists ask for format, cadence and imports; the count comes from the file', async ({
+  page,
+}) => {
   await stub(page);
   await page.goto('/studio/listings/new');
   await page.getByTestId('kind-wallet').click();
@@ -208,11 +210,16 @@ test('wallet lists ask for format, count, cadence and imports', async ({ page })
     .getByTestId('terminals')
     .getByRole('button', { name: /Photon/ })
     .click();
-  await page.getByLabel('Wallet count').fill('412');
+  // No manual wallet count: no stepper, no input, no "How many wallets" prompt.
+  await expect(page.getByLabel('Wallet count')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Fewer wallets|More wallets/ })).toHaveCount(0);
+  await expect(page.getByText('How many wallets the file holds')).toHaveCount(0);
+  await expect(page.getByTestId('wallet-count-auto')).toContainText('verified count');
+  await expect(page.getByTestId('wizard').locator('input[inputmode="numeric"]')).toHaveCount(0);
   await page.getByRole('radio', { name: /Daily/ }).click();
   await page.getByRole('button', { name: /\.json/ }).click();
   const spec = page.getByText('Spec buyers see').locator('..');
-  await expect(spec).toContainText('412');
+  await expect(spec).not.toContainText('Wallets');
   await expect(spec).toContainText('CSV, JSON');
   await expect(spec).toContainText('Daily');
   await expect(spec).toContainText('Photon');

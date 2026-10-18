@@ -4,6 +4,12 @@ import * as walk from 'acorn-walk';
 import bs58 from 'bs58';
 import { unzipSync } from 'fflate';
 import { arrayBufferOf, filterPresetSchema } from '@trenchmart/shared';
+import {
+  parseWalletList,
+  walletListFacts,
+  type WalletListFacts,
+  type WalletListParse,
+} from './wallets';
 import { listZip, unsafeZipPath, unixModeIsSymlink, type ZipEntryMeta } from './zip';
 
 export const ENGINE_VER = 'scanner@1.1.0';
@@ -34,6 +40,8 @@ export type ScanOutput = {
   checks: ScanCheck[];
   declared: Declared;
   summary: CheckResult;
+  /** Wallet lists only: the unique Solana wallets counted from the file, with parse facts. */
+  wallets?: WalletListFacts & { count: number };
 };
 
 export type ScanOptions = {
@@ -675,55 +683,41 @@ function linkChecks(text: string, opts: ScanOptions): ScanCheck[] {
   ];
 }
 
-function scanWalletList(text: string, opts: ScanOptions): ScanCheck[] {
+function scanWalletList(
+  text: string,
+  name: string,
+  opts: ScanOptions,
+): { checks: ScanCheck[]; wallets: WalletListParse } {
   const checks: ScanCheck[] = [];
   const max = opts.maxWalletRows ?? 5000;
-  let rows: string[] = [];
-  const trimmed = text.trim();
-  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-    try {
-      const json = JSON.parse(trimmed) as unknown;
-      const list = Array.isArray(json) ? json : [];
-      if (!Array.isArray(json)) {
-        checks.push(
-          check('wl-schema', 'fail', 'Wallet list schema', 'JSON wallet lists must be an array.'),
-        );
-        checks.push(...linkChecks(text, opts));
-        return checks;
-      }
-      for (const item of list) {
-        if (typeof item === 'string') rows.push(item.trim());
-        else if (item && typeof item === 'object' && 'address' in item)
-          rows.push(String((item as { address: unknown }).address).trim());
-        else rows.push('');
-      }
-    } catch {
-      checks.push(check('wl-schema', 'fail', 'Wallet list schema', 'Invalid JSON.'));
-      return checks;
-    }
-  } else {
-    const lines = trimmed.split(/\r?\n/).filter(Boolean);
-    const header = (lines[0] ?? '').split(',').map((s) => s.trim().toLowerCase());
-    const idx = header.indexOf('address');
-    if (idx < 0) {
-      checks.push(check('wl-schema', 'fail', 'Wallet list schema', 'CSV needs an address column.'));
-      return checks;
-    }
-    rows = lines.slice(1).map((line) => (line.split(',')[idx] ?? '').trim());
+  const wallets = parseWalletList(text, name);
+  if (wallets.error) {
+    checks.push(check('wl-schema', 'fail', 'Wallet list schema', wallets.error));
+    checks.push(...linkChecks(text, opts));
+    return { checks, wallets };
   }
-  const invalid = rows.filter((r) => !isPubkey(r));
-  const unique = new Set(rows.filter(Boolean));
-  if (rows.length > max) {
+  const counted = `${wallets.count} unique Solana wallet${wallets.count === 1 ? '' : 's'} counted from the file`;
+  const other = wallets.otherChains ? `, ${wallets.otherChains} other-chain entries skipped` : '';
+  if (wallets.rows > max) {
     checks.push(
-      check('wl-schema', 'fail', 'Wallet list schema', `${rows.length} rows exceeds ${max}.`),
+      check('wl-schema', 'fail', 'Wallet list schema', `${wallets.rows} rows exceeds ${max}.`),
     );
-  } else if (invalid.length) {
+  } else if (wallets.invalid) {
     checks.push(
       check(
         'wl-schema',
         'fail',
         'Wallet list schema',
-        `${invalid.length} value(s) are not 32-byte base58 pubkeys.`,
+        `${wallets.invalid} value(s) are not 32-byte base58 pubkeys: ${wallets.invalidSamples.join(', ')}.`,
+      ),
+    );
+  } else if (wallets.count === 0) {
+    checks.push(
+      check(
+        'wl-schema',
+        'fail',
+        'Wallet list schema',
+        'The file holds no Solana wallet addresses.',
       ),
     );
   } else {
@@ -732,10 +726,11 @@ function scanWalletList(text: string, opts: ScanOptions): ScanCheck[] {
         'wl-schema',
         'pass',
         'Wallet list schema',
-        `${rows.length} rows, ${rows.length - unique.size} duplicates removed in the count.`,
+        `${counted} (${wallets.rows} rows, ${wallets.duplicates} duplicates removed in the count${other}).`,
       ),
     );
   }
+  const rows = wallets.addresses;
   const programs = rows.filter(
     (r) => KNOWN_PROGRAM_IDS.has(r) || (opts.creatorWallet && r === opts.creatorWallet),
   );
@@ -750,7 +745,7 @@ function scanWalletList(text: string, opts: ScanOptions): ScanCheck[] {
       : check('wl-no-programs', 'pass', 'Program ids', 'No known program ids in the list.'),
   );
   checks.push(...linkChecks(text, opts));
-  return checks;
+  return { checks, wallets };
 }
 
 function scanFilter(text: string, opts: ScanOptions): ScanCheck[] {
@@ -882,8 +877,15 @@ async function scanContent(
   }
   const text = decodeText(file.bytes);
   if (category === 'wallet_list') {
-    const checks = scanWalletList(text, opts);
-    return { engineVer: ENGINE_VER, checks, declared: emptyDeclared(), summary: summarize(checks) };
+    const { checks, wallets } = scanWalletList(text, file.name, opts);
+    return {
+      engineVer: ENGINE_VER,
+      checks,
+      declared: emptyDeclared(),
+      summary: summarize(checks),
+      // Counts only: the verified wallet count stored on the version (never the addresses).
+      wallets: { count: wallets.count, ...walletListFacts(wallets) },
+    };
   }
   if (category === 'filter') {
     const checks = scanFilter(text, opts);
