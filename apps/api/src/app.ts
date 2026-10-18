@@ -67,6 +67,15 @@ import {
 import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
 import { EscrowError } from './escrow';
 import {
+  findCreator,
+  loadOwnProfile,
+  profileMediaResponse,
+  publicProfile,
+  removeProfileImage,
+  saveProfile,
+  uploadProfileImage,
+} from './profile';
+import {
   activeBond,
   applyPayment,
   grantCreatorRole,
@@ -376,6 +385,34 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json({ handle: body.handle });
   });
 
+  // Creator profile (studio redesign): editable fields, avatar and banner.
+  api.get('/studio/profile', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await loadOwnProfile(deps, user.id as string)));
+  });
+
+  api.put('/studio/profile', async (c) => {
+    const user = requireUser(c);
+    return c.json(jsonSafe(await saveProfile(deps, user.id as string, await c.req.json())));
+  });
+
+  for (const kind of ['avatar', 'banner'] as const) {
+    api.post(`/studio/profile/${kind}`, async (c) => {
+      const user = requireUser(c);
+      const declared = Number(c.req.header('content-length') ?? '0');
+      if (declared > IMAGE_MAX_BYTES) {
+        throw new HttpError(413, 'IMAGE_TOO_LARGE', 'images are limited to 3 MB');
+      }
+      const bytes = await readCapped(c.req.raw.body, IMAGE_MAX_BYTES);
+      return c.json(await uploadProfileImage(deps, user.id as string, kind, bytes));
+    });
+    api.delete(`/studio/profile/${kind}`, async (c) => {
+      const user = requireUser(c);
+      await removeProfileImage(deps, user.id as string, kind);
+      return c.json({ ok: true });
+    });
+  }
+
   api.get('/categories', async (c) => {
     const counts = await deps.sql<{ category: string; count: number }[]>`
       select category, count(*)::int as count from listings
@@ -485,13 +522,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   });
 
   api.get('/creators/:handle', async (c) => {
-    const handle = c.req.param('handle').replace(/^@/, '');
-    const users = await deps.sql<Record<string, any>[]>`
-      select id, handle, wallet, x_handle from users
-      where handle = ${handle} or x_handle = ${handle}
-      limit 1
-    `;
-    const creator = users[0];
+    const creator = await findCreator(deps, c.req.param('handle'));
     if (!creator) throw new HttpError(404, 'NOT_FOUND', 'creator not found');
     const listings = await deps.sql<Record<string, any>[]>`
       select l.*, u.handle from listings l join users u on u.id = l.creator_id
@@ -499,17 +530,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         and l.live_version_id is not null
       order by l.created_at desc
     `;
-    const bond = await activeBond(deps.sql, creator.id as string);
+    const viewer = c.get('user');
+    const profile = await publicProfile(deps, creator, (viewer?.id as string | undefined) ?? null);
     return c.json(
-      jsonSafe({
-        handle: creator.handle,
-        wallet: creator.wallet,
-        xHandle: creator.x_handle,
-        bond,
-        listings: listings.map((listing) => publicListing(listing)),
-      }),
+      jsonSafe({ ...profile, listings: listings.map((listing) => publicListing(listing)) }),
     );
   });
+
+  api.get('/profile-media/:id', (c) => profileMediaResponse(deps, c.req.param('id')));
 
   api.post('/orders/quote', async (c) => {
     const user = requireUser(c);
@@ -1508,6 +1536,8 @@ function publicUser(user: Record<string, any>) {
     wallet: user.wallet,
     handle: user.handle,
     xHandle: user.x_handle,
+    displayName: user.display_name ?? null,
+    avatarUrl: user.avatar_media_id ? `/api/v1/profile-media/${user.avatar_media_id}` : null,
     roles: user.roles,
   };
 }
