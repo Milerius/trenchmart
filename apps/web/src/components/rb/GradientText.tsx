@@ -61,7 +61,7 @@ export default function GradientText({
   pauseOnHover = false,
   followPointer = false,
   className = '',
-  style
+  style,
 }: GradientTextProps) {
   const rootRef = useRef<HTMLSpanElement>(null);
   const settingsRef = useRef<Settings | null>(null);
@@ -76,7 +76,7 @@ export default function GradientText({
     scale: clamp(scale, 1, 6),
     yoyo,
     pauseOnHover,
-    followPointer
+    followPointer,
   };
 
   useEffect(() => {
@@ -88,7 +88,18 @@ export default function GradientText({
     if (!root) return undefined;
 
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    const state = { time: 0, inside: false, visible: true, x: 0.5, y: 0.5, px: 0.5, py: 0.5, vx: 0, vy: 0, pull: 0 };
+    const state = {
+      time: 0,
+      inside: false,
+      visible: true,
+      x: 0.5,
+      y: 0.5,
+      px: 0.5,
+      py: 0.5,
+      vx: 0,
+      vy: 0,
+      pull: 0,
+    };
     let raf = 0;
     let last = 0;
     let alive = true;
@@ -128,7 +139,9 @@ export default function GradientText({
           offset = (cycle % 1) * period;
         }
         offset += (state.px - 0.5) * period * 0.5 * state.pull;
-        const stops = loop.map((color, i) => `${color} ${((i / (loop.length - 1)) * period - offset).toFixed(2)}%`);
+        const stops = loop.map(
+          (color, i) => `${color} ${((i / (loop.length - 1)) * period - offset).toFixed(2)}%`,
+        );
         image = `repeating-linear-gradient(${s.angle}deg, ${stops.join(', ')})`;
       }
       root.style.setProperty('--gt-gradient', image);
@@ -150,7 +163,8 @@ export default function GradientText({
       state.px += state.vx * dt;
       state.py += state.vy * dt;
       paint();
-      const settling = Math.abs(state.pull - target) > 0.001 || Math.abs(state.vx) + Math.abs(state.vy) > 0.001;
+      const settling =
+        Math.abs(state.pull - target) > 0.001 || Math.abs(state.vx) + Math.abs(state.vy) > 0.001;
       if (!state.visible || (paused && !settling)) return;
       raf = requestAnimationFrame(tick);
     };
@@ -188,8 +202,8 @@ export default function GradientText({
       wake();
     };
 
-    const observer = new IntersectionObserver(entries => {
-      state.visible = entries.some(entry => entry.isIntersecting);
+    const observer = new IntersectionObserver((entries) => {
+      state.visible = entries.some((entry) => entry.isIntersecting);
       if (state.visible) wake();
     });
     observer.observe(root);
@@ -221,7 +235,7 @@ export default function GradientText({
           '--gt-gradient': `linear-gradient(${direction ? (ANGLES[direction] ?? angle) : angle}deg, ${loop.join(', ')})`,
           '--gt-border': `${borderWidth}px`,
           '--gt-glow': clamp(glow, 0, 1),
-          ...style
+          ...style,
         } as CSSProperties
       }
     >
