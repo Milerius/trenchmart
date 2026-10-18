@@ -99,6 +99,8 @@ export type Deps = {
   escrowChain?: EscrowChain;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
   llmFetch?: typeof fetch;
+  /** Fetch used for X OAuth (M-04). Defaults to the global fetch. */
+  xFetch?: typeof fetch;
   /** Fetch used by monitoring checks and alert delivery (ops.ts). Defaults to the global fetch. */
   opsFetch?: typeof fetch;
   /** On-chain $TRENCH balance of a wallet in base units. Optional: tiers fall back to stored rows. */

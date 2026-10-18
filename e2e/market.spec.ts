@@ -83,7 +83,29 @@ test('creator profile shows the handle, X link and listings; unknown handles say
   await page.goto('/u/maker');
   await expect(page.getByRole('heading', { name: '@maker' })).toBeVisible();
   await expect(page.getByText(/X @trenchmaker/)).toBeVisible();
+  // M-04: a handle not proven through X sign-in is labelled.
+  await expect(page.getByTestId('x-unverified')).toHaveText('(unverified)');
   await expect(page.getByRole('heading', { name: 'Trojan Intel' })).toBeVisible();
   await page.goto('/u/nobody');
   await expect(page.getByText('Creator not found.')).toBeVisible();
+});
+
+test('creator profile: an X handle verified through X sign-in has no unverified label', async ({
+  page,
+}) => {
+  await stub(page, (path) =>
+    path === '/creators/verified'
+      ? {
+          handle: 'verified',
+          wallet: 'H4kHTS2dSvuJX6NL4KxYRsPBZvHNc79rTpmnWm2ecdbZ',
+          xHandle: 'realtrader',
+          xVerified: true,
+          bond: '5000000000',
+          listings: [],
+        }
+      : undefined,
+  );
+  await page.goto('/u/verified');
+  await expect(page.getByText(/X @realtrader/)).toBeVisible();
+  await expect(page.getByTestId('x-unverified')).toHaveCount(0);
 });

@@ -52,6 +52,9 @@ export type Env = {
   checkoutPaused: boolean;
   /** Shared secret the web proxy sends with the real client IP (M-03). */
   proxySecret: string;
+  /** X OAuth 2.0 app (M-04). Empty: only the devnet-only unverified handle link works. */
+  xClientId: string;
+  xClientSecret: string;
   /** Server-side wasm WebP re-encode at upload (CPU heavy; off unless IMAGE_OPTIMIZE=1). */
   imageOptimize: boolean;
   /** Alert delivery (ops.ts). ntfy topic is a secret: anyone who knows it can read alerts. */
@@ -207,6 +210,8 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     escrowCrankSecret: blank(source.ESCROW_CRANK_SECRET),
     checkoutPaused: /^(1|true|yes)$/i.test(source.CHECKOUT_PAUSED ?? ''),
     proxySecret: blank(source.PROXY_SECRET),
+    xClientId: blank(source.X_CLIENT_ID),
+    xClientSecret: blank(source.X_CLIENT_SECRET),
     imageOptimize: source.IMAGE_OPTIMIZE === '1',
     alertNtfyServer: blank(source.ALERT_NTFY_SERVER) || 'https://ntfy.sh',
     alertNtfyTopic: blank(source.ALERT_NTFY_TOPIC),

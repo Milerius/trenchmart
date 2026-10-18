@@ -67,6 +67,7 @@ import {
 } from './content';
 import { IMAGE_MAX_BYTES } from '@trenchmart/scanner';
 import { EscrowError } from './escrow';
+import { checkXState, fetchXAccount, startXAuth, X_COOKIE, xVerified } from './x-oauth';
 import {
   findCreator,
   loadOwnProfile,
@@ -380,17 +381,85 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     );
   });
 
+  // M-04: X OAuth 2.0 + PKCE. The callback runs on the web origin (through the /api/v1
+  // proxy) so the session cookie comes along.
+  const xRedirectUri = () => `${deps.env.appUrl}/api/v1/auth/x/callback`;
   api.get('/auth/x/start', (c) => {
-    requireUser(c);
-    throw new HttpError(
-      501,
-      'X_UNCONFIGURED',
-      'X OAuth is not configured. Use the dev handle link.',
-    );
+    const user = requireUser(c);
+    if (!deps.env.xClientId)
+      throw new HttpError(
+        501,
+        'X_UNCONFIGURED',
+        'X OAuth is not configured. Use the dev handle link.',
+      );
+    const started = startXAuth({
+      clientId: deps.env.xClientId,
+      redirectUri: xRedirectUri(),
+      userId: user.id as string,
+      secret: deps.env.sessionSecret,
+      now: deps.now(),
+    });
+    setCookie(c, X_COOKIE, started.cookie, {
+      httpOnly: true,
+      secure: deps.env.appUrl.startsWith('https://'),
+      sameSite: 'Lax',
+      path: '/api/v1/auth/x',
+      maxAge: 600,
+    });
+    return c.json({ url: started.url });
+  });
+
+  api.get('/auth/x/callback', async (c) => {
+    const user = requireUser(c);
+    const done = (result: string) => c.redirect(`${deps.env.appUrl}/studio?x=${result}`, 302);
+    setCookie(c, X_COOKIE, '', { path: '/api/v1/auth/x', maxAge: 0 });
+    if (!deps.env.xClientId) return done('unconfigured');
+    if (c.req.query('error')) return done('denied');
+    const verifier = checkXState({
+      cookie: getCookie(c, X_COOKIE),
+      state: c.req.query('state'),
+      userId: user.id as string,
+      secret: deps.env.sessionSecret,
+      now: deps.now(),
+    });
+    const code = c.req.query('code');
+    if (!verifier || !code) return done('invalid');
+    let account: { id: string; username: string };
+    try {
+      account = await fetchXAccount({
+        fetch: deps.xFetch ?? fetch,
+        clientId: deps.env.xClientId,
+        clientSecret: deps.env.xClientSecret,
+        redirectUri: xRedirectUri(),
+        code,
+        verifier,
+      });
+    } catch (err) {
+      console.error('x oauth failed', (err as Error).message);
+      return done('failed');
+    }
+    const taken = await deps.sql`
+      select 1 from users where x_user_id = ${account.id} and id <> ${user.id}
+    `;
+    if (taken.length > 0) return done('taken');
+    // A dev-linked (unverified) claim on this handle by someone else is released.
+    await deps.sql`
+      update users set x_handle = null, x_user_id = null
+      where lower(x_handle) = lower(${account.username}) and id <> ${user.id} and x_user_id like 'dev:%'
+    `;
+    await deps.sql`update users set x_handle = ${account.username}, x_user_id = ${account.id} where id = ${user.id}`;
+    await audit(deps.sql, user.id as string, 'user', user.id as string, 'x_linked', {
+      xUserId: account.id,
+      handle: account.username,
+    });
+    return done('linked');
   });
 
   api.post('/studio/x', async (c) => {
     const user = requireUser(c);
+    // Unverified dev link (test clusters only by construction): disabled once X OAuth is set.
+    if (deps.env.xClientId)
+      throw new HttpError(410, 'X_OAUTH_REQUIRED', 'link X with the Connect X button');
     const body = await bodyOf(devLinkBody, await c.req.json());
     await deps.sql`update users set x_handle = ${body.handle}, x_user_id = ${'dev:' + body.handle} where id = ${user.id}`;
     return c.json({ handle: body.handle });
@@ -472,7 +541,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/listings/:slug', async (c) => {
     const slug = c.req.param('slug');
     const rows = await deps.sql<Record<string, any>[]>`
-      select l.*, u.handle, u.wallet as creator_wallet, u.x_handle
+      select l.*, u.handle, u.wallet as creator_wallet, u.x_handle, u.x_user_id
       from listings l join users u on u.id = l.creator_id
       where l.slug = ${slug} or (${UUID_RE.test(slug)} and l.id::text = ${slug.toLowerCase()})
       limit 1
@@ -873,7 +942,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       jsonSafe({
         creator: ((user.roles as string[] | undefined) ?? []).includes('creator'),
         walletSigned: true,
-        xLinked: Boolean(user.x_handle),
+        // Once X OAuth is configured, only a verified link counts: dev links must re-verify.
+        xLinked: deps.env.xClientId ? xVerified(user) : Boolean(user.x_handle),
         bondRequired: required,
         bondActive: bond,
         bondOk: bond >= required,
@@ -919,7 +989,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
 
   api.post('/studio/listings', async (c) => {
     const user = requireUser(c);
-    if (!user.x_handle) throw new HttpError(400, 'X_REQUIRED', 'link an X handle first');
+    if (deps.env.xClientId ? !xVerified(user) : !user.x_handle)
+      throw new HttpError(400, 'X_REQUIRED', 'link and verify your X account first');
     const body = await bodyOf(listingBody, await c.req.json());
     // The category bond is the gate (docs/06-payments-escrow.md). Meeting it makes the
     // wallet a creator, so a creator is never blocked by a role it cannot request.
@@ -1580,6 +1651,7 @@ function publicUser(user: Record<string, any>) {
     wallet: user.wallet,
     handle: user.handle,
     xHandle: user.x_handle,
+    xVerified: xVerified(user),
     displayName: user.display_name ?? null,
     avatarUrl: user.avatar_media_id ? `/api/v1/profile-media/${user.avatar_media_id}` : null,
     roles: user.roles,
@@ -1615,6 +1687,7 @@ function creatorCard(listing: Record<string, any>, bond: bigint) {
     handle: listing.handle,
     wallet: listing.creator_wallet,
     xHandle: listing.x_handle,
+    xVerified: xVerified(listing),
     bondLamports: bond,
   };
 }
