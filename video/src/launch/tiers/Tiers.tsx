@@ -24,8 +24,23 @@ const FeeBackdrop: React.FC<{ dur: number }> = ({ dur }) => {
   const fee = i >= steps.length - 1 ? 0 : steps[i] + (steps[i + 1] - steps[i]) * t;
   const fade = Math.min(ease(frame, 0, 14), 1 - ease(frame, dur - 14, dur - 2));
   return (
-    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', paddingBottom: tall ? 260 : 40, opacity: fade * 0.09 }}>
-      <div style={{ fontFamily: MONO, fontWeight: 700, fontSize: tall ? 300 : 460, color: C.accent, letterSpacing: '-0.05em' }}>
+    <AbsoluteFill
+      style={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingBottom: tall ? 260 : 40,
+        opacity: fade * 0.09,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: MONO,
+          fontWeight: 700,
+          fontSize: tall ? 300 : 460,
+          color: C.accent,
+          letterSpacing: '-0.05em',
+        }}
+      >
         {fee.toFixed(2)}%
       </div>
     </AbsoluteFill>
@@ -36,8 +51,14 @@ const Hook: React.FC<SceneProps> = ({ dur }) => (
   <HookScene
     dur={dur}
     label="$TRENCH TIERS"
-    wide={[[{ t: 'Hold' }, { t: '$TRENCH.' }], [{ t: 'Pay' }, { t: 'lower' }, { t: 'fees.', c: C.accent }]]}
-    tall={[[{ t: 'Hold' }, { t: '$TRENCH.' }], [{ t: 'Pay' }, { t: 'lower' }, { t: 'fees.', c: C.accent }]]}
+    wide={[
+      [{ t: 'Hold' }, { t: '$TRENCH.' }],
+      [{ t: 'Pay' }, { t: 'lower' }, { t: 'fees.', c: C.accent }],
+    ]}
+    tall={[
+      [{ t: 'Hold' }, { t: '$TRENCH.' }],
+      [{ t: 'Pay' }, { t: 'lower' }, { t: 'fees.', c: C.accent }],
+    ]}
     backdrop={<FeeBackdrop dur={dur} />}
   />
 );
@@ -50,9 +71,22 @@ const Side: React.FC<{
   rows: [string, string, string?][];
   total: [string, string];
 }> = ({ show, big, bigColor, title, rows, total }) => (
-  <Panel style={{ flex: 1, padding: 26, opacity: show, transform: `translateY(${(1 - show) * 24}px)` }}>
+  <Panel
+    style={{ flex: 1, padding: 26, opacity: show, transform: `translateY(${(1 - show) * 24}px)` }}
+  >
     <Label style={{ fontSize: 16 }}>{title}</Label>
-    <div style={{ fontFamily: MONO, fontSize: 76, fontWeight: 700, color: bigColor, letterSpacing: '-0.04em', marginTop: 8 }}>{big}</div>
+    <div
+      style={{
+        fontFamily: MONO,
+        fontSize: 76,
+        fontWeight: 700,
+        color: bigColor,
+        letterSpacing: '-0.04em',
+        marginTop: 8,
+      }}
+    >
+      {big}
+    </div>
     <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
       {rows.map(([k, v, c]) => (
         <Row key={k} label={k} value={v} size={20} valueColor={c ?? C.text} />
@@ -67,8 +101,17 @@ const FeeCard: React.FC = () => {
   const frame = useCurrentFrame();
   return (
     <div style={{ width: CARD_W }}>
-      <div style={{ fontFamily: SANS, fontSize: 21, color: C.text2, marginBottom: 16, opacity: ease(frame, 0, 10) }}>
-        Trojan Trenches Intel · listed at <span style={{ fontFamily: MONO, color: C.text }}>0.10 SOL</span>
+      <div
+        style={{
+          fontFamily: SANS,
+          fontSize: 21,
+          color: C.text2,
+          marginBottom: 16,
+          opacity: ease(frame, 0, 10),
+        }}
+      >
+        Trojan Trenches Intel · listed at{' '}
+        <span style={{ fontFamily: MONO, color: C.text }}>0.10 SOL</span>
       </div>
       <div style={{ display: 'flex', gap: 20 }}>
         <Side
@@ -103,8 +146,15 @@ const FeeScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '01 / THE FEE',
-      wide: [[{ t: '5%' }, { t: 'on' }, { t: 'top.' }], [{ t: '0%' }, { t: 'for' }], [{ t: 'creators.', c: C.accent }]],
-      tall: [[{ t: '5%' }, { t: 'on' }, { t: 'top.' }], [{ t: '0%' }, { t: 'for' }, { t: 'creators.', c: C.accent }]],
+      wide: [
+        [{ t: '5%' }, { t: 'on' }, { t: 'top.' }],
+        [{ t: '0%' }, { t: 'for' }],
+        [{ t: 'creators.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: '5%' }, { t: 'on' }, { t: 'top.' }],
+        [{ t: '0%' }, { t: 'for' }, { t: 'creators.', c: C.accent }],
+      ],
       sub: 'The creator receives the full listing price.',
     }}
     card={<FeeCard />}
@@ -125,7 +175,11 @@ const LadderCard: React.FC = () => {
   const at = [0, LADDER.scout, LADDER.trencher, LADDER.og];
   const offAt = [0, LADDER.scoutOff, LADDER.trencherOff, LADDER.ogOff];
   const active = at.filter((f) => frame >= f).length - 1;
-  const fee = TIER_ROWS.reduce((v, r, i) => (i === 0 ? r.fee : v + (r.fee - TIER_ROWS[i - 1].fee) * ease(frame, offAt[i], offAt[i] + 14)), 0);
+  const fee = TIER_ROWS.reduce(
+    (v, r, i) =>
+      i === 0 ? r.fee : v + (r.fee - TIER_ROWS[i - 1].fee) * ease(frame, offAt[i], offAt[i] + 14),
+    0,
+  );
   return (
     <Card style={{ width: CARD_W, padding: 30, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -153,12 +207,38 @@ const LadderCard: React.FC = () => {
                 opacity: show * (reached && !on ? 0.7 : 1),
               }}
             >
-              <span style={{ fontFamily: SANS, fontSize: 26, fontWeight: 600, color: on ? C.accent : C.text }}>{r.name}</span>
+              <span
+                style={{
+                  fontFamily: SANS,
+                  fontSize: 26,
+                  fontWeight: 600,
+                  color: on ? C.accent : C.text,
+                }}
+              >
+                {r.name}
+              </span>
               <span style={{ fontFamily: MONO, fontSize: 21, color: C.text2 }}>{r.hold}</span>
-              <span style={{ fontFamily: MONO, fontSize: 21, color: i === 0 ? C.muted : C.accent, opacity: i === 0 ? 1 : 0.35 + 0.65 * off }}>
+              <span
+                style={{
+                  fontFamily: MONO,
+                  fontSize: 21,
+                  color: i === 0 ? C.muted : C.accent,
+                  opacity: i === 0 ? 1 : 0.35 + 0.65 * off,
+                }}
+              >
                 {r.off}
               </span>
-              <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 600, color: C.text, textAlign: 'right' }}>{r.fee}%</span>
+              <span
+                style={{
+                  fontFamily: MONO,
+                  fontSize: 24,
+                  fontWeight: 600,
+                  color: C.text,
+                  textAlign: 'right',
+                }}
+              >
+                {r.fee}%
+              </span>
             </div>
           );
         })}
@@ -166,13 +246,28 @@ const LadderCard: React.FC = () => {
       <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 24 }}>
         <div style={{ flex: 1 }}>
           <Label style={{ fontSize: 15 }}>Fee on a 0.10 SOL listing</Label>
-          <div style={{ marginTop: 12, height: 14, borderRadius: 7, background: C.border, overflow: 'hidden' }}>
+          <div
+            style={{
+              marginTop: 12,
+              height: 14,
+              borderRadius: 7,
+              background: C.border,
+              overflow: 'hidden',
+            }}
+          >
             <div style={{ width: `${(fee / 5) * 100}%`, height: '100%', background: C.accent }} />
           </div>
         </div>
         <div style={{ textAlign: 'right', minWidth: 300 }}>
-          <div style={{ fontFamily: MONO, fontSize: 48, fontWeight: 700, color: fee < 0.01 ? C.accent : C.text }}>
-            {fee < 0.001 ? 'no fee' : `${(0.1 * fee / 100).toFixed(5).replace(/0+$/, '')} SOL`}
+          <div
+            style={{
+              fontFamily: MONO,
+              fontSize: 48,
+              fontWeight: 700,
+              color: fee < 0.01 ? C.accent : C.text,
+            }}
+          >
+            {fee < 0.001 ? 'no fee' : `${((0.1 * fee) / 100).toFixed(5).replace(/0+$/, '')} SOL`}
           </div>
         </div>
       </div>
@@ -185,7 +280,10 @@ const LadderScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '02 / TIERS',
-      wide: [[{ t: 'Hold' }, { t: 'more.' }], [{ t: 'Pay' }, { t: 'less.', c: C.accent }]],
+      wide: [
+        [{ t: 'Hold' }, { t: 'more.' }],
+        [{ t: 'Pay' }, { t: 'less.', c: C.accent }],
+      ],
       tall: [[{ t: 'Hold' }, { t: 'more.' }, { t: 'Pay' }, { t: 'less.', c: C.accent }]],
       sub: 'Scout, Trencher and OG take 25%, 60% and 100% off the 5% buyer fee.',
     }}
@@ -206,7 +304,16 @@ const CheckoutCard: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Label style={{ fontSize: 16 }}>Checkout</Label>
-          <div style={{ fontFamily: SANS, fontSize: 30, fontWeight: 600, color: C.text, marginTop: 6, letterSpacing: '-0.02em' }}>
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 30,
+              fontWeight: 600,
+              color: C.text,
+              marginTop: 6,
+              letterSpacing: '-0.02em',
+            }}
+          >
             Trojan Trenches Intel
           </div>
         </div>
@@ -223,7 +330,11 @@ const CheckoutCard: React.FC = () => {
         <div style={{ position: 'relative', height: 30 }}>
           <Row
             label="Your tier discount"
-            value={<span style={{ color: C.info, fontFamily: SANS, fontSize: 20 }}>Connect to apply</span>}
+            value={
+              <span style={{ color: C.info, fontFamily: SANS, fontSize: 20 }}>
+                Connect to apply
+              </span>
+            }
             size={23}
             style={{ position: 'absolute', inset: 0, opacity: 1 - discount }}
           />
@@ -232,7 +343,12 @@ const CheckoutCard: React.FC = () => {
             value="−0.003 SOL"
             valueColor={C.accent}
             size={23}
-            style={{ position: 'absolute', inset: 0, opacity: discount, transform: `translateX(${(1 - discount) * -16}px)` }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              opacity: discount,
+              transform: `translateX(${(1 - discount) * -16}px)`,
+            }}
           />
         </div>
         <Row label="Creator commission" value="0%" size={23} valueColor={C.accent} />
@@ -242,15 +358,37 @@ const CheckoutCard: React.FC = () => {
         <span style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>
           {discount > 0.5 ? 'You pay' : 'You pay (before discount)'}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 38, fontWeight: 700, color: discount > 0.5 ? C.accent : C.text }}>
+        <span
+          style={{
+            fontFamily: MONO,
+            fontSize: 38,
+            fontWeight: 700,
+            color: discount > 0.5 ? C.accent : C.text,
+          }}
+        >
           {total.toFixed(3)} SOL
         </span>
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 19, color: C.muted, marginTop: 10, opacity: ease(frame, CHECKOUT.locked, CHECKOUT.locked + 10) }}>
+      <div
+        style={{
+          fontFamily: SANS,
+          fontSize: 19,
+          color: C.muted,
+          marginTop: 10,
+          opacity: ease(frame, CHECKOUT.locked, CHECKOUT.locked + 10),
+        }}
+      >
         Quote locked for tier Trencher
       </div>
       <div style={{ marginTop: 20 }}>
-        <Button height={66} style={{ fontSize: 23, boxShadow: `0 0 ${40 * sign}px ${C.accent}66`, transform: `scale(${1 + 0.03 * sign})` }}>
+        <Button
+          height={66}
+          style={{
+            fontSize: 23,
+            boxShadow: `0 0 ${40 * sign}px ${C.accent}66`,
+            transform: `scale(${1 + 0.03 * sign})`,
+          }}
+        >
           Pay into escrow
         </Button>
       </div>
@@ -264,7 +402,10 @@ const CheckoutScene: React.FC<SceneProps> = ({ dur }) => (
     headline={{
       label: '03 / CHECKOUT',
       wide: [[{ t: 'Applied' }], [{ t: 'before' }, { t: 'you' }], [{ t: 'sign.', c: C.accent }]],
-      tall: [[{ t: 'Applied' }, { t: 'before' }], [{ t: 'you' }, { t: 'sign.', c: C.accent }]],
+      tall: [
+        [{ t: 'Applied' }, { t: 'before' }],
+        [{ t: 'you' }, { t: 'sign.', c: C.accent }],
+      ],
       sub: 'The discount is in the quote, and in the escrow.',
     }}
     card={<CheckoutCard />}
@@ -290,7 +431,9 @@ const WindowCard: React.FC = () => {
   const y = (v: number) => H - ((Math.log10(v) - 4.7) / (7.4 - 4.7)) * H;
   const x = (h: number) => (h / 72) * W;
   const draw = lin(frame, WINDOW.draw[0], WINDOW.draw[1]);
-  const path = SERIES.map((v, h) => `${h ? 'L' : 'M'}${x(h).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const path = SERIES.map((v, h) => `${h ? 'L' : 'M'}${x(h).toFixed(1)} ${y(v).toFixed(1)}`).join(
+    ' ',
+  );
   const low = ease(frame, WINDOW.low, WINDOW.low + 12);
   const result = ease(frame, WINDOW.result, WINDOW.result + 12);
   const lines = [
@@ -304,16 +447,35 @@ const WindowCard: React.FC = () => {
         <Label style={{ fontSize: 16 }}>Your $TRENCH balance · last 72 h</Label>
         <Tag size={16}>read from Solana devnet</Tag>
       </div>
-      <svg width={W} height={H + 30} style={{ display: 'block', marginTop: 20, overflow: 'visible' }}>
+      <svg
+        width={W}
+        height={H + 30}
+        style={{ display: 'block', marginTop: 20, overflow: 'visible' }}
+      >
         {lines.map((l) => (
           <g key={l.v}>
-            <line x1={0} x2={W} y1={y(l.v)} y2={y(l.v)} stroke={C.borderStrong} strokeDasharray="6 6" />
+            <line
+              x1={0}
+              x2={W}
+              y1={y(l.v)}
+              y2={y(l.v)}
+              stroke={C.borderStrong}
+              strokeDasharray="6 6"
+            />
             <text x={4} y={y(l.v) - 8} fill={C.muted} fontFamily={MONO} fontSize={17}>
               {l.label}
             </text>
           </g>
         ))}
-        <path d={path} fill="none" stroke={C.text} strokeWidth={3} pathLength={1} strokeDasharray="1 1" strokeDashoffset={1 - draw} />
+        <path
+          d={path}
+          fill="none"
+          stroke={C.text}
+          strokeWidth={3}
+          pathLength={1}
+          strokeDasharray="1 1"
+          strokeDashoffset={1 - draw}
+        />
         <g opacity={low}>
           <line x1={0} x2={W} y1={y(LOW)} y2={y(LOW)} stroke={C.accent} strokeWidth={2} />
           <circle cx={x(LOW_H)} cy={y(LOW)} r={9} fill={C.accent} />
@@ -321,7 +483,15 @@ const WindowCard: React.FC = () => {
             lowest · {Math.round(LOW / 1000)}K
           </text>
         </g>
-        <text x={x(70.5)} y={y(12_000_000) - 16} textAnchor="end" fill={C.warn} fontFamily={MONO} fontSize={18} opacity={lin(frame, WINDOW.spike[1], WINDOW.spike[1] + 8)}>
+        <text
+          x={x(70.5)}
+          y={y(12_000_000) - 16}
+          textAnchor="end"
+          fill={C.warn}
+          fontFamily={MONO}
+          fontSize={18}
+          opacity={lin(frame, WINDOW.spike[1], WINDOW.spike[1] + 8)}
+        >
           bought 12M, 2 h ago
         </text>
         <text x={0} y={H + 28} fill={C.muted} fontFamily={MONO} fontSize={17}>
@@ -344,7 +514,9 @@ const WindowCard: React.FC = () => {
         }}
       >
         <div>
-          <div style={{ fontFamily: SANS, fontSize: 26, fontWeight: 600, color: C.text }}>Your tier: Scout</div>
+          <div style={{ fontFamily: SANS, fontSize: 26, fontWeight: 600, color: C.text }}>
+            Your tier: Scout
+          </div>
           <div style={{ fontFamily: SANS, fontSize: 19, color: C.accentBody, marginTop: 4 }}>
             The 12M only counts once it has been held for 72 hours.
           </div>
@@ -388,5 +560,11 @@ const COMPONENTS = {
 };
 
 export const TiersVideo: React.FC<LaunchProps> = ({ audio }) => (
-  <LaunchShell scenes={TIERS.list} components={COMPONENTS} captions={captions} audioFile="audio/launch/tiers.flac" audio={audio} />
+  <LaunchShell
+    scenes={TIERS.list}
+    components={COMPONENTS}
+    captions={captions}
+    audioFile="audio/launch/tiers.flac"
+    audio={audio}
+  />
 );

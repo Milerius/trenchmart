@@ -20,7 +20,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
 const PUBLIC = path.join(ROOT, 'public', 'audio', 'launch');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const VIDEOS: Record<string, LaunchAudio<any>> = { security, escrow, tiers, sellers };
 
 const build = <T extends string>(spec: LaunchAudio<T>) => {
@@ -43,7 +42,9 @@ const build = <T extends string>(spec: LaunchAudio<T>) => {
     place(sfx, src, (spec.timeline.at[scene].from + frame) / FPS, gain, pan),
   );
 
-  const script = JSON.parse(readFileSync(path.join(ROOT, 'src', 'launch', spec.id, 'vo.json'), 'utf8')) as {
+  const script = JSON.parse(
+    readFileSync(path.join(ROOT, 'src', 'launch', spec.id, 'vo.json'), 'utf8'),
+  ) as {
     lines: { id: string; at: number }[];
   };
   const vo = renderVoBus(
@@ -51,7 +52,8 @@ const build = <T extends string>(spec: LaunchAudio<T>) => {
     path.join(dir, 'vo'),
     seconds,
   );
-  if (!vo) throw new Error(`[${spec.id}] voiceover missing; run \`npm run tts:launch -- ${spec.id}\``);
+  if (!vo)
+    throw new Error(`[${spec.id}] voiceover missing; run \`npm run tts:launch -- ${spec.id}\``);
 
   writeFileSync(path.join(dir, 'stem-music.wav'), wav(music));
   writeFileSync(path.join(dir, 'stem-sfx.wav'), wav(sfx));
@@ -64,6 +66,7 @@ const build = <T extends string>(spec: LaunchAudio<T>) => {
 const ids = process.argv.slice(2);
 for (const id of ids.length ? ids : Object.keys(VIDEOS)) {
   const spec = VIDEOS[id];
-  if (!spec) throw new Error(`Unknown launch video "${id}". Known: ${Object.keys(VIDEOS).join(', ')}`);
+  if (!spec)
+    throw new Error(`Unknown launch video "${id}". Known: ${Object.keys(VIDEOS).join(', ')}`);
   build(spec);
 }

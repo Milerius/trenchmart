@@ -1,6 +1,17 @@
 import { BUY, DISPUTE, ESCROW_V, HOLD, PROOF, RELEASE } from '../../src/launch/escrow/timeline';
 import { FPS } from '../../src/timeline';
-import { beep, chime, coin, glitch, lockClunk, pop, thud, uiClick, whir, whoosh } from '../instruments';
+import {
+  beep,
+  chime,
+  coin,
+  glitch,
+  lockClunk,
+  pop,
+  thud,
+  uiClick,
+  whir,
+  whoosh,
+} from '../instruments';
 import { range, type LaunchAudio } from './spec';
 
 export const escrow: LaunchAudio<(typeof ESCROW_V.list)[number]['id']> = {
@@ -9,7 +20,9 @@ export const escrow: LaunchAudio<(typeof ESCROW_V.list)[number]['id']> = {
   key: 2,
   prog: ['i', 'VII', 'VI', 'VII', 'i', 'VII', 'VI', 'v', 'iv', 'VI', 'III', 'VII', 'i'],
   sfx: (cue) => {
-    range(20, 110, 18).forEach((f, i) => cue('hook', f, beep(76 + (i % 3) * 3, 0.05), 0.03, i % 2 ? 0.4 : -0.4));
+    range(20, 110, 18).forEach((f, i) =>
+      cue('hook', f, beep(76 + (i % 3) * 3, 0.05), 0.03, i % 2 ? 0.4 : -0.4),
+    );
 
     cue('buy', BUY.click, uiClick(), 0.42);
     cue('buy', BUY.click + 3, beep(83, 0.08), 0.08);
@@ -25,13 +38,16 @@ export const escrow: LaunchAudio<(typeof ESCROW_V.list)[number]['id']> = {
     cue('dispute', DISPUTE.open, glitch(0.3, 52), 0.1);
     cue('dispute', DISPUTE.open + 1, thud(), 0.35);
     cue('dispute', DISPUTE.open + 2, beep(70, 0.3), 0.08);
-    for (const k of ['refund', 'reject', 'timeout'] as const) cue('dispute', DISPUTE[k], beep(86, 0.05), 0.06, 0.3);
+    for (const k of ['refund', 'reject', 'timeout'] as const)
+      cue('dispute', DISPUTE[k], beep(86, 0.05), 0.06, 0.3);
 
     cue('release', RELEASE.ff[0], whir((RELEASE.ff[1] - RELEASE.ff[0]) / FPS), 0.14);
     cue('release', RELEASE.released, lockClunk(), 0.3);
     cue('release', RELEASE.released + 1, chime([80, 84, 87, 92]), 0.26);
     for (let i = 0; i < 14; i += 2) cue('release', RELEASE.seller + i, coin(40 + i), 0.05, -0.3);
-    range(RELEASE.split[0], RELEASE.split[0] + 9, 3).forEach((f, i) => cue('release', f, beep(88 + i * 2, 0.06), 0.07, 0.3));
+    range(RELEASE.split[0], RELEASE.split[0] + 9, 3).forEach((f, i) =>
+      cue('release', f, beep(88 + i * 2, 0.06), 0.07, 0.3),
+    );
 
     cue('proof', 2, whoosh(0.4, true, 36), 0.14, 0.3);
     cue('proof', PROOF.addr, beep(91, 0.1), 0.1);

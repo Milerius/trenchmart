@@ -19,7 +19,9 @@ const CARD_W = 860;
 
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const fakeKey = (seed: number) =>
-  Array.from({ length: 44 }, (_, i) => B58[Math.floor(random(`k${seed}-${i}`) * B58.length)]).join('');
+  Array.from({ length: 44 }, (_, i) => B58[Math.floor(random(`k${seed}-${i}`) * B58.length)]).join(
+    '',
+  );
 
 /** Accounts scrolling past like a ledger, with the escrow program's row lit. */
 const LedgerBackdrop: React.FC<{ dur: number }> = ({ dur }) => {
@@ -39,9 +41,23 @@ const LedgerBackdrop: React.FC<{ dur: number }> = ({ dur }) => {
         maskImage: 'radial-gradient(ellipse 62% 60% at 50% 50%, #000 25%, transparent 85%)',
       }}
     >
-      <div style={{ transform: `translateY(${-frame * 0.5}px)`, fontFamily: MONO, fontSize: size, lineHeight: `${lineH}px` }}>
+      <div
+        style={{
+          transform: `translateY(${-frame * 0.5}px)`,
+          fontFamily: MONO,
+          fontSize: size,
+          lineHeight: `${lineH}px`,
+        }}
+      >
         {Array.from({ length: rows }, (_, i) => (
-          <div key={i} style={{ whiteSpace: 'pre', color: i === lit ? C.accent : C.decor, textAlign: 'center' }}>
+          <div
+            key={i}
+            style={{
+              whiteSpace: 'pre',
+              color: i === lit ? C.accent : C.decor,
+              textAlign: 'center',
+            }}
+          >
             {i === lit ? PROGRAM_ID : fakeKey(i)}
             {'   '}
             {i === lit ? 'TrenchMart Escrow' : `+${(random(`a${i}`) * 2).toFixed(4)} SOL`}
@@ -56,8 +72,14 @@ const Hook: React.FC<SceneProps> = ({ dur }) => (
   <HookScene
     dur={dur}
     label="ON-CHAIN ESCROW"
-    wide={[[{ t: 'Paid' }, { t: 'to' }, { t: 'escrow.' }], [{ t: 'Not' }, { t: 'the' }, { t: 'seller.', c: C.accent }]]}
-    tall={[[{ t: 'Paid' }, { t: 'to' }, { t: 'escrow.' }], [{ t: 'Not' }, { t: 'the' }, { t: 'seller.', c: C.accent }]]}
+    wide={[
+      [{ t: 'Paid' }, { t: 'to' }, { t: 'escrow.' }],
+      [{ t: 'Not' }, { t: 'the' }, { t: 'seller.', c: C.accent }],
+    ]}
+    tall={[
+      [{ t: 'Paid' }, { t: 'to' }, { t: 'escrow.' }],
+      [{ t: 'Not' }, { t: 'the' }, { t: 'seller.', c: C.accent }],
+    ]}
     backdrop={<LedgerBackdrop dur={dur} />}
   />
 );
@@ -74,7 +96,10 @@ const CheckoutCard: React.FC = () => {
     frame < BUY.click
       ? { label: <>Pay into escrow</>, style: {} }
       : frame < BUY.signed
-        ? { label: <>Approve in your wallet…</>, style: { background: C.warnBg, color: C.warn, border: `1px solid ${C.warnBorder}` } }
+        ? {
+            label: <>Approve in your wallet…</>,
+            style: { background: C.warnBg, color: C.warn, border: `1px solid ${C.warnBorder}` },
+          }
         : {
             label: (
               <>
@@ -89,7 +114,16 @@ const CheckoutCard: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <Label style={{ fontSize: 16 }}>Checkout</Label>
-            <div style={{ fontFamily: SANS, fontSize: 30, fontWeight: 600, color: C.text, marginTop: 6, letterSpacing: '-0.02em' }}>
+            <div
+              style={{
+                fontFamily: SANS,
+                fontSize: 30,
+                fontWeight: 600,
+                color: C.text,
+                marginTop: 6,
+                letterSpacing: '-0.02em',
+              }}
+            >
               Trojan Trenches Intel
             </div>
           </div>
@@ -103,11 +137,23 @@ const CheckoutCard: React.FC = () => {
         </div>
         <Divider style={{ margin: '20px 0 16px' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <span style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>You pay</span>
-          <span style={{ fontFamily: MONO, fontSize: 36, fontWeight: 700, color: C.text }}>0.105 SOL</span>
+          <span style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>
+            You pay
+          </span>
+          <span style={{ fontFamily: MONO, fontSize: 36, fontWeight: 700, color: C.text }}>
+            0.105 SOL
+          </span>
         </div>
         <div style={{ position: 'relative', marginTop: 22, height: 96 }}>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', opacity: 1 - done }}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              opacity: 1 - done,
+            }}
+          >
             <div style={{ width: '100%' }}>
               <Button height={68} press={press} style={{ fontSize: 23, ...btn.style }}>
                 {btn.label}
@@ -131,7 +177,9 @@ const CheckoutCard: React.FC = () => {
               ✓
             </Square>
             <div>
-              <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>Paid · in escrow</div>
+              <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>
+                Paid · in escrow
+              </div>
               <div style={{ fontFamily: SANS, fontSize: 20, color: C.accentBody, marginTop: 4 }}>
                 Your SOL is in escrow for 1 hour. Your download is ready now.
               </div>
@@ -155,13 +203,25 @@ const CheckoutCard: React.FC = () => {
                   opacity: frame >= BUY.click ? 1 : 0.5,
                 }}
               >
-                <span style={{ color: on ? C.accent : C.decor, fontFamily: MONO }}>{on ? '✓' : '○'}</span>
+                <span style={{ color: on ? C.accent : C.decor, fontFamily: MONO }}>
+                  {on ? '✓' : '○'}
+                </span>
                 {p}
               </div>
             );
           })}
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 20, fontFamily: SANS, fontSize: 19, color: C.text2 }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+            marginTop: 20,
+            fontFamily: SANS,
+            fontSize: 19,
+            color: C.text2,
+          }}
+        >
           <Shield size={20} color={C.accent} />
           Held in escrow for 1 hour. Dispute any time in that window.
         </div>
@@ -183,8 +243,14 @@ const BuyScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '01 / BUY',
-      wide: [[{ t: 'One' }, { t: 'signature.' }], [{ t: 'Escrow' }, { t: 'funded.', c: C.accent }]],
-      tall: [[{ t: 'One' }, { t: 'signature.' }], [{ t: 'Escrow' }, { t: 'funded.', c: C.accent }]],
+      wide: [
+        [{ t: 'One' }, { t: 'signature.' }],
+        [{ t: 'Escrow' }, { t: 'funded.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: 'One' }, { t: 'signature.' }],
+        [{ t: 'Escrow' }, { t: 'funded.', c: C.accent }],
+      ],
       sub: 'Your SOL goes to a program account, not the seller.',
     }}
     card={<CheckoutCard />}
@@ -214,14 +280,24 @@ const VaultCard: React.FC<{ s: VaultState; children?: React.ReactNode }> = ({ s,
   const frozen = s.frozen ?? 0;
   const enter = s.enter ?? 1;
   return (
-    <Card style={{ width: CARD_W, padding: 32, boxSizing: 'border-box', opacity: enter, transform: `translateY(${(1 - enter) * 40}px)` }}>
+    <Card
+      style={{
+        width: CARD_W,
+        padding: 32,
+        boxSizing: 'border-box',
+        opacity: enter,
+        transform: `translateY(${(1 - enter) * 40}px)`,
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Label style={{ fontSize: 16 }}>Escrow account · on-chain</Label>
         <Tag tone={s.status.tone} size={18}>
           {s.status.text}
         </Tag>
       </div>
-      <div style={{ fontFamily: MONO, fontSize: 22, color: C.text, marginTop: 14 }}>{ESCROW_ACCOUNT}</div>
+      <div style={{ fontFamily: MONO, fontSize: 22, color: C.text, marginTop: 14 }}>
+        {ESCROW_ACCOUNT}
+      </div>
       <div style={{ fontFamily: MONO, fontSize: 17, color: C.muted, marginTop: 6 }}>
         owned by TrenchMart Escrow · Solana devnet
       </div>
@@ -243,13 +319,23 @@ const VaultCard: React.FC<{ s: VaultState; children?: React.ReactNode }> = ({ s,
         </div>
         <div style={{ flex: 1 }}>
           <Label style={{ fontSize: 15 }}>Deposit</Label>
-          <div style={{ fontFamily: MONO, fontSize: 52, fontWeight: 700, color: C.text, letterSpacing: '-0.02em' }}>
+          <div
+            style={{
+              fontFamily: MONO,
+              fontSize: 52,
+              fontWeight: 700,
+              color: C.text,
+              letterSpacing: '-0.02em',
+            }}
+          >
             {s.amount.toFixed(3)} SOL
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <Label style={{ fontSize: 15 }}>{frozen > 0.5 ? 'Release' : 'Releases in'}</Label>
-          <div style={{ fontFamily: MONO, fontSize: 42, fontWeight: 600, color: s.clockTone }}>{s.clock}</div>
+          <div style={{ fontFamily: MONO, fontSize: 42, fontWeight: 600, color: s.clockTone }}>
+            {s.clock}
+          </div>
         </div>
       </div>
       <div style={{ marginTop: 26 }}>
@@ -266,7 +352,16 @@ const VaultCard: React.FC<{ s: VaultState; children?: React.ReactNode }> = ({ s,
             }}
           />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontFamily: MONO, fontSize: 17, color: C.muted }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginTop: 10,
+            fontFamily: MONO,
+            fontSize: 17,
+            color: C.muted,
+          }}
+        >
           <span>paid</span>
           <span style={{ color: frozen > 0.5 ? C.info : C.text2 }}>dispute window · 1 hour</span>
           <span>release</span>
@@ -277,12 +372,12 @@ const VaultCard: React.FC<{ s: VaultState; children?: React.ReactNode }> = ({ s,
   );
 };
 
-const Line: React.FC<{ show: number; icon: React.ReactNode; children: React.ReactNode; color?: string }> = ({
-  show,
-  icon,
-  children,
-  color = C.text2,
-}) => (
+const Line: React.FC<{
+  show: number;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  color?: string;
+}> = ({ show, icon, children, color = C.text2 }) => (
   <div
     style={{
       display: 'flex',
@@ -308,7 +403,10 @@ const HoldCard: React.FC = () => {
   return (
     <VaultCard
       s={{
-        status: { text: frame >= HOLD.count[1] ? 'Paid' : 'Funding…', tone: frame >= HOLD.count[1] ? 'ok' : 'info' },
+        status: {
+          text: frame >= HOLD.count[1] ? 'Paid' : 'Funding…',
+          tone: frame >= HOLD.count[1] ? 'ok' : 'info',
+        },
         amount,
         clock: clock(3600 - ticking),
         clockTone: C.text,
@@ -317,10 +415,17 @@ const HoldCard: React.FC = () => {
       }}
     >
       <div style={{ display: 'grid', gap: 6 }}>
-        <Line show={ease(frame, HOLD.download, HOLD.download + 10)} icon={<Download size={24} color={C.accent} />} color={C.text}>
+        <Line
+          show={ease(frame, HOLD.download, HOLD.download + 10)}
+          icon={<Download size={24} color={C.accent} />}
+          color={C.text}
+        >
           Download ready in Purchases, right after payment confirms
         </Line>
-        <Line show={ease(frame, HOLD.download + 14, HOLD.download + 24)} icon={<Lock size={22} color={C.muted} />}>
+        <Line
+          show={ease(frame, HOLD.download + 14, HOLD.download + 24)}
+          icon={<Lock size={22} color={C.muted} />}
+        >
           The seller gets nothing until the window ends
         </Line>
       </div>
@@ -333,8 +438,15 @@ const HoldScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '02 / HOLD',
-      wide: [[{ t: 'Held' }, { t: 'by' }, { t: 'the' }], [{ t: 'program.' }], [{ t: 'One' }, { t: 'hour.', c: C.accent }]],
-      tall: [[{ t: 'Held' }, { t: 'by' }, { t: 'the' }, { t: 'program.' }], [{ t: 'One' }, { t: 'hour.', c: C.accent }]],
+      wide: [
+        [{ t: 'Held' }, { t: 'by' }, { t: 'the' }],
+        [{ t: 'program.' }],
+        [{ t: 'One' }, { t: 'hour.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: 'Held' }, { t: 'by' }, { t: 'the' }, { t: 'program.' }],
+        [{ t: 'One' }, { t: 'hour.', c: C.accent }],
+      ],
       sub: 'The release time is written on-chain.',
     }}
     card={<HoldCard />}
@@ -346,7 +458,11 @@ const HoldScene: React.FC<SceneProps> = ({ dur }) => (
 const OUTCOMES = [
   { ix: 'refund', text: 'The resolver refunds you in full', key: 'refund' as const },
   { ix: 'reject_dispute', text: 'or rejects it, and the seller is paid', key: 'reject' as const },
-  { ix: 'refund_after_timeout', text: 'Still open 7 days later? Anyone can refund you', key: 'timeout' as const },
+  {
+    ix: 'refund_after_timeout',
+    text: 'Still open 7 days later? Anyone can refund you',
+    key: 'timeout' as const,
+  },
 ];
 
 const DisputeCard: React.FC = () => {
@@ -370,12 +486,31 @@ const DisputeCard: React.FC = () => {
         }}
       >
         <div style={{ position: 'relative', height: 156 }}>
-          <div style={{ position: 'absolute', inset: 0, opacity: 1 - ease(frame, DISPUTE.open + 6, DISPUTE.open + 16) }}>
-            <Button variant="secondary" height={64} press={press} style={{ fontSize: 22, borderColor: C.warnBorder, color: C.warn }}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              opacity: 1 - ease(frame, DISPUTE.open + 6, DISPUTE.open + 16),
+            }}
+          >
+            <Button
+              variant="secondary"
+              height={64}
+              press={press}
+              style={{ fontSize: 22, borderColor: C.warnBorder, color: C.warn }}
+            >
               Open a dispute
             </Button>
           </div>
-          <div style={{ position: 'absolute', inset: 0, display: 'grid', gap: 8, alignContent: 'start' }}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'grid',
+              gap: 8,
+              alignContent: 'start',
+            }}
+          >
             {OUTCOMES.map((o) => {
               const show = ease(frame, DISPUTE[o.key], DISPUTE[o.key] + 10);
               return (
@@ -389,7 +524,17 @@ const DisputeCard: React.FC = () => {
                     transform: `translateY(${(1 - show) * 10}px)`,
                   }}
                 >
-                  <span style={{ fontFamily: MONO, fontSize: 17, color: C.info, width: 236, flex: 'none' }}>{o.ix}</span>
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 17,
+                      color: C.info,
+                      width: 236,
+                      flex: 'none',
+                    }}
+                  >
+                    {o.ix}
+                  </span>
                   <span style={{ fontFamily: SANS, fontSize: 21, color: C.text2 }}>{o.text}</span>
                 </div>
               );
@@ -414,8 +559,15 @@ const DisputeScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '03 / DISPUTE',
-      wide: [[{ t: 'Dispute' }, { t: 'it.' }], [{ t: 'The' }, { t: 'escrow' }], [{ t: 'freezes.', c: C.info }]],
-      tall: [[{ t: 'Dispute' }, { t: 'it.' }], [{ t: 'The' }, { t: 'escrow' }, { t: 'freezes.', c: C.info }]],
+      wide: [
+        [{ t: 'Dispute' }, { t: 'it.' }],
+        [{ t: 'The' }, { t: 'escrow' }],
+        [{ t: 'freezes.', c: C.info }],
+      ],
+      tall: [
+        [{ t: 'Dispute' }, { t: 'it.' }],
+        [{ t: 'The' }, { t: 'escrow' }, { t: 'freezes.', c: C.info }],
+      ],
       sub: 'Release refuses a disputed escrow.',
     }}
     card={<DisputeCard />}
@@ -461,12 +613,22 @@ const ReleaseCard: React.FC = () => {
             fontFamily: MONO,
             fontSize: 18,
             color: C.muted,
-            opacity: ease(frame, RELEASE.ff[0], RELEASE.ff[0] + 6) * (1 - ease(frame, RELEASE.released, RELEASE.released + 8)),
+            opacity:
+              ease(frame, RELEASE.ff[0], RELEASE.ff[0] + 6) *
+              (1 - ease(frame, RELEASE.released, RELEASE.released + 8)),
           }}
         >
           ≫ one hour later · no dispute
         </div>
-        <div style={{ position: 'absolute', inset: 0, display: 'grid', gap: 12, alignContent: 'start' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            gap: 12,
+            alignContent: 'start',
+          }}
+        >
           <div
             style={{
               display: 'flex',
@@ -480,14 +642,35 @@ const ReleaseCard: React.FC = () => {
               transform: `translateX(${(1 - seller) * -20}px)`,
             }}
           >
-            <span style={{ fontFamily: SANS, fontSize: 22, color: C.text }}>Seller · full listing price</span>
-            <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 600, color: C.accent }}>+0.100 SOL</span>
+            <span style={{ fontFamily: SANS, fontSize: 22, color: C.text }}>
+              Seller · full listing price
+            </span>
+            <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 600, color: C.accent }}>
+              +0.100 SOL
+            </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 26px', opacity: split }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px 26px',
+              opacity: split,
+            }}
+          >
             {SPLIT.map((s, i) => {
               const p = ease(frame, RELEASE.split[0] + i * 3, RELEASE.split[0] + 10 + i * 3);
               return (
-                <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', fontFamily: SANS, fontSize: 19, color: C.text2, opacity: p }}>
+                <div
+                  key={s.label}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontFamily: SANS,
+                    fontSize: 19,
+                    color: C.text2,
+                    opacity: p,
+                  }}
+                >
                   <span>
                     {s.label} · {s.pct}%
                   </span>
@@ -507,8 +690,15 @@ const ReleaseScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '04 / RELEASE',
-      wide: [[{ t: 'No' }, { t: 'dispute?' }], [{ t: 'It' }, { t: 'releases' }], [{ t: 'on' }, { t: 'its' }, { t: 'own.', c: C.accent }]],
-      tall: [[{ t: 'No' }, { t: 'dispute?' }], [{ t: 'It' }, { t: 'releases' }, { t: 'on' }, { t: 'its' }, { t: 'own.', c: C.accent }]],
+      wide: [
+        [{ t: 'No' }, { t: 'dispute?' }],
+        [{ t: 'It' }, { t: 'releases' }],
+        [{ t: 'on' }, { t: 'its' }, { t: 'own.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: 'No' }, { t: 'dispute?' }],
+        [{ t: 'It' }, { t: 'releases' }, { t: 'on' }, { t: 'its' }, { t: 'own.', c: C.accent }],
+      ],
       sub: 'The 5% buyer fee is split on-chain in the same instruction.',
     }}
     card={<ReleaseCard />}
@@ -531,9 +721,26 @@ const ProofCard: React.FC = () => {
   ];
   return (
     <div style={{ width: bw }}>
-      <Panel style={{ padding: '16px 22px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 18 }}>
+      <Panel
+        style={{
+          padding: '16px 22px',
+          marginBottom: 18,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 18,
+        }}
+      >
         <Label style={{ fontSize: 15, flex: 'none' }}>Escrow program</Label>
-        <span style={{ fontFamily: MONO, fontSize: tall ? 23 : 22, color: C.accent, whiteSpace: 'nowrap' }}>{PROGRAM_ID}</span>
+        <span
+          style={{
+            fontFamily: MONO,
+            fontSize: tall ? 23 : 22,
+            color: C.accent,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {PROGRAM_ID}
+        </span>
       </Panel>
       <div style={{ position: 'relative', height: bh }}>
         <div style={{ position: 'absolute', inset: 0, opacity: 1 - toTx }}>
@@ -550,7 +757,14 @@ const ProofCard: React.FC = () => {
             highlights={[{ x: 470, y: 598, w: 1560, h: 86, from: PROOF.addr }]}
           />
         </div>
-        <div style={{ position: 'absolute', inset: 0, opacity: toTx, transform: `translateY(${(1 - toTx) * 30}px)` }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: toTx,
+            transform: `translateY(${(1 - toTx) * 30}px)`,
+          }}
+        >
           <BrowserShot
             src="launch/explorer-paytx.webp"
             imgW={2866}
@@ -582,7 +796,14 @@ const ProofCard: React.FC = () => {
               fontFamily: SANS,
               fontSize: 22,
               color: C.text2,
-              opacity: step === i ? ease(frame, [0, PROOF.tx, PROOF.zoomC[0]][i], [0, PROOF.tx, PROOF.zoomC[0]][i] + 10) : 0,
+              opacity:
+                step === i
+                  ? ease(
+                      frame,
+                      [0, PROOF.tx, PROOF.zoomC[0]][i],
+                      [0, PROOF.tx, PROOF.zoomC[0]][i] + 10,
+                    )
+                  : 0,
             }}
           >
             {n}
@@ -598,8 +819,15 @@ const ProofScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '05 / PROOF',
-      wide: [[{ t: "Don't" }, { t: 'trust' }, { t: 'us.' }], [{ t: 'Check' }, { t: 'the' }], [{ t: 'chain.', c: C.accent }]],
-      tall: [[{ t: "Don't" }, { t: 'trust' }, { t: 'us.' }], [{ t: 'Check' }, { t: 'the' }, { t: 'chain.', c: C.accent }]],
+      wide: [
+        [{ t: "Don't" }, { t: 'trust' }, { t: 'us.' }],
+        [{ t: 'Check' }, { t: 'the' }],
+        [{ t: 'chain.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: "Don't" }, { t: 'trust' }, { t: 'us.' }],
+        [{ t: 'Check' }, { t: 'the' }, { t: 'chain.', c: C.accent }],
+      ],
       sub: 'Every escrow is a real account on Solana devnet.',
     }}
     card={<ProofCard />}
@@ -609,7 +837,10 @@ const ProofScene: React.FC<SceneProps> = ({ dur }) => (
 );
 
 const Outro: React.FC<SceneProps> = ({ dur }) => (
-  <OutroScene dur={dur} tagline={[{ t: 'Your' }, { t: 'SOL,' }, { t: 'held' }, { t: 'on-chain.', c: C.accent }]} />
+  <OutroScene
+    dur={dur}
+    tagline={[{ t: 'Your' }, { t: 'SOL,' }, { t: 'held' }, { t: 'on-chain.', c: C.accent }]}
+  />
 );
 
 const COMPONENTS = {

@@ -18,7 +18,12 @@ const cropAt = (frame: number, keys: Crop[]) => {
         ...clamp,
         easing: Easing.bezier(0.65, 0, 0.35, 1),
       });
-      return { at: frame, x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, w: a.w + (b.w - a.w) * t };
+      return {
+        at: frame,
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        w: a.w + (b.w - a.w) * t,
+      };
     }
   }
   return keys[keys.length - 1];
@@ -64,7 +69,10 @@ export const BrowserShot: React.FC<{
       >
         <div style={{ display: 'flex', gap: 8 }}>
           {['#ff5f57', '#febc2e', '#28c840'].map((c) => (
-            <span key={c} style={{ width: 12, height: 12, borderRadius: 6, background: c, opacity: 0.85 }} />
+            <span
+              key={c}
+              style={{ width: 12, height: 12, borderRadius: 6, background: c, opacity: 0.85 }}
+            />
           ))}
         </div>
         <div
@@ -89,7 +97,16 @@ export const BrowserShot: React.FC<{
           {url}
         </div>
       </div>
-      <div style={{ position: 'absolute', left: 0, right: 0, top: CHROME, bottom: 0, overflow: 'hidden' }}>
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: CHROME,
+          bottom: 0,
+          overflow: 'hidden',
+        }}
+      >
         <Img
           src={staticFile(src)}
           style={{
@@ -101,7 +118,8 @@ export const BrowserShot: React.FC<{
           }}
         />
         {highlights.map((h, i) => {
-          const on = ease(frame, h.from, h.from + 10) * (h.to ? 1 - ease(frame, h.to, h.to + 8) : 1);
+          const on =
+            ease(frame, h.from, h.from + 10) * (h.to ? 1 - ease(frame, h.to, h.to + 8) : 1);
           if (on <= 0) return null;
           return (
             <div

@@ -50,7 +50,11 @@ const KindsBackdrop: React.FC<{ dur: number }> = ({ dur }) => {
             transform: `translateX(${(r % 2 ? -1 : 1) * frame * 0.8 - 400}px)`,
           }}
         >
-          {Array.from({ length: 4 }, () => KINDS.slice(r % KINDS.length).concat(KINDS.slice(0, r % KINDS.length)).join('   ·   ')).join('   ·   ')}
+          {Array.from({ length: 4 }, () =>
+            KINDS.slice(r % KINDS.length)
+              .concat(KINDS.slice(0, r % KINDS.length))
+              .join('   ·   '),
+          ).join('   ·   ')}
         </div>
       ))}
     </AbsoluteFill>
@@ -61,8 +65,14 @@ const Hook: React.FC<SceneProps> = ({ dur }) => (
   <HookScene
     dur={dur}
     label="FOR SELLERS"
-    wide={[[{ t: 'Sell' }, { t: 'your' }, { t: 'edge.' }], [{ t: 'Keep' }, { t: '100%.', c: C.accent }]]}
-    tall={[[{ t: 'Sell' }, { t: 'your' }, { t: 'edge.' }], [{ t: 'Keep' }, { t: '100%.', c: C.accent }]]}
+    wide={[
+      [{ t: 'Sell' }, { t: 'your' }, { t: 'edge.' }],
+      [{ t: 'Keep' }, { t: '100%.', c: C.accent }],
+    ]}
+    tall={[
+      [{ t: 'Sell' }, { t: 'your' }, { t: 'edge.' }],
+      [{ t: 'Keep' }, { t: '100%.', c: C.accent }],
+    ]}
     backdrop={<KindsBackdrop dur={dur} />}
   />
 );
@@ -103,10 +113,27 @@ const Stepper: React.FC<{ step: number }> = ({ step }) => (
           >
             {done ? '✓' : n}
           </div>
-          <div style={{ fontFamily: SANS, fontSize: 16, fontWeight: 600, color: done || now ? C.text : C.muted, marginTop: 8, whiteSpace: 'nowrap' }}>
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 16,
+              fontWeight: 600,
+              color: done || now ? C.text : C.muted,
+              marginTop: 8,
+              whiteSpace: 'nowrap',
+            }}
+          >
             {title}
           </div>
-          <div style={{ fontFamily: SANS, fontSize: 14, color: now ? C.accent : C.faint, marginTop: 2, whiteSpace: 'nowrap' }}>
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 14,
+              color: now ? C.accent : C.faint,
+              marginTop: 2,
+              whiteSpace: 'nowrap',
+            }}
+          >
             {now ? 'You are here' : done ? 'Done' : sub}
           </div>
         </div>
@@ -156,8 +183,25 @@ const WizardCard: React.FC = () => {
       <Stepper step={step} />
       <Divider style={{ margin: '24px 0' }} />
       <div style={{ position: 'relative', height: 404 }}>
-        <div style={{ position: 'absolute', inset: 0, opacity: 1 - step2, transform: `translateX(${-30 * step2}px)` }}>
-          <div style={{ fontFamily: SANS, fontSize: 28, fontWeight: 600, color: C.text, letterSpacing: '-0.02em' }}>What are you selling?</div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: 1 - step2,
+            transform: `translateX(${-30 * step2}px)`,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 28,
+              fontWeight: 600,
+              color: C.text,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            What are you selling?
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 20 }}>
             {KINDS.map((k, i) => {
               const on = i === 0 && picked;
@@ -185,14 +229,32 @@ const WizardCard: React.FC = () => {
             })}
           </div>
         </div>
-        <div style={{ position: 'absolute', inset: 0, opacity: step2, transform: `translateX(${30 * (1 - step2)}px)` }}>
-          <div style={{ fontFamily: SANS, fontSize: 28, fontWeight: 600, color: C.text, letterSpacing: '-0.02em' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: step2,
+            transform: `translateX(${30 * (1 - step2)}px)`,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 28,
+              fontWeight: 600,
+              color: C.text,
+              letterSpacing: '-0.02em',
+            }}
+          >
             Which terminals does it run on?
           </div>
           <div style={{ fontFamily: SANS, fontSize: 19, color: C.text2, marginTop: 6 }}>
-            Buyers filter by terminal. The review checks your <span style={{ fontFamily: MONO }}>@match</span> lines.
+            Buyers filter by terminal. The review checks your{' '}
+            <span style={{ fontFamily: MONO }}>@match</span> lines.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}>
+          <div
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20 }}
+          >
             {[...TERMINALS, { name: 'Any site', host: 'all terminals' }].map((t, i) => {
               const at = WIZARD.terminals[i];
               const on = at !== undefined && frame >= at;
@@ -227,8 +289,28 @@ const WizardCard: React.FC = () => {
                   >
                     {i === 5 ? '◎' : t.name[0]}
                   </div>
-                  <div style={{ fontFamily: SANS, fontSize: 22, fontWeight: 600, color: C.text, marginTop: 12 }}>{t.name}</div>
-                  <div style={{ fontFamily: MONO, fontSize: 15, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div
+                    style={{
+                      fontFamily: SANS,
+                      fontSize: 22,
+                      fontWeight: 600,
+                      color: C.text,
+                      marginTop: 12,
+                    }}
+                  >
+                    {t.name}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 15,
+                      color: C.muted,
+                      marginTop: 2,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
                     {t.host}
                   </div>
                   <div style={{ position: 'absolute', right: 14, top: 14 }}>
@@ -239,11 +321,19 @@ const WizardCard: React.FC = () => {
             })}
           </div>
           <div style={{ fontFamily: SANS, fontSize: 17, color: C.muted, marginTop: 14 }}>
-            <span style={{ color: C.accent }}>{selected} selected</span> · TrenchMart is not affiliated with these terminals.
+            <span style={{ color: C.accent }}>{selected} selected</span> · TrenchMart is not
+            affiliated with these terminals.
           </div>
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: 18,
+        }}
+      >
         <span style={{ fontFamily: MONO, fontSize: 17, color: C.muted }}>Step {step} of 7</span>
         <div style={{ width: 340 }}>
           <Button height={58} style={{ fontSize: 21 }}>
@@ -260,7 +350,10 @@ const WizardScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '01 / LIST',
-      wide: [[{ t: 'Seven' }, { t: 'steps' }], [{ t: 'to' }, { t: 'listed.', c: C.accent }]],
+      wide: [
+        [{ t: 'Seven' }, { t: 'steps' }],
+        [{ t: 'to' }, { t: 'listed.', c: C.accent }],
+      ],
       tall: [[{ t: 'Seven' }, { t: 'steps' }, { t: 'to' }, { t: 'listed.', c: C.accent }]],
       sub: 'A wizard tailored to what you sell.',
     }}
@@ -310,8 +403,12 @@ const PricingCard: React.FC = () => {
   ];
   return (
     <Card style={{ width: CARD_W, padding: 30, boxSizing: 'border-box' }}>
-      <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>One-time price</div>
-      <div style={{ fontFamily: SANS, fontSize: 19, color: C.text2, marginTop: 4 }}>What a buyer pays once. You keep 100% of it.</div>
+      <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>
+        One-time price
+      </div>
+      <div style={{ fontFamily: SANS, fontSize: 19, color: C.text2, marginTop: 4 }}>
+        What a buyer pays once. You keep 100% of it.
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginTop: 16 }}>
         <div
           style={{
@@ -327,21 +424,43 @@ const PricingCard: React.FC = () => {
           }}
         >
           <span style={{ flex: 1, fontFamily: MONO, fontSize: 34, fontWeight: 600, color: C.text }}>
-            {typed(frame, '0.10', PRICING.price[0], PRICING.price[1]) || <span style={{ color: C.faint }}>1.20</span>}
+            {typed(frame, '0.10', PRICING.price[0], PRICING.price[1]) || (
+              <span style={{ color: C.faint }}>1.20</span>
+            )}
           </span>
           <span style={{ fontFamily: MONO, fontSize: 18, color: C.muted }}>SOL</span>
         </div>
-        <div style={{ fontFamily: SANS, fontSize: 20, color: C.text2, opacity: ease(frame, PRICING.price[1], PRICING.price[1] + 8) }}>
+        <div
+          style={{
+            fontFamily: SANS,
+            fontSize: 20,
+            color: C.text2,
+            opacity: ease(frame, PRICING.price[1], PRICING.price[1] + 8),
+          }}
+        >
           0% creator commission
         </div>
       </div>
       <Divider style={{ margin: '24px 0 20px' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>Updates subscription</div>
-          <div style={{ fontFamily: SANS, fontSize: 19, color: C.text2, marginTop: 4 }}>Buyers renew monthly to keep getting new versions.</div>
+          <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>
+            Updates subscription
+          </div>
+          <div style={{ fontFamily: SANS, fontSize: 19, color: C.text2, marginTop: 4 }}>
+            Buyers renew monthly to keep getting new versions.
+          </div>
         </div>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: SANS, fontSize: 19, color: C.text2 }}>
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            fontFamily: SANS,
+            fontSize: 19,
+            color: C.text2,
+          }}
+        >
           {on > 0.5 ? 'On' : 'Off'} <Toggle on={on} />
         </span>
       </div>
@@ -360,23 +479,40 @@ const PricingCard: React.FC = () => {
               boxSizing: 'border-box',
             }}
           >
-            <span style={{ flex: 1, fontFamily: MONO, fontSize: 26, fontWeight: 600, color: C.text }}>
+            <span
+              style={{ flex: 1, fontFamily: MONO, fontSize: 26, fontWeight: 600, color: C.text }}
+            >
               {monthly || <span style={{ color: C.faint }}>0.12</span>}
             </span>
             <span style={{ fontFamily: MONO, fontSize: 17, color: C.muted }}>SOL / month</span>
           </div>
-          <span style={{ fontFamily: MONO, fontSize: 17, color: C.muted }}>Suggested 10% of the price</span>
+          <span style={{ fontFamily: MONO, fontSize: 17, color: C.muted }}>
+            Suggested 10% of the price
+          </span>
         </div>
         <Panel tone="ok" style={{ marginTop: 18, padding: 20 }}>
           <div style={{ fontFamily: SANS, fontSize: 21, fontWeight: 600, color: C.accent }}>
             ✓ First 30 days of updates are free with every purchase
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 16 }}>
+          <div
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 16 }}
+          >
             {cols.map(([a, b, p], i) => (
               <div key={a} style={{ opacity: 0.4 + 0.6 * p }}>
-                <div style={{ height: 5, borderRadius: 3, background: i === 2 ? C.borderStrong : C.accent, opacity: i === 0 ? 0.6 : 1 }} />
-                <div style={{ fontFamily: MONO, fontSize: 16, color: C.muted, marginTop: 10 }}>{a}</div>
-                <div style={{ fontFamily: SANS, fontSize: 19, color: C.text2, marginTop: 2 }}>{b}</div>
+                <div
+                  style={{
+                    height: 5,
+                    borderRadius: 3,
+                    background: i === 2 ? C.borderStrong : C.accent,
+                    opacity: i === 0 ? 0.6 : 1,
+                  }}
+                />
+                <div style={{ fontFamily: MONO, fontSize: 16, color: C.muted, marginTop: 10 }}>
+                  {a}
+                </div>
+                <div style={{ fontFamily: SANS, fontSize: 19, color: C.text2, marginTop: 2 }}>
+                  {b}
+                </div>
               </div>
             ))}
           </div>
@@ -395,7 +531,10 @@ const PricingScene: React.FC<SceneProps> = ({ dur }) => (
     headline={{
       label: '02 / PRICING',
       wide: [[{ t: 'Paid' }, { t: 'once.' }], [{ t: 'Updates' }], [{ t: 'monthly.', c: C.accent }]],
-      tall: [[{ t: 'Paid' }, { t: 'once.' }], [{ t: 'Updates' }, { t: 'monthly.', c: C.accent }]],
+      tall: [
+        [{ t: 'Paid' }, { t: 'once.' }],
+        [{ t: 'Updates' }, { t: 'monthly.', c: C.accent }],
+      ],
       sub: '30 days of updates free, then your price.',
     }}
     card={<PricingCard />}
@@ -411,7 +550,11 @@ const STATUS: Record<string, [string, string, Tone]> = {
   superseded: ['↷', 'SUPERSEDED', 'neutral'],
 };
 
-const VersionRow: React.FC<{ semver: string; status: string; live?: boolean }> = ({ semver, status, live }) => {
+const VersionRow: React.FC<{ semver: string; status: string; live?: boolean }> = ({
+  semver,
+  status,
+  live,
+}) => {
   const [sym, label, tone] = STATUS[status]!;
   return (
     <div
@@ -427,7 +570,9 @@ const VersionRow: React.FC<{ semver: string; status: string; live?: boolean }> =
     >
       <span style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <span style={{ fontFamily: MONO, fontSize: 22, color: C.text }}>v{semver}</span>
-        {live ? <span style={{ fontFamily: SANS, fontSize: 18, color: C.accent }}>live for buyers</span> : null}
+        {live ? (
+          <span style={{ fontFamily: SANS, fontSize: 18, color: C.accent }}>live for buyers</span>
+        ) : null}
       </span>
       <Tag tone={tone} size={16}>
         {sym} {label}
@@ -439,7 +584,8 @@ const VersionRow: React.FC<{ semver: string; status: string; live?: boolean }> =
 const VersionsCard: React.FC = () => {
   const frame = useCurrentFrame();
   const submitted = frame >= VERSIONS.submit;
-  const newStatus = frame < VERSIONS.verdict ? 'scanning' : frame < VERSIONS.live ? 'in_review' : 'live';
+  const newStatus =
+    frame < VERSIONS.verdict ? 'scanning' : frame < VERSIONS.live ? 'in_review' : 'live';
   const swapped = frame >= VERSIONS.live;
   const rowIn = ease(frame, VERSIONS.submit, VERSIONS.submit + 10);
   return (
@@ -447,7 +593,16 @@ const VersionsCard: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Label style={{ fontSize: 16 }}>Trojan Trenches Intel</Label>
-          <div style={{ fontFamily: SANS, fontSize: 30, fontWeight: 600, color: C.text, marginTop: 4, letterSpacing: '-0.02em' }}>
+          <div
+            style={{
+              fontFamily: SANS,
+              fontSize: 30,
+              fontWeight: 600,
+              color: C.text,
+              marginTop: 4,
+              letterSpacing: '-0.02em',
+            }}
+          >
             Upload new version
           </div>
         </div>
@@ -456,28 +611,81 @@ const VersionsCard: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 16, marginTop: 20 }}>
         <div>
           <div style={{ fontFamily: SANS, fontSize: 18, color: C.text2 }}>Version</div>
-          <div style={{ marginTop: 8, height: 56, borderRadius: 12, border: `1px solid ${C.accent}`, background: C.inset, display: 'flex', alignItems: 'center', padding: '0 16px', fontFamily: MONO, fontSize: 24, color: C.text }}>
+          <div
+            style={{
+              marginTop: 8,
+              height: 56,
+              borderRadius: 12,
+              border: `1px solid ${C.accent}`,
+              background: C.inset,
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 16px',
+              fontFamily: MONO,
+              fontSize: 24,
+              color: C.text,
+            }}
+          >
             {typed(frame, '1.4.2', VERSIONS.semver[0], VERSIONS.semver[1])}
           </div>
         </div>
         <div>
           <div style={{ fontFamily: SANS, fontSize: 18, color: C.text2 }}>Changelog</div>
-          <div style={{ marginTop: 8, height: 56, borderRadius: 12, border: `1px solid ${C.borderStrong}`, background: C.inset, display: 'flex', alignItems: 'center', padding: '0 16px', fontFamily: SANS, fontSize: 21, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            {typed(frame, 'Faster labels on new pairs', VERSIONS.changelog[0], VERSIONS.changelog[1])}
+          <div
+            style={{
+              marginTop: 8,
+              height: 56,
+              borderRadius: 12,
+              border: `1px solid ${C.borderStrong}`,
+              background: C.inset,
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 16px',
+              fontFamily: SANS,
+              fontSize: 21,
+              color: C.text,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+            }}
+          >
+            {typed(
+              frame,
+              'Faster labels on new pairs',
+              VERSIONS.changelog[0],
+              VERSIONS.changelog[1],
+            )}
           </div>
         </div>
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 17, color: C.muted, marginTop: 10 }}>Suggested patch bump from v1.4.1. It must be higher than the live version.</div>
+      <div style={{ fontFamily: SANS, fontSize: 17, color: C.muted, marginTop: 10 }}>
+        Suggested patch bump from v1.4.1. It must be higher than the live version.
+      </div>
       <Divider style={{ margin: '22px 0 18px' }} />
       <Label style={{ fontSize: 15 }}>Versions</Label>
       <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-        <div style={{ opacity: submitted ? rowIn : 0, transform: `translateY(${(1 - rowIn) * -10}px)` }}>
+        <div
+          style={{
+            opacity: submitted ? rowIn : 0,
+            transform: `translateY(${(1 - rowIn) * -10}px)`,
+          }}
+        >
           <VersionRow semver="1.4.2" status={newStatus} live={swapped} />
         </div>
         <VersionRow semver="1.4.1" status={swapped ? 'superseded' : 'live'} live={!swapped} />
       </div>
-      <Panel tone="info" style={{ marginTop: 18, padding: '14px 18px', fontFamily: SANS, fontSize: 18, color: C.text2, lineHeight: 1.4 }}>
-        The current version stays live. Buyers switch over once the new file passes review; subscribers get it automatically.
+      <Panel
+        tone="info"
+        style={{
+          marginTop: 18,
+          padding: '14px 18px',
+          fontFamily: SANS,
+          fontSize: 18,
+          color: C.text2,
+          lineHeight: 1.4,
+        }}
+      >
+        The current version stays live. Buyers switch over once the new file passes review;
+        subscribers get it automatically.
       </Panel>
     </Card>
   );
@@ -488,7 +696,10 @@ const VersionsScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '03 / VERSIONS',
-      wide: [[{ t: 'Ship' }, { t: 'updates.' }], [{ t: 'Stay' }, { t: 'live.', c: C.accent }]],
+      wide: [
+        [{ t: 'Ship' }, { t: 'updates.' }],
+        [{ t: 'Stay' }, { t: 'live.', c: C.accent }],
+      ],
       tall: [[{ t: 'Ship' }, { t: 'updates.' }, { t: 'Stay' }, { t: 'live.', c: C.accent }]],
       sub: 'Every version is reviewed before buyers get it.',
     }}
@@ -513,7 +724,14 @@ const StudioCard: React.FC = () => {
           <Label style={{ fontSize: 15 }}>Creator studio · your dashboard</Label>
           <span style={{ fontFamily: MONO, fontSize: 16, color: C.muted }}>/studio</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginTop: 14 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr 1fr',
+            gap: 10,
+            marginTop: 14,
+          }}
+        >
           {STATS.map((s, i) => {
             const p = ease(frame, STUDIO.chips[0] + i * 6, STUDIO.chips[0] + 10 + i * 6);
             return (
@@ -539,7 +757,9 @@ const StudioCard: React.FC = () => {
           })}
         </div>
       </Panel>
-      <div style={{ marginTop: 18, opacity: shotIn, transform: `translateY(${(1 - shotIn) * 40}px)` }}>
+      <div
+        style={{ marginTop: 18, opacity: shotIn, transform: `translateY(${(1 - shotIn) * 40}px)` }}
+      >
         <BrowserShot
           src="launch/profile.webp"
           imgW={2880}
@@ -556,7 +776,16 @@ const StudioCard: React.FC = () => {
           ]}
         />
       </div>
-      <div style={{ textAlign: 'center', fontFamily: SANS, fontSize: 21, color: C.text2, marginTop: 16, opacity: shotIn }}>
+      <div
+        style={{
+          textAlign: 'center',
+          fontFamily: SANS,
+          fontSize: 21,
+          color: C.text2,
+          marginTop: 16,
+          opacity: shotIn,
+        }}
+      >
         Your public profile, live on devnet today
       </div>
     </div>
@@ -568,7 +797,10 @@ const StudioScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '04 / STUDIO',
-      wide: [[{ t: 'Your' }, { t: 'studio.' }], [{ t: 'Your' }, { t: 'record.', c: C.accent }]],
+      wide: [
+        [{ t: 'Your' }, { t: 'studio.' }],
+        [{ t: 'Your' }, { t: 'record.', c: C.accent }],
+      ],
       tall: [[{ t: 'Your' }, { t: 'studio.' }, { t: 'Your' }, { t: 'record.', c: C.accent }]],
       sub: 'Buyers see your bond, sales and reviewed versions.',
     }}
@@ -596,6 +828,11 @@ const COMPONENTS = {
 };
 
 export const SellersVideo: React.FC<LaunchProps> = ({ audio }) => (
-  <LaunchShell scenes={SELLERS.list} components={COMPONENTS} captions={captions} audioFile="audio/launch/sellers.flac" audio={audio} />
+  <LaunchShell
+    scenes={SELLERS.list}
+    components={COMPONENTS}
+    captions={captions}
+    audioFile="audio/launch/sellers.flac"
+    audio={audio}
+  />
 );
-

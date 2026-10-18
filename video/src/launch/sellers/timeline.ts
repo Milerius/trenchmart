@@ -16,6 +16,19 @@ export const WIZARD = {
   /** When each terminal is named in the voiceover: Axiom, GMGN, Photon, Terminal, Trojan. */
   terminals: [115, 133, 169, 184, 194],
 } as const;
-export const PRICING = { price: [14, 30], toggle: 76, free: 118, monthly: [150, 166], renews: 172 } as const;
-export const VERSIONS = { semver: [10, 22], changelog: [24, 50], submit: 56, checks: 60, verdict: 96, live: 118 } as const;
+export const PRICING = {
+  price: [14, 30],
+  toggle: 76,
+  free: 118,
+  monthly: [150, 166],
+  renews: 172,
+} as const;
+export const VERSIONS = {
+  semver: [10, 22],
+  changelog: [24, 50],
+  submit: 56,
+  checks: 60,
+  verdict: 96,
+  live: 118,
+} as const;
 export const STUDIO = { chips: [20, 50], zoom: [80, 104], bond: 98, trust: 116 } as const;

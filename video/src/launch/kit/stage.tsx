@@ -25,7 +25,9 @@ export const SceneHeadline: React.FC<{ spec: HeadlineSpec; dur: number; delay?: 
   const { tall } = useFormat();
   const lines = tall ? (spec.tall ?? spec.wide) : spec.wide;
   const size = tall ? fit(lines, 950, 100) : fit(lines, 720, 86);
-  return <Headline label={spec.label} lines={lines} sub={spec.sub} size={size} dur={dur} delay={delay} />;
+  return (
+    <Headline label={spec.label} lines={lines} sub={spec.sub} size={size} dur={dur} delay={delay} />
+  );
 };
 
 /**

@@ -1,5 +1,15 @@
 import { BAR, FPS } from '../../src/timeline';
-import { addInto, applyGain, normalize, pingPong, place, reverb, softClip, Stereo, stereo } from '../dsp';
+import {
+  addInto,
+  applyGain,
+  normalize,
+  pingPong,
+  place,
+  reverb,
+  softClip,
+  Stereo,
+  stereo,
+} from '../dsp';
 import { bell, boom, clap, crash, hat, kick, padNote, pluck, riser, sub808 } from '../instruments';
 
 const BAR_S = BAR / FPS;
@@ -55,14 +65,21 @@ export const renderLaunchMusic = (song: Song): Stereo => {
     const intro = bar < 2;
     const cutoff = intro ? 900 + bar * 500 : 1700;
     ch.pad.forEach((m, i) =>
-      place(pads, padNote(tr(m), BAR_S, cutoff, bar), at(bar), intro ? 0.15 : 0.11, [-0.6, -0.2, 0.2, 0.6][i]),
+      place(
+        pads,
+        padNote(tr(m), BAR_S, cutoff, bar),
+        at(bar),
+        intro ? 0.15 : 0.11,
+        [-0.6, -0.2, 0.2, 0.6][i],
+      ),
     );
 
     if (intro) {
       place(bass, sub808(tr(ch.root), BAR_S * 0.9, 2.2), at(bar), 0.45);
       place(drums, k, at(bar), 0.5);
       place(drums, kSoft, at(bar, 10), 0.35);
-      for (let p = 0; p < 16; p += 2) place(drums, hc[p % 3], at(bar, p), p % 4 ? 0.06 : 0.09, 0.25);
+      for (let p = 0; p < 16; p += 2)
+        place(drums, hc[p % 3], at(bar, p), p % 4 ? 0.06 : 0.09, 0.25);
       if (bar === 1) {
         for (const p of [4, 8, 12]) place(drums, k, at(bar, p), 0.45);
         for (let p = 8; p < 16; p++) place(drums, cl, at(bar, p), 0.08 + ((p - 8) / 8) * 0.3);
@@ -102,7 +119,8 @@ export const renderLaunchMusic = (song: Song): Stereo => {
       place(drums, hc[p % 3], at(bar, p), p % 4 === 0 ? 0.13 : 0.085, 0.25);
     }
     if (sceneEnd) {
-      for (let p = 12; p < 16; p += 1 / 3) place(drums, hc[1], at(bar, p), 0.06 + (p - 12) * 0.015, 0.25);
+      for (let p = 12; p < 16; p += 1 / 3)
+        place(drums, hc[1], at(bar, p), 0.06 + (p - 12) * 0.015, 0.25);
     } else {
       place(drums, ho, at(bar, 14), 0.06, -0.25);
     }
@@ -111,7 +129,13 @@ export const renderLaunchMusic = (song: Song): Stereo => {
       const notes = ch.pad.slice(1).map((m) => tr(m + 12));
       const seq = [0, 1, 2, 1, 0, 2, 1, 2];
       for (let p = 0; p < 16; p++)
-        place(arps, pluck(notes[seq[p % 8]] + (p >= 12 && sceneEnd ? 12 : 0)), at(bar, p), 0.07, p % 2 ? 0.35 : -0.35);
+        place(
+          arps,
+          pluck(notes[seq[p % 8]] + (p >= 12 && sceneEnd ? 12 : 0)),
+          at(bar, p),
+          0.07,
+          p % 2 ? 0.35 : -0.35,
+        );
     }
   }
 

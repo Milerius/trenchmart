@@ -1,5 +1,22 @@
-import { HOOK, REPORT, REVIEW, SECURITY, UPLOAD, VERDICT } from '../../src/launch/security/timeline';
-import { beep, chime, glitch, keyTick, lockClunk, pop, thud, uiClick, whoosh } from '../instruments';
+import {
+  HOOK,
+  REPORT,
+  REVIEW,
+  SECURITY,
+  UPLOAD,
+  VERDICT,
+} from '../../src/launch/security/timeline';
+import {
+  beep,
+  chime,
+  glitch,
+  keyTick,
+  lockClunk,
+  pop,
+  thud,
+  uiClick,
+  whoosh,
+} from '../instruments';
 import { scanHum } from '../sfx';
 import { FPS } from '../../src/timeline';
 import { range, type LaunchAudio } from './spec';
@@ -16,12 +33,16 @@ export const security: LaunchAudio<(typeof SECURITY.list)[number]['id']> = {
 
     cue('upload', UPLOAD.fly[0] - 2, whoosh(0.32, true), 0.22, 0.4);
     cue('upload', UPLOAD.fly[1], thud(), 0.3);
-    range(UPLOAD.progress[0], UPLOAD.progress[1], 4).forEach((f, i) => cue('upload', f, beep(84 + i, 0.05), 0.035));
+    range(UPLOAD.progress[0], UPLOAD.progress[1], 4).forEach((f, i) =>
+      cue('upload', f, beep(84 + i, 0.05), 0.035),
+    );
     range(UPLOAD.sha[0], UPLOAD.sha[1], 2).forEach((f, i) => cue('upload', f, keyTick(i), 0.07));
     cue('upload', UPLOAD.pinned, lockClunk(), 0.3, 0.2);
     cue('upload', UPLOAD.scanning, pop(), 0.12, -0.3);
 
-    range(REVIEW.staticRun, REVIEW.staticDone - 4, 4).forEach((f, i) => cue('review', f, beep(86 + (i % 3) * 2, 0.04), 0.04, 0.2));
+    range(REVIEW.staticRun, REVIEW.staticDone - 4, 4).forEach((f, i) =>
+      cue('review', f, beep(86 + (i % 3) * 2, 0.04), 0.04, 0.2),
+    );
     cue('review', REVIEW.staticDone, beep(91), 0.13);
     cue('review', REVIEW.sandboxDone, beep(95), 0.13);
     cue('review', REVIEW.verdictRun, uiClick(22), 0.15);
@@ -38,7 +59,9 @@ export const security: LaunchAudio<(typeof SECURITY.list)[number]['id']> = {
     cue('verdict', VERDICT.final, thud(), 0.35);
     cue('verdict', VERDICT.final + 1, beep(76, 0.2), 0.1);
 
-    range(REPORT.json[0], REPORT.json[1], 6).forEach((f, i) => cue('report', f, keyTick(300 + i), 0.08));
+    range(REPORT.json[0], REPORT.json[1], 6).forEach((f, i) =>
+      cue('report', f, keyTick(300 + i), 0.08),
+    );
     cue('report', REPORT.sign, lockClunk(), 0.32, -0.2);
     cue('report', REPORT.browser[0], whoosh(0.4, true, 36), 0.14, 0.3);
     cue('report', REPORT.valid, chime([84, 88, 91, 96]), 0.26);

@@ -9,9 +9,13 @@ const TARGET_LUFS = -14;
 const CEILING_DBTP = -1;
 
 export const readMono48k = (file: string): Float32Array => {
-  const raw = execFileSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'f32le', '-ac', '1', '-ar', String(SR), '-'], {
-    maxBuffer: 1 << 28,
-  });
+  const raw = execFileSync(
+    'ffmpeg',
+    ['-v', 'error', '-i', file, '-f', 'f32le', '-ac', '1', '-ar', String(SR), '-'],
+    {
+      maxBuffer: 1 << 28,
+    },
+  );
   return new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4).slice();
 };
 
@@ -27,7 +31,11 @@ export const rms = (x: Float32Array, gate = 0) => {
 };
 
 /** Places each line's `<id>.wav` at its start time, EQ'd for clarity. Null if any line is missing. */
-export const renderVoBus = (lines: { id: string; seconds: number }[], dir: string, seconds: number): Stereo | null => {
+export const renderVoBus = (
+  lines: { id: string; seconds: number }[],
+  dir: string,
+  seconds: number,
+): Stereo | null => {
   const files = lines.map((l) => path.join(dir, `${l.id}.wav`));
   if (!files.every(existsSync)) return null;
   const bus = stereo(seconds);

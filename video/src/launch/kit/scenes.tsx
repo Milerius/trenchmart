@@ -72,10 +72,17 @@ export const OutroScene: React.FC<{ dur: number; tagline: Word[]; note?: string 
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: mark * 0.24 }}>
-          <div style={{ transform: `scale(${0.7 + 0.3 * ease(frame, 0, 18)})`, opacity: ease(frame, 0, 8) }}>
+          <div
+            style={{
+              transform: `scale(${0.7 + 0.3 * ease(frame, 0, 18)})`,
+              opacity: ease(frame, 0, 8),
+            }}
+          >
             <LogoMark size={mark} chevron={ease(frame, 4, 18)} trench={ease(frame, 12, 28)} />
           </div>
-          <div style={{ overflow: 'hidden', width: `${reveal * (word * 5.1)}px`, transition: 'none' }}>
+          <div
+            style={{ overflow: 'hidden', width: `${reveal * (word * 5.1)}px`, transition: 'none' }}
+          >
             <span
               style={{
                 display: 'inline-block',

@@ -8,8 +8,8 @@ export const tiers: LaunchAudio<(typeof TIERS.list)[number]['id']> = {
   key: -2,
   prog: ['i', 'VI', 'III', 'VII', 'i', 'VI', 'III', 'VII', 'iv', 'VI', 'v', 'VII'],
   sfx: (cue) => {
-    range(HOOK_T.count[0], HOOK_T.count[1], (HOOK_T.count[1] - HOOK_T.count[0]) / 3).forEach((f, i) =>
-      cue('hook', f, beep(84 - i * 3, 0.08), 0.05),
+    range(HOOK_T.count[0], HOOK_T.count[1], (HOOK_T.count[1] - HOOK_T.count[0]) / 3).forEach(
+      (f, i) => cue('hook', f, beep(84 - i * 3, 0.08), 0.05),
     );
 
     cue('fee', FEE.buyer, whoosh(0.25, true, 33), 0.1, -0.4);

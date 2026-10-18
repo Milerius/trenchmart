@@ -1,7 +1,13 @@
 import type { Mono } from '../dsp';
 import type { Chord } from './music';
 
-export type Cue<T extends string> = (scene: T, frame: number, src: Mono, gain: number, pan?: number) => void;
+export type Cue<T extends string> = (
+  scene: T,
+  frame: number,
+  src: Mono,
+  gain: number,
+  pan?: number,
+) => void;
 
 /** A launch video's soundtrack: the score's key and chords, and SFX cues on scene-local frames. */
 export type LaunchAudio<T extends string> = {

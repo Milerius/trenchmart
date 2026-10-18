@@ -50,15 +50,25 @@ const CodeBackdrop: React.FC<{ dur: number }> = ({ dur }) => {
         maskImage: 'radial-gradient(ellipse 60% 60% at 50% 50%, #000 30%, transparent 85%)',
       }}
     >
-      <div style={{ position: 'relative', fontFamily: MONO, fontSize: size, lineHeight: `${lineH}px` }}>
+      <div
+        style={{ position: 'relative', fontFamily: MONO, fontSize: size, lineHeight: `${lineH}px` }}
+      >
         {CODE.map((l, i) => {
           const passed = beamY > (i + 0.5) * lineH;
           const bad = l.bad && passed;
           return (
-            <div key={i} style={{ whiteSpace: 'pre', color: bad ? C.danger : passed ? C.accentLabel : C.decor }}>
+            <div
+              key={i}
+              style={{
+                whiteSpace: 'pre',
+                color: bad ? C.danger : passed ? C.accentLabel : C.decor,
+              }}
+            >
               {l.t}
               {bad ? (
-                <span style={{ color: C.danger, opacity: flag, marginLeft: 24 }}>✕ no-sign-transaction</span>
+                <span style={{ color: C.danger, opacity: flag, marginLeft: 24 }}>
+                  ✕ no-sign-transaction
+                </span>
               ) : null}
             </div>
           );
@@ -151,11 +161,21 @@ const UploadCard: React.FC = () => {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: MONO, fontSize: 22, color: C.text }}>{FILE}</div>
               <div style={{ fontFamily: MONO, fontSize: 18, color: C.muted, marginTop: 4 }}>
-                {progress < 1 ? `uploading · ${(38.4 * progress).toFixed(1)} KB` : 'uploaded · 38.4 KB'}
+                {progress < 1
+                  ? `uploading · ${(38.4 * progress).toFixed(1)} KB`
+                  : 'uploaded · 38.4 KB'}
               </div>
             </div>
           </div>
-          <div style={{ marginTop: 14, height: 6, borderRadius: 3, background: C.border, overflow: 'hidden' }}>
+          <div
+            style={{
+              marginTop: 14,
+              height: 6,
+              borderRadius: 3,
+              background: C.border,
+              overflow: 'hidden',
+            }}
+          >
             <div style={{ width: `${progress * 100}%`, height: '100%', background: C.accent }} />
           </div>
         </div>
@@ -177,7 +197,17 @@ const UploadCard: React.FC = () => {
             </Tag>
           </span>
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 20, color: C.text, marginTop: 10, wordBreak: 'break-all', minHeight: 48, lineHeight: 1.4 }}>
+        <div
+          style={{
+            fontFamily: MONO,
+            fontSize: 20,
+            color: C.text,
+            marginTop: 10,
+            wordBreak: 'break-all',
+            minHeight: 48,
+            lineHeight: 1.4,
+          }}
+        >
           {typed(frame, SHA, UPLOAD.sha[0], UPLOAD.sha[1])}
         </div>
       </div>
@@ -207,8 +237,14 @@ const UploadScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '01 / UPLOAD',
-      wide: [[{ t: 'Pinned' }, { t: 'the' }], [{ t: 'second' }, { t: 'it' }, { t: 'lands.', c: C.accent }]],
-      tall: [[{ t: 'Pinned' }, { t: 'the' }, { t: 'second' }], [{ t: 'it' }, { t: 'lands.', c: C.accent }]],
+      wide: [
+        [{ t: 'Pinned' }, { t: 'the' }],
+        [{ t: 'second' }, { t: 'it' }, { t: 'lands.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: 'Pinned' }, { t: 'the' }, { t: 'second' }],
+        [{ t: 'it' }, { t: 'lands.', c: C.accent }],
+      ],
       sub: 'Every version is stored under its SHA-256.',
     }}
     card={<UploadCard />}
@@ -279,7 +315,9 @@ const ReviewStep: React.FC<{
             </span>
           ) : null}
         </div>
-        <div style={{ fontFamily: SANS, fontSize: 19, color: C.muted, marginTop: 4, lineHeight: 1.35 }}>
+        <div
+          style={{ fontFamily: SANS, fontSize: 19, color: C.muted, marginTop: 4, lineHeight: 1.35 }}
+        >
           {done ? doneText : desc}
         </div>
         {extra}
@@ -291,7 +329,13 @@ const ReviewStep: React.FC<{
   );
 };
 
-const LOG = ['egress blocked', 'timeout 15000ms', 'memory 128mb', 'timers run 14', 'interrupt ticks 2'];
+const LOG = [
+  'egress blocked',
+  'timeout 15000ms',
+  'memory 128mb',
+  'timers run 14',
+  'interrupt ticks 2',
+];
 
 const ReviewCard: React.FC = () => {
   const frame = useCurrentFrame();
@@ -305,19 +349,31 @@ const ReviewCard: React.FC = () => {
       : frame < REVIEW.verdictRun
         ? lin(frame, REVIEW.staticRun, REVIEW.verdictRun, [0, 2.3])
         : lin(frame, REVIEW.verdictRun, REVIEW.verdictDone, [2.3, 24.6]);
-  const checkIdx = Math.floor(lin(frame, REVIEW.staticRun, REVIEW.staticDone, [0, CHECKS.length - 0.01]));
+  const checkIdx = Math.floor(
+    lin(frame, REVIEW.staticRun, REVIEW.staticDone, [0, CHECKS.length - 0.01]),
+  );
   const logLines = Math.floor(lin(frame, REVIEW.logs[0], REVIEW.logs[1], [0, LOG.length + 0.99]));
   const logIn = ease(frame, REVIEW.logs[0] - 6, REVIEW.logs[0] + 4);
   const liveIn = ease(frame, REVIEW.live, REVIEW.live + 10);
   return (
     <Card style={{ width: 860, padding: 28 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-        <div style={{ fontFamily: SANS, fontSize: 32, fontWeight: 600, letterSpacing: '-0.03em', color: C.text }}>
+        <div
+          style={{
+            fontFamily: SANS,
+            fontSize: 32,
+            fontWeight: 600,
+            letterSpacing: '-0.03em',
+            color: C.text,
+          }}
+        >
           Live review
         </div>
         <div style={{ textAlign: 'right' }}>
           <Label style={{ fontSize: 16 }}>{ai.status === 'done' ? 'Review time' : 'Elapsed'}</Label>
-          <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 600, color: C.text }}>{elapsed.toFixed(1)}s</div>
+          <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 600, color: C.text }}>
+            {elapsed.toFixed(1)}s
+          </div>
         </div>
       </div>
       <div
@@ -400,7 +456,15 @@ const ReviewCard: React.FC = () => {
             opacity: logIn * (1 - liveIn),
           }}
         >
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px', borderBottom: `1px solid ${C.borderSoft}` }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              padding: '10px 14px',
+              borderBottom: `1px solid ${C.borderSoft}`,
+            }}
+          >
             <Label style={{ fontSize: 16 }}>Sandbox log</Label>
             <Tag tone="warn" size={15}>
               egress blocked
@@ -410,7 +474,15 @@ const ReviewCard: React.FC = () => {
             </Tag>
             <Tag size={15}>0 hosts</Tag>
           </div>
-          <div style={{ padding: '8px 14px', fontFamily: MONO, fontSize: 17, lineHeight: 1.5, color: C.text2 }}>
+          <div
+            style={{
+              padding: '8px 14px',
+              fontFamily: MONO,
+              fontSize: 17,
+              lineHeight: 1.5,
+              color: C.text2,
+            }}
+          >
             {LOG.slice(0, logLines).join('  ·  ')}
           </div>
         </div>
@@ -431,7 +503,9 @@ const ReviewCard: React.FC = () => {
             ✓
           </Square>
           <div>
-            <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>Approved and live</div>
+            <div style={{ fontFamily: SANS, fontSize: 24, fontWeight: 600, color: C.text }}>
+              Approved and live
+            </div>
             <div style={{ fontFamily: SANS, fontSize: 20, color: C.accentBody, marginTop: 4 }}>
               Buyers see the checks and the pinned hash on your listing.
             </div>
@@ -484,7 +558,15 @@ const VerdictCard: React.FC = () => {
   const finalP = ease(frame, VERDICT.final, VERDICT.final + 12);
   const marker = ease(frame, VERDICT.final + 6, VERDICT.final + 26);
   const note = ease(frame, VERDICT.note, VERDICT.note + 12);
-  const col = (who: string, engine: string, p: number, enter: number, verdict: React.ReactNode, why: string, pending: boolean) => (
+  const col = (
+    who: string,
+    engine: string,
+    p: number,
+    enter: number,
+    verdict: React.ReactNode,
+    why: string,
+    pending: boolean,
+  ) => (
     <Card
       style={{
         flex: 1,
@@ -499,10 +581,24 @@ const VerdictCard: React.FC = () => {
         {pending ? (
           <Thinking frame={frame} />
         ) : (
-          <span style={{ opacity: p, transform: `scale(${0.85 + 0.15 * p})`, display: 'inline-block' }}>{verdict}</span>
+          <span
+            style={{ opacity: p, transform: `scale(${0.85 + 0.15 * p})`, display: 'inline-block' }}
+          >
+            {verdict}
+          </span>
         )}
       </div>
-      <div style={{ fontFamily: SANS, fontSize: 20, color: C.text2, marginTop: 12, lineHeight: 1.35, opacity: p, minHeight: 46 }}>
+      <div
+        style={{
+          fontFamily: SANS,
+          fontSize: 20,
+          color: C.text2,
+          marginTop: 12,
+          lineHeight: 1.35,
+          opacity: p,
+          minHeight: 46,
+        }}
+      >
         {why}
       </div>
     </Card>
@@ -560,7 +656,16 @@ const VerdictCard: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <Label style={{ fontSize: 17, color: C.warn }}>Final verdict · stricter wins</Label>
-            <div style={{ fontFamily: SANS, fontSize: 34, fontWeight: 700, color: C.text, marginTop: 6, letterSpacing: '-0.02em' }}>
+            <div
+              style={{
+                fontFamily: SANS,
+                fontSize: 34,
+                fontWeight: 700,
+                color: C.text,
+                marginTop: 6,
+                letterSpacing: '-0.02em',
+              }}
+            >
               Changes requested
             </div>
           </div>
@@ -569,7 +674,18 @@ const VerdictCard: React.FC = () => {
           </Square>
         </div>
         <div style={{ position: 'relative', marginTop: 22, height: 54 }}>
-          <div style={{ position: 'absolute', left: 0, right: 0, top: 10, height: 4, borderRadius: 2, background: `linear-gradient(90deg, ${C.accent}, ${C.warn}, ${C.danger})`, opacity: 0.7 }} />
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 10,
+              height: 4,
+              borderRadius: 2,
+              background: `linear-gradient(90deg, ${C.accent}, ${C.warn}, ${C.danger})`,
+              opacity: 0.7,
+            }}
+          />
           {levels.map((l, i) => (
             <div
               key={l}
@@ -623,8 +739,14 @@ const VerdictScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '03 / VERDICT',
-      wide: [[{ t: 'They' }, { t: 'disagree?' }], [{ t: 'Stricter' }, { t: 'wins.', c: C.accent }]],
-      tall: [[{ t: 'They' }, { t: 'disagree?' }], [{ t: 'Stricter' }, { t: 'wins.', c: C.accent }]],
+      wide: [
+        [{ t: 'They' }, { t: 'disagree?' }],
+        [{ t: 'Stricter' }, { t: 'wins.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: 'They' }, { t: 'disagree?' }],
+        [{ t: 'Stricter' }, { t: 'wins.', c: C.accent }],
+      ],
       sub: 'Rules engine and LLM, combined.',
     }}
     card={<VerdictCard />}
@@ -647,7 +769,9 @@ const JSON_LINES: { k: string; v: string; ind?: number }[] = [
 const ReportCard: React.FC = () => {
   const frame = useCurrentFrame();
   const { tall } = useFormat();
-  const shown = Math.floor(lin(frame, REPORT.json[0], REPORT.json[1], [0, JSON_LINES.length + 0.99]));
+  const shown = Math.floor(
+    lin(frame, REPORT.json[0], REPORT.json[1], [0, JSON_LINES.length + 0.99]),
+  );
   const sign = ease(frame, REPORT.sign, REPORT.sign + 8);
   const browser = ease(frame, REPORT.browser[0], REPORT.browser[1]);
   const bw = tall ? 900 : 960;
@@ -668,7 +792,13 @@ const ReportCard: React.FC = () => {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Label style={{ fontSize: 17 }}>scan-report.json · Trojan Trenches Intel v1.4.1</Label>
-          <span style={{ opacity: sign, transform: `scale(${1.4 - 0.4 * sign}) rotate(${(1 - sign) * -8}deg)`, display: 'inline-block' }}>
+          <span
+            style={{
+              opacity: sign,
+              transform: `scale(${1.4 - 0.4 * sign}) rotate(${(1 - sign) * -8}deg)`,
+              display: 'inline-block',
+            }}
+          >
             <Tag tone="ok" size={17}>
               ✓ signed · ed25519
             </Tag>
@@ -715,8 +845,14 @@ const ReportScene: React.FC<SceneProps> = ({ dur }) => (
     dur={dur}
     headline={{
       label: '04 / SIGNED REPORT',
-      wide: [[{ t: 'Signed.' }, { t: 'Checkable' }], [{ t: 'on' }, { t: '/verify.', c: C.accent }]],
-      tall: [[{ t: 'Signed.' }, { t: 'Checkable' }], [{ t: 'on' }, { t: '/verify.', c: C.accent }]],
+      wide: [
+        [{ t: 'Signed.' }, { t: 'Checkable' }],
+        [{ t: 'on' }, { t: '/verify.', c: C.accent }],
+      ],
+      tall: [
+        [{ t: 'Signed.' }, { t: 'Checkable' }],
+        [{ t: 'on' }, { t: '/verify.', c: C.accent }],
+      ],
       sub: 'The check runs in your browser.',
     }}
     card={<ReportCard />}
