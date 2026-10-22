@@ -414,7 +414,10 @@ function plan(
 
 export async function closeEpoch(deps: Deps, cfg: RewardConfig, epoch: Row): Promise<string> {
   const id = Number(epoch.epoch_id);
-  await ensureEpoch(deps, cfg, id + 1);
+  // The epoch that starts when this one ends under the CURRENT length (REWARDS_EPOCH_SECONDS
+  // may have changed since this row was opened, so never assume id + 1).
+  const nextId = epochIdAt(new Date(epoch.ends_at).getTime(), cfg.epochSeconds);
+  await ensureEpoch(deps, cfg, nextId);
   const required = (epoch.sample_ticks as number[]).length;
   const [rev] = await deps.sql<Row[]>`
     select coalesce(sum(net_fee), 0)::bigint as revenue, coalesce(sum(slot_lamports), 0)::bigint as slot,
@@ -433,8 +436,8 @@ export async function closeEpoch(deps: Deps, cfg: RewardConfig, epoch: Row): Pro
         select b.owner, b.min_amount::text as weight, h.first_seen_at
         from reward_balances b
         join reward_epochs e on e.epoch_id = b.epoch_id
-        join reward_balances p on p.epoch_id = b.epoch_id - 1 and p.owner = b.owner
-        join reward_epochs pe on pe.epoch_id = p.epoch_id
+        join reward_epochs pe on pe.ends_at = e.starts_at
+        join reward_balances p on p.epoch_id = pe.epoch_id and p.owner = b.owner
         join reward_holders h on h.owner = b.owner
         where b.epoch_id = ${id}
           and b.samples = e.samples_done and b.min_amount >= coalesce(e.min_balance, 0) and b.min_amount > 0
@@ -519,7 +522,7 @@ export async function closeEpoch(deps: Deps, cfg: RewardConfig, epoch: Row): Pro
           ${b.reduce((s, r) => s + r.lamports, 0n)})
       `;
     if (carryNext > 0n)
-      await sql`update reward_epochs set carry_in = carry_in + ${carryNext} where epoch_id = ${id + 1}`;
+      await sql`update reward_epochs set carry_in = carry_in + ${carryNext} where epoch_id = ${nextId}`;
     if (p.fund === 0n && !halt)
       await sql`update reward_epochs set status = 'paid', paid_at = ${deps.now()} where epoch_id = ${id}`;
   });
@@ -532,7 +535,7 @@ async function anomaly(deps: Deps, pool: bigint): Promise<string | null> {
   if (pool <= 1_000_000_000n) return null;
   const rows = await deps.sql<{ p: bigint }[]>`
     select holder_pool as p from reward_epochs where status = 'paid' and holder_pool > 0
-    order by epoch_id desc limit 8
+    order by starts_at desc limit 8
   `;
   if (rows.length < 4) return null;
   const sorted = rows.map((r) => BigInt(r.p)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
@@ -847,7 +850,7 @@ export async function rewardsTick(deps: Deps, queue?: RewardQueue): Promise<Rewa
   out.sampled = await sampleIfDue(deps, cfg, chain, epoch);
   // Close every ended epoch, oldest first (catches up after downtime).
   const ended = await deps.sql<Row[]>`
-    select * from reward_epochs where status = 'open' and ends_at <= ${deps.now()} order by epoch_id limit 4
+    select * from reward_epochs where status = 'open' and ends_at <= ${deps.now()} order by starts_at, epoch_id limit 4
   `;
   for (const e of ended) {
     await closeEpoch(deps, cfg, e);
@@ -858,7 +861,7 @@ export async function rewardsTick(deps: Deps, queue?: RewardQueue): Promise<Rewa
   await finishEpochs(deps);
   // One epoch moves at a time, oldest first.
   const [next] = await deps.sql<Row[]>`
-    select * from reward_epochs where status in ('closed', 'funding', 'paying') order by epoch_id limit 1
+    select * from reward_epochs where status in ('closed', 'funding', 'paying') order by starts_at, epoch_id limit 1
   `;
   if (next?.status === 'closed') out.funding = await fund(deps, cfg, chain, next);
   else if (next?.status === 'funding')
@@ -905,7 +908,7 @@ export async function rewardHealth(deps: Deps): Promise<RewardAlert[]> {
       message: `${failed!.n} holder reward batch(es) failed ${REWARD_MAX_ATTEMPTS} times; see reward_batches.last_error, reset to pending after fixing`,
     });
   const halted = await deps.sql<Row[]>`
-    select epoch_id, halted_reason from reward_epochs where status = 'halted' order by epoch_id limit 5
+    select epoch_id, halted_reason from reward_epochs where status = 'halted' order by starts_at limit 5
   `;
   for (const h of halted)
     alerts.push({
@@ -1000,7 +1003,7 @@ const sol = (v: unknown) => (Number(BigInt((v as bigint | string | number) ?? 0)
 
 export async function recentEpochs(deps: Deps, limit: number) {
   const rows = await deps.sql<Row[]>`
-    select * from reward_epochs where status <> 'open' order by epoch_id desc limit ${limit}
+    select * from reward_epochs where status <> 'open' order by starts_at desc, epoch_id desc limit ${limit}
   `;
   const ids = rows.map((r) => r.epoch_id);
   const costs = ids.length
@@ -1086,11 +1089,13 @@ export async function walletRewards(deps: Deps, wallet: string) {
   const rows = await deps.sql<Row[]>`
     select a.*, b.tx_sig from reward_allocations a
     left join reward_batches b on b.epoch_id = a.epoch_id and b.batch_no = a.batch_no
-    where a.owner = ${wallet} order by a.epoch_id desc limit 20
+    join reward_epochs e on e.epoch_id = a.epoch_id
+    where a.owner = ${wallet} order by e.starts_at desc limit 20
   `;
   const [cur] = await deps.sql<Row[]>`
     select b.min_amount::text as weight, b.samples from reward_balances b
-    where b.owner = ${wallet} order by b.epoch_id desc limit 1
+    join reward_epochs e on e.epoch_id = b.epoch_id
+    where b.owner = ${wallet} order by e.starts_at desc limit 1
   `;
   return {
     wallet,
@@ -1122,7 +1127,7 @@ export async function resumeEpoch(deps: Deps, epochId: number): Promise<boolean>
 export async function topHolders(deps: Deps, limit: number) {
   const [e] = await deps.sql<Row[]>`
     select epoch_id from reward_epochs where status in ('closed', 'funding', 'paying', 'paid')
-    order by epoch_id desc limit 1
+    order by starts_at desc limit 1
   `;
   if (!e) return { epoch: null, holders: [] };
   const rows = await deps.sql<Row[]>`
