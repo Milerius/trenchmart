@@ -218,7 +218,7 @@ async function runEpoch(deps: Deps, id: number, during?: (tick: number) => void)
 }
 
 /** Revenue that paid the rewards vault: a released order with the routed split. */
-async function revenue(deps: Deps, netFee: bigint, ref = crypto.randomUUID()) {
+async function revenue(deps: Deps, netFee: bigint, ref: string = crypto.randomUUID()) {
   const routing = feeRouting(deps.env, {
     fee_split_bps: { buyback: 4000, ai_verification: 2500, ops: 2000, safety: 1500 },
   });
@@ -311,8 +311,9 @@ describe('$MART holder rewards', () => {
     // Funding, then 20-recipient batches through a fake queue.
     const queued: { epochId: number; batchNo: number }[] = [];
     const queue = {
-      sendBatch: async (m: { body: unknown }[]) =>
-        void queued.push(...(m.map((x) => x.body) as never)),
+      sendBatch: async (m: { body: unknown }[]) => {
+        for (const x of m) queued.push(x.body as { epochId: number; batchNo: number });
+      },
     };
     now = new Date(now.getTime() + 300_000);
     await rewardsTick(deps, queue); // fund
