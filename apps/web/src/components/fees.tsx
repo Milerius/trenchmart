@@ -1,9 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { DEFAULT_CONFIG_JSON } from '@trenchmart/shared/config';
-import { quote, splitFee } from '@trenchmart/shared/fee';
-import { Money, Tag } from '@/components/ui';
+import { Tag } from '@/components/ui';
 import { TIER_LABEL, type PublicConfig } from '@/lib/config';
 
 type FeeConfig = Pick<PublicConfig, 'feeBps' | 'tierRebateBps' | 'feeSplitBps'>;
