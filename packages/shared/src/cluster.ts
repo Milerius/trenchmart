@@ -74,7 +74,7 @@ export function resolveRpc(
   try {
     const u = new URL(url);
     if (u.protocol !== 'https:') throw new MainnetRpcRequiredError('must be https');
-    host = u.hostname.toLowerCase();
+    host = u.hostname.toLowerCase().replace(/\.+$/, ''); // `host.` is the same host
   } catch (err) {
     if (err instanceof MainnetRpcRequiredError) throw err;
     throw new MainnetRpcRequiredError('not a URL');
