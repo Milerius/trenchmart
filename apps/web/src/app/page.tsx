@@ -497,8 +497,8 @@ export default function HomePage() {
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <SectionHead
                   id="fees-heading"
-                  kicker="$TRENCH"
-                  title="Hold $TRENCH,"
+                  kicker="$MART"
+                  title="Hold $MART,"
                   accent="pay less."
                 />
                 <Link

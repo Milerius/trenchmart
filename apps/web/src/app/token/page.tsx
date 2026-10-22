@@ -1,17 +1,24 @@
 'use client';
 
 import { solToLamports } from '@trenchmart/shared/money';
+import { displaySplitBps } from '@trenchmart/shared/rewards';
 import { useState } from 'react';
-import { DEFAULT_FEES, FeeBreakdown, TIER_ORDER, TierCards } from '@/components/fees';
+import { DEFAULT_FEES, TIER_ORDER, TierCards } from '@/components/fees';
+import { FeeBreakdown } from '@/components/fee-breakdown';
 import { GradientWords } from '@/components/gradient-words';
 import { MARKET_WRAP } from '@/components/page-hero';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';
 import { useWallet } from '@/lib/wallet';
 
 const SPLIT: Record<string, [string, string, string]> = {
+  holders: [
+    '$MART holders',
+    'Half of net revenue (after costs), pushed in SOL to the top 1,000 holders every 3 hours.',
+    '#7CF2C4',
+  ],
   buyback: [
-    '$TRENCH buyback',
-    'Buys $TRENCH on a published schedule, with the transactions posted.',
+    '$MART buyback',
+    'Buys $MART on a published schedule, with the transactions posted.',
     '#C6F432',
   ],
   ai_verification: [
@@ -34,6 +41,7 @@ export default function TokenPage() {
   const [price, setPrice] = useState('1.5');
   const [tier, setTier] = useState('trencher');
   const fees = config ?? DEFAULT_FEES;
+  const split = displaySplitBps(fees.feeSplitBps);
 
   let lamports: string | null;
   try {
@@ -54,7 +62,7 @@ export default function TokenPage() {
           className={`${MARKET_WRAP} relative flex flex-col items-start gap-6 pt-16 pb-14 sm:pt-20`}
         >
           <span className="font-mono text-xs font-medium tracking-[.18em] text-accent uppercase">
-            $TRENCH · fair launch on pump.fun
+            $MART · fair launch on pump.fun
           </span>
           <h1 className="m-0 max-w-5xl text-[clamp(40px,6vw,84px)] leading-[0.98] font-semibold tracking-[-0.05em]">
             Fees fund the token.{' '}
@@ -63,7 +71,7 @@ export default function TokenPage() {
             </GradientWords>
           </h1>
           <p className="m-0 max-w-2xl text-lg text-ink-2">
-            Buyers pay a {fees.feeBps / 100}% fee on top of the listing price. Holding $TRENCH cuts
+            Buyers pay a {fees.feeBps / 100}% fee on top of the listing price. Holding $MART cuts
             it: Scout 25% off, Trencher 60% off, OG pays nothing. Creators pay 0% commission at
             every tier.
           </p>
@@ -77,7 +85,7 @@ export default function TokenPage() {
           </h2>
           <TierCards config={config} current={wallet.session?.tier} />
           <p className="m-0 text-sm text-muted">
-            Your tier uses your lowest $TRENCH balance over the last {config?.tierWindowHours ?? 72}{' '}
+            Your tier uses your lowest $MART balance over the last {config?.tierWindowHours ?? 72}{' '}
             hours, read from Solana devnet.
           </p>
         </section>
@@ -151,19 +159,21 @@ export default function TokenPage() {
             Where every fee goes
           </h2>
           <p className="m-0 max-w-2xl text-ink-2">
-            The net fee, after your tier discount, is split four ways. The verification bucket funds
-            automated review, not people.
+            Half of net revenue (fees after your tier discount, minus ledgered running costs) goes
+            to the top 1,000 $MART holders every 3 hours. The other half is split across the four
+            buckets in their usual proportions. The verification bucket funds automated review, not
+            people.
           </p>
           <div aria-hidden="true" className="flex h-4 overflow-hidden rounded-full">
-            {Object.entries(fees.feeSplitBps).map(([bucket, bps]) => (
+            {Object.entries(split).map(([bucket, bps]) => (
               <span
                 key={bucket}
                 style={{ width: `${bps / 100}%`, background: SPLIT[bucket]?.[2] ?? '#9AA197' }}
               />
             ))}
           </div>
-          <ul className="m-0 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
-            {Object.entries(fees.feeSplitBps).map(([bucket, bps]) => (
+          <ul className="m-0 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-5">
+            {Object.entries(split).map(([bucket, bps]) => (
               <li
                 key={bucket}
                 data-testid="fee-split"

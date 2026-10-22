@@ -53,7 +53,7 @@ export type AppConfig = {
 /**
  * Proposed defaults. Handlers read the `config` table; this object is the
  * seed and the typed fallback when a key is missing. Tier thresholds are whole
- * $TRENCH (1B supply, 6 decimals): Scout 100k, Trencher 1M, OG 10M. A value that is
+ * $MART (1B supply, 6 decimals): Scout 100k, Trencher 1M, OG 10M. A value that is
  * not an integer string disables that tier.
  */
 /** Owner decision: buyers' SOL is held for at most one hour before release. */

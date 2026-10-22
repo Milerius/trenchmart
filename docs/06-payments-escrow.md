@@ -8,10 +8,10 @@
 | Creator commission | Creator             | 0%                                                         | —                                              | Attract supply                  |
 | Verification fee   | Creator per version | 0.25 SOL                                                   | Free from Trencher                             | Pays reviewers, stops spam      |
 | Creator bond       | Creator, refundable | 1–5 SOL by category (UI also shows larger voluntary bonds) | OG −50%                                        | Slashed for malicious listings  |
-| Featured slot      | Creator, optional   | 0.5 SOL / week                                             | −20% if paid in $TRENCH                        | Promotion (phase 2)             |
+| Featured slot      | Creator, optional   | 0.5 SOL / week                                             | −20% if paid in $MART                          | Promotion (phase 2)             |
 | Subscriptions      | Buyer, recurring    | 5% of each renewal                                         | Same as marketplace                            | Live wallet lists / alert feeds |
 
-**Fee split** of each collected fee (after rebate): buyback 40% · verifiers 25% · ops 20% · safety 15%. Verification fees go 100% to the verifiers bucket.
+**Fee split** of all platform revenue (each collected fee after rebate, plus verification fees): **$MART holders 50% of net revenue** (revenue minus ledgered running costs, paid every 3 h, see `docs/ops/holder-rewards.md`), then the rest in the bucket proportions buyback 40% · verifiers 25% · ops 20% · safety 15%, i.e. buyback 20% · verifiers 12.5% · ops 10% · safety 7.5% of each fee.
 
 ## Fee math (`packages/shared/fee.ts`)
 

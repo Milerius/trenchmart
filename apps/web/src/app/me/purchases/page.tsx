@@ -566,7 +566,7 @@ function UpdatesBlock({
           {banner.kind === 'renew' ? (
             <p className="m-0 mt-2 text-[13px] text-ink-2">
               Your free updates ended. Renewing adds {updates.periodDays} days of updates; the
-              platform fee is included and your $TRENCH tier discount applies.
+              platform fee is included and your $MART tier discount applies.
             </p>
           ) : null}
         </Panel>

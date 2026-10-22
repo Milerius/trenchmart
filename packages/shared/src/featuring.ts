@@ -32,7 +32,7 @@ export type FeatureRules = {
 
 export type FeatureConfig = {
   slots: Record<FeatureKind, FeatureSlot>;
-  /** Discount on featuring by $TRENCH tier, in basis points (the existing Scout/Trencher/OG tiers). */
+  /** Discount on featuring by $MART tier, in basis points (the existing Scout/Trencher/OG tiers). */
   discountBps: Record<Tier, number>;
   rules: FeatureRules;
 };

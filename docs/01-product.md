@@ -36,7 +36,7 @@ Terminals for compatibility tags (config-driven list): Axiom, GMGN, Photon, Term
 - Creator studio: new listing, upload version, see pipeline status, explain warnings, bond management, payouts history.
 - Verifier queue: pending versions, diff vs previous version, scan report, approve/reject with notes.
 - My purchases: downloads, open dispute.
-- $TRENCH page: fee table, revenue split, tiers, savings calculator, how holding is checked.
+- $MART page: fee table, revenue split, tiers, savings calculator, how holding is checked.
 - Holder perks: fee rebate, 48h early access to new listings, holder-only listings, free verification (Trencher+), half bond (OG), vote on featured (later), verifier application (OG).
 
 ## Out of scope for POC (phase 2+)

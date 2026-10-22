@@ -84,7 +84,7 @@ export async function requestIntel(deps: Deps, wallet: string): Promise<void> {
   `;
 }
 
-/** Re-reads the $TRENCH tier (72 h window) and stores it for vote weights. */
+/** Re-reads the $MART tier (72 h window) and stores it for vote weights. */
 export async function refreshHolderTier(deps: Deps, wallet: string): Promise<Tier> {
   let tier: Tier;
   try {

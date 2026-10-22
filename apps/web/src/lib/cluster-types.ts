@@ -15,7 +15,7 @@ export type ClusterConfig = {
   escrowProgramId: string;
   multisig: string;
   vault: string;
-  trenchMint: string;
+  martMint: string;
 };
 
 /** Hostnames and endpoints (lib/cluster-endpoints.ts): server, docs and the network menu only. */

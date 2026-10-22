@@ -46,7 +46,7 @@ test('/token: tier cards, calculator tier radios and the fee split', async ({ pa
   await expect(og).toHaveAttribute('aria-checked', 'true');
   await calc.getByRole('textbox').fill('abc');
   await expect(calc.getByText('Enter a SOL amount with up to 9 decimals.')).toBeVisible();
-  await expect(page.getByTestId('fee-split')).toHaveCount(4);
+  await expect(page.getByTestId('fee-split')).toHaveCount(5);
   await expect(page.locator('[data-fx="gradient-text"]')).toHaveCount(0);
 });
 

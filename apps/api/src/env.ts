@@ -19,7 +19,7 @@ export type Env = {
   rpcUrl: string;
   webhookSecret: string;
   vaultAddress: string;
-  trenchMint: string;
+  martMint: string;
   buckets: {
     buyback: string;
     ai_verification: string;
@@ -206,7 +206,8 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     rpcUrl,
     webhookSecret: source.HELIUS_WEBHOOK_SECRET || 'change-me',
     vaultAddress: blank(source.VAULT_ADDRESS),
-    trenchMint: blank(source.TRENCH_MINT),
+    // MART_MINT; TRENCH_MINT is read as an alias for one release (rename to $MART).
+    martMint: blank(source.MART_MINT) || blank(source.TRENCH_MINT),
     buckets: {
       buyback: blank(source.BUCKET_WALLET_BUYBACK),
       ai_verification: blank(source.BUCKET_WALLET_AI_VERIFICATION),

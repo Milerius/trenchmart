@@ -1,11 +1,11 @@
-# 07 · $TRENCH token & holder tiers
+# 07 · $MART token & holder tiers
 
-- Token launches on **pump.fun** (fair launch). The marketplace never mints; it only reads balances. `TRENCH_MINT` env var; until launch, use a devnet SPL token you create for testing.
+- Token launches on **pump.fun** (fair launch). The marketplace never mints; it only reads balances. `MART_MINT` env var; until launch, use a devnet SPL token you create for testing.
 - pump.fun tokens use 6 decimals; read `decimals` from the mint, don't hard-code.
 
 ## Tiers
 
-Thresholds are whole $TRENCH (1,000,000,000 supply, 6 decimals), stored in `config.tier_thresholds` and compared with base-unit balances (`× 10^trench_decimals`).
+Thresholds are whole $MART (1,000,000,000 supply, 6 decimals), stored in `config.tier_thresholds` and compared with base-unit balances (`× 10^trench_decimals`).
 
 | Tier         | Requirement        | Perks                                                                                                                               |
 | ------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -25,10 +25,10 @@ Tier = based on the **lowest balance held at any point in the last 72h** (`tier_
 ## Data flow
 
 ```
-  $TRENCH transfer on-chain
+  $MART transfer on-chain
           │
           ▼
-  Helius enhanced webhook (type: TRANSFER, accountAddresses: [TRENCH_MINT])
+  Helius enhanced webhook (type: TRANSFER, accountAddresses: [MART_MINT])
           │
           ▼
   POST /hooks/helius ──▶ for each affected owner wallet:
@@ -85,5 +85,8 @@ Thresholds are stored as whole-token integer strings in config (`"100000"`, `"10
 
 ## Revenue → token
 
-- POC: `bucket:buyback` accumulates in the ledger; ops manually swaps SOL→$TRENCH (Jupiter) on a published schedule and posts tx sigs on the $TRENCH page. Burn vs reward split decided later by governance.
-- Show on the $TRENCH page: total buyback SOL to date, last buyback tx (from a `buybacks` admin-entered table, add if needed).
+- **Holder rewards (2026-10-22):** 50% of NET platform revenue (released-sale fees + verification fees, minus ledgered costs: RPC, network/priority fees, payout fees, infra pro-rata) is pushed in SOL to the top 1,000 $MART holders every 3 h. Eligibility: at least 0.05% of supply, held for 2 epochs, weight = lowest of 6 random balance samples in the epoch. Shares under 0.01 SOL carry over. The remaining 50% is split across the four buckets in their configured proportions. Mechanics: `docs/ops/holder-rewards.md`.
+- Config: `MART_MINT` (`TRENCH_MINT` is still read as an alias for one release).
+
+- POC: `bucket:buyback` accumulates in the ledger; ops manually swaps SOL→$MART (Jupiter) on a published schedule and posts tx sigs on the $MART page. Burn vs reward split decided later by governance.
+- Show on the $MART page: total buyback SOL to date, last buyback tx (from a `buybacks` admin-entered table, add if needed).

@@ -526,7 +526,7 @@ export const ROUTES: RouteDoc[] = [
     method: 'get',
     path: '/studio/featuring',
     tag: 'Featuring',
-    summary: 'Your listings with featuring eligibility, your $TRENCH tier and your bookings',
+    summary: 'Your listings with featuring eligibility, your $MART tier and your bookings',
   },
   {
     method: 'post',

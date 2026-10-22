@@ -1738,7 +1738,7 @@ describe('owner product decisions', () => {
             return { success: !key.startsWith('198.51.100.9') };
           },
         },
-        trenchBalance: async () => 42n,
+        martBalance: async () => 42n,
       },
     );
     const post = (headers: Record<string, string>) =>

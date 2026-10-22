@@ -7,7 +7,7 @@
  *   pnpm screenshots
  *
  * It writes demo fixtures into the local database (a buyer with Trencher-tier
- * $TRENCH, three orders in different escrow states, creator payouts) and signs
+ * $MART, three orders in different escrow states, creator payouts) and signs
  * in through the app's test wallet hook. Tier thresholds are set to demo values
  * while it runs and restored afterwards. `pnpm db:seed` resets everything.
  */

@@ -9,5 +9,5 @@ export const MAINNET: ClusterConfig = {
   escrowProgramId: '',
   multisig: '',
   vault: '',
-  trenchMint: '',
+  martMint: '',
 };

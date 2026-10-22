@@ -16,7 +16,7 @@ function deps(): Deps {
   return {
     sql,
     now: () => clock,
-    trenchBalance: async () => {
+    martBalance: async () => {
       if (onChain instanceof Error) throw onChain;
       return onChain;
     },
@@ -33,7 +33,7 @@ beforeEach(async () => {
   clock = new Date('2026-06-01T00:00:00.000Z');
 });
 
-describe('$TRENCH holder tiers read from chain', () => {
+describe('$MART holder tiers read from chain', () => {
   const config = parseAppConfig({});
 
   it('trusts the first on-chain snapshot: 1.5M TRENCH is Trencher (60% off the fee)', async () => {
@@ -72,7 +72,7 @@ describe('$TRENCH holder tiers read from chain', () => {
   it('an unchanged balance is read from chain at most every 5 minutes, not on every request', async () => {
     let reads = 0;
     const counting = () =>
-      ({ ...deps(), trenchBalance: async () => (reads++, 150_000n * WHOLE) }) as unknown as Deps;
+      ({ ...deps(), martBalance: async () => (reads++, 150_000n * WHOLE) }) as unknown as Deps;
     onChain = 150_000n * WHOLE;
     await ensureSnapshot(deps(), wallet);
     clock = new Date(clock.getTime() + 10 * BALANCE_RECONCILE_MS);
@@ -86,7 +86,7 @@ describe('$TRENCH holder tiers read from chain', () => {
   it('the display read (/me) never waits on the chain once a wallet has history', async () => {
     let reads = 0;
     const counting = () =>
-      ({ ...deps(), trenchBalance: async () => (reads++, 150_000n * WHOLE) }) as unknown as Deps;
+      ({ ...deps(), martBalance: async () => (reads++, 150_000n * WHOLE) }) as unknown as Deps;
     const other = 'TierWa11et2222222222222222222222222222222222';
     await sql`delete from token_balances where wallet = ${other}`;
     // First sight still snapshots from chain, once.

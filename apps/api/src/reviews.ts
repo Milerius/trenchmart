@@ -33,7 +33,7 @@ import {
 /**
  * Verified-buyer reviews: one per released order, signed by the buying wallet, tagged with a
  * version that wallet downloaded. Creators reply once (editable), never hide. Helpful votes and
- * reports are weighted (buyer 1.0×, $TRENCH holder 0.5×, everyone else 0×).
+ * reports are weighted (buyer 1.0×, $MART holder 0.5×, everyone else 0×).
  */
 
 const SORTS = ['helpful', 'newest', 'lowest', 'highest'] as const;

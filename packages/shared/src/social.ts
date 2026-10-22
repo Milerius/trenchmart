@@ -11,7 +11,7 @@ import { TIERS, tierAtLeast, type Tier } from './tier';
 export type SocialConfig = {
   /** Vote weight (basis points of one vote) for a wallet with a released purchase. */
   weightBuyerBps: number;
-  /** Vote weight for a wallet holding at least `holderMinTier` of $TRENCH (72 h window). */
+  /** Vote weight for a wallet holding at least `holderMinTier` of $MART (72 h window). */
   weightHolderBps: number;
   holderMinTier: Tier;
   /** A wallet counts only once its TrenchMart account or first on-chain activity is this old. */
@@ -71,7 +71,7 @@ export type VoterFacts = {
   oldestSeenAt: Date | null;
   /** Has at least one released order on a listing it does not own. */
   isBuyer: boolean;
-  /** $TRENCH tier (72 h minimum balance) at the last check. */
+  /** $MART tier (72 h minimum balance) at the last check. */
   holderTier: Tier;
   /** The creator in question funded this wallet inside the funder window. */
   fundedByCreator: boolean;
@@ -112,8 +112,8 @@ export function voteWeight(
 
 export const WEIGHT_REASON_TEXT: Record<WeightReason, string> = {
   buyer: 'Your vote counts fully: this wallet has a released order.',
-  holder: 'Your vote counts half: this wallet holds $TRENCH.',
-  no_purchase_or_holding: 'Shown, not counted: buy something or hold $TRENCH for it to count.',
+  holder: 'Your vote counts half: this wallet holds $MART.',
+  no_purchase_or_holding: 'Shown, not counted: buy something or hold $MART for it to count.',
   wallet_too_new: 'Shown, not counted yet: new wallets count after 7 days.',
   funded_by_creator: 'Not counted: this wallet was funded by the creator.',
   own_listing: 'Creators cannot vote on their own listings or reviews.',

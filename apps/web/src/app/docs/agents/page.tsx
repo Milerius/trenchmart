@@ -251,7 +251,7 @@ export default function AgentDocsPage() {
       <DocSection id="fees" title="Fees">
         <ul className="m-0 list-disc space-y-1 pl-5">
           <li>
-            Buyer pays price + {FACTS.fee} fee − tier rebate ({FACTS.rebates}, $TRENCH held for{' '}
+            Buyer pays price + {FACTS.fee} fee − tier rebate ({FACTS.rebates}, $MART held for{' '}
             {FACTS.tierWindowHours} h). See{' '}
             <Link className="text-ink underline" href="/docs/fees">
               Fees

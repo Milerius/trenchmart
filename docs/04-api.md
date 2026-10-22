@@ -140,13 +140,13 @@ per line (`#` and `//` comments skipped). Upload the standard export as `.txt` o
 
 ## Internal / webhooks
 
-| Method | Path                                  | Notes                                                                                                                                                                                                                             |
-| ------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/hooks/helius`                       | 🤖 `Authorization: <HELIUS_WEBHOOK_SECRET>`. Handles (a) SOL transfers to vault → match memo → mark order/bond paid; (b) $TRENCH token transfers → insert `token_balances` rows for affected wallets. Idempotent on tx signature. |
-| GET    | `/internal/sandbox/next`              | 🤖 `INTERNAL_TOKEN`. Returns next sandbox job `{versionId, fileUrl, declared, targetUrls}` or 204                                                                                                                                 |
-| POST   | `/internal/sandbox/:versionId/result` | 🤖 result payload (see 05)                                                                                                                                                                                                        |
-| POST   | `/internal/status/run`                | 🤖 `INTERNAL_TOKEN`. Runs one status tick (probes, incidents, roll-up) now; the API cron runs it every 5 min                                                                                                                      |
-| POST   | `/internal/status/external`           | 🤖 `STATUS_PUSH_TOKEN` (watchdog only). `{checks:[{name: web\|api\|rpc, ok, ms}]}`; 401 when the token is unset or short                                                                                                          |
+| Method | Path                                  | Notes                                                                                                                                                                                                                           |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/hooks/helius`                       | 🤖 `Authorization: <HELIUS_WEBHOOK_SECRET>`. Handles (a) SOL transfers to vault → match memo → mark order/bond paid; (b) $MART token transfers → insert `token_balances` rows for affected wallets. Idempotent on tx signature. |
+| GET    | `/internal/sandbox/next`              | 🤖 `INTERNAL_TOKEN`. Returns next sandbox job `{versionId, fileUrl, declared, targetUrls}` or 204                                                                                                                               |
+| POST   | `/internal/sandbox/:versionId/result` | 🤖 result payload (see 05)                                                                                                                                                                                                      |
+| POST   | `/internal/status/run`                | 🤖 `INTERNAL_TOKEN`. Runs one status tick (probes, incidents, roll-up) now; the API cron runs it every 5 min                                                                                                                    |
+| POST   | `/internal/status/external`           | 🤖 `STATUS_PUSH_TOKEN` (watchdog only). `{checks:[{name: web\|api\|rpc, ok, ms}]}`; 401 when the token is unset or short                                                                                                        |
 
 ## Payment verification (shared by webhook and `/submitted`)
 

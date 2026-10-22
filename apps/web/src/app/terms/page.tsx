@@ -106,9 +106,9 @@ export default function TermsPage() {
           active bond falls below the required amount, the creator&apos;s listings can be paused.
         </p>
       </DocSection>
-      <DocSection id="token" title="The $TRENCH token">
+      <DocSection id="token" title="The $MART token">
         <p>
-          Holding $TRENCH can place a wallet in a tier. A tier can lower the buyer fee, waive the{' '}
+          Holding $MART can place a wallet in a tier. A tier can lower the buyer fee, waive the{' '}
           {protocol.verificationFee} verification fee from {protocol.verificationFeeFreeFrom}{' '}
           upward, discount an OG bond, and unlock holder-only listings. The thresholds are Scout{' '}
           {formatTrench(protocol.thresholds.scout)}, Trencher{' '}
@@ -118,7 +118,7 @@ export default function TermsPage() {
           -hour window.
         </p>
         <p>
-          $TRENCH is not a share of TrenchMart, not a claim on fees, and not an offer of profit,
+          $MART is not a share of TrenchMart, not a claim on fees, and not an offer of profit,
           yield, or buyback at any price. The buyback bucket is only a destination for part of the
           marketplace fee. Buying or holding the token is not an investment in the marketplace.
         </p>

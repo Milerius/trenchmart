@@ -184,7 +184,7 @@ export async function transparency(deps: Deps) {
       account('Fee bucket: review (verification)', env.buckets.ai_verification),
       account('Fee bucket: ops', env.buckets.ops),
       account('Fee bucket: safety', env.buckets.safety),
-      account('$TRENCH devnet mint', env.trenchMint),
+      account('$MART devnet mint', env.martMint),
     ]),
     review: {
       engine: env.llm.apiKey && env.llm.model ? `${RULES_ENGINE}+llm` : RULES_ENGINE,

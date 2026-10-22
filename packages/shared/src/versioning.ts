@@ -114,7 +114,7 @@ export function renewalWindow(
   return { startsAt: start, endsAt: new Date(start.getTime() + periodDays * DAY_MS) };
 }
 
-/** Same fee math as a purchase: platform fee on top, cut by the buyer's $TRENCH tier. */
+/** Same fee math as a purchase: platform fee on top, cut by the buyer's $MART tier. */
 export function renewalQuote(updatePrice: bigint, feeBps: number, rebateBps: number): FeeQuote {
   return quote(updatePrice, feeBps, rebateBps);
 }

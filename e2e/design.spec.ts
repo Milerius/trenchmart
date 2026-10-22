@@ -132,7 +132,8 @@ test('connected Trencher sees 60% off the fee and the verification split', async
   await expect(fees).toContainText('1.224 SOL');
   await expect(page.getByTestId('preview-notice')).toHaveCount(0);
   await fees.getByText('Where the fee goes').click();
-  await expect(fees).toContainText('Verification · 25%');
+  await expect(fees).toContainText('$MART holders · 50%');
+  await expect(fees).toContainText('Verification · 12.5%');
   await expect(fees).not.toContainText(/verifiers/i);
   await expect(page.getByTestId('buy')).toHaveText('Pay into escrow');
 });

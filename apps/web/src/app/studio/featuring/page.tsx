@@ -910,7 +910,7 @@ export default function StudioFeaturingPage() {
                 ))}
               </div>
               <p className="m-0 mt-1.5 text-[11px] text-muted">
-                $TRENCH discount from your holder tier.
+                $MART discount from your holder tier.
               </p>
               {quoteError ? (
                 <p

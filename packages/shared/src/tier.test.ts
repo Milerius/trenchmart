@@ -120,7 +120,7 @@ describe('minBalanceInWindow', () => {
   });
 });
 
-describe('real $TRENCH thresholds', () => {
+describe('real $MART thresholds', () => {
   it('seeds Scout 100k, Trencher 1M, OG 10M whole tokens and scales by decimals', async () => {
     const { parseAppConfig, DEFAULT_CONFIG_JSON } = await import('./config');
     expect(DEFAULT_CONFIG_JSON.tier_thresholds).toEqual({
@@ -140,7 +140,7 @@ describe('real $TRENCH thresholds', () => {
 
   it('formats whole tokens for display', async () => {
     const { formatTrench } = await import('./tier');
-    expect(formatTrench('1000000')).toBe('1,000,000 $TRENCH');
+    expect(formatTrench('1000000')).toBe('1,000,000 $MART');
     expect(formatTrench('off')).toBe('not set');
   });
 });

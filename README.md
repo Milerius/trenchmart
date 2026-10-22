@@ -25,7 +25,7 @@ Every file passes automated security review in seconds. Every order is held by a
 </div>
 
 > [!NOTE]
-> TrenchMart runs on **Solana devnet** with test SOL only. Nothing here has real value yet. TrenchMart and $TRENCH are working names. See [Status](#status) for what is live and what is left before mainnet.
+> TrenchMart runs on **Solana devnet** with test SOL only. Nothing here has real value yet. TrenchMart and $MART are working names. See [Status](#status) for what is live and what is left before mainnet.
 
 ## Why TrenchMart
 
@@ -51,7 +51,7 @@ Every version is statically scanned (scripts also run in an isolated sandbox), t
 
 **Transparent fees**
 
-Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission. Every line of the price is shown before you sign.
+Buyers pay a 5% fee, cut by up to 100% with $MART. Creators pay 0% commission. Every line of the price is shown before you sign.
 
 </td>
 </tr>
@@ -71,7 +71,7 @@ Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission.
 ## How buying works
 
 1. **Pick a verified tool.** Filter by terminal (Axiom, GMGN, Photon, Terminal, Trojan) or category.
-2. **See your exact price.** Connect your wallet and your $TRENCH tier is applied to the receipt before anything is signed.
+2. **See your exact price.** Connect your wallet and your $MART tier is applied to the receipt before anything is signed.
 3. **Pay into escrow.** One transaction. Your SOL is held for 1 hour, and you can dispute at any time in that window.
 4. **Download.** The file unlocks once payment is confirmed in escrow, watermarked to your wallet. Check any file against its pinned hash on [/verify](https://trenchmart.fun/verify) (1 free check per wallet per UTC day, then 0.01 SOL each).
 5. **Get updates.** New versions are yours for 30 days, then renew monthly at the seller's update price if you want to keep receiving them.
@@ -97,7 +97,7 @@ Buyers pay a 5% fee, cut by up to 100% with $TRENCH. Creators pay 0% commission.
 
 ## Fees and tiers
 
-Buyers pay a 5% fee on top of the listing price. Holding $TRENCH cuts it. Creators pay nothing at any tier.
+Buyers pay a 5% fee on top of the listing price. Holding $MART cuts it. Creators pay nothing at any tier.
 
 | Tier         | Fee discount | Buyer fee | You pay on a 1.20 SOL listing | Creator commission |
 | ------------ | -----------: | --------: | ----------------------------: | -----------------: |
@@ -108,9 +108,9 @@ Buyers pay a 5% fee on top of the listing price. Holding $TRENCH cuts it. Creato
 
 Tiers also cut creator costs: from **Trencher** up, the per-version verification fee is waived.
 
-Your tier is based on your lowest $TRENCH balance over the last 72 hours, so it can't be gamed by borrowing tokens for one purchase. Balance thresholds are set by the owner and live in config.
+Your tier is based on your lowest $MART balance over the last 72 hours, so it can't be gamed by borrowing tokens for one purchase. Balance thresholds are set by the owner and live in config.
 
-**Where the fee goes.** The net fee, after your discount, is split four ways: 40% $TRENCH buyback, 25% verification (automated review: static checks, sandbox runs and the review verdict), 20% operations, 15% safety fund.
+**Where the fee goes.** Half of net revenue (fees after your discount, minus running costs) goes to the top 1,000 $MART holders every 3 hours, in SOL. The other half is split in the usual proportions: 40% $MART buyback, 25% verification (automated review: static checks, sandbox runs and the review verdict), 20% operations, 15% safety fund (20% / 12.5% / 10% / 7.5% of each fee).
 
 ## Trust and security
 
@@ -189,7 +189,7 @@ TrenchMart is a **devnet proof of concept**. The site, API, escrow program and S
 | Monitoring and backups            | 5-minute health checks; nightly encrypted backups ([monitoring](docs/ops/monitoring.md), [backups](docs/ops/backups.md)).                                                                                          |
 | Networks (Devnet / Mainnet)       | Header pill; one deployment per cluster on its own hostname (`devnet.trenchmart.fun`; mainnet "Coming soon") ([networks](docs/ops/networks.md)).                                                                   |
 | Public status page                | [trenchmart.fun/status](https://trenchmart.fun/status): live state, p50/p95 latency and 90-day uptime per component, plus incident history; JSON at `GET /api/v1/status` ([status page](docs/ops/status-page.md)). |
-| Mainnet                           | Not yet. The open items are tracked in [mainnet readiness](docs/mainnet-readiness.md), including the $TRENCH launch and lifting the devnet guard.                                                                  |
+| Mainnet                           | Not yet. The open items are tracked in [mainnet readiness](docs/mainnet-readiness.md), including the $MART launch and lifting the devnet guard.                                                                    |
 
 ## Tech stack
 
@@ -237,9 +237,9 @@ The screenshots in this README are captured from the live devnet site at [trench
 | Mainnet readiness      | [`docs/mainnet-readiness.md`](docs/mainnet-readiness.md): what is done, what is left, and the owner decisions                                                             |
 | Operations             | [`docs/ops/`](docs/ops/): monitoring, backups, verified build                                                                                                             |
 | Agent API              | [trenchmart.fun/docs/agents](https://trenchmart.fun/docs/agents) · [`packages/sdk`](packages/sdk) · [`examples/`](examples) · [llms.txt](https://trenchmart.fun/llms.txt) |
-| User docs (live)       | [trenchmart.fun/docs](https://trenchmart.fun/docs): buyers, sellers, escrow, fees, $TRENCH, security, treasury, FAQ                                                       |
+| User docs (live)       | [trenchmart.fun/docs](https://trenchmart.fun/docs): buyers, sellers, escrow, fees, $MART, security, treasury, FAQ                                                         |
 | Payments and escrow    | [`docs/06-payments-escrow.md`](docs/06-payments-escrow.md) · [`docs/ESCROW_TESTNET_EVIDENCE.md`](docs/ESCROW_TESTNET_EVIDENCE.md)                                         |
-| $TRENCH tiers          | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                                                                        |
+| $MART tiers            | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                                                                        |
 | Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/)                                                |
 | Brand assets           | [`brand/`](brand/): logo mark, wordmark (dark and light), X avatar and header, favicon. `pnpm brand` re-renders the PNGs                                                  |
 | Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                                                                             |

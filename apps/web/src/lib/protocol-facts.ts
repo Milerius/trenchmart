@@ -24,7 +24,7 @@ export const ESCROW_CLUSTER = CLUSTER.id;
 export const DEVNET_ADDRESSES = {
   multisig: CLUSTER.multisig,
   vault: CLUSTER.vault,
-  trenchMint: CLUSTER.trenchMint,
+  martMint: CLUSTER.martMint,
 } as const;
 /** trenchmart.fun has no mail server yet, so contact goes through GitHub, which is real and public. */
 export const CONTACT_URL = 'https://github.com/Milerius/trenchmart/issues';
@@ -72,7 +72,7 @@ export const DOCS_NAV = [
   { href: '/docs/agents/reference', label: 'API reference' },
   { href: '/docs/escrow', label: 'Escrow program' },
   { href: '/docs/fees', label: 'Fees' },
-  { href: '/docs/token', label: '$TRENCH' },
+  { href: '/docs/token', label: '$MART' },
   { href: '/docs/treasury', label: 'Treasury' },
   { href: '/docs/security', label: 'Security' },
   { href: '/docs/faq', label: 'FAQ' },

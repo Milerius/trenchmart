@@ -29,7 +29,7 @@ export async function GET() {
   const { data: live } = await publicApi<Transparency>('/transparency', 300);
   const role = (re: RegExp) => live?.accounts?.find((a) => re.test(a.role))?.address ?? null;
   const vault = role(/vault/i) ?? DEVNET_ADDRESSES.vault;
-  const mint = role(/mint/i) ?? DEVNET_ADDRESSES.trenchMint;
+  const mint = role(/mint/i) ?? DEVNET_ADDRESSES.martMint;
   const multisig = live?.multisig?.address ?? DEVNET_ADDRESSES.multisig;
   const body = {
     name: 'TrenchMart',

@@ -1841,7 +1841,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
         for (const row of event.tokenBalances as { wallet?: unknown; mint?: unknown }[]) {
           if (typeof row.wallet !== 'string' || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(row.wallet))
             continue;
-          if (deps.env.trenchMint && row.mint && row.mint !== deps.env.trenchMint) continue;
+          if (deps.env.martMint && row.mint && row.mint !== deps.env.martMint) continue;
           wallets.add(row.wallet);
         }
         for (const wallet of [...wallets].slice(0, 20))

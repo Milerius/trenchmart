@@ -24,7 +24,7 @@ link keeps working, and sessions are per hostname (host-only cookie).
 Everything that differs per cluster is in `apps/web/src/lib/`, joined by `clusters.ts`:
 
 - `cluster-devnet.ts`, `cluster-mainnet.ts`: chain id, escrow program id, multisig, vault,
-  $TRENCH mint, explorer/Solscan `?cluster=` value.
+  $MART mint, explorer/Solscan `?cluster=` value.
 - `cluster-endpoints.ts`: site origin, API base, RPC, Squads program, note.
 - `cluster.ts`: `CLUSTER` (this build's cluster; the other one is dropped from the bundle),
   explorer/Solscan link helpers, `chainMismatch`.

@@ -128,9 +128,9 @@ export function bondToList(
   return cheapest !== null && cheapest > live ? cheapest : live;
 }
 
-/** "1000000" (whole tokens) → "1,000,000 $TRENCH". A value that is not an integer → "not set". */
+/** "1000000" (whole tokens) → "1,000,000 $MART". A value that is not an integer → "not set". */
 export function formatTrench(wholeTokens: unknown): string {
   const value = parseThreshold(wholeTokens);
   if (value === undefined) return 'not set';
-  return `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')} $TRENCH`;
+  return `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')} $MART`;
 }
