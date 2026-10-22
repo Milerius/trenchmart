@@ -337,6 +337,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     signerRef.current = null;
     signerIdRef.current = null;
     setWalletAddress(null);
+    document.documentElement.removeAttribute('data-cluster-mismatch');
   }
 
   /** Track the connected account; Phantom/Backpack/Solflare announce switches via standard:events. */

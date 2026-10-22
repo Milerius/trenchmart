@@ -24,7 +24,10 @@ export function installMockWallet(initial: string) {
   const accountFor = (address: string) => ({
     address,
     publicKey: new Uint8Array(32),
-    chains: ['solana:devnet'],
+    // A spec can pretend the wallet is on another cluster (network-switch.spec.ts).
+    chains: JSON.parse(
+      sessionStorage.getItem('mock-wallet-chains') ?? '["solana:devnet"]',
+    ) as string[],
     features: ['solana:signMessage', 'solana:signTransaction'],
   });
   let active = accountFor(sessionStorage.getItem('mock-wallet-address') ?? initial);

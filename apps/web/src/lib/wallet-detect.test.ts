@@ -21,6 +21,12 @@ import {
   type WalletList,
 } from './wallet-detect';
 
+// signerFromStandardWallet marks <html data-cluster-mismatch> (the amber banner); node has no DOM.
+const htmlAttrs = new Map<string, boolean>();
+vi.stubGlobal('document', {
+  documentElement: { toggleAttribute: (name: string, on: boolean) => htmlAttrs.set(name, on) },
+});
+
 const account = (address: string, chains: readonly string[]): StandardAccount => ({
   address,
   chains,
@@ -300,6 +306,16 @@ describe('signerFromStandardWallet', () => {
       expect.objectContaining({ account: devnet, chain: DEVNET_CHAIN }),
     );
     expect(JSON.stringify(phantom.signTransaction.mock.calls)).not.toContain('solana:mainnet');
+  });
+
+  it('refuses to sign a transaction when the account is only on another cluster', async () => {
+    const phantom = wallet('Phantom', ['solana:mainnet']);
+    const mainnet = account('Mainnet1111111111111111111111111111111111111', ['solana:mainnet']);
+    phantom.connect.mockResolvedValue({ accounts: [mainnet] });
+    const signer = await signerFromStandardWallet(phantom);
+    expect(htmlAttrs.get('data-cluster-mismatch')).toBe(true);
+    await expect(signer.signTransaction(new Uint8Array([9]))).rejects.toThrow(/Devnet/);
+    expect(phantom.signTransaction).not.toHaveBeenCalled();
   });
 
   it('prompts when a silent connect returns no accounts', async () => {
