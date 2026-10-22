@@ -3,7 +3,7 @@
 import { categoryMeta } from '@trenchmart/shared/categories';
 import type { PublicIdentity } from '@trenchmart/shared/social';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { recentRead, rememberRead } from '@/lib/recent';
 import { solText } from '@/lib/money';
@@ -69,11 +69,14 @@ export function useActivity(limit = 24) {
         .then(
           (body) =>
             !stop &&
-            setEvents(
-              rememberRead(key, {
-                events: Array.isArray(body?.events) ? body.events : [],
-                sponsored: Array.isArray(body?.sponsored) ? body.sponsored : [],
-              }),
+            // A transition keeps the band's render out of one long main-thread task.
+            startTransition(() =>
+              setEvents(
+                rememberRead(key, {
+                  events: Array.isArray(body?.events) ? body.events : [],
+                  sponsored: Array.isArray(body?.sponsored) ? body.sponsored : [],
+                }),
+              ),
             ),
         )
         .catch(() => !stop && setEvents((prev) => prev ?? { events: [], sponsored: [] }));

@@ -3,7 +3,7 @@
 import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
 import { escrowWindowLabel, escrowWindowShort } from '@trenchmart/shared/escrow';
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { startTransition, useEffect, useState, type ReactNode } from 'react';
 import { solText } from '@/lib/money';
 import { CATEGORIES } from '@trenchmart/shared/categories';
 import { ActivityBand, useActivity } from '@/components/activity';
@@ -83,6 +83,11 @@ export default function HomePage() {
   const [board, setBoard] = useState<Board | null | 'error'>(
     () => recentRead<Board>('home-board|earners') ?? null,
   );
+  // Automated browsers (e2e, full-page screenshots) capture without scrolling, so they lay out
+  // every section at once; real visitors get the content-visibility skip (see .cv-section).
+  useEffect(() => {
+    if (navigator.webdriver) document.documentElement.dataset.cv = 'off';
+  }, []);
   const activity = useActivity(24);
   const featured = useFeatured('home');
 
@@ -93,20 +98,23 @@ export default function HomePage() {
     const recent = recentRead<Listing[]>(key);
     if (recent) setListings(recent);
     void api<Listing[]>(`/listings${query}`)
-      .then((body) => {
-        setListings(rememberRead(key, body));
-        if (terminal === 'All' && Array.isArray(body)) {
-          const counts: Record<string, number> = {};
-          for (const item of body) counts[item.category] = (counts[item.category] ?? 0) + 1;
-          setCatCounts(counts);
-        }
-      })
+      .then((body) =>
+        // A transition: React renders the grid in short slices instead of one long task.
+        startTransition(() => {
+          setListings(rememberRead(key, body));
+          if (terminal === 'All' && Array.isArray(body)) {
+            const counts: Record<string, number> = {};
+            for (const item of body) counts[item.category] = (counts[item.category] ?? 0) + 1;
+            setCatCounts(counts);
+          }
+        }),
+      )
       .catch(() => setListings((prev) => prev ?? []));
   }, [terminal, viewer]);
 
   useEffect(() => {
     void api<Stats>('/stats')
-      .then((body) => setStats(rememberRead('stats', body)))
+      .then((body) => startTransition(() => setStats(rememberRead('stats', body))))
       .catch(() => setStatsFailed(true));
   }, []);
 
@@ -116,8 +124,10 @@ export default function HomePage() {
     const recent = recentRead<Board>(key);
     if (recent) setBoard(recent);
     void api<Board>(`/creators/leaderboard?tab=${creatorTab}&range=30d&limit=6`)
-      .then(
-        (body) => !stop && setBoard(Array.isArray(body?.rows) ? rememberRead(key, body) : 'error'),
+      .then((body) =>
+        startTransition(() => {
+          if (!stop) setBoard(Array.isArray(body?.rows) ? rememberRead(key, body) : 'error');
+        }),
       )
       .catch(() => !stop && setBoard('error'));
     return () => {
@@ -243,302 +253,335 @@ export default function HomePage() {
           />
         ) : null}
 
-        <section id="market" aria-labelledby="market-heading" className="scroll-mt-24">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <SectionHead id="market-heading" kicker="Market" title="Trending" accent="this week" />
-            <PillGroup data-testid="terminal-filter" role="group" aria-label="Filter by terminal">
-              {TERMINALS.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  aria-pressed={terminal === name}
-                  className={pillClass(terminal === name)}
-                  onClick={() => setTerminal(name)}
-                >
-                  {name === 'All' ? name : <TerminalName name={name} logoClassName="h-4 w-4" />}
-                </button>
-              ))}
-            </PillGroup>
-          </div>
-          {!wallet.session ? (
-            <div className="mt-6">
-              <PreviewNotice onConnect={() => void wallet.connect()} />
-            </div>
-          ) : null}
-          <div className="mt-8">
-            <ListingGrid
-              listings={listings ?? []}
-              loading={listings === null}
-              centsPerSol={cents}
-              config={config}
-              tier={wallet.session?.tier}
-              wide
-            />
-          </div>
-          {listings?.length ? (
-            <div className="mt-8 flex justify-center">
-              <ButtonLink href="/search" variant="secondary" size="sm">
-                See all listings →
-              </ButtonLink>
-            </div>
-          ) : null}
-        </section>
-
-        <Reveal>
-          <section aria-labelledby="cat-heading">
-            <SectionHead id="cat-heading" kicker="Categories" title="Find your" accent="edge" />
-            <ul className="mt-10 grid gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
-              {CATEGORIES.map((cat) => (
-                <li key={cat.code} className="list-none">
-                  <Spot
-                    color={cat.color}
-                    alpha="40"
-                    shape="beam"
-                    className="motion-card h-full !rounded-panel"
-                  >
-                    <Link
-                      href={`/c/${cat.code}`}
-                      className="flex h-full min-h-52 flex-col justify-between gap-6 rounded-[inherit] p-7"
-                    >
-                      <span className="flex items-center justify-between gap-3">
-                        <span
-                          className="font-mono text-xs tracking-[0.16em]"
-                          style={{ color: cat.color }}
-                        >
-                          {cat.short}
-                        </span>
-                        {catCounts && (
-                          <span className="font-mono text-xs text-faint">
-                            {catCounts[cat.code] ?? 0} live
-                          </span>
-                        )}
-                      </span>
-                      <span className="flex flex-col gap-2">
-                        <span className="text-[28px] font-semibold tracking-[-0.03em]">
-                          {cat.label}
-                        </span>
-                        <span className="text-sm text-muted">{cat.desc}</span>
-                      </span>
-                    </Link>
-                  </Spot>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </Reveal>
-
-        <Reveal>
-          <section aria-labelledby="how-heading">
-            <SectionHead
-              id="how-heading"
-              kicker="How buying works"
-              title="Four steps,"
-              accent="no surprises."
-            />
-            <ol className="stagger relative mt-10 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
-              <li
-                aria-hidden="true"
-                className="pointer-events-none absolute top-[54px] right-[12%] left-[12%] hidden h-px list-none bg-gradient-to-r from-accent/0 via-accent/50 to-accent/0 lg:block"
-              />
-              {(
-                [
-                  [
-                    'Pick a verified tool',
-                    'Every listing shows its review result, the checks it passed, the file hash and a signed scan report.',
-                  ],
-                  [
-                    'See your exact price',
-                    'Price, 5% fee, your tier discount and 0% creator commission, itemised before you sign.',
-                  ],
-                  [
-                    'Pay into escrow',
-                    `Your SOL is held in escrow for ${escrowWindowLabel(escrowHours)}. Open a dispute any time in that window.`,
-                  ],
-                  [
-                    'Download on release',
-                    'Once payment is confirmed in escrow, download a copy watermarked to your wallet.',
-                  ],
-                ] as const
-              ).map(([title, body], index) => {
-                const Icon = STEP_ICONS[index] ?? ScanSearch;
-                return (
-                  <li
-                    key={title}
-                    className="motion-card relative flex list-none flex-col gap-4 rounded-[22px] border border-line bg-surface/70 p-6"
-                  >
-                    <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-accent-line bg-accent-bg text-accent">
-                      <Icon size={20} aria-hidden="true" />
-                    </span>
-                    <span className="font-mono text-xs text-faint">STEP 0{index + 1}</span>
-                    <h3 className="m-0 text-xl font-semibold tracking-tight">{title}</h3>
-                    <p className="m-0 text-sm text-muted">{body}</p>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
-        </Reveal>
-
-        <Reveal>
-          <section
-            aria-labelledby="creators-heading"
-            data-testid="top-creators"
-            className="grid items-start gap-10 lg:grid-cols-[1fr_1.4fr]"
-          >
-            <div>
+        <Island>
+          <section id="market" aria-labelledby="market-heading" className="scroll-mt-24">
+            <div className="flex flex-wrap items-end justify-between gap-4">
               <SectionHead
-                id="creators-heading"
-                kicker="Leaderboard"
-                title="Top creators"
-                accent="this month"
+                id="market-heading"
+                kicker="Market"
+                title="Trending"
+                accent="this week"
               />
-              <p className="mt-4 max-w-sm text-sm text-ink-2">
-                Ranked on released sales, verified-buyer reviews and weighted upvotes. Paid
-                featuring never changes a rank.
-              </p>
-              <Link
-                href="/creators"
-                className="mt-4 inline-block text-sm text-accent underline-offset-4 hover:underline"
-              >
-                Full leaderboard →
-              </Link>
-            </div>
-            <div className="rounded-[26px] border border-line bg-surface/60 p-2">
-              <PillGroup role="tablist" aria-label="Top creators" className="m-2">
-                {HOME_TABS.map((value) => (
+              <PillGroup data-testid="terminal-filter" role="group" aria-label="Filter by terminal">
+                {TERMINALS.map((name) => (
                   <button
-                    key={value}
+                    key={name}
                     type="button"
-                    role="tab"
-                    aria-selected={creatorTab === value}
-                    onClick={() => setCreatorTab(value)}
-                    className={pillClass(creatorTab === value)}
+                    aria-pressed={terminal === name}
+                    className={pillClass(terminal === name)}
+                    onClick={() => setTerminal(name)}
                   >
-                    {TAB_LABEL[value]}
+                    {name === 'All' ? name : <TerminalName name={name} logoClassName="h-4 w-4" />}
                   </button>
                 ))}
               </PillGroup>
-              <div className="mt-1">
-                {board === null ? (
-                  <p className="m-0 p-3 text-muted">Loading creators…</p>
-                ) : board === 'error' ? (
-                  <p className="m-0 p-3 text-muted">Creator rankings are unavailable right now.</p>
-                ) : board.rows.length === 0 ? (
-                  <p className="m-0 p-3 text-muted" data-testid="top-creators-empty">
-                    {creatorTab === 'earners'
-                      ? 'No creator payouts in the last 30 days yet. The first released order puts a creator here.'
-                      : creatorTab === 'rated'
-                        ? `No creator has ${board.rules.topRatedMinReviews}+ verified reviews yet.`
-                        : `No creator has ${board.rules.risingMinSales}+ sales this month yet.`}
-                  </p>
-                ) : (
-                  <CreatorCards rows={board.rows} tab={creatorTab} centsPerSol={cents} />
-                )}
+            </div>
+            {!wallet.session ? (
+              <div className="mt-6">
+                <PreviewNotice onConnect={() => void wallet.connect()} />
               </div>
-            </div>
-          </section>
-        </Reveal>
-
-        <Reveal>
-          <section aria-labelledby="fees-heading">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <SectionHead
-                id="fees-heading"
-                kicker="$TRENCH"
-                title="Hold $TRENCH,"
-                accent="pay less."
+            ) : null}
+            <div className="mt-8">
+              <ListingGrid
+                listings={listings ?? []}
+                loading={listings === null}
+                centsPerSol={cents}
+                config={config}
+                tier={wallet.session?.tier}
+                wide
               />
-              <Link
-                href="/token"
-                className="text-sm text-accent underline-offset-4 hover:underline"
-              >
-                See tiers and savings →
-              </Link>
             </div>
-            <div className="mt-10">
-              <TierCards config={config} current={wallet.session?.tier} />
-            </div>
+            {listings?.length ? (
+              <div className="mt-8 flex justify-center">
+                <ButtonLink href="/search" variant="secondary" size="sm">
+                  See all listings →
+                </ButtonLink>
+              </div>
+            ) : null}
           </section>
-        </Reveal>
+        </Island>
 
-        <Reveal>
-          <section aria-labelledby="trust-heading">
-            <SectionHead
-              id="trust-heading"
-              kicker="Trust"
-              title="Built so you don't have to"
-              accent="trust anyone."
-            />
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              {[
-                [
-                  'Escrow on every order',
-                  `The creator is paid only after ${escrowWindowLabel(escrowHours)} with no dispute. A dispute freezes the funds until it is settled.`,
-                ],
-                [
-                  'On-chain escrow program',
-                  'Each order is a program account on Solana. Only the program moves the SOL: to the creator after the window, or back to you on an upheld dispute.',
-                ],
-                [
-                  'Sandboxed automated review',
-                  'Each file is statically scanned; scripts also run in an isolated sandbox with logged network calls. A rules engine and an LLM then review it; the stricter verdict wins.',
-                ],
-              ].map(([title, body], index) => {
-                const [Icon, color] = TRUST_ICONS[index] ?? [ShieldCheck, '#C6F432'];
-                return (
-                  <Spot
-                    key={title}
-                    color={color}
-                    alpha="33"
-                    className="motion-card !rounded-[22px]"
-                  >
-                    <div className="flex flex-col gap-4 p-7">
-                      <Icon size={26} style={{ color }} aria-hidden="true" />
+        <Island>
+          <Reveal>
+            <section aria-labelledby="cat-heading">
+              <SectionHead id="cat-heading" kicker="Categories" title="Find your" accent="edge" />
+              <ul className="mt-10 grid gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3">
+                {CATEGORIES.map((cat) => (
+                  <li key={cat.code} className="list-none">
+                    <Spot
+                      color={cat.color}
+                      alpha="40"
+                      shape="beam"
+                      className="motion-card h-full !rounded-panel"
+                    >
+                      <Link
+                        href={`/c/${cat.code}`}
+                        className="flex h-full min-h-52 flex-col justify-between gap-6 rounded-[inherit] p-7"
+                      >
+                        <span className="flex items-center justify-between gap-3">
+                          <span
+                            className="font-mono text-xs tracking-[0.16em]"
+                            style={{ color: cat.color }}
+                          >
+                            {cat.short}
+                          </span>
+                          {catCounts && (
+                            <span className="font-mono text-xs text-faint">
+                              {catCounts[cat.code] ?? 0} live
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex flex-col gap-2">
+                          <span className="text-[28px] font-semibold tracking-[-0.03em]">
+                            {cat.label}
+                          </span>
+                          <span className="text-sm text-muted">{cat.desc}</span>
+                        </span>
+                      </Link>
+                    </Spot>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </Reveal>
+        </Island>
+
+        <Island>
+          <Reveal>
+            <section aria-labelledby="how-heading">
+              <SectionHead
+                id="how-heading"
+                kicker="How buying works"
+                title="Four steps,"
+                accent="no surprises."
+              />
+              <ol className="stagger relative mt-10 grid gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
+                <li
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-[54px] right-[12%] left-[12%] hidden h-px list-none bg-gradient-to-r from-accent/0 via-accent/50 to-accent/0 lg:block"
+                />
+                {(
+                  [
+                    [
+                      'Pick a verified tool',
+                      'Every listing shows its review result, the checks it passed, the file hash and a signed scan report.',
+                    ],
+                    [
+                      'See your exact price',
+                      'Price, 5% fee, your tier discount and 0% creator commission, itemised before you sign.',
+                    ],
+                    [
+                      'Pay into escrow',
+                      `Your SOL is held in escrow for ${escrowWindowLabel(escrowHours)}. Open a dispute any time in that window.`,
+                    ],
+                    [
+                      'Download on release',
+                      'Once payment is confirmed in escrow, download a copy watermarked to your wallet.',
+                    ],
+                  ] as const
+                ).map(([title, body], index) => {
+                  const Icon = STEP_ICONS[index] ?? ScanSearch;
+                  return (
+                    <li
+                      key={title}
+                      className="motion-card relative flex list-none flex-col gap-4 rounded-[22px] border border-line bg-surface/70 p-6"
+                    >
+                      <span className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-accent-line bg-accent-bg text-accent">
+                        <Icon size={20} aria-hidden="true" />
+                      </span>
+                      <span className="font-mono text-xs text-faint">STEP 0{index + 1}</span>
                       <h3 className="m-0 text-xl font-semibold tracking-tight">{title}</h3>
-                      <p className="m-0 text-muted">{body}</p>
-                    </div>
-                  </Spot>
-                );
-              })}
-            </div>
-          </section>
-        </Reveal>
+                      <p className="m-0 text-sm text-muted">{body}</p>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          </Reveal>
+        </Island>
 
-        <Reveal>
-          <section
-            aria-labelledby="sell-cta-heading"
-            data-testid="sell-cta"
-            className="relative overflow-hidden rounded-[36px] border border-accent/25 bg-[#080a06]"
-          >
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgba(198,244,50,0.16),transparent_70%)]"
-            />
-            <CtaRays />
-            <div className="relative flex flex-col items-center gap-6 px-6 py-24 text-center">
-              <Wallet size={28} className="text-accent" aria-hidden="true" />
-              <h2
-                id="sell-cta-heading"
-                className="m-0 text-[clamp(40px,6.5vw,88px)] font-semibold leading-[0.95] tracking-[-0.05em]"
-              >
-                Have an edge? <Serif className="text-accent">Sell it.</Serif>
-              </h2>
-              <p className="m-0 max-w-lg text-lg text-ink-2">
-                Upload a file and watch the automated review run live. 0% commission, payouts in
-                SOL.
-              </p>
-              <PrimaryCta href="/sell">
-                Start selling <span aria-hidden="true">→</span>
-              </PrimaryCta>
-            </div>
-          </section>
-        </Reveal>
+        <Island>
+          <Reveal>
+            <section
+              aria-labelledby="creators-heading"
+              data-testid="top-creators"
+              className="grid items-start gap-10 lg:grid-cols-[1fr_1.4fr]"
+            >
+              <div>
+                <SectionHead
+                  id="creators-heading"
+                  kicker="Leaderboard"
+                  title="Top creators"
+                  accent="this month"
+                />
+                <p className="mt-4 max-w-sm text-sm text-ink-2">
+                  Ranked on released sales, verified-buyer reviews and weighted upvotes. Paid
+                  featuring never changes a rank.
+                </p>
+                <Link
+                  href="/creators"
+                  className="mt-4 inline-block text-sm text-accent underline-offset-4 hover:underline"
+                >
+                  Full leaderboard →
+                </Link>
+              </div>
+              <div className="rounded-[26px] border border-line bg-surface/60 p-2">
+                <PillGroup role="tablist" aria-label="Top creators" className="m-2">
+                  {HOME_TABS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={creatorTab === value}
+                      onClick={() => setCreatorTab(value)}
+                      className={pillClass(creatorTab === value)}
+                    >
+                      {TAB_LABEL[value]}
+                    </button>
+                  ))}
+                </PillGroup>
+                <div className="mt-1">
+                  {board === null ? (
+                    <p className="m-0 p-3 text-muted">Loading creators…</p>
+                  ) : board === 'error' ? (
+                    <p className="m-0 p-3 text-muted">
+                      Creator rankings are unavailable right now.
+                    </p>
+                  ) : board.rows.length === 0 ? (
+                    <p className="m-0 p-3 text-muted" data-testid="top-creators-empty">
+                      {creatorTab === 'earners'
+                        ? 'No creator payouts in the last 30 days yet. The first released order puts a creator here.'
+                        : creatorTab === 'rated'
+                          ? `No creator has ${board.rules.topRatedMinReviews}+ verified reviews yet.`
+                          : `No creator has ${board.rules.risingMinSales}+ sales this month yet.`}
+                    </p>
+                  ) : (
+                    <CreatorCards rows={board.rows} tab={creatorTab} centsPerSol={cents} />
+                  )}
+                </div>
+              </div>
+            </section>
+          </Reveal>
+        </Island>
+
+        <Island>
+          <Reveal>
+            <section aria-labelledby="fees-heading">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <SectionHead
+                  id="fees-heading"
+                  kicker="$TRENCH"
+                  title="Hold $TRENCH,"
+                  accent="pay less."
+                />
+                <Link
+                  href="/token"
+                  className="text-sm text-accent underline-offset-4 hover:underline"
+                >
+                  See tiers and savings →
+                </Link>
+              </div>
+              <div className="mt-10">
+                <TierCards config={config} current={wallet.session?.tier} />
+              </div>
+            </section>
+          </Reveal>
+        </Island>
+
+        <Island>
+          <Reveal>
+            <section aria-labelledby="trust-heading">
+              <SectionHead
+                id="trust-heading"
+                kicker="Trust"
+                title="Built so you don't have to"
+                accent="trust anyone."
+              />
+              <div className="mt-10 grid gap-4 md:grid-cols-3">
+                {[
+                  [
+                    'Escrow on every order',
+                    `The creator is paid only after ${escrowWindowLabel(escrowHours)} with no dispute. A dispute freezes the funds until it is settled.`,
+                  ],
+                  [
+                    'On-chain escrow program',
+                    'Each order is a program account on Solana. Only the program moves the SOL: to the creator after the window, or back to you on an upheld dispute.',
+                  ],
+                  [
+                    'Sandboxed automated review',
+                    'Each file is statically scanned; scripts also run in an isolated sandbox with logged network calls. A rules engine and an LLM then review it; the stricter verdict wins.',
+                  ],
+                ].map(([title, body], index) => {
+                  const [Icon, color] = TRUST_ICONS[index] ?? [ShieldCheck, '#C6F432'];
+                  return (
+                    <Spot
+                      key={title}
+                      color={color}
+                      alpha="33"
+                      className="motion-card !rounded-[22px]"
+                    >
+                      <div className="flex flex-col gap-4 p-7">
+                        <Icon size={26} style={{ color }} aria-hidden="true" />
+                        <h3 className="m-0 text-xl font-semibold tracking-tight">{title}</h3>
+                        <p className="m-0 text-muted">{body}</p>
+                      </div>
+                    </Spot>
+                  );
+                })}
+              </div>
+            </section>
+          </Reveal>
+        </Island>
+
+        <Island>
+          <Reveal>
+            <section
+              aria-labelledby="sell-cta-heading"
+              data-testid="sell-cta"
+              className="relative overflow-hidden rounded-[36px] border border-accent/25 bg-[#080a06]"
+            >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgba(198,244,50,0.16),transparent_70%)]"
+              />
+              <CtaRays />
+              <div className="relative flex flex-col items-center gap-6 px-6 py-24 text-center">
+                <Wallet size={28} className="text-accent" aria-hidden="true" />
+                <h2
+                  id="sell-cta-heading"
+                  className="m-0 text-[clamp(40px,6.5vw,88px)] font-semibold leading-[0.95] tracking-[-0.05em]"
+                >
+                  Have an edge? <Serif className="text-accent">Sell it.</Serif>
+                </h2>
+                <p className="m-0 max-w-lg text-lg text-ink-2">
+                  Upload a file and watch the automated review run live. 0% commission, payouts in
+                  SOL.
+                </p>
+                <PrimaryCta href="/sell">
+                  Start selling <span aria-hidden="true">→</span>
+                </PrimaryCta>
+              </div>
+            </section>
+          </Reveal>
+        </Island>
       </div>
     </div>
   );
 }
 
 const WRAP = 'mx-auto max-w-7xl px-4 sm:px-6';
+
+/**
+ * A below-the-fold section the browser may skip laying out and painting until it nears the
+ * viewport (content-visibility: auto). Same pixels; less main-thread work on the first load.
+ */
+function Island({ children }: { children: ReactNode }) {
+  return (
+    <div className="flow-root">
+      <div className="cv-section">{children}</div>
+    </div>
+  );
+}
 
 function SectionHead({
   id,
