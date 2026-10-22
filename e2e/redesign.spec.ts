@@ -317,6 +317,8 @@ test.describe('phase 5: header, nav and footer', () => {
       'Verify',
       'Docs',
       'Sell',
+      'GitHub',
+      '@TrenchmartSI',
     ]);
     await page.getByTestId('search-mobile').fill('trojan');
     await page.getByTestId('search-mobile').press('Enter');

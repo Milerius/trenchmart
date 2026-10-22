@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Instrument_Serif } from 'next/font/google';
 import { Shell } from '@/components/shell';
+import { SocialIcons, SocialPills } from '@/components/social-links';
 import { DEVNET_ADDRESSES, ESCROW_CLUSTER, ESCROW_PROGRAM_ID } from '@/lib/protocol-facts';
 import './globals.css';
 
@@ -39,7 +40,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable} ${serif.variable}`}>
       <body>
-        <Shell>{children}</Shell>
+        <Shell
+          social={{
+            header: <SocialIcons where="header" />,
+            menu: <SocialPills />,
+            footer: <SocialIcons where="footer" />,
+          }}
+        >
+          {children}
+        </Shell>
       </body>
     </html>
   );

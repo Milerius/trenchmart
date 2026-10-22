@@ -105,7 +105,7 @@ function Ticker() {
   );
 }
 
-function Nav() {
+function Nav({ social }: { social?: Social }) {
   const wallet = useWallet();
   const router = useRouter();
   const pathname = usePathname();
@@ -202,6 +202,7 @@ function Nav() {
           Sell
         </Link>
         <div className="ml-auto flex items-center gap-2 md:ml-0">
+          {social ? <div className="mr-1 hidden lg:block">{social.header}</div> : null}
           {wallet.session ? (
             <span
               data-testid="tier-pill"
@@ -242,6 +243,7 @@ function Nav() {
               {link.label}
             </Link>
           ))}
+          {social?.menu}
         </nav>
       ) : null}
       {wallet.error ? (
@@ -295,7 +297,7 @@ const FOOTER_COLUMNS: { title: string; links: [string, string][] }[] = [
   },
 ];
 
-function Footer() {
+function Footer({ social }: { social?: Social }) {
   const addresses: [string, string, string | undefined][] = [
     ['Escrow program (devnet)', ESCROW_PROGRAM_ID, 'footer-program'],
     ['Squads multisig', DEVNET_ADDRESSES.multisig, undefined],
@@ -312,6 +314,7 @@ function Footer() {
           <p className="m-0 max-w-xs text-sm text-muted">
             Reviewed trading tools, escrowed on Solana. 0% creator commission.
           </p>
+          {social?.footer}
           <ul className="m-0 flex flex-col gap-1.5 p-0 font-mono text-xs text-muted">
             {addresses.map(([label, address, testId]) => (
               <li key={address} className="list-none">
@@ -359,7 +362,10 @@ const FULL_BLEED_PREFIXES = ['/c/', '/u/'];
 
 const PRELOADED_READS = ['/api/v1/me', '/api/v1/config/public'];
 
-export function Shell({ children }: { children: ReactNode }) {
+/** Server-rendered link groups (see social-links.tsx): HTML only, no client JS. */
+export type Social = { header: ReactNode; menu: ReactNode; footer: ReactNode };
+
+export function Shell({ children, social }: { children: ReactNode; social?: Social }) {
   // Redesigned pages lay out their own full-width hero and column; the rest get the column.
   const path = usePathname();
   const fullBleed = FULL_BLEED.has(path) || FULL_BLEED_PREFIXES.some((p) => path.startsWith(p));
@@ -375,7 +381,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </a>
       <NetworkBanner />
       <Ticker />
-      <Nav />
+      <Nav social={social} />
       {/* overflow-x-clip lets a page paint full-width glows without a horizontal scrollbar. */}
       <main id="content" className="overflow-x-clip">
         {fullBleed ? (
@@ -384,7 +390,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</div>
         )}
       </main>
-      <Footer />
+      <Footer social={social} />
     </WalletProvider>
   );
 }
