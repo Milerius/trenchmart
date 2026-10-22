@@ -26,6 +26,7 @@ import { opsCheck } from './ops';
 import {
   feeRouting,
   processBatchMessage,
+  recentEpochs,
   recordRevenue,
   resumeEpoch,
   rewardHealth,
@@ -466,5 +467,47 @@ describe('$MART holder rewards', () => {
     expect(await codes()).toContain('REWARD_BALANCE_LOW');
     chain.vault = 51_000_000n; // covers what is due plus the 0.001 SOL floor
     expect(await codes()).not.toContain('REWARD_BALANCE_LOW');
+
+  it('survives an epoch-length change (900 s test epochs, then back to 3 h) without losing carry', async () => {
+    const short = await setup({ REWARDS_EPOCH_SECONDS: '900' });
+    const holders = [randomKeypair().publicKey, randomKeypair().publicKey];
+    for (const h of holders) short.chain.balances.set(h, tokens(2_000_000));
+    const tickAll = async (deps: Deps, from: number, to: number) => {
+      for (let t = from; t <= to; t += 300_000) {
+        now = new Date(t + 1000);
+        await rewardsTick(deps);
+      }
+    };
+    const start = epochStart(epochIdAt(now.getTime(), EPOCH) + 1).getTime(); // a 3 h boundary
+    await tickAll(short.deps, start, start + 900_000 * 3);
+    now = new Date(start + 900_000 * 3 + 1000);
+    await revenue(short.deps, 30_000_000n); // holder share 15M: under the 0.01 SOL minimum → carried
+    await tickAll(short.deps, start + 900_000 * 3, start + 900_000 * 4);
+    // Back to 3 h mid-way through a 3 h epoch: the open 900 s row closes and hands its carry on.
+    const long = await setup();
+    for (const h of holders) long.chain.balances.set(h, tokens(2_000_000));
+    await tickAll(long.deps, start + 900_000 * 4, start + EPOCH * 1000 * 2 + 300_000);
+    const stale =
+      await sql`select epoch_id from reward_epochs where status = 'open' and ends_at <= ${now}`;
+    expect(stale).toHaveLength(0);
+    const [held] = await sql<
+      { c: string }[]
+    >`select coalesce(sum(carry), 0)::text as c from reward_holders`;
+    const [open] = await sql<
+      { c: string }[]
+    >`select coalesce(sum(carry_in), 0)::text as c from reward_epochs where status = 'open'`;
+    const [paid] = await sql<
+      { c: string }[]
+    >`select coalesce(sum(paid_lamports), 0)::text as c from reward_epochs`;
+    const [net] = await sql<
+      { c: string }[]
+    >`select sum(holder_gross - cost_reserve)::text as c from reward_epochs where status <> 'open'`;
+    expect(BigInt(net!.c)).toBeGreaterThan(10_000_000n); // 15M minus the ledgered cost half
+    expect(BigInt(held!.c) + BigInt(open!.c) + BigInt(paid!.c)).toBe(BigInt(net!.c));
+    // Newest first by time, whatever the id scale (900 s ids are ~12x the 3 h ids).
+    const feed = await recentEpochs(long.deps, 20);
+    const starts = feed.map((e) => new Date(e.startsAt as string | Date).getTime());
+    expect(starts).toEqual([...starts].sort((a, b) => b - a));
+    expect(starts.length).toBeGreaterThan(3);
   });
 });
