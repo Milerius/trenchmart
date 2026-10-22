@@ -216,12 +216,16 @@ export async function autoPayouts(deps: Deps): Promise<AutoPayoutResult> {
     where mode = 'auto' and status in ('sending', 'sent')
       and sent_at > ${new Date(deps.now().getTime() - 86_400_000)}
   `;
+  // In-flight sends have not left the vault yet: count them so overlapping runs never overdraw it.
+  const [inflight] = await deps.sql<{ sum: bigint }[]>`
+    select coalesce(sum(amount), 0)::bigint as sum from payouts where mode = 'auto' and status = 'sending'
+  `;
   const vault = await chain.account(cfg.vault);
   // Keep the vault rent-exempt and never spend more than the program or our cap allows.
   let budget = [
     effectiveRemaining(check.limit, nowSec),
     cfg.dailyCapLamports - (spent?.sum ?? 0n),
-    (vault?.lamports ?? 0n) - 1_000_000n,
+    (vault?.lamports ?? 0n) - (inflight?.sum ?? 0n) - 1_000_000n,
   ].reduce((a, b) => (a < b ? a : b));
 
   const rows = await deps.sql<Row[]>`
@@ -339,6 +343,10 @@ export async function payoutHealth(deps: Deps): Promise<PayoutHealth> {
         code: 'LOW_BALANCE',
         message: `payout signer ${cfg.signer} holds ${Number(signer?.lamports ?? 0n) / 1e9} SOL; top it up so payout fees can be paid`,
       });
+    // In-flight sends have not left the vault yet: count them so overlapping runs never overdraw it.
+    const [inflight] = await deps.sql<{ sum: bigint }[]>`
+    select coalesce(sum(amount), 0)::bigint as sum from payouts where mode = 'auto' and status = 'sending'
+  `;
     const vault = await chain.account(cfg.vault);
     if ((vault?.lamports ?? 0n) < owed + 1_000_000n)
       alerts.push({

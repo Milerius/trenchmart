@@ -75,6 +75,13 @@ Worker secret `PAYOUT_SIGNER_SECRET` (never in a file in the repo); vars `MULTIS
 address the feature is off. Manual run: `POST /api/v1/internal/cron/auto-payouts` with the
 internal token.
 
+## Live status (devnet)
+
+Spending limit created on 2026-10-22: proposal #9 approved by member-2 and member-3, executed in
+tx `4mp7gjFz9H26WAvMAEbbP8Ln1EEvsyWvDhc8xJzzbua3o7tvJ4pHEjeur7YzW1yEqm6XupMb5X4UG5d4qcLrQU9h`.
+The first automated run paid 27 lines (2.7705 SOL, including the 21 that had waited since
+Oct 17–19). Example: `59QevpDAmaJtd3kz9sUqRN4tWuRuqFWnKzDd3iDykXrF66BXv3pTsUhLMoGPbFbYD7Siu7fq5vuR58PaC8Qzv36a`.
+
 ## Setting up the spending limit (one multisig signature)
 
 The limit is a Squads **config transaction** `AddSpendingLimit` — it needs the multisig
