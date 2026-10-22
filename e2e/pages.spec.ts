@@ -52,7 +52,7 @@ test('home, listing shell, and dashboard expose the market test ids', async ({ p
   await expect(page.getByRole('heading', { name: 'The verified edge, for sale.' })).toBeVisible();
   await expect(page.getByTestId('dashboard')).toBeVisible();
   await expect(page.getByTestId('terminal-filter')).toBeVisible();
-  await expect(page.getByTestId('search')).toBeVisible();
+  await expect(page.getByTestId('header-search')).toBeVisible();
 
   await page.goto('/l/not-a-listing');
   await expect(
