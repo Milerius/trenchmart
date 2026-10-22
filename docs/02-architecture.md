@@ -11,7 +11,7 @@
 | Jobs        | Cloudflare Queues + Cron Triggers                                                                                        | Scans, payouts, tier refresh                         |
 | Static scan | `packages/scanner` (acorn AST + rules) inside a queue consumer Worker                                                    | Pure TS, no infra                                    |
 | Sandbox     | `apps/sandbox`: Node + Playwright + Tampermonkey on a small VPS                                                          | Needs a real browser                                 |
-| Solana data | Helius RPC + enhanced webhooks                                                                                           | Payments verification, $MART transfers             |
+| Solana data | Helius RPC + enhanced webhooks                                                                                           | Payments verification, $MART transfers               |
 | Treasury    | Squads multisig vault                                                                                                    | POC escrow + fee buckets                             |
 | Validation  | zod (shared)                                                                                                             | One schema for web + api                             |
 | Tests       | Vitest                                                                                                                   | Fast                                                 |

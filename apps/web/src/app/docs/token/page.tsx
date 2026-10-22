@@ -19,8 +19,8 @@ export default function TokenDocsPage() {
           compared with the configured thresholds: Scout {formatTrench(protocol.thresholds.scout)},
           Trencher {formatTrench(protocol.thresholds.trencher)}, and OG{' '}
           {formatTrench(protocol.thresholds.og)} (of a 1,000,000,000 supply). Balances are read from
-          the $MART mint on Solana devnet when you sign in and re-checked at most every five
-          minutes when you get a quote.
+          the $MART mint on Solana devnet when you sign in and re-checked at most every five minutes
+          when you get a quote.
         </p>
         <ul className="m-0 grid gap-2 p-0">
           {tierRows.map((row) => (

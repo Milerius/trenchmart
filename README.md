@@ -188,7 +188,7 @@ TrenchMart is a **devnet proof of concept**. The site, API, escrow program and S
 | Agent API and SDK                 | Live on devnet: scoped keys, validated broadcast, buyer and creator flows, docs and llms.txt. The SDK is not on npm yet (license and npm token pending).                                                           |
 | Monitoring and backups            | 5-minute health checks; nightly encrypted backups ([monitoring](docs/ops/monitoring.md), [backups](docs/ops/backups.md)).                                                                                          |
 | Public status page                | [trenchmart.fun/status](https://trenchmart.fun/status): live state, p50/p95 latency and 90-day uptime per component, plus incident history; JSON at `GET /api/v1/status` ([status page](docs/ops/status-page.md)). |
-| Mainnet                           | Not yet. The open items are tracked in [mainnet readiness](docs/mainnet-readiness.md), including the $MART launch and lifting the devnet guard.                                                                  |
+| Mainnet                           | Not yet. The open items are tracked in [mainnet readiness](docs/mainnet-readiness.md), including the $MART launch and lifting the devnet guard.                                                                    |
 
 ## Tech stack
 
@@ -236,9 +236,9 @@ The screenshots in this README are captured from the live devnet site at [trench
 | Mainnet readiness      | [`docs/mainnet-readiness.md`](docs/mainnet-readiness.md): what is done, what is left, and the owner decisions                                                             |
 | Operations             | [`docs/ops/`](docs/ops/): monitoring, backups, verified build                                                                                                             |
 | Agent API              | [trenchmart.fun/docs/agents](https://trenchmart.fun/docs/agents) · [`packages/sdk`](packages/sdk) · [`examples/`](examples) · [llms.txt](https://trenchmart.fun/llms.txt) |
-| User docs (live)       | [trenchmart.fun/docs](https://trenchmart.fun/docs): buyers, sellers, escrow, fees, $MART, security, treasury, FAQ                                                       |
+| User docs (live)       | [trenchmart.fun/docs](https://trenchmart.fun/docs): buyers, sellers, escrow, fees, $MART, security, treasury, FAQ                                                         |
 | Payments and escrow    | [`docs/06-payments-escrow.md`](docs/06-payments-escrow.md) · [`docs/ESCROW_TESTNET_EVIDENCE.md`](docs/ESCROW_TESTNET_EVIDENCE.md)                                         |
-| $MART tiers          | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                                                                        |
+| $MART tiers            | [`docs/07-token-tiers.md`](docs/07-token-tiers.md)                                                                                                                        |
 | Design system and UX   | [`docs/design-system.md`](docs/design-system.md) · [`docs/ux-guidelines.md`](docs/ux-guidelines.md) · [`design/`](design/)                                                |
 | Brand assets           | [`brand/`](brand/): logo mark, wordmark (dark and light), X avatar and header, favicon. `pnpm brand` re-renders the PNGs                                                  |
 | Screens and build plan | [`docs/09-screens.md`](docs/09-screens.md) · [`docs/10-build-plan.md`](docs/10-build-plan.md)                                                                             |

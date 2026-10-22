@@ -175,8 +175,7 @@ export function UpvotePanel({ upvotes }: { upvotes: Upvotes }) {
         </div>
         <div className="flex justify-between gap-3">
           <dt className="text-ink-2">
-            $MART {TIER_LABEL[state.weights.holderMinTier] ?? state.weights.holderMinTier}+
-            holders
+            $MART {TIER_LABEL[state.weights.holderMinTier] ?? state.weights.holderMinTier}+ holders
           </dt>
           <dd className="m-0 font-mono text-ink">
             {state.mix.holders} · {state.weights.holder}

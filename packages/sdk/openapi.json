@@ -3937,7 +3937,7 @@
         "tags": [
           "Featuring"
         ],
-        "summary": "Your listings with featuring eligibility, your $TRENCH tier and your bookings",
+        "summary": "Your listings with featuring eligibility, your $MART tier and your bookings",
         "operationId": "getStudioFeaturing",
         "x-scope": "sell",
         "parameters": [],
