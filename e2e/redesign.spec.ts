@@ -1,3 +1,4 @@
+import { E2E_ADDRESSES } from './cluster-addresses';
 import { expect, test } from '@playwright/test';
 
 // Redesign (React Bits port). Each phase adds its checks here; existing specs keep covering behaviour.
@@ -333,15 +334,15 @@ test.describe('phase 5: header, nav and footer', () => {
       `https://explorer.solana.com/address/${address}?cluster=devnet`;
     await expect(footer.getByTestId('footer-program')).toHaveAttribute(
       'href',
-      explorer('Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw'),
+      explorer(E2E_ADDRESSES.program),
     );
     await expect(footer.getByRole('link', { name: /Squads multisig/ })).toHaveAttribute(
       'href',
-      explorer('CaatcAQaDTEsrSoC3maTP1kgBWEY66hhgBNKa8Aeg55B'),
+      explorer(E2E_ADDRESSES.multisig),
     );
     await expect(footer.getByRole('link', { name: /\$MART mint/ })).toHaveAttribute(
       'href',
-      explorer('FLEdRySnQLYioT9FecE44LexuVfKMaC2uRjK9GgTrZ92'),
+      explorer(E2E_ADDRESSES.martMint),
     );
     for (const [name, href] of [
       ['Explore', '/search'],

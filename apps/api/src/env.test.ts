@@ -57,3 +57,35 @@ describe('$MART mint config', () => {
     expect(readEnv({ MART_MINT: 'Mart111', TRENCH_MINT: 'Old111' }).martMint).toBe('Mart111');
   });
 });
+
+describe('mainnet RPC', () => {
+  const mainnet = { ...good, SOLANA_CLUSTER: 'mainnet', MAINNET_LAUNCHED: '1' };
+
+  it('still refuses mainnet before launch', () => {
+    expect(() => readEnv({ ...good, SOLANA_CLUSTER: 'mainnet' })).toThrow(/Refusing/);
+    expect(() =>
+      readEnv({
+        ...good,
+        SOLANA_CLUSTER: 'mainnet',
+        HELIUS_RPC_URL: 'https://mainnet.helius-rpc.com/?api-key=k',
+      }),
+    ).toThrow(/Refusing/);
+  });
+
+  it('requires SOLANA_RPC_URL or HELIUS_RPC_URL, never the public endpoint', () => {
+    expect(() => readEnv(mainnet)).toThrow(/private RPC/);
+    expect(() =>
+      readEnv({ ...mainnet, SOLANA_RPC_URL: 'https://api.mainnet-beta.solana.com' }),
+    ).toThrow(/public mainnet-beta/);
+    const env = readEnv({
+      ...mainnet,
+      HELIUS_RPC_URL: 'https://mainnet.helius-rpc.com/?api-key=k',
+    });
+    expect(env.cluster).toBe('mainnet');
+    expect(env.rpcUrl).toBe('https://mainnet.helius-rpc.com/?api-key=k');
+  });
+
+  it('keeps devnet defaults', () => {
+    expect(readEnv(good).rpcUrl).toBe('https://api.devnet.solana.com');
+  });
+});

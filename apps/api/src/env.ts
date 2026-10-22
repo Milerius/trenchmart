@@ -1,4 +1,4 @@
-import { assertSafeRpc, assertTestCluster, defaultRpc, type TestCluster } from '@trenchmart/shared';
+import { parseCluster, resolveRpc, type Cluster } from '@trenchmart/shared';
 
 export type Env = {
   appUrl: string;
@@ -15,7 +15,7 @@ export type Env = {
   internalToken: string;
   /** Lets the external watchdog push its checks for the status page (status.ts). '' = off. */
   statusPushToken: string;
-  cluster: TestCluster;
+  cluster: Cluster;
   rpcUrl: string;
   webhookSecret: string;
   vaultAddress: string;
@@ -203,11 +203,14 @@ function intEnv(value: string | undefined, fallback: number, min: number, max: n
 
 export function readEnv(source: Record<string, string | undefined> = process.env): Env {
   assertProductionSecrets(source);
-  const cluster = assertTestCluster(source.SOLANA_CLUSTER || 'devnet');
-  const helius = blank(source.HELIUS_RPC_URL);
-  const explicit = blank(source.SOLANA_RPC_URL);
-  const rpcUrl = explicit || defaultRpc(cluster, helius || undefined);
-  assertSafeRpc(rpcUrl);
+  const cluster = parseCluster(source.SOLANA_CLUSTER || 'devnet', {
+    mainnetLaunched: source.MAINNET_LAUNCHED?.trim() === '1',
+  });
+  // Mainnet has no public fallback: SOLANA_RPC_URL or HELIUS_RPC_URL is required.
+  const rpcUrl = resolveRpc(cluster, {
+    explicit: blank(source.SOLANA_RPC_URL),
+    helius: blank(source.HELIUS_RPC_URL),
+  });
   const accountId = blank(source.CF_ACCOUNT_ID);
   const accessKeyId = blank(source.R2_ACCESS_KEY_ID);
   const secretAccessKey = blank(source.R2_SECRET_ACCESS_KEY);

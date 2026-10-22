@@ -25,6 +25,7 @@ import WEBP_ENC_WASM from '@jsquash/webp/codec/enc/webp_enc_simd.wasm';
 import RESIZE_WASM from '@jsquash/resize/lib/resize/pkg/squoosh_resize_bg.wasm';
 import { createImageOptimizer } from './image-optimize';
 import { assertDeployedEnv, readEnv, weakSecrets, isLocalAppUrl } from './env';
+import { resolveRpc } from '@trenchmart/shared';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
 import { autoPayouts } from './payouts-auto';
@@ -118,10 +119,30 @@ export default {
     if (url.pathname === '/api/v1/health') {
       const cluster = env.SOLANA_CLUSTER || 'devnet';
       if (cluster === 'mainnet' || cluster === 'mainnet-beta') {
-        return Response.json(
-          { error: { code: 'MAINNET_REFUSED', message: 'refusing mainnet' } },
-          { status: 500 },
-        );
+        // Fail closed until launch (MAINNET_LAUNCHED=1), then only with a private RPC.
+        if ((env.MAINNET_LAUNCHED as string | undefined)?.trim() !== '1') {
+          return Response.json(
+            { error: { code: 'MAINNET_REFUSED', message: 'refusing mainnet' } },
+            { status: 500 },
+          );
+        }
+        try {
+          resolveRpc('mainnet', {
+            explicit: env.SOLANA_RPC_URL as string | undefined,
+            helius: env.HELIUS_RPC_URL as string | undefined,
+          });
+        } catch {
+          return Response.json(
+            {
+              ok: false,
+              error: {
+                code: 'MAINNET_RPC_REQUIRED',
+                message: 'set SOLANA_RPC_URL or HELIUS_RPC_URL',
+              },
+            },
+            { status: 503 },
+          );
+        }
       }
       // H-01: report (names only) and fail closed if a secret is missing or a default.
       const weak = isLocalAppUrl(env.APP_URL as string | undefined)
