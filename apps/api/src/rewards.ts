@@ -1038,39 +1038,53 @@ export async function recentEpochs(deps: Deps, limit: number) {
         select epoch_id, batch_no, tx_sig, status, lamports, jsonb_array_length(recipients) as n
         from reward_batches where epoch_id in ${deps.sql(ids.map((i) => Number(i)))} order by batch_no`
     : [];
-  return rows.map((e) => ({
-    epoch: Number(e.epoch_id),
-    startsAt: e.starts_at,
-    endsAt: e.ends_at,
-    status: e.status,
-    revenue: { lamports: String(e.revenue_lamports), sol: sol(e.revenue_lamports) },
-    costs: Object.fromEntries(
-      costs.filter((c) => c.epoch_id === e.epoch_id).map((c) => [c.kind, String(c.lamports)]),
-    ),
-    costTotal: String(e.cost_lamports),
-    holderPool: { lamports: String(e.holder_pool), sol: sol(e.holder_pool) },
-    carryIn: String(e.carry_in),
-    eligible: e.eligible,
-    paidCount: e.paid_count,
-    carriedCount: e.carried_count,
-    paidLamports: String(e.paid_lamports),
-    buybackForward: String(e.buyback_forward),
-    samples: { done: e.samples_done, planned: (e.sample_ticks as number[]).length },
-    // The seed is only published once the epoch is closed (it decides the sample times).
-    seed: e.seed,
-    sampleTicks: e.sample_ticks,
-    fundSig: e.status === 'funding' || e.fund_sig ? e.fund_sig : null,
-    batches: batches
-      .filter((b) => b.epoch_id === e.epoch_id)
-      .map((b) => ({
-        n: b.batch_no,
-        recipients: b.n,
-        lamports: String(b.lamports),
-        sig: b.tx_sig,
-        status: b.status,
-      })),
-    paidAt: e.paid_at,
-  }));
+  // Paid = SOL actually sent to holders: holder lines of batches reconciled as sent on chain
+  // (includes their carry-in; excludes the buyback forward and anything not yet landed).
+  const sent = ids.length
+    ? await deps.sql<{ epoch_id: string; lamports: string; n: number }[]>`
+        select b.epoch_id, coalesce(sum((r->>'lamports')::bigint), 0)::text as lamports, count(*)::int as n
+        from reward_batches b, jsonb_array_elements(b.recipients) r
+        where b.epoch_id in ${deps.sql(ids.map((i) => Number(i)))} and b.status = 'sent' and r->>'kind' = 'holder'
+        group by b.epoch_id`
+    : [];
+  return rows.map((e) => {
+    const out = sent.find((x) => String(x.epoch_id) === String(e.epoch_id));
+    const paidOut = BigInt(out?.lamports ?? 0);
+    return {
+      epoch: Number(e.epoch_id),
+      startsAt: e.starts_at,
+      endsAt: e.ends_at,
+      status: e.status,
+      revenue: { lamports: String(e.revenue_lamports), sol: sol(e.revenue_lamports) },
+      costs: Object.fromEntries(
+        costs.filter((c) => c.epoch_id === e.epoch_id).map((c) => [c.kind, String(c.lamports)]),
+      ),
+      costTotal: String(e.cost_lamports),
+      holderPool: { lamports: String(e.holder_pool), sol: sol(e.holder_pool) },
+      carryIn: String(e.carry_in),
+      eligible: e.eligible,
+      paidCount: e.paid_count,
+      carriedCount: e.carried_count,
+      paidLamports: String(e.paid_lamports),
+      paid: { lamports: String(paidOut), sol: sol(paidOut), recipients: out?.n ?? 0 },
+      buybackForward: String(e.buyback_forward),
+      samples: { done: e.samples_done, planned: (e.sample_ticks as number[]).length },
+      // The seed is only published once the epoch is closed (it decides the sample times).
+      seed: e.seed,
+      sampleTicks: e.sample_ticks,
+      fundSig: e.status === 'funding' || e.fund_sig ? e.fund_sig : null,
+      batches: batches
+        .filter((b) => b.epoch_id === e.epoch_id)
+        .map((b) => ({
+          n: b.batch_no,
+          recipients: b.n,
+          lamports: String(b.lamports),
+          sig: b.tx_sig,
+          status: b.status,
+        })),
+      paidAt: e.paid_at,
+    };
+  });
 }
 
 export async function currentEpoch(deps: Deps) {

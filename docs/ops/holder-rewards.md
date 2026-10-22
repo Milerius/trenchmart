@@ -87,6 +87,10 @@ Cron tick: a balance sample is 2 calls (mint + one `getProgramAccounts`), fundin
 
 - `GET /api/v1/rewards/epochs/recent?limit=` – closed epochs: revenue, cost lines, pool,
   eligible / paid / carried, funding signature, every batch signature, seed and sample ticks.
+  `holderPool` ("To holders") is this epoch's net pool; `paid` ("Paid") is the SOL actually sent
+  to holders, summed from the holder lines of batches reconciled as `sent` on chain, so it
+  includes the carry-in it settles and excludes the buyback forward. A fully carried epoch has
+  `paid.lamports = "0"` and the UI shows "carried".
 - `GET /api/v1/rewards/current` – current epoch, countdown, revenue so far, rules.
 - `GET /api/v1/rewards/wallet/:pubkey` – rank, weight, share, carry and signature per epoch.
 

@@ -358,8 +358,17 @@ describe('$MART holder rewards', () => {
     const feed = (await (await app.request('/api/v1/rewards/epochs/recent')).json()) as {
       epochs: { epoch: number; batches: { sig: string }[]; fundSig: string; costs: object }[];
     };
-    const row = feed.epochs.find((e) => e.epoch === e0 + 1)!;
+    const row = feed.epochs.find((e) => e.epoch === e0 + 1)! as (typeof feed.epochs)[number] & {
+      paid: { lamports: string; recipients: number };
+      paidCount: number;
+    };
     expect(row.fundSig).toBeTruthy();
+    // Paid = holder lines actually sent (reconciled batches), never the buyback forward.
+    const toHolders = [...chain.paid]
+      .filter(([to]) => to !== BUYBACK)
+      .reduce((a, [, l]) => a + l, 0n);
+    expect(row.paid.lamports).toBe(String(toHolders));
+    expect(row.paid.recipients).toBe(row.paidCount);
     expect(row.batches.every((b) => b.sig)).toBe(true);
     const me = (await (await app.request(`/api/v1/rewards/wallet/${holders[1048]}`)).json()) as {
       epochs: { status: string; sig: string | null }[];
@@ -397,6 +406,24 @@ describe('$MART holder rewards', () => {
       await sql`select * from reward_allocations where epoch_id = ${e0 + 2} and owner = ${small}`;
     expect(b!.status).toBe('pay');
     expect(BigInt(b!.carry_in)).toBe(BigInt(a!.lamports));
+    // Feed: Paid includes the carry-in it settles; only reconciled (sent) batches count.
+    expect((await recentEpochs(deps, 10)).find((e) => e.epoch === e0 + 2)!.paid.lamports).toBe('0');
+    for (let i = 0; i < 8; i++) {
+      now = new Date(now.getTime() + 300_000);
+      await rewardsTick(deps);
+    }
+    const [st] = await sql`select status from reward_epochs where epoch_id = ${e0 + 2}`;
+    expect(st!.status).toBe('paid');
+    const [pays] = await sql<{ c: string }[]>`
+      select coalesce(sum(lamports), 0)::text as c from reward_allocations where epoch_id = ${e0 + 2} and status = 'pay'`;
+    const feed = await recentEpochs(deps, 10);
+    const row = feed.find((e) => e.epoch === e0 + 2)!;
+    expect(row.paid.lamports).toBe(pays!.c);
+    expect(BigInt(row.paid.lamports)).toBeGreaterThan(
+      BigInt(row.holderPool.lamports) - BigInt(a!.lamports),
+    );
+    await sql`update reward_batches set status = 'sending' where epoch_id = ${e0 + 2}`;
+    expect((await recentEpochs(deps, 10)).find((e) => e.epoch === e0 + 2)!.paid.lamports).toBe('0');
   }, 60_000);
 
   it('a holder needs two epochs; REWARDS_AUTO=0 allocates but never sends', async () => {
@@ -523,6 +550,10 @@ describe('$MART holder rewards', () => {
     const starts = feed.map((e) => new Date(e.startsAt as string | Date).getTime());
     expect(starts).toEqual([...starts].sort((a, b) => b - a));
     expect(starts.length).toBeGreaterThan(3);
+    // Fully carried epochs report 0 paid (the UI shows "carried").
+    for (const e of feed.filter((x) => x.paidCount === 0 && x.carriedCount > 0))
+      expect(e.paid).toEqual({ lamports: '0', sol: '0.000000000', recipients: 0 });
+    expect(feed.some((x) => x.paidCount === 0 && x.carriedCount > 0)).toBe(true);
   });
 
   it('reports the samples actually planned (2 in a 900 s epoch, 6 in 3 h)', async () => {
