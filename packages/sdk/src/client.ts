@@ -10,6 +10,7 @@ import {
 } from './tx.js';
 import { COMPUTE_BUDGET_PROGRAM } from './constants.js';
 import type {
+  RecentPayouts,
   ApiKeyInfo,
   CheckoutOrder,
   CreateListingInput,
@@ -225,6 +226,12 @@ export class TrenchmartClient {
 
   creator(handle: string): Promise<Json> {
     return this.request('GET', `/creators/${encodeURIComponent(handle)}`);
+  }
+
+  /** Recent creator payouts (public): sent lines with their Solscan-able signature, at least
+   * 10 minutes old with times rounded to 15 minutes. No order, listing or buyer data. */
+  recentPayouts(limit = 20): Promise<RecentPayouts> {
+    return this.request('GET', `/payouts/recent?limit=${Math.min(50, Math.max(1, limit))}`);
   }
 
   // ---------------------------------------------------------------- transactions

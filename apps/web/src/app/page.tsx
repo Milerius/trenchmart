@@ -2,11 +2,37 @@
 
 import { DEFAULT_ESCROW_HOURS } from '@trenchmart/shared/config';
 import { escrowWindowLabel, escrowWindowShort } from '@trenchmart/shared/escrow';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { startTransition, useEffect, useState, type ReactNode } from 'react';
 import { solText } from '@/lib/money';
 import { CATEGORIES } from '@trenchmart/shared/categories';
 import { ActivityBand, useActivity } from '@/components/activity';
+
+// The payouts band is its own chunk, fetched only when the stats block nears the viewport.
+const PayoutsBand = dynamic(() => import('@/components/payouts-band').then((m) => m.PayoutsBand), {
+  ssr: false,
+  loading: () => null,
+});
+
+function LazyPayoutsBand() {
+  const [near, setNear] = useState(false);
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!el || near) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.some((e) => e.isIntersecting) && setNear(true),
+      { rootMargin: '300px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [el, near]);
+  return (
+    <div ref={setEl} data-testid="payouts-band-slot">
+      {near ? <PayoutsBand /> : null}
+    </div>
+  );
+}
 import { FeaturedRow, useFeatured } from '@/components/featured';
 import { TierCards } from '@/components/fees';
 import { type Board, type BoardTab, CreatorCards, TAB_LABEL } from '@/components/leaderboard';
@@ -241,6 +267,7 @@ export default function HomePage() {
           <div className="space-y-8">
             <LandingStats stats={stats} failed={statsFailed} />
             <ActivityBand activity={activity} />
+            <LazyPayoutsBand />
           </div>
         </Reveal>
 

@@ -217,6 +217,12 @@ function mockClient(
 }
 
 describe('client', () => {
+  it('recentPayouts clamps the limit and reads the public feed', async () => {
+    const { client, calls } = mockClient(() => ({ body: { payouts: [] } }));
+    await client.recentPayouts(500);
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/api/v1/payouts/recent' });
+  });
+
   it('calls only routes documented in the shipped OpenAPI spec', async () => {
     const spec = JSON.parse(readFileSync(new URL('../openapi.json', import.meta.url), 'utf8')) as {
       paths: Record<string, Record<string, unknown>>;
@@ -235,6 +241,7 @@ describe('client', () => {
       client.me(),
       client.config(),
       client.categories(),
+      client.recentPayouts(5),
       client.listings({ q: 'x' }),
       client.listing('slug'),
       client.versions('slug'),
