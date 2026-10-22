@@ -274,6 +274,16 @@ describe('automated payouts (Squads spending limit)', () => {
     expect(chain.transfers).toHaveLength(3);
   });
 
+  it('counts in-flight sends against the vault balance', async () => {
+    const { deps, chain } = await setup();
+    chain.vault = 500_000_000n;
+    const a = await line(300_000_000n);
+    await sql`update payouts set status = 'sending', mode = 'auto', tx_sig = 'inflight', valid_until_height = 10000, sent_at = ${now} where id = ${a.id}`;
+    await line(300_000_000n);
+    expect(await autoPayouts(deps)).toMatchObject({ submitted: 0 });
+    expect(chain.transfers).toHaveLength(0);
+  });
+
   it('pauses, and alerts, while the spending limit is missing or does not list the signer', async () => {
     const { deps, chain } = await setup();
     await line(5_000_000n);
