@@ -305,7 +305,7 @@ export function TypeStep({
       <div
         role="radiogroup"
         aria-label="What you sell"
-        className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4"
+        className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-3"
       >
         {LISTING_KINDS.map((k) => {
           const on = k.code === kind;

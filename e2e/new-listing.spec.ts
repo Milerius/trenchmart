@@ -523,8 +523,21 @@ test('a fresh "New listing" starts on step 1 with nothing chosen, even with a sa
   const resume = page.getByTestId('resume-draft');
   await expect(resume).toContainText('Filter');
   await expect(resume).toContainText('step 2 of');
-  if (process.env.WIZARD_SHOTS)
-    await page.screenshot({ path: `${process.env.WIZARD_SHOTS}/new-listing-fresh-step1.png` });
+  if (process.env.WIZARD_SHOTS) {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+      path: `${process.env.WIZARD_SHOTS}/new-listing-fresh-step1.png`,
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: `${process.env.WIZARD_SHOTS}/new-listing-fresh-step1-mobile.png`,
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+  }
+  // Step 1 shows the market card preview beside the type picker on desktop (prototype layout).
+  await expect(page.getByTestId('card-preview')).toBeVisible();
   expect(
     await page.evaluate((p) => Object.keys(localStorage).filter((k) => k.startsWith(p)), prefix),
   ).toEqual([`${prefix}:legacy`]);
