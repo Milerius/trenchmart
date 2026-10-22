@@ -3,9 +3,9 @@
 import type { ReactNode } from 'react';
 import { quote, splitFee } from '@trenchmart/shared/fee';
 import { displaySplitBps } from '@trenchmart/shared/rewards';
-import { Money, Tag } from '@/components/ui';
+import { Money } from '@/components/ui';
 import { TIER_LABEL, type PublicConfig } from '@/lib/config';
-import { DEFAULT_FEES, compactHold, pct } from '@/components/fees';
+import { DEFAULT_FEES, pct } from '@/components/fees';
 
 type FeeConfig = Pick<PublicConfig, 'feeBps' | 'tierRebateBps' | 'feeSplitBps'>;
 
