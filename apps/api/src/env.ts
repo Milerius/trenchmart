@@ -61,6 +61,26 @@ export type Env = {
     maxLineLamports: bigint;
     dailyCapLamports: bigint;
   };
+  /**
+   * $MART holder rewards (docs/ops/holder-rewards.md). A hot wallet that is only a member of a
+   * Squads spending limit on the rewards vault (vault index 1, destination = the hot wallet).
+   * REWARDS_AUTO=0 stops funding and sending; sampling and allocation keep running.
+   */
+  rewards: {
+    enabled: boolean;
+    signerSecret: string;
+    spendingLimit: string;
+    vaultIndex: number;
+    /** On: new fees pay the holders + buyback share to the rewards vault. */
+    splitActive: boolean;
+    epochSeconds: number;
+    topN: number;
+    minSupplyBps: number;
+    minPayoutLamports: bigint;
+    maxEpochLamports: bigint;
+    rpcCostLamports: bigint;
+    infraCostLamports: bigint;
+  };
   /** Kill switch: when true, POST /orders returns 503 (mainnet readiness #18). */
   checkoutPaused: boolean;
   /** Shared secret the web proxy sends with the real client IP (M-03). */
@@ -169,6 +189,12 @@ function lamportsEnv(value: string | undefined, fallback: bigint): bigint {
   return BigInt(raw);
 }
 
+function intEnv(value: string | undefined, fallback: number, min: number, max: number): number {
+  const n = Number(value?.trim() || fallback);
+  if (!Number.isInteger(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
 export function readEnv(source: Record<string, string | undefined> = process.env): Env {
   assertProductionSecrets(source);
   const cluster = assertTestCluster(source.SOLANA_CLUSTER || 'devnet');
@@ -239,6 +265,21 @@ export function readEnv(source: Record<string, string | undefined> = process.env
       spendingLimit: blank(source.PAYOUT_SPENDING_LIMIT),
       maxLineLamports: lamportsEnv(source.PAYOUT_MAX_LINE_LAMPORTS, 500_000_000n),
       dailyCapLamports: lamportsEnv(source.PAYOUT_DAILY_CAP_LAMPORTS, 3_000_000_000n),
+    },
+    rewards: {
+      enabled: !/^(0|false|no|off)$/i.test(source.REWARDS_AUTO ?? ''),
+      signerSecret: blank(source.REWARDS_SIGNER_SECRET),
+      spendingLimit: blank(source.REWARDS_SPENDING_LIMIT),
+      vaultIndex: intEnv(source.REWARDS_VAULT_INDEX, 1, 1, 255),
+      splitActive: /^(1|true|yes|on)$/i.test(source.REWARDS_SPLIT ?? ''),
+      // Shortened epochs exist for the devnet end-to-end run only; never below 15 minutes.
+      epochSeconds: intEnv(source.REWARDS_EPOCH_SECONDS, 10_800, 900, 86_400),
+      topN: intEnv(source.REWARDS_TOP_N, 1000, 1, 1000),
+      minSupplyBps: intEnv(source.REWARDS_MIN_SUPPLY_BPS, 5, 0, 10_000),
+      minPayoutLamports: lamportsEnv(source.REWARDS_MIN_PAYOUT_LAMPORTS, 10_000_000n),
+      maxEpochLamports: lamportsEnv(source.REWARDS_MAX_EPOCH_LAMPORTS, 10_000_000_000n),
+      rpcCostLamports: lamportsEnv(source.REWARDS_COST_RPC_LAMPORTS, 0n),
+      infraCostLamports: lamportsEnv(source.REWARDS_COST_INFRA_LAMPORTS, 0n),
     },
     checkoutPaused: /^(1|true|yes)$/i.test(source.CHECKOUT_PAUSED ?? ''),
     proxySecret: blank(source.PROXY_SECRET),

@@ -1,3 +1,4 @@
+import { feeRouting, recordRevenue } from './rewards';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -545,12 +546,13 @@ export async function featureMaintenance(deps: Deps) {
   let settled = 0;
   for (const booking of done) {
     const kept = (booking.total as bigint) - (booking.refund_lamports as bigint);
+    const routing = feeRouting(deps.env, appConfig);
     const lines = releasePayouts({
       price: 0n,
       netFee: kept,
-      splitBps: appConfig.fee_split_bps,
+      splitBps: routing.splitBps,
       creatorWallet: '',
-      buckets: deps.env.buckets,
+      buckets: routing.buckets,
     });
     const wrote = await deps.sql.begin(async (sql) => {
       // Claim the booking first so overlapping runs never pay its buckets twice.
@@ -575,6 +577,12 @@ export async function featureMaintenance(deps: Deps) {
       return true;
     });
     if (!wrote) continue;
+    await recordRevenue(deps, {
+      source: 'featuring',
+      ref: booking.id as string,
+      netFee: kept,
+      lines,
+    });
     settled += 1;
   }
   return { expired: expired.length, pulled: pulled.length, settled };

@@ -22,6 +22,18 @@ bucket_name = "trenchmart-files"
 binding = "SCAN_QUEUE"
 queue = "scan-static"
 
+# $MART holder rewards: one push batch (≤ 20 SOL transfers) per message (docs/ops/holder-rewards.md).
+[[queues.producers]]
+binding = "REWARDS_QUEUE"
+queue = "rewards-send"
+
+[[queues.consumers]]
+queue = "rewards-send"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 40
+dead_letter_queue = "rewards-send-dlq"
+
 # Encrypted, pooled Postgres via Hyperdrive (TLS to Supabase). Created 2026-10-18 as trenchmart-db.
 # Without the binding the Worker falls back to the DATABASE_URL secret (local/CI).
 [[hyperdrive]]

@@ -1,3 +1,4 @@
+import { feeRouting, recordRevenue } from './rewards';
 import { createHash, randomUUID } from 'node:crypto';
 import { unzipSync, zipSync, strToU8 } from 'fflate';
 import type { Sql } from '@trenchmart/db';
@@ -102,6 +103,10 @@ export type Deps = {
   escrowChain?: EscrowChain;
   /** Chain access for automated payouts (payouts-auto.ts). Defaults to env.rpcUrl. */
   payoutChain?: import('./payouts-auto').PayoutChain;
+  /** Chain access for $MART holder rewards (rewards.ts). Defaults to env.rpcUrl. */
+  rewardChain?: import('./rewards').RewardChain;
+  /** Cloudflare Queue for reward batches (one batch per message). Optional: cron sends inline. */
+  rewardQueue?: import('./rewards').RewardQueue;
   /** Relays a signed transaction (agent broadcast). Defaults to sendRaw on env.rpcUrl. */
   sendTx?: (tx: Uint8Array) => Promise<string>;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
@@ -690,12 +695,28 @@ async function verifyEscrowFunding(
     expiresAt: order.expires_at as Date,
     escrowUntil: order.escrow_until as Date,
   });
-  const wrong = escrowMismatch(account, {
-    ...expected,
+  const who = {
     buyer: buyer.wallet as string,
     orderId: order.id as string,
     total: order.total as bigint,
-  });
+  };
+  // REWARDS_SPLIT may have been toggled between checkout and settle: accept either routing.
+  const wrong =
+    escrowMismatch(account, { ...expected, ...who }) &&
+    escrowMismatch(account, {
+      ...orderEscrowArgs({
+        env: deps.env,
+        config,
+        seller: seller[0]?.wallet ?? '',
+        price: order.price as bigint,
+        feeBps: order.fee_bps as number,
+        rebateBps: order.rebate_bps as number,
+        expiresAt: order.expires_at as Date,
+        escrowUntil: order.escrow_until as Date,
+        routing: 'plain',
+      }),
+      ...who,
+    });
   if (wrong)
     return {
       ok: false,
@@ -768,10 +789,23 @@ async function settleVfee(deps: Deps, versionId: string, txSig: string, tx: Chai
   });
   if (!assessment.ok) return assessment;
   await deps.sql`update versions set vfee_sig = ${txSig} where id = ${versionId}`;
-  const lines = verificationFeePayout(
-    version.vfee_lamports as bigint,
-    deps.env.buckets.ai_verification,
-  );
+  // With holder rewards on, a verification fee is platform revenue split like any fee.
+  const routing = feeRouting(deps.env, await loadConfig(deps));
+  const lines = deps.env.rewards.splitActive
+    ? releasePayouts({
+        price: 0n,
+        netFee: version.vfee_lamports as bigint,
+        splitBps: routing.splitBps,
+        creatorWallet: '',
+        buckets: routing.buckets,
+      })
+    : verificationFeePayout(version.vfee_lamports as bigint, deps.env.buckets.ai_verification);
+  await recordRevenue(deps, {
+    source: 'vfee',
+    ref: versionId,
+    netFee: version.vfee_lamports as bigint,
+    lines,
+  });
   for (const line of lines) {
     await deps.sql`
       insert into payouts (order_id, recipient, bucket, amount) values (null, ${line.recipient}, ${line.bucket}, ${line.amount})
@@ -816,8 +850,7 @@ export async function releaseOrders(
     // recipients and split stored in the escrow account, not today's env or config, so the
     // ledger stays true even if a bucket wallet or the fee split changes mid-window.
     let creatorWallet = order.creator_wallet as string;
-    let buckets: Deps['env']['buckets'] = deps.env.buckets;
-    let splitBps = config.fee_split_bps;
+    let { buckets, splitBps } = feeRouting(deps.env, config);
     if (order.escrow_address) {
       const outcome = await releaseEscrow(deps, order).catch((err: unknown) => {
         console.error('escrow release failed', order.id, (err as Error).message);
@@ -888,6 +921,13 @@ export async function releaseOrders(
         `;
       }
     }
+    // Holder rewards: counted only if this release paid the rewards vault (rewards.ts).
+    await recordRevenue(deps, {
+      source: 'order',
+      ref: order.id as string,
+      netFee: (order.fee as bigint) - (order.rebate as bigint),
+      lines,
+    });
     await notify(deps.sql, order.creator_user as string, 'released', { orderId: order.id });
     await notify(deps.sql, order.buyer_id as string, 'released', { orderId: order.id });
     released.push(order.id as string);

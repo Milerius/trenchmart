@@ -1,3 +1,4 @@
+import { feeRouting, recordRevenue } from './rewards';
 import { randomUUID } from 'node:crypto';
 import {
   assessPayment,
@@ -267,9 +268,15 @@ export async function settleSupplement(
   const lines = releasePayouts({
     price: 0n,
     netFee: row.lamports as bigint,
-    splitBps: config.fee_split_bps,
+    splitBps: feeRouting(deps.env, config).splitBps,
     creatorWallet: '',
-    buckets: deps.env.buckets,
+    buckets: feeRouting(deps.env, config).buckets,
+  });
+  await recordRevenue(deps, {
+    source: 'supplement',
+    ref: String(row.id),
+    netFee: row.lamports as bigint,
+    lines,
   });
   for (const line of lines) {
     await deps.sql`
@@ -703,9 +710,15 @@ export async function settleRenewal(
   const lines = releasePayouts({
     price: renewal.price as bigint,
     netFee: (renewal.fee as bigint) - (renewal.rebate as bigint),
-    splitBps: config.fee_split_bps,
+    splitBps: feeRouting(deps.env, config).splitBps,
     creatorWallet: seller?.wallet ?? 'UNCONFIGURED:creator',
-    buckets: deps.env.buckets,
+    buckets: feeRouting(deps.env, config).buckets,
+  });
+  await recordRevenue(deps, {
+    source: 'renewal',
+    ref: String(result.order.id),
+    netFee: (renewal.fee as bigint) - (renewal.rebate as bigint),
+    lines,
   });
   for (const line of lines) {
     await deps.sql`

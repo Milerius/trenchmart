@@ -9,6 +9,7 @@ import { pendingMigrations } from '@trenchmart/db';
 import type { Deps } from './logic';
 import { resolverOf } from './escrow';
 import { payoutHealth, rpcErrorCode } from './payouts-auto';
+import { rewardHealth } from './rewards';
 
 export type OpsLevel = 'warn' | 'critical';
 export type OpsAlert = { level: OpsLevel; code: string; message: string };
@@ -432,6 +433,7 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
         `${payouts!.n} vault payout line(s) waiting more than 48 h (automated payouts paused or capped, or a Squads batch is unsigned)`,
       );
     for (const alert of await payoutHealth(deps)) add(alert.level, alert.code, alert.message);
+    for (const alert of await rewardHealth(deps)) add(alert.level, alert.code, alert.message);
   } catch (err) {
     add('critical', 'DB_ERROR', `database check failed: ${(err as Error).message}`);
   }
