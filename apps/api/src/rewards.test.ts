@@ -467,6 +467,7 @@ describe('$MART holder rewards', () => {
     expect(await codes()).toContain('REWARD_BALANCE_LOW');
     chain.vault = 51_000_000n; // covers what is due plus the 0.001 SOL floor
     expect(await codes()).not.toContain('REWARD_BALANCE_LOW');
+  });
 
   it('survives an epoch-length change (900 s test epochs, then back to 3 h) without losing carry', async () => {
     const short = await setup({ REWARDS_EPOCH_SECONDS: '900' });
