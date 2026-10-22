@@ -84,7 +84,7 @@ export function RewardsCard({
         </Link>
       </div>
       <p className="m-0 text-sm text-muted">
-        50% of net revenue, pushed in SOL to the top 1,000 $MART holders every 3 hours. Every
+        50% of net revenue, pushed every 3 hours to the top 1,000 $MART holders in SOL. Every
         transaction is public.
       </p>
       {data === null ? (

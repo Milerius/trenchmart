@@ -159,11 +159,7 @@ export default function TokenPage() {
             Where every fee goes
           </h2>
           <p className="m-0 max-w-2xl text-ink-2">
-            <Link
-              href="/rewards"
-              className="text-info hover:underline"
-              data-testid="token-rewards-link"
-            >
+            <Link href="/rewards" className="text-info underline" data-testid="token-rewards-link">
               Holder rewards →
             </Link>{' '}
             Half of net revenue (fees after your tier discount, minus ledgered running costs) goes

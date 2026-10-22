@@ -10,4 +10,7 @@ export const MAINNET: ClusterConfig = {
   multisig: '',
   vault: '',
   martMint: '',
+  rewardsVault: '',
+  rewardsSpendingLimit: '',
+  rewardsWallet: '',
 };
