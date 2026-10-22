@@ -7,7 +7,9 @@
  * from a click or a mount effect, then use `discoverWallet`.
  */
 
-export const DEVNET_CHAIN = 'solana:devnet';
+import { chainMismatch, CLUSTER } from '@/lib/cluster';
+/** The chain this deployment signs for (lib/cluster.ts). */
+export const DEVNET_CHAIN: string = CLUSTER.chain;
 export const NO_WALLET_MESSAGE = 'No wallet. Install Phantom, or run the test adapter.';
 export const DISCOVERY_TIMEOUT_MS = 1500;
 
@@ -258,6 +260,11 @@ export async function signerFromStandardWallet(
     'disconnect',
   );
 
+  // Wallet on another cluster: show the amber banner (components/cluster-mismatch.tsx) and
+  // refuse to sign transactions below, so no payment can go out on the wrong network.
+  const wrongCluster = () => chainMismatch(current().chains);
+  document.documentElement.toggleAttribute('data-cluster-mismatch', wrongCluster());
+
   return {
     address: account.address,
     name: wallet.name,
@@ -295,6 +302,7 @@ export async function signerFromStandardWallet(
       return out.signature;
     },
     async signTransaction(transaction: Uint8Array) {
+      if (wrongCluster()) throw new Error(`Switch your wallet to Solana ${CLUSTER.label}.`);
       const [out] = await signTransaction({
         account: current(),
         transaction,

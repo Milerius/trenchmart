@@ -1,3 +1,5 @@
+import { CLUSTER } from '@/lib/cluster';
+import { ENDPOINTS } from '@/lib/cluster-endpoints';
 import { DEFAULT_CONFIG_JSON } from '@trenchmart/shared/config';
 import {
   AI_AGENT_ID,
@@ -36,7 +38,7 @@ export async function GET() {
     mainnet: false,
     notice:
       'Every address below is on Solana DEVNET. Looking them up on mainnet returns nothing. Use ?cluster=devnet on Solana Explorer or RPC https://api.devnet.solana.com.',
-    rpc: 'https://api.devnet.solana.com',
+    rpc: ENDPOINTS[CLUSTER.id].rpc,
     escrowProgram: {
       programId: ESCROW_PROGRAM_ID,
       idlAccount: live?.idl?.account ?? null,

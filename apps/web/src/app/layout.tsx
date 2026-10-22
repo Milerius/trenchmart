@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Instrument_Serif } from 'next/font/google';
 import { Shell } from '@/components/shell';
 import { SocialIcons, SocialPills } from '@/components/social-links';
+import { NetworkSwitch } from '@/components/network-switch';
+import { ClusterMismatchBanner } from '@/components/cluster-mismatch';
 import { DEVNET_ADDRESSES, ESCROW_CLUSTER, ESCROW_PROGRAM_ID } from '@/lib/protocol-facts';
 import './globals.css';
 
@@ -45,6 +47,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             header: <SocialIcons where="header" />,
             menu: <SocialPills />,
             footer: <SocialIcons where="footer" />,
+            network: <NetworkSwitch />,
+            networkMenu: <NetworkSwitch inMenu />,
+            clusterBanner: <ClusterMismatchBanner />,
           }}
         >
           {children}
