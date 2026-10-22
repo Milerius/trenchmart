@@ -1066,7 +1066,13 @@ export async function currentEpoch(deps: Deps) {
     startsAt: start,
     endsAt: end,
     epochSeconds: cfg.epochSeconds,
-    samples: { done: e?.samples_done ?? 0, planned: REWARD_DEFAULTS.samplesPerEpoch },
+    samples: {
+      done: e?.samples_done ?? 0,
+      // min(6, ticks in the epoch): a 900 s test epoch has only 3 five-minute ticks.
+      planned:
+        (e?.sample_ticks as number[] | undefined)?.length ??
+        Math.min(REWARD_DEFAULTS.samplesPerEpoch, ticksPerEpoch(cfg)),
+    },
     revenueSoFar: String(rev?.revenue ?? 0),
     holderGrossSoFar: String(rev?.holder_gross ?? 0),
     carryIn: String(e?.carry_in ?? 0),

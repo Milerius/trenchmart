@@ -24,6 +24,7 @@ import { readEnv } from './env';
 import type { Deps } from './logic';
 import { opsCheck } from './ops';
 import {
+  currentEpoch,
   feeRouting,
   processBatchMessage,
   recentEpochs,
@@ -496,5 +497,14 @@ describe('$MART holder rewards', () => {
     const starts = feed.map((e) => new Date(e.startsAt as string | Date).getTime());
     expect(starts).toEqual([...starts].sort((a, b) => b - a));
     expect(starts.length).toBeGreaterThan(3);
+  });
+
+  it('reports the samples actually planned (3 in a 900 s epoch, 6 in 3 h)', async () => {
+    const short = await setup({ REWARDS_EPOCH_SECONDS: '900' });
+    expect((await currentEpoch(short.deps))?.samples.planned).toBe(3);
+    await rewardsTick(short.deps);
+    expect((await currentEpoch(short.deps))?.samples.planned).toBe(3);
+    const long = await setup();
+    expect((await currentEpoch(long.deps))?.samples.planned).toBe(6);
   });
 });
