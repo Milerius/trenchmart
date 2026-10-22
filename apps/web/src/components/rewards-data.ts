@@ -17,6 +17,8 @@ export type RewardEpoch = {
   paidCount: number;
   carriedCount: number;
   paidLamports: string;
+  /** SOL actually sent to holders (reconciled batches, incl. carry-in). */
+  paid?: { lamports: string; sol: string; recipients: number };
   buybackForward: string;
   samples: { done: number; planned: number };
   seed: string;

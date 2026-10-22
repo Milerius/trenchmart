@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectLegible } from './legibility';
+import { expectNoHorizontalOverflow, expectNoOverlap } from './layout-helpers';
 
 // $MART holder rewards page + /status and treasury cards over stubbed /api/v1/rewards/* (the
 // endpoints are covered by apps/api/src/rewards.test.ts).
@@ -43,6 +45,7 @@ const epoch = (n: number) => ({
   paidCount: 612,
   carriedCount: 388,
   paidLamports: '3050000000',
+  paid: { lamports: '3059918150', sol: '3.05991815', recipients: 612 },
   buybackForward: '1224000000',
   samples: { done: 6, planned: 6 },
   seed: 'ab'.repeat(32),
@@ -50,7 +53,17 @@ const epoch = (n: number) => ({
   batches: [{ n: 0, recipients: 20, lamports: '100000000', sig: SIG, status: 'sent' }],
   paidAt: iso(NOW - n * 10_800_000),
 });
-const FEED = { epochs: [epoch(1), epoch(2), epoch(3)] };
+// A fully carried epoch: shares under 0.01 SOL, nothing sent (the UI says "carried").
+const carried = (n: number) => ({
+  ...epoch(n),
+  paidCount: 0,
+  carriedCount: 44,
+  eligible: 44,
+  paidLamports: '0',
+  holderPool: { lamports: '149994650', sol: '0.14999465' },
+  paid: { lamports: '0', sol: '0.000000000', recipients: 0 },
+});
+const FEED = { epochs: [epoch(1), carried(2), epoch(3)] };
 const TOP = {
   epoch: EPOCH - 1,
   holders: [
@@ -97,7 +110,14 @@ test('/rewards: countdown, pool so far, distributions with Solscan links, top ho
     'href',
     `https://solscan.io/tx/${SIG}?cluster=devnet`,
   );
-  await expect(page.getByTestId('reward-epoch').first()).toContainText('612 / 388');
+  const first = page.getByTestId('reward-epoch').first();
+  await expect(first.getByTestId('reward-pool')).toContainText('◎ 3.060');
+  await expect(first.getByTestId('reward-paid')).toContainText('◎ 3.060');
+  await expect(first.getByTestId('reward-paid')).toContainText('612 paid · 388 carried');
+  const second = page.getByTestId('reward-epoch').nth(1);
+  await expect(second.getByTestId('reward-paid')).toContainText('carried');
+  await expect(second.getByTestId('reward-paid')).toContainText('0 paid · 44 carried');
+  await expect(second.getByTestId('reward-pool')).toContainText('◎ 0.150');
   await expect(page.getByTestId('rewards-top').getByRole('listitem')).toHaveCount(2);
   await expect(page.getByTestId('rewards-mine')).toContainText('Connect a wallet');
   await expect(page.getByText('0.01 SOL carry over')).toBeVisible();
@@ -129,3 +149,30 @@ for (const path of ['/status', '/docs/treasury'] as const) {
     await expect(page.getByTestId('rewards-card').getByTestId('rewards-empty')).toBeVisible();
   });
 }
+
+for (const path of ['/rewards', '/status', '/docs/treasury'] as const)
+  for (const width of [390, 1280, 1440])
+    test(`${path} @${width}: pool and Paid columns legible, no overlap`, async ({ browser }) => {
+      const page = await browser.newPage({ viewport: { width, height: 900 } });
+      await stub(page);
+      await page.goto(path);
+      const rows = page.getByTestId('reward-epoch');
+      await expect(rows).toHaveCount(3);
+      for (let i = 0; i < 3; i++) {
+        const row = rows.nth(i);
+        await row.scrollIntoViewIfNeeded();
+        const pool = row.getByTestId('reward-pool');
+        const paid = row.getByTestId('reward-paid');
+        await expectLegible(pool, `pool ${i}`);
+        await expectLegible(paid, `paid ${i}`);
+        await expectNoOverlap([
+          { label: 'epoch', locator: row.locator('> span').first() },
+          { label: 'revenue', locator: row.locator('> span').nth(1) },
+          { label: 'pool', locator: pool },
+          { label: 'paid', locator: paid },
+          { label: 'txs', locator: row.locator('> span').nth(4) },
+        ]);
+      }
+      await expectNoHorizontalOverflow(page.locator('main'), 'main');
+      await page.close();
+    });

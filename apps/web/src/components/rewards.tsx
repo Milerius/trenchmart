@@ -13,7 +13,7 @@ export function RewardEpochsTable({ epochs }: { epochs: RewardEpoch[] }) {
         <span>Epoch</span>
         <span>Revenue − costs</span>
         <span>To holders</span>
-        <span>Paid / carried</span>
+        <span>Paid</span>
         <span>Transactions</span>
         <span className="text-right">Funding tx</span>
       </div>
@@ -33,12 +33,10 @@ export function RewardEpochsTable({ epochs }: { epochs: RewardEpoch[] }) {
             ◎ {sol(e.revenue.lamports, 3)}{' '}
             <span className="text-muted">− {sol(e.costTotal, 4)}</span>
           </span>
-          <span className="font-mono text-[13px] text-accent">
-            ◎ {sol(e.holderPool.lamports, 3)}
+          <span className="font-mono text-[13px] text-accent" data-testid="reward-pool">
+            <span className="text-muted md:hidden">pool </span>◎ {sol(e.holderPool.lamports, 3)}
           </span>
-          <span className="font-mono text-[13px] text-ink-2">
-            {e.paidCount} / {e.carriedCount}
-          </span>
+          <PaidCell e={e} />
           <span className="font-mono text-[13px] text-ink-2">
             {e.batches.length} txs · {e.eligible} eligible
           </span>
@@ -58,6 +56,29 @@ export function RewardEpochsTable({ epochs }: { epochs: RewardEpoch[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** Actual SOL sent to holders this epoch (incl. carry-in), or why nothing was sent. */
+function PaidCell({ e }: { e: RewardEpoch }) {
+  const paid = BigInt(e.paid?.lamports ?? '0');
+  const counts = `${e.paidCount} paid · ${e.carriedCount} carried`;
+  const pending = e.status === 'closed' || e.status === 'funding' || e.status === 'paying';
+  return (
+    <span data-testid="reward-paid" className="flex min-w-0 flex-col font-mono text-[13px]">
+      {paid > 0n ? (
+        <span className="text-ink">
+          <span className="text-muted md:hidden">paid </span>◎ {sol(e.paid!.lamports, 3)}
+        </span>
+      ) : pending && e.paidCount > 0 ? (
+        <span className="text-warn">sending…</span>
+      ) : e.carriedCount > 0 ? (
+        <span className="text-ink-2">carried</span>
+      ) : (
+        <span className="text-faint">—</span>
+      )}
+      {e.eligible > 0 ? <span className="text-[11px] text-muted">{counts}</span> : null}
+    </span>
   );
 }
 
