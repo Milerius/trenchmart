@@ -1,3 +1,4 @@
+import { feeRouting } from './rewards';
 import {
   compileLegacyTx,
   computeBudgetIxs,
@@ -74,9 +75,16 @@ export function orderEscrowArgs(input: {
   rebateBps: number;
   expiresAt: Date;
   escrowUntil: Date;
+  /** 'plain' = the four buckets only; default follows REWARDS_SPLIT (holder share → rewards vault). */
+  routing?: 'auto' | 'plain';
 }): EscrowInitArgs {
-  const buckets = requireBuckets(input.env);
-  const split = input.config.fee_split_bps;
+  requireBuckets(input.env);
+  const routed =
+    input.routing === 'plain'
+      ? { buckets: input.env.buckets, splitBps: input.config.fee_split_bps }
+      : feeRouting(input.env, input.config);
+  const buckets = routed.buckets;
+  const split = routed.splitBps;
   if (split.buyback + split.ai_verification + split.ops + split.safety !== 10_000)
     throw new EscrowError(503, 'ESCROW_MISCONFIGURED', 'fee split must sum to 10000 bps');
   return {

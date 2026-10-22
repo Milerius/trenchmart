@@ -1,3 +1,4 @@
+import { currentEpoch, recentEpochs, resumeEpoch, rewardsTick, walletRewards } from './rewards';
 import { pendingMigrations } from '@trenchmart/db';
 import {
   deliverAlerts,
@@ -1637,6 +1638,24 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json({ status: fresh[0]?.status });
   });
 
+  // $MART holder rewards (docs/ops/holder-rewards.md): every closed epoch with its revenue,
+  // costs, pool, sample seed and every Solana transaction. Holder payouts reveal no sale.
+  api.get('/rewards/epochs/recent', async (c) => {
+    const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 10));
+    return c.json(jsonSafe({ epochs: await recentEpochs(deps, limit) }));
+  });
+  api.get('/rewards/current', async (c) => {
+    const current = await currentEpoch(deps);
+    if (!current) throw new HttpError(404, 'REWARDS_OFF', 'holder rewards are not configured');
+    return c.json(jsonSafe(current));
+  });
+  api.get('/rewards/wallet/:wallet', async (c) => {
+    const wallet = c.req.param('wallet');
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet))
+      throw new HttpError(400, 'BAD_WALLET', 'not a Solana address');
+    return c.json(jsonSafe(await walletRewards(deps, wallet)));
+  });
+
   // Public "Recent payouts" feed (/status, treasury docs, home band). Creator lines only:
   // never refunds or fee buckets, never the listing or order, and only lines sent at least
   // PAYOUT_FEED_DELAY_MS ago with the time rounded down, so a payout cannot be matched to a sale.
@@ -2050,6 +2069,29 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return c.json(jsonSafe(await opsStatus(deps)));
   });
 
+  // Holder rewards admin: resume a halted epoch after review; add/remove an exclusion.
+  api.post('/internal/rewards/resume/:epoch', async (c) => {
+    assertInternal(c, deps.env);
+    const ok = await resumeEpoch(deps, Number(c.req.param('epoch')));
+    if (!ok) throw new HttpError(409, 'NOT_HALTED', 'epoch is not halted');
+    return c.json({ ok: true });
+  });
+  api.post('/internal/rewards/exclusions', async (c) => {
+    assertInternal(c, deps.env);
+    const body = (await c.req.json().catch(() => ({}))) as {
+      address?: string;
+      reason?: string;
+      remove?: boolean;
+    };
+    if (!body.address || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(body.address))
+      throw new HttpError(400, 'BAD_WALLET', 'address must be a Solana address');
+    if (body.remove) await deps.sql`delete from reward_exclusions where address = ${body.address}`;
+    else
+      await deps.sql`insert into reward_exclusions (address, reason) values (${body.address}, ${body.reason || 'excluded'})
+        on conflict (address) do update set reason = excluded.reason`;
+    return c.json({ ok: true });
+  });
+
   api.post('/internal/cron/:job', async (c) => {
     assertInternal(c, deps.env);
     const job = c.req.param('job');
@@ -2057,6 +2099,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (job === 'release') return c.json({ released: await releaseOrders(deps) });
     if (job === 'payouts') return c.json({ batch: await proposePayouts(deps) });
     if (job === 'auto-payouts') return c.json(await autoPayouts(deps));
+    if (job === 'rewards') return c.json(jsonSafe(await rewardsTick(deps, deps.rewardQueue)));
     if (job === 'ledger') return c.json(jsonSafe({ vault: await ledgerVault(deps.sql) }));
     if (job === 'ranking')
       return c.json(jsonSafe({ ranks: await computeRanks(deps, { force: true }) }));

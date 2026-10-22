@@ -28,6 +28,7 @@ import { assertDeployedEnv, readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
 import { autoPayouts } from './payouts-auto';
+import { processBatchMessage, rewardsTick } from './rewards';
 import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
 import { deliverAlerts, opsCheck, recordOpsEvent, type OpsAlert } from './ops';
 import { statusTick } from './status';
@@ -39,6 +40,8 @@ type Binding = Record<string, unknown> & {
   // terminates TLS to Supabase (whose CA workerd cannot verify) and pools connections.
   HYPERDRIVE?: { connectionString: string };
   SCAN_QUEUE?: { send(body: unknown): Promise<void> };
+  // Holder reward batches: one push transaction per message (rewards.ts), consumed below.
+  REWARDS_QUEUE?: { sendBatch(messages: { body: unknown }[]): Promise<void> };
   // R2 bucket for uploads and licensed copies. workerd's node:fs is a per-request VFS,
   // so a disk-backed store loses every upload between requests.
   FILES?: R2BucketLike;
@@ -140,7 +143,12 @@ export default {
     const run = async (): Promise<Response> => {
       const deps = depsFor(env, dbUrl);
       const app = createApp(
-        { ...deps, sandboxQueue: env.SCAN_QUEUE, rateLimiter: env.RATE_LIMITER },
+        {
+          ...deps,
+          sandboxQueue: env.SCAN_QUEUE,
+          rateLimiter: env.RATE_LIMITER,
+          rewardQueue: env.REWARDS_QUEUE,
+        },
         priceCache,
       );
       const close = () => deps.sql.end({ timeout: 5 });
@@ -156,6 +164,44 @@ export default {
     };
     // Anonymous public reads are served from the Cloudflare edge cache (s-maxage + SWR).
     return withEdgeCache(request, run, (p) => ctx.waitUntil(p), edgeCache());
+  },
+  // Cloudflare Queue consumer (rewards-send): each message is one reward batch, so each
+  // invocation has its own small subrequest budget (≈ 3 RPC calls).
+  async queue(
+    batch: {
+      messages: {
+        body: unknown;
+        ack(): void;
+        retry(options?: { delaySeconds?: number }): void;
+      }[];
+    },
+    env: Binding,
+  ): Promise<void> {
+    const dbUrl = databaseUrl(env);
+    if (!dbUrl) return;
+    const deps = depsFor(env, dbUrl);
+    try {
+      for (const message of batch.messages) {
+        const body = message.body as { kind?: string; epochId?: number; batchNo?: number };
+        if (body?.kind !== 'reward-batch' || body.epochId == null || body.batchNo == null) {
+          message.ack();
+          continue;
+        }
+        try {
+          const outcome = await processBatchMessage(deps, {
+            epochId: body.epochId,
+            batchNo: body.batchNo,
+          });
+          if (outcome === 'done') message.ack();
+          else message.retry({ delaySeconds: 15 });
+        } catch (err) {
+          console.error('reward batch message failed', (err as Error).message);
+          message.retry({ delaySeconds: 30 });
+        }
+      }
+    } finally {
+      await deps.sql.end({ timeout: 5 });
+    }
   },
   async scheduled(_event: unknown, env: Binding, ctx: Ctx): Promise<void> {
     const dbUrl = databaseUrl(env);
@@ -186,6 +232,11 @@ export default {
           const result = await autoPayouts(deps);
           if (result.submitted || result.confirmed || result.failed || result.retried)
             console.log('payouts', JSON.stringify(result));
+        });
+        await step('rewards', async () => {
+          const result = await rewardsTick(deps, env.REWARDS_QUEUE);
+          if (result.sampled || result.closed.length || result.sent || result.settled)
+            console.log('rewards', JSON.stringify(result));
         });
         await step('payouts', () => proposePayouts(deps));
         await step('escrow-housekeeping', () => escrowHousekeeping(deps));
