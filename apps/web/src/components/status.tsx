@@ -16,6 +16,7 @@ import {
 } from '@/components/ui';
 import { api } from '@/lib/api';
 import { PayoutsCard } from '@/components/payouts';
+import { RewardsCard } from '@/components/rewards';
 
 // Public status page over GET /api/v1/status (docs/ops/status-page.md). Every number here comes
 // from the 5-minute probes; days without a probe are drawn grey ("no data"), never guessed.
@@ -416,6 +417,9 @@ export function StatusBoard() {
       ) : null}
       <div className="mt-10">
         <PayoutsCard />
+      </div>
+      <div className="mt-10">
+        <RewardsCard />
       </div>
       <DocSection id="how" title="How to read this">
         <p>

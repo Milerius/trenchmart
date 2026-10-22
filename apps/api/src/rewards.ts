@@ -1117,3 +1117,30 @@ export async function resumeEpoch(deps: Deps, epochId: number): Promise<boolean>
   `;
   return r.length > 0;
 }
+
+/** Top allocations of the latest allocated epoch (public: wallets and amounts are on chain). */
+export async function topHolders(deps: Deps, limit: number) {
+  const [e] = await deps.sql<Row[]>`
+    select epoch_id from reward_epochs where status in ('closed', 'funding', 'paying', 'paid')
+    order by epoch_id desc limit 1
+  `;
+  if (!e) return { epoch: null, holders: [] };
+  const rows = await deps.sql<Row[]>`
+    select owner, rank, weight::text as weight, lamports, status from reward_allocations
+    where epoch_id = ${e.epoch_id} order by rank limit ${limit}
+  `;
+  const [sum] = await deps.sql<Row[]>`
+    select coalesce(sum(weight), 0)::text as total from reward_allocations where epoch_id = ${e.epoch_id}
+  `;
+  const total = BigInt(sum?.total ?? '0');
+  return {
+    epoch: Number(e.epoch_id),
+    holders: rows.map((r) => ({
+      wallet: r.owner,
+      rank: r.rank,
+      weightBps: total > 0n ? Number((BigInt(r.weight) * 10_000n) / total) : 0,
+      lamports: String(r.lamports),
+      status: r.status,
+    })),
+  };
+}

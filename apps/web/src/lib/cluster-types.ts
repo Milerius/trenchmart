@@ -16,6 +16,12 @@ export type ClusterConfig = {
   multisig: string;
   vault: string;
   martMint: string;
+  /** Squads vault (index 1) that holds the $MART holder-rewards pool. */
+  rewardsVault: string;
+  /** Squads spending limit on the rewards vault; its only destination is rewardsWallet. */
+  rewardsSpendingLimit: string;
+  /** Rewards hot wallet that pushes the 20-recipient payout batches. */
+  rewardsWallet: string;
 };
 
 /** Hostnames and endpoints (lib/cluster-endpoints.ts): server, docs and the network menu only. */

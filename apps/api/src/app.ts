@@ -1,4 +1,11 @@
-import { currentEpoch, recentEpochs, resumeEpoch, rewardsTick, walletRewards } from './rewards';
+import {
+  currentEpoch,
+  recentEpochs,
+  resumeEpoch,
+  rewardsTick,
+  topHolders,
+  walletRewards,
+} from './rewards';
 import { pendingMigrations } from '@trenchmart/db';
 import {
   deliverAlerts,
@@ -1643,6 +1650,10 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   api.get('/rewards/epochs/recent', async (c) => {
     const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 10));
     return c.json(jsonSafe({ epochs: await recentEpochs(deps, limit) }));
+  });
+  api.get('/rewards/top', async (c) => {
+    const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 10));
+    return c.json(jsonSafe(await topHolders(deps, limit)));
   });
   api.get('/rewards/current', async (c) => {
     const current = await currentEpoch(deps);

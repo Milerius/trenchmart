@@ -341,7 +341,7 @@ test.describe('phase 5: header, nav and footer', () => {
     );
     await expect(footer.getByRole('link', { name: /\$MART mint/ })).toHaveAttribute(
       'href',
-      explorer('8Gu4hXYypyRrxY6763AdhQnyHma82L3ww9wq3vy2cbq6'),
+      explorer('FLEdRySnQLYioT9FecE44LexuVfKMaC2uRjK9GgTrZ92'),
     );
     for (const [name, href] of [
       ['Explore', '/search'],
