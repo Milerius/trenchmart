@@ -70,6 +70,12 @@ export const REWARD_EPOCH_CEILING = 50_000_000_000n;
 const FUND_SIGNATURES = 1;
 /** Compute limit of the funding transaction (Squads spending_limit_use). */
 const FUND_UNITS = 60_000;
+/**
+ * The funding tx loads the Squads v4 program (its program data is over 1 MiB): with the 64 KiB
+ * batch limit it failed with MaxLoadedAccountsDataSizeExceeded and never landed (devnet
+ * 2026-10-22; 1 MiB also fails, 2 MiB passes). 3 MiB leaves room for a Squads upgrade.
+ */
+export const FUND_LOADED_BYTES = 3 * 1024 * 1024;
 
 export type RewardChain = PayoutChain & {
   /** One getProgramAccounts: every token account of `mint`, as (owner, amount). */
@@ -652,7 +658,11 @@ async function fund(deps: Deps, cfg: RewardConfig, chain: RewardChain, epoch: Ro
       feePayer: send.signer,
       recentBlockhash: latest.blockhash,
       instructions: [
-        ...computeBudgetIxs({ ...BUDGET, units: FUND_UNITS }),
+        ...computeBudgetIxs({
+          ...BUDGET,
+          units: FUND_UNITS,
+          loadedAccountsDataBytes: FUND_LOADED_BYTES,
+        }),
         spendingLimitUseSolIx({
           multisig: cfg.multisig,
           member: send.signer,
