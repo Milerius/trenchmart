@@ -2,15 +2,18 @@
 name = "trench_escrow"
 version = "0.1.0"
 edition = "2021"
+# tests/escrow.rs is compiled into the lib's unit-test harness (see src/lib.rs), so the crate
+# can be cdylib-only: a mixed cdylib+lib crate silently disables fat LTO in cargo-build-sbf.
+autotests = false
 description = "Phase-2 TrenchMart escrow. Launch custody stays a Squads vault."
 license = "MIT"
 
 [lib]
-crate-type = ["cdylib", "lib"]
+crate-type = ["cdylib"]
 name = "trench_escrow"
 
 [features]
-default = []
+default = ["no-log-ix-name"]
 idl-build = ["anchor-lang/idl-build"]
 no-entrypoint = []
 no-idl = []

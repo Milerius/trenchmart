@@ -1,3 +1,5 @@
+import { CLUSTER } from '@/lib/cluster';
+import { ENDPOINTS } from '@/lib/cluster-endpoints';
 import {
   API_SCOPES,
   CHALLENGE_TTL_MS,
@@ -14,7 +16,7 @@ import { DEVNET_ADDRESSES, ESCROW_PROGRAM_ID, bpsPercent, protocol } from './pro
 
 /** Single source for the agent docs pages, llms.txt and llms-full.txt. Devnet only. */
 export const SITE = 'https://trenchmart.fun';
-export const API_BASE = 'https://api.trenchmart.fun/api/v1';
+export const API_BASE = ENDPOINTS[CLUSTER.id].apiBase;
 export const OPENAPI_URL = `${API_BASE}/openapi.json`;
 export const SDK_PACKAGE = '@trenchmart/sdk';
 export const REPO_URL = 'https://github.com/Milerius/trenchmart';

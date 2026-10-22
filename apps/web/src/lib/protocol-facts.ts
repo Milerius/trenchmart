@@ -1,3 +1,4 @@
+import { CLUSTER, explorerAddressUrl, explorerTxUrl } from './cluster';
 import { CATEGORIES } from '@trenchmart/shared/categories';
 import { DEFAULT_CONFIG_JSON, type CategoryCode } from '@trenchmart/shared/config';
 import {
@@ -16,14 +17,14 @@ import {
 } from '@trenchmart/shared/state';
 import { TIERS, type Tier } from '@trenchmart/shared/tier';
 
-/** Devnet program id from programs/trench_escrow/src/lib.rs. */
-export const ESCROW_PROGRAM_ID = 'Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw';
-export const ESCROW_CLUSTER = 'devnet';
-/** Devnet deployment addresses (2026-10-17). /api/v1/transparency reads them live from chain. */
+/** Program id of this deployment's cluster (lib/cluster.ts; devnet id from programs/trench_escrow/src/lib.rs). */
+export const ESCROW_PROGRAM_ID = CLUSTER.escrowProgramId;
+export const ESCROW_CLUSTER = CLUSTER.id;
+/** Deployment addresses of this cluster (lib/cluster.ts). /api/v1/transparency reads them live from chain. */
 export const DEVNET_ADDRESSES = {
-  multisig: 'CaatcAQaDTEsrSoC3maTP1kgBWEY66hhgBNKa8Aeg55B',
-  vault: '47RLqPda5YLW7rFHkoJ2K5yACWu4qc7j2yYU2so64bz7',
-  martMint: '8Gu4hXYypyRrxY6763AdhQnyHma82L3ww9wq3vy2cbq6',
+  multisig: CLUSTER.multisig,
+  vault: CLUSTER.vault,
+  martMint: CLUSTER.martMint,
 } as const;
 /** trenchmart.fun has no mail server yet, so contact goes through GitHub, which is real and public. */
 export const CONTACT_URL = 'https://github.com/Milerius/trenchmart/issues';
@@ -203,11 +204,11 @@ export type VersionEdge = { from: VersionStatus; to: VersionStatus };
 
 /** Solana Explorer links, always pinned to devnet. */
 export function explorerAddress(address: string): string {
-  return `https://explorer.solana.com/address/${address}?cluster=${ESCROW_CLUSTER}`;
+  return explorerAddressUrl(address);
 }
 
 export function explorerTx(signature: string): string {
-  return `https://explorer.solana.com/tx/${signature}?cluster=${ESCROW_CLUSTER}`;
+  return explorerTxUrl(signature);
 }
 
 export function shortKey(value: string, head = 6, tail = 4): string {

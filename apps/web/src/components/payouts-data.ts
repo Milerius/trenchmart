@@ -3,6 +3,7 @@
 import type { PublicIdentity } from '@trenchmart/shared/social';
 import { startTransition, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { solscanTxUrl } from '@/lib/cluster';
 
 /** GET /api/v1/payouts/recent: sent creator payout lines, at least 10 minutes old, times
  * rounded down to 15 minutes. No order, listing or buyer data ever comes back. */
@@ -15,7 +16,7 @@ export type RecentPayout = {
 };
 export type RecentPayouts = { payouts: RecentPayout[] };
 
-export const solscanTx = (sig: string) => `https://solscan.io/tx/${sig}?cluster=devnet`;
+export const solscanTx = (sig: string) => solscanTxUrl(sig);
 export const shortSig = (sig: string) => `${sig.slice(0, 4)}…${sig.slice(-4)}`;
 
 /** Times are rounded server-side, so the copy says "about". */
