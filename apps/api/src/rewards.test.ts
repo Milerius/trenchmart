@@ -349,6 +349,11 @@ describe('$MART holder rewards', () => {
       epochs: { status: string; sig: string | null }[];
     };
     expect(me.epochs[0]!.status).toBe('pay');
+    const top = (await (await app.request('/api/v1/rewards/top?limit=3')).json()) as {
+      holders: { wallet: string; rank: number }[];
+    };
+    expect(top.holders.map((h) => h.rank)).toEqual([1, 2, 3]);
+    expect(top.holders[0]!.wallet).toBe(holders[1048]);
     expect(me.epochs[0]!.sig).toBeTruthy();
   }, 120_000);
 

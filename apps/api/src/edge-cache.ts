@@ -42,7 +42,7 @@ export const EDGE_RULES: Rule[] = [
   { pattern: /^\/api\/v1\/payouts\/recent$/, fresh: 60, stale: 300, shared: true },
   // $MART holder rewards: public epochs feed and the current epoch (viewer-independent).
   {
-    pattern: /^\/api\/v1\/rewards\/(epochs\/recent|current)$/,
+    pattern: /^\/api\/v1\/rewards\/(epochs\/recent|current|top)$/,
     fresh: 30,
     stale: 300,
     shared: true,

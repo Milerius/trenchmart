@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
 import { PayoutsCard } from '@/components/payouts';
+import { RewardsCard } from '@/components/rewards';
 import { protocol } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Treasury · TrenchMart docs' };
@@ -50,6 +51,19 @@ export default function TreasuryDocsPage() {
         </p>
         <div className="not-prose mt-5">
           <PayoutsCard title="Latest creator payouts" limit={8} />
+        </div>
+      </DocSection>
+      <DocSection id="holder-rewards" title="$MART holder rewards">
+        <p data-testid="rewards-treasury">
+          Half of net revenue (fees minus ledgered running costs) goes to the top 1,000 $MART
+          holders every 3 hours. The holders&apos; share of each fee is paid to a separate Squads
+          vault (index 1). Once per epoch a spending limit on that vault, whose only destination is
+          the rewards hot wallet, moves exactly the epoch&apos;s payouts; the hot wallet then sends
+          SOL in transactions of 20 transfers each. Every funding and batch signature is listed
+          below and in the public feed.
+        </p>
+        <div className="not-prose mt-5">
+          <RewardsCard title="Latest holder distributions" limit={5} />
         </div>
       </DocSection>
       <DocSection id="program" title="The on-chain program">

@@ -301,6 +301,7 @@ const FOOTER_COLUMNS: { title: string; links: [string, string][] }[] = [
       ['Verify & proof', '/verify'],
       ['How automated review works', '/sell'],
       ['Fees & $MART', '/token'],
+      ['$MART holder rewards', '/rewards'],
       ['Status', '/status'],
     ],
   },
@@ -374,7 +375,7 @@ function Footer({ social }: { social?: Social }) {
 // The mode must match api(): same-origin with credentials ('use-credentials'), or the
 // browser fetches twice. These are hints only; nothing here changes what is cached.
 // Pages that draw their own full-width hero and content column.
-const FULL_BLEED = new Set(['/', '/search', '/creators', '/token', '/verify', '/sell']);
+const FULL_BLEED = new Set(['/', '/search', '/creators', '/token', '/rewards', '/verify', '/sell']);
 const FULL_BLEED_PREFIXES = ['/c/', '/u/'];
 
 const PRELOADED_READS = ['/api/v1/me', '/api/v1/config/public'];

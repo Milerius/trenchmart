@@ -2,6 +2,7 @@
 
 import { solToLamports } from '@trenchmart/shared/money';
 import { displaySplitBps } from '@trenchmart/shared/rewards';
+import Link from 'next/link';
 import { useState } from 'react';
 import { DEFAULT_FEES, FeeBreakdown, TIER_ORDER, TierCards } from '@/components/fees';
 import { GradientWords } from '@/components/gradient-words';
@@ -158,6 +159,13 @@ export default function TokenPage() {
             Where every fee goes
           </h2>
           <p className="m-0 max-w-2xl text-ink-2">
+            <Link
+              href="/rewards"
+              className="text-info hover:underline"
+              data-testid="token-rewards-link"
+            >
+              Holder rewards →
+            </Link>{' '}
             Half of net revenue (fees after your tier discount, minus ledgered running costs) goes
             to the top 1,000 $MART holders every 3 hours. The other half is split across the four
             buckets in their usual proportions. The verification bucket funds automated review, not

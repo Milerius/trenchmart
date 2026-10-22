@@ -8,6 +8,7 @@ const STATIC = [
   '/search',
   '/sell',
   '/token',
+  '/rewards',
   '/creators',
   '/verify',
   '/docs',
