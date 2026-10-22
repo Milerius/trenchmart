@@ -258,7 +258,7 @@ function Leaderboard() {
           <EmptyState title={EMPTY_COPY[tab].title} body={EMPTY_COPY[tab].body} />
         ) : (
           <ol
-            className="m-0 grid items-end gap-3 p-0 md:grid-cols-3"
+            className="grid list-none items-end gap-3 p-0 md:grid-cols-3"
             data-testid="leaderboard-podium"
           >
             {podiumOrder.map((row) => {
@@ -266,7 +266,7 @@ function Leaderboard() {
               return (
                 <li
                   key={row.creator.wallet}
-                  className={`list-none ${first ? 'order-first md:order-none md:-translate-y-4' : ''}`}
+                  className={`list-none ${first ? 'order-first md:order-none md:mb-4' : ''}`}
                 >
                   <Link
                     href={profileHref(row.creator)}
