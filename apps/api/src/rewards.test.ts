@@ -30,6 +30,7 @@ import {
   recentEpochs,
   recordRevenue,
   resumeEpoch,
+  rewardHealth,
   rewardsTick,
   TOKEN_PROGRAM_ID,
   type RewardChain,
@@ -454,6 +455,19 @@ describe('$MART holder rewards', () => {
       headers: { authorization: `Bearer ${TOKEN}` },
     });
     expect(ok.status).toBe(200);
+  });
+
+  it('REWARD_BALANCE_LOW only fires when an amount is due and the vault cannot cover it', async () => {
+    const { deps, chain } = await setup();
+    chain.vault = 0n;
+    const codes = async () => (await rewardHealth(deps)).map((a) => a.code);
+    // Nothing due, empty vault: the idle state, no alert (2026-10-22 false alarm).
+    expect(await codes()).not.toContain('REWARD_BALANCE_LOW');
+    await sql`insert into reward_epochs (epoch_id, starts_at, ends_at, status, seed, sample_ticks, fund_lamports)
+      values (1, now(), now(), 'closed', 's', '{}', ${String(50_000_000n)})`;
+    expect(await codes()).toContain('REWARD_BALANCE_LOW');
+    chain.vault = 51_000_000n; // covers what is due plus the 0.001 SOL floor
+    expect(await codes()).not.toContain('REWARD_BALANCE_LOW');
   });
 
   it('survives an epoch-length change (900 s test epochs, then back to 3 h) without losing carry', async () => {

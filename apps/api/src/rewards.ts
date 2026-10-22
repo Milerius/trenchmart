@@ -981,7 +981,8 @@ export async function rewardHealth(deps: Deps): Promise<RewardAlert[]> {
       select coalesce(sum(carry), 0)::bigint as sum from reward_holders
     `;
     const owed = BigInt(due?.sum ?? 0n);
-    if ((vault?.lamports ?? 0n) < owed + VAULT_FLOOR)
+    // Only when something is actually due: an empty vault with nothing owed is the normal idle state.
+    if (owed > 0n && (vault?.lamports ?? 0n) < owed + VAULT_FLOOR)
       alerts.push({
         level: 'critical',
         code: 'REWARD_BALANCE_LOW',

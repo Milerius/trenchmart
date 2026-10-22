@@ -182,7 +182,7 @@ function Nav({ social }: { social?: Social }) {
           name="q"
           type="search"
           aria-label="Search listings"
-          placeholder="Search scripts, wallets, filters"
+          placeholder="Search…"
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
         />
         {mobile ? null : (

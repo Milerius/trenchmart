@@ -102,7 +102,8 @@ export async function expectNoOverlap(items: { label: string; locator: Locator }
  * `expectLegible` fails when a visible control cannot be read in full:
  * - its box is narrower than `minWidth` (a search box squashed to an icon pill, a button
  *   shrunk around one letter);
- * - it or any descendant clips its text (scrollWidth > clientWidth);
+ * - it or any descendant clips its text (scrollWidth > clientWidth), or an input's placeholder
+ *   is wider than the input's content box (canvas measureText with the input's font);
  * - its text paints outside its own box, or onto any of the `others` boxes (the search "/"
  *   hint spilling onto "Sell");
  * - for text inputs, the input itself is narrower than `minInputWidth` (default 160 px).
@@ -129,6 +130,18 @@ export async function expectLegible(
         if (node.matches('.sr-only') || node.closest('.sr-only')) continue;
         if (node instanceof HTMLInputElement && node.type !== 'hidden') {
           inputs.push(node.getBoundingClientRect().width);
+          // Placeholder text is not a text node: measure it with the input's own font.
+          if (node.placeholder && !node.value) {
+            const ctx = document.createElement('canvas').getContext('2d')!;
+            ctx.font = style.font;
+            const text = ctx.measureText(node.placeholder).width;
+            const room =
+              node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+            if (text > room + 1)
+              clipped.push(
+                `placeholder "${node.placeholder}" ${text.toFixed(0)}>${room.toFixed(0)}`,
+              );
+          }
           continue;
         }
         if (
