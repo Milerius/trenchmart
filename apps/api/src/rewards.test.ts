@@ -123,6 +123,18 @@ function fakeChain(signer: string, limit: string): Fake {
       const sig = bs58.encode(parsed.signatures[0]!);
       if (f.landed.has(sig)) return sig; // duplicate broadcast of the same signed tx: no-op
       const squads = parsed.instructions.find((i) => i.programId === SQUADS_PROGRAM_ID);
+      // Like the runtime: a tx that loads the Squads program (>1 MiB of program data, measured
+      // on devnet) fails with MaxLoadedAccountsDataSizeExceeded under a smaller loaded-data cap.
+      const cap = parsed.instructions.find(
+        (i) => i.programId === 'ComputeBudget111111111111111111111111111111' && i.data[0] === 4,
+      );
+      const loaded = cap
+        ? new DataView(cap.data.buffer, cap.data.byteOffset).getUint32(1, true)
+        : 64 * 1024 * 1024;
+      if (squads && loaded < 2 * 1024 * 1024) {
+        f.landed.set(sig, { err: 'MaxLoadedAccountsDataSizeExceeded' });
+        return sig;
+      }
       if (squads) {
         const lamports = new DataView(squads.data.buffer, squads.data.byteOffset).getBigUint64(
           8,
