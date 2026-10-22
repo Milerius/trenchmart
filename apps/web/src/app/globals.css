@@ -89,15 +89,26 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #161916 0%, #1e221e 50%, #161916 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
+  position: relative;
+  overflow: hidden;
+  background: #161916;
   border-radius: 6px;
+}
+
+/* The sweep moves with a transform (compositor only). Animating background-position repainted
+   every skeleton on the main thread each frame while the page was loading. */
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, #1e221e 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s linear infinite;
 }
 
 @keyframes shimmer {
   to {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }
 
@@ -235,6 +246,27 @@ body {
 @media (min-width: 640px) {
   .hero-aurora {
     opacity: 0.85;
+  }
+}
+
+.cv-section {
+  /* Below-the-fold home sections: skipped by layout and paint until near the viewport. The
+     padding and matching negative margin give card glows and shadows room inside the paint
+     containment, so nothing is clipped. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+  margin: -40px -16px;
+  padding: 40px 16px;
+}
+
+html[data-cv='off'] .cv-section {
+  content-visibility: visible;
+}
+
+@media (min-width: 640px) {
+  .cv-section {
+    margin-inline: -24px;
+    padding-inline: 24px;
   }
 }
 
@@ -431,7 +463,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton,
+  .skeleton::after,
   .ticker-track,
   .hero-glow,
   .hero-particle,

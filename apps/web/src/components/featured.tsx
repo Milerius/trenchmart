@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { ListingCard, type Listing } from '@/components/listings';
 import { Label } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -19,7 +19,10 @@ export function useFeatured(placement: 'home' | 'category', category?: string) {
     void api<{ items: Listing[] }>(`/featured?${query}`)
       .then(
         (body) =>
-          !stop && setItems(rememberRead(key, Array.isArray(body?.items) ? body.items : [])),
+          !stop &&
+          startTransition(() =>
+            setItems(rememberRead(key, Array.isArray(body?.items) ? body.items : [])),
+          ),
       )
       .catch(() => !stop && setItems([]));
     return () => {
