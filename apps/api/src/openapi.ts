@@ -198,6 +198,13 @@ export const ROUTES: RouteDoc[] = [
   },
   {
     method: 'get',
+    path: '/payouts/recent',
+    tag: 'Discovery',
+    summary: 'Recent creator payouts with transaction signatures (delayed, rounded)',
+    public: true,
+  },
+  {
+    method: 'get',
     path: '/prices/sol',
     tag: 'Discovery',
     summary: 'SOL/USD used for display',

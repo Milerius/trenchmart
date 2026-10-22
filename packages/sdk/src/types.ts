@@ -246,3 +246,25 @@ export type CreatorReview = {
 };
 
 export type Page = { limit?: number; before?: string };
+
+/** One public creator payout line. `creator` follows the leaderboard identity rules. */
+export type RecentPayout = {
+  id: string;
+  at: string;
+  amount: { lamports: string; sol: string; usdCents: string | null };
+  txSig: string;
+  creator: {
+    kind: 'x' | 'pseudonym' | 'wallet';
+    name: string;
+    handle: string | null;
+    avatarUrl: string | null;
+    wallet: string;
+  };
+};
+
+export type RecentPayouts = {
+  solUsd: { centsPerSol: string | null; source: string };
+  delayMinutes: number;
+  roundMinutes: number;
+  payouts: RecentPayout[];
+};

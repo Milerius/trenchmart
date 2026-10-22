@@ -80,6 +80,15 @@ for (const r of (await tm.creatorReviews({ unreplied: true })).reviews)
 
 Creating a listing needs the category bond; every version passes the security scan. X is optional (a trust badge for buyers, verified once in the studio) and never required to list, publish or sell.
 
+## Public data
+
+```ts
+const { payouts } = await client.recentPayouts(20);
+// [{ at, amount: { lamports, sol, usdCents }, txSig, creator: { kind, name, wallet } }]
+```
+
+Public, no key needed. Creator payouts only, at least 10 minutes old, times rounded to 15 minutes.
+
 ## Signers
 
 - `keypairSigner(secretKey)`: a local ed25519 keypair (64-byte secret key).

@@ -103,7 +103,7 @@ import { registerReviewRoutes } from './reviews';
 import { computeRanks, registerUpvoteRoutes } from './ranking';
 import { featuredToday, registerFeaturingRoutes, featureMaintenance } from './featuring';
 import { paidToCreators, registerLeaderboardRoutes } from './leaderboard';
-import { scanWalletIntel } from './social';
+import { identityRow, scanWalletIntel } from './social';
 import {
   authenticateApiKey,
   consumeKeyRate,
@@ -227,6 +227,9 @@ export type PriceCacheBox = { value: PriceCache };
 // The Worker builds one app per request (a postgres.js client cannot be shared across
 // requests in workerd), so it passes a module-level box to keep the SOL price cache warm.
 /** Listing links may carry the id instead of the slug; both resolve to the same page. */
+/** Public payout feed: at least 10 minutes behind, times rounded down to 15 minutes. */
+const PAYOUT_FEED_DELAY_MS = 10 * 60_000;
+const PAYOUT_FEED_ROUND_MS = 15 * 60_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null }): App {
@@ -1613,6 +1616,46 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       { status: string }[]
     >`select status from versions where id = ${version.id}`;
     return c.json({ status: fresh[0]?.status });
+  });
+
+  // Public "Recent payouts" feed (/status, treasury docs, home band). Creator lines only:
+  // never refunds or fee buckets, never the listing or order, and only lines sent at least
+  // PAYOUT_FEED_DELAY_MS ago with the time rounded down, so a payout cannot be matched to a sale.
+  api.get('/payouts/recent', async (c) => {
+    const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 20));
+    const now = deps.now().getTime();
+    const before = new Date(now - PAYOUT_FEED_DELAY_MS);
+    const rows = await deps.sql<Record<string, any>[]>`
+      select p.id, p.recipient, p.amount, p.tx_sig, coalesce(p.sent_at, p.created_at) as at,
+        u.handle, u.display_name, u.x_user_id, u.x_handle, u.avatar_media_id
+      from payouts p left join users u on u.wallet = p.recipient
+      where p.bucket = 'creator' and p.status = 'sent' and p.tx_sig is not null
+        and coalesce(p.sent_at, p.created_at) <= ${before}
+      order by coalesce(p.sent_at, p.created_at) desc
+      limit ${limit}
+    `;
+    const price = await solPrice();
+    return c.json(
+      jsonSafe({
+        solUsd: { centsPerSol: price.centsPerSol, source: price.source },
+        delayMinutes: PAYOUT_FEED_DELAY_MS / 60_000,
+        roundMinutes: PAYOUT_FEED_ROUND_MS / 60_000,
+        payouts: rows.map((row) => {
+          const at = new Date(row.at as Date).getTime();
+          return {
+            id: row.id,
+            at: new Date(at - (at % PAYOUT_FEED_ROUND_MS)).toISOString(),
+            amount: moneyView(
+              row.amount as bigint,
+              price.centsPerSol,
+              formatSol(row.amount as bigint),
+            ),
+            txSig: row.tx_sig,
+            creator: identityRow({ ...row, wallet: row.recipient }),
+          };
+        }),
+      }),
+    );
   });
 
   api.get('/studio/payouts', async (c) => {

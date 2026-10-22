@@ -90,6 +90,10 @@ tx `4mp7gjFz9H26WAvMAEbbP8Ln1EEvsyWvDhc8xJzzbua3o7tvJ4pHEjeur7YzW1yEqm6XupMb5X4U
 The first automated run paid 27 lines (2.7705 SOL, including the 21 that had waited since
 Oct 17–19). Example: `59QevpDAmaJtd3kz9sUqRN4tWuRuqFWnKzDd3iDykXrF66BXv3pTsUhLMoGPbFbYD7Siu7fq5vuR58PaC8Qzv36a`.
 
+## Public feed
+
+`GET /api/v1/payouts/recent` lists sent creator lines with their signature (Solscan devnet links on `/status`, `/docs/treasury` and the home "Paid to creators" band). Fee buckets and refunds are never listed. To keep a payout from being matched to a sale in the activity feed, a line shows up only 10 minutes after it was sent and its time is rounded down to 15 minutes; no order, listing or buyer field is returned.
+
 ## Setting up the spending limit (one multisig signature)
 
 The limit is a Squads **config transaction** `AddSpendingLimit` — it needs the multisig

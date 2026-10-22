@@ -15,6 +15,7 @@ import {
   type Tone,
 } from '@/components/ui';
 import { api } from '@/lib/api';
+import { PayoutsCard } from '@/components/payouts';
 
 // Public status page over GET /api/v1/status (docs/ops/status-page.md). Every number here comes
 // from the 5-minute probes; days without a probe are drawn grey ("no data"), never guessed.
@@ -413,6 +414,9 @@ export function StatusBoard() {
           </section>
         </>
       ) : null}
+      <div className="mt-10">
+        <PayoutsCard />
+      </div>
       <DocSection id="how" title="How to read this">
         <p>
           <strong className="text-ink">Operational</strong> means the last check got a normal

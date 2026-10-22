@@ -39,6 +39,7 @@ export const EDGE_RULES: Rule[] = [
   { pattern: /^\/api\/v1\/(categories|stats|creators\/top)$/, fresh: 60, stale: DAY, shared: true },
   { pattern: /^\/api\/v1\/(config\/public|prices\/sol)$/, fresh: 60, stale: 600, shared: true },
   { pattern: /^\/api\/v1\/activity$/, fresh: 30, stale: 120, shared: true },
+  { pattern: /^\/api\/v1\/payouts\/recent$/, fresh: 60, stale: 300, shared: true },
   // Public status page: one aggregate read for everyone, refreshed about once a minute (the
   // probes run every 5 min). Viewer-independent, so signed-in visitors share the copy.
   { pattern: /^\/api\/v1\/status$/, fresh: 60, stale: 300, shared: true },

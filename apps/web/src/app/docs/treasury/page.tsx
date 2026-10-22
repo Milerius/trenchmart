@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DocHeader, DocSection } from '@/components/doc';
+import { PayoutsCard } from '@/components/payouts';
 import { protocol } from '@/lib/protocol-facts';
 
 export const metadata: Metadata = { title: 'Treasury · TrenchMart docs' };
@@ -41,6 +42,15 @@ export default function TreasuryDocsPage() {
           a Squads signer. The multisig can remove the spending limit at any time, which stops
           automated payouts. Recipients that are still unconfigured are left out.
         </p>
+        <p>
+          Every signature is public. The latest creator payouts are below, each linked to its
+          transaction on Solscan. Fee-bucket transfers and refunds are not listed, and lines appear
+          at least 10 minutes after sending with times rounded to 15 minutes, so a payout cannot be
+          matched to a sale.
+        </p>
+        <div className="not-prose mt-5">
+          <PayoutsCard title="Latest creator payouts" limit={8} />
+        </div>
       </DocSection>
       <DocSection id="program" title="The on-chain program">
         <p>

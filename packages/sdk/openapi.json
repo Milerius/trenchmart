@@ -1037,6 +1037,40 @@
         "security": []
       }
     },
+    "/payouts/recent": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Recent creator payouts with transaction signatures (delayed, rounded)",
+        "operationId": "getPayoutsRecent",
+        "x-scope": "none",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/prices/sol": {
       "get": {
         "tags": [
