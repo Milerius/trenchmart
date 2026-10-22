@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     'trenchmart:escrow-program': ESCROW_PROGRAM_ID,
     'trenchmart:treasury-vault': DEVNET_ADDRESSES.vault,
     'trenchmart:squads-multisig': DEVNET_ADDRESSES.multisig,
-    'trenchmart:trench-mint': DEVNET_ADDRESSES.trenchMint,
+    'trenchmart:trench-mint': DEVNET_ADDRESSES.martMint,
     'trenchmart:manifest': '/.well-known/trenchmart.json',
   },
 };

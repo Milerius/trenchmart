@@ -44,7 +44,7 @@ Work milestone by milestone. Don't start the next until the acceptance criteria 
 - Quote, order, unsigned tx, submit, verify via RPC and Helius webhook (idempotent).
 - Signed downloads with watermark; `/verify` tool.
 - Cron: expire, release, payout batches; admin batch page.
-- Helius $TRENCH webhook (use a devnet test mint), snapshot on first login, reconcile cron, 72h min rule, holder-only window.
+- Helius $MART webhook (use a devnet test mint), snapshot on first login, reconcile cron, 72h min rule, holder-only window.
   **Done when:** end-to-end on devnet: buyer pays 1.53 SOL at Trencher tier for a 1.5 SOL listing → order paid → download works and watermark line contains the order id → `/verify` says "Matches" → after the escrow window (set to 2 min in dev) payouts appear: creator 1.5 SOL and buckets totaling 0.030 SOL. Sending tokens away drops the tier only after the window passes (test with fake timestamps). Webhook replay creates no duplicates.
 
 ## M6 · Disputes, reviews, hardening (2 days)

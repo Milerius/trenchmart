@@ -6,13 +6,13 @@ Four screens are fully designed (`design/*.dc.html`). Others below are specified
 
 ### 1. Home & browse — `/` (`design/Main.dc.html`)
 
-1. **Top ticker**: "Solana devnet · live", `$TRENCH [PRICE]`, "Holders: up to 100% off the 5% fee", right: "Every version scanned, sandboxed and AI-verified before it goes live". A devnet banner sits above it (see `docs/ux-guidelines.md`).
-2. **Nav**: logo, Explore / Sell / $TRENCH / Creators, search (focus with `/`), tier chip, wallet button (or "Connect wallet").
+1. **Top ticker**: "Solana devnet · live", `$MART [PRICE]`, "Holders: up to 100% off the 5% fee", right: "Every version scanned, sandboxed and AI-verified before it goes live". A devnet banner sits above it (see `docs/ux-guidelines.md`).
+2. **Nav**: logo, Explore / Sell / $MART / Creators, search (focus with `/`), tier chip, wallet button (or "Connect wallet").
 3. **Hero** (2 columns): pill "Solana first · more chains later"; H1 "The verified edge, / for sale."; lead copy; buttons "Browse the market" (primary) + "Sell your tooling". Right: featured listing as a `CodeWindow` showing its header, permission ticks and a filter snippet, footer with title/creator/price → links to listing.
 4. **Trust strip**: Static + sandbox scan · Human review · Hash-pinned versions · Escrowed payouts.
 5. **Categories** (6 cards).
 6. **Trending this week**: terminal filter pills (All, Axiom, GMGN, Photon, Terminal, Trojan) → filters cards; grid of `ListingCard`. Data: `GET /listings?sort=trending&terminal=`.
-7. **Bottom split**: "Top verified creators" list (rank, avatar, handle, category · bond, 30d volume) + $TRENCH holder banner (3 tier mini-tiles, CTA → `/token`).
+7. **Bottom split**: "Top verified creators" list (rank, avatar, handle, category · bond, 30d volume) + $MART holder banner (3 tier mini-tiles, CTA → `/token`).
 8. **Footer**: Security policy, Report a listing, Become a verifier, Docs; "Not financial advice. Tools don't guarantee profits."
 
 ### 2. Listing — `/l/[slug]` (`design/Listing.dc.html`)
@@ -34,9 +34,9 @@ Four screens are fully designed (`design/*.dc.html`). Others below are specified
 - **Left**: "Step 3 · Automated scan" with file row (name, size, sha256, Replace file), `ScanRow` list, status line "1 warning · fix or explain to continue". `FlaggedCode` per warn with explain textarea → `POST /explain`, and quick fix "Declare @connect host" (opens new version flow with header patched suggestion — POC: just copy text).
 - **Right**: Listing details form (title, category, price SOL, license, holder-only early access checkbox) and Trust requirements (wallet signed, X linked, bond progress, verification fee + waiver note, bond explanation).
 
-### 4. Fees & $TRENCH — `/token` (`design/Economics.dc.html`)
+### 4. Fees & $MART — `/token` (`design/Economics.dc.html`)
 
-- Hero: pill "$TRENCH · fair launch on pump.fun", H1 "Fees fund the token. / The token cuts your fees.", 3 stat tiles (5% / 100% / 40%).
+- Hero: pill "$MART · fair launch on pump.fun", H1 "Fees fund the token. / The token cuts your fees.", 3 stat tiles (5% / 100% / 40%).
 - Fee model table with "PROPOSED" tag (drop the tag when final).
 - "Where every fee goes": `SplitBar` + 4 explainer cards.
 - Holder tiers: 3 `TierCard`s.

@@ -49,3 +49,11 @@ describe('H-01 fail-closed secrets', () => {
     expect(() => readEnv({ APP_URL: 'http://localhost:3000' })).not.toThrow();
   });
 });
+
+describe('$MART mint config', () => {
+  it('reads MART_MINT and accepts TRENCH_MINT as a one-release alias', () => {
+    expect(readEnv({ MART_MINT: 'Mart111' }).martMint).toBe('Mart111');
+    expect(readEnv({ TRENCH_MINT: 'Old111' }).martMint).toBe('Old111');
+    expect(readEnv({ MART_MINT: 'Mart111', TRENCH_MINT: 'Old111' }).martMint).toBe('Mart111');
+  });
+});

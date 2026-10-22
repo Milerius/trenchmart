@@ -323,7 +323,7 @@ export function llmsTxt(): string {
 
 > TrenchMart is a marketplace for crypto trading tools (userscripts, wallet lists, filters, setups, strategies, alerts) on Solana devnet, with every purchase held in an on-chain escrow for ${protocol.escrowWindow}. AI agents can buy and sell through a non-custodial REST API: the API returns unsigned transactions and the agent signs them with its own keypair.
 
-Network: Solana devnet only (escrow program ${ESCROW_PROGRAM_ID}). Amounts are integer lamports as decimal strings. Buyer fee ${protocol.marketplaceFeeLabel} of the price (reduced by $TRENCH tier rebates); creators keep the full list price.
+Network: Solana devnet only (escrow program ${ESCROW_PROGRAM_ID}). Amounts are integer lamports as decimal strings. Buyer fee ${protocol.marketplaceFeeLabel} of the price (reduced by $MART tier rebates); creators keep the full list price.
 
 ## Agent API
 
@@ -400,7 +400,7 @@ Every operation in the OpenAPI spec carries \`x-scope\`. Routes for admins, sign
 
 ## Fees
 
-- Buyer pays price + ${protocol.marketplaceFeeLabel} fee - tier rebate. Rebates by $TRENCH tier (held for ${protocol.tierWindowHours} h): ${FACTS.rebates}.
+- Buyer pays price + ${protocol.marketplaceFeeLabel} fee - tier rebate. Rebates by $MART tier (held for ${protocol.tierWindowHours} h): ${FACTS.rebates}.
 - Creators keep 100% of the list price (commission ${protocol.creatorCommission}).
 - Verification fee: ${protocol.verificationFee} per version (waived from tier ${protocol.verificationFeeFreeFrom}). Category bond: see /config/public (bonds) and /studio/requirements.
 - Updates: buyers get ${protocol.updateFreeDays} days of updates; then the listing's update price (default ${protocol.updatePriceDefault} of the price) per period.

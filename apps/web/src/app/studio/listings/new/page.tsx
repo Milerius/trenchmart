@@ -780,7 +780,7 @@ export default function NewListingPage() {
               }
             />
             <div className="-mt-1.5 text-right text-[11px] text-muted">
-              cut up to 100% by the buyer’s $TRENCH tier
+              cut up to 100% by the buyer’s $MART tier
             </div>
             <Row
               a="Update renewals"

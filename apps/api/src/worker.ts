@@ -94,8 +94,8 @@ function depsFor(env: Binding, url: string) {
     getTx: (signature: string) => fetchTransaction(parsed.rpcUrl, signature),
     blockhash: () => latestBlockhash(parsed.rpcUrl),
     simulate: (tx: Uint8Array) => simulateUnsigned(parsed.rpcUrl, tx),
-    trenchBalance: parsed.trenchMint
-      ? (wallet: string) => tokenBalance(parsed.rpcUrl, wallet, parsed.trenchMint as string)
+    martBalance: parsed.martMint
+      ? (wallet: string) => tokenBalance(parsed.rpcUrl, wallet, parsed.martMint as string)
       : undefined,
     walletHistory: (wallet: string, sinceMs: number) =>
       walletHistory(parsed.rpcUrl, wallet, sinceMs),

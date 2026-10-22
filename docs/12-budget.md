@@ -32,7 +32,7 @@ Custody for launch stays a **Squads multisig vault**. A full Anchor escrow audit
 | Item                                     | When                |           Cost | Notes                                                                  |
 | ---------------------------------------- | ------------------- | -------------: | ---------------------------------------------------------------------- |
 | pump.fun token launch                    | Before launch       |   ~$1–5 in SOL | No platform fee. Network fees only                                     |
-| Initial $TRENCH dev buy                  | Optional            | Owner's choice | Disclose it. Not required to run the market                            |
+| Initial $MART dev buy                  | Optional            | Owner's choice | Disclose it. Not required to run the market                            |
 | Squads multisig vault setup              | Before mainnet      |      ~$1–5 SOL | estimate. Default escrow custody                                       |
 | Devnet creator bond / test funds         | POC                 |             $0 | Airdrop                                                                |
 | Seed liquidity for treasury buckets      | Optional            | Owner's choice | Buyback / AI verification / ops / safety                               |

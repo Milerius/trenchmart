@@ -50,7 +50,7 @@ function lamportsToSol(lamports: string): string {
   return frac ? `${whole}.${frac}` : whole.toString();
 }
 
-/** Admin: featuring prices, slots per day, $TRENCH tier discounts and rules (config rows). */
+/** Admin: featuring prices, slots per day, $MART tier discounts and rules (config rows). */
 export function FeaturingAdmin() {
   const [data, setData] = useState<AdminFeaturing | null>(null);
   const [prices, setPrices] = useState<Record<Kind, { perDay: string; sol: string }> | null>(null);
@@ -166,7 +166,7 @@ export function FeaturingAdmin() {
           ))}
         </fieldset>
         <fieldset className="m-0 space-y-2 rounded-ctl border border-line p-3">
-          <legend className="px-1 text-sm font-semibold">$TRENCH tier discount (%)</legend>
+          <legend className="px-1 text-sm font-semibold">$MART tier discount (%)</legend>
           {TIERS.map((t) => (
             <div key={t} className="flex items-center justify-between gap-2 text-sm">
               <span className="capitalize text-ink-2">{t}</span>

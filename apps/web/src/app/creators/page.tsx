@@ -57,7 +57,7 @@ const EMPTY_COPY: Record<BoardTab, { title: string; body: string }> = {
   },
   upvoted: {
     title: 'No counted upvotes yet.',
-    body: 'Only upvotes from buyers and $TRENCH holders count toward the board.',
+    body: 'Only upvotes from buyers and $MART holders count toward the board.',
   },
 };
 
@@ -560,7 +560,7 @@ function RULE_CARDS(rules: Board['rules']): { tab: BoardTab; formula: string; no
     {
       tab: 'upvoted',
       formula: 'Σ upvote weight on live listings',
-      note: `Buyers ×${rules.weights.buyer}, ${rules.holderMinTier}+ $TRENCH holders ×${rules.weights.holder}, any other wallet ×0 (shown, not counted).`,
+      note: `Buyers ×${rules.weights.buyer}, ${rules.holderMinTier}+ $MART holders ×${rules.weights.holder}, any other wallet ×0 (shown, not counted).`,
     },
   ];
 }

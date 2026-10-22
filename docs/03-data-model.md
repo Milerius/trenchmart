@@ -286,7 +286,7 @@ create table audit_log (
 }
 ```
 
-Tier thresholds are whole $TRENCH (Scout 100k, Trencher 1M, OG 10M of a 1B supply). Tier logic treats any non-integer string as "tier disabled".
+Tier thresholds are whole $MART (Scout 100k, Trencher 1M, OG 10M of a 1B supply). Tier logic treats any non-integer string as "tier disabled".
 
 ## State machines
 

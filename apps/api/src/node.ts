@@ -26,8 +26,8 @@ const app = createApp({
   getTx: (signature) => fetchTransaction(env.rpcUrl, signature),
   blockhash: () => latestBlockhash(env.rpcUrl),
   simulate: (tx) => simulateUnsigned(env.rpcUrl, tx),
-  trenchBalance: env.trenchMint
-    ? (wallet) => tokenBalance(env.rpcUrl, wallet, env.trenchMint as string)
+  martBalance: env.martMint
+    ? (wallet) => tokenBalance(env.rpcUrl, wallet, env.martMint as string)
     : undefined,
   escrowChain: {
     account: (address) => accountData(env.rpcUrl, address),

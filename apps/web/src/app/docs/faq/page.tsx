@@ -26,7 +26,7 @@ const QA: [string, string][] = [
     `Once per day (UTC) per wallet and network. After that each check costs ${protocol.verifySupplement}, paid on chain. A wallet sign-in is required so the limit can be enforced.`,
   ],
   [
-    'Does $TRENCH pay yield?',
+    'Does $MART pay yield?',
     'No. A tier can lower fees or a bond. It is not a share of the marketplace and not a promise that the token will increase in price.',
   ],
   [

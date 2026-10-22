@@ -110,8 +110,8 @@ export type Deps = {
   xFetch?: typeof fetch;
   /** Fetch used by monitoring checks and alert delivery (ops.ts). Defaults to the global fetch. */
   opsFetch?: typeof fetch;
-  /** On-chain $TRENCH balance of a wallet in base units. Optional: tiers fall back to stored rows. */
-  trenchBalance?: (wallet: string) => Promise<bigint>;
+  /** On-chain $MART balance of a wallet in base units. Optional: tiers fall back to stored rows. */
+  martBalance?: (wallet: string) => Promise<bigint>;
   /**
    * Anti-sybil chain read (social.ts): the wallet's oldest activity and who sent it SOL
    * since `sinceMs`. Optional: without it, wallets count by TrenchMart account age only.
@@ -180,7 +180,7 @@ export async function tierForWallet(
   needed: bigint;
 }> {
   // Display-only reads (/me on every page) skip the on-chain re-read: the stored history is
-  // kept current by the $TRENCH webhook, and every fee decision (checkout, verification,
+  // kept current by the $MART webhook, and every fee decision (checkout, verification,
   // featuring) still reconciles first. A Solana RPC call here cost ~1 s on each page view.
   if (opts.reconcile === false) await ensureSnapshot(deps, wallet);
   else await reconcileBalance(deps, wallet);
@@ -201,7 +201,7 @@ export async function tierForWallet(
 }
 
 /**
- * I-06: a webhook names wallets that moved $TRENCH, but its amounts are never trusted.
+ * I-06: a webhook names wallets that moved $MART, but its amounts are never trusted.
  * The balance is re-read from chain and stored only if the RPC answered.
  */
 export async function recordChainBalance(
@@ -219,9 +219,9 @@ export async function recordChainBalance(
 }
 
 async function readTrench(deps: Deps, wallet: string): Promise<bigint | null> {
-  if (!deps.trenchBalance) return null;
+  if (!deps.martBalance) return null;
   try {
-    return await deps.trenchBalance(wallet);
+    return await deps.martBalance(wallet);
   } catch {
     // An RPC failure must never invent a balance. Keep the stored history as it is.
     return null;
@@ -235,7 +235,7 @@ async function readTrench(deps: Deps, wallet: string): Promise<bigint | null> {
 export async function ensureSnapshot(deps: Deps, wallet: string): Promise<void> {
   const existing = await deps.sql`select 1 from token_balances where wallet = ${wallet} limit 1`;
   if (existing.length > 0) return;
-  const amount = deps.trenchBalance ? await readTrench(deps, wallet) : 0n;
+  const amount = deps.martBalance ? await readTrench(deps, wallet) : 0n;
   if (amount === null) return;
   await deps.sql`
     insert into token_balances (wallet, amount, ts, source)
@@ -255,7 +255,7 @@ const reconciledAt = new Map<string, number>();
 const RECONCILED_MAX = 5_000;
 
 export async function reconcileBalance(deps: Deps, wallet: string): Promise<void> {
-  if (!deps.trenchBalance) return;
+  if (!deps.martBalance) return;
   const nowMs = deps.now().getTime();
   const checked = reconciledAt.get(wallet);
   if (checked !== undefined && nowMs >= checked && nowMs - checked < BALANCE_RECONCILE_MS) return;

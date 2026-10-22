@@ -267,7 +267,7 @@ export function PreviewNotice({
           <p className="m-0 font-semibold">Preview prices</p>
           <p className="m-0 text-[13px] text-ink-2">
             You&apos;re seeing list prices. Connect your wallet to see your exact price with your
-            $TRENCH tier discount (up to 100% off the 5% fee).
+            $MART tier discount (up to 100% off the 5% fee).
           </p>
         </div>
       </div>

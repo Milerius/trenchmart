@@ -12,7 +12,7 @@ test.describe('phase 1: fonts', () => {
       'Trending this week',
       'Four steps, no surprises.',
       'Find your edge',
-      'Hold $TRENCH, pay less.',
+      'Hold $MART, pay less.',
       "Built so you don't have to trust anyone.",
       'Have an edge? Sell it.',
     ]) {
@@ -263,12 +263,12 @@ test.describe('phase 5: header, nav and footer', () => {
     });
     expect(style.position).toBe('sticky');
     expect(style.filter).toContain('blur(18px)');
-    // Prototype nav: Explore, Creators, $TRENCH, Verify, Docs.
+    // Prototype nav: Explore, Creators, $MART, Verify, Docs.
     const primary = header.getByRole('navigation', { name: 'Primary' });
     await expect(primary.getByRole('link')).toHaveText([
       'Explore',
       'Creators',
-      '$TRENCH',
+      '$MART',
       'Verify',
       'Docs',
     ]);
@@ -313,7 +313,7 @@ test.describe('phase 5: header, nav and footer', () => {
     await expect(menu.getByRole('link')).toHaveText([
       'Explore',
       'Creators',
-      '$TRENCH',
+      '$MART',
       'Verify',
       'Docs',
       'Sell',
@@ -339,7 +339,7 @@ test.describe('phase 5: header, nav and footer', () => {
       'href',
       explorer('CaatcAQaDTEsrSoC3maTP1kgBWEY66hhgBNKa8Aeg55B'),
     );
-    await expect(footer.getByRole('link', { name: /\$TRENCH mint/ })).toHaveAttribute(
+    await expect(footer.getByRole('link', { name: /\$MART mint/ })).toHaveAttribute(
       'href',
       explorer('8Gu4hXYypyRrxY6763AdhQnyHma82L3ww9wq3vy2cbq6'),
     );
@@ -350,7 +350,7 @@ test.describe('phase 5: header, nav and footer', () => {
       ['Creator Studio', '/studio'],
       ['Verify & proof', '/verify'],
       ['How automated review works', '/sell'],
-      ['Fees & $TRENCH', '/token'],
+      ['Fees & $MART', '/token'],
       ['Status', '/status'],
       ['Docs', '/docs'],
       ['Terms', '/terms'],
@@ -489,7 +489,7 @@ test.describe('phase 6: home', () => {
       'Find your edge',
       'Four steps, no surprises.',
       'Top creators this month',
-      'Hold $TRENCH, pay less.',
+      'Hold $MART, pay less.',
       "Built so you don't have to trust anyone.",
       'Have an edge? Sell it.',
     ];

@@ -130,11 +130,11 @@ function Nav({ social }: { social?: Social }) {
     router.push(q ? `/search?q=${encodeURIComponent(q)}` : '/search');
   }
 
-  // Prototype nav: Explore, Creators, $TRENCH, Verify, Docs (+ Studio once signed in).
+  // Prototype nav: Explore, Creators, $MART, Verify, Docs (+ Studio once signed in).
   const links = [
     { href: '/search', label: 'Explore' },
     { href: '/creators', label: 'Creators' },
-    { href: '/token', label: '$TRENCH' },
+    { href: '/token', label: '$MART' },
     { href: '/verify', label: 'Verify' },
     { href: '/docs', label: 'Docs' },
     ...(wallet.session ? [{ href: '/studio', label: 'Studio' }] : []),
@@ -300,7 +300,7 @@ const FOOTER_COLUMNS: { title: string; links: [string, string][] }[] = [
     links: [
       ['Verify & proof', '/verify'],
       ['How automated review works', '/sell'],
-      ['Fees & $TRENCH', '/token'],
+      ['Fees & $MART', '/token'],
       ['Status', '/status'],
     ],
   },
@@ -318,7 +318,7 @@ function Footer({ social }: { social?: Social }) {
   const addresses: [string, string, string | undefined][] = [
     ['Escrow program (devnet)', ESCROW_PROGRAM_ID, 'footer-program'],
     ['Squads multisig', DEVNET_ADDRESSES.multisig, undefined],
-    ['$TRENCH mint', DEVNET_ADDRESSES.trenchMint, undefined],
+    ['$MART mint', DEVNET_ADDRESSES.martMint, undefined],
   ];
   return (
     <footer className="mt-24 border-t border-line">

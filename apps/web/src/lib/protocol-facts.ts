@@ -23,7 +23,7 @@ export const ESCROW_CLUSTER = 'devnet';
 export const DEVNET_ADDRESSES = {
   multisig: 'CaatcAQaDTEsrSoC3maTP1kgBWEY66hhgBNKa8Aeg55B',
   vault: '47RLqPda5YLW7rFHkoJ2K5yACWu4qc7j2yYU2so64bz7',
-  trenchMint: '8Gu4hXYypyRrxY6763AdhQnyHma82L3ww9wq3vy2cbq6',
+  martMint: '8Gu4hXYypyRrxY6763AdhQnyHma82L3ww9wq3vy2cbq6',
 } as const;
 /** trenchmart.fun has no mail server yet, so contact goes through GitHub, which is real and public. */
 export const CONTACT_URL = 'https://github.com/Milerius/trenchmart/issues';
@@ -71,7 +71,7 @@ export const DOCS_NAV = [
   { href: '/docs/agents/reference', label: 'API reference' },
   { href: '/docs/escrow', label: 'Escrow program' },
   { href: '/docs/fees', label: 'Fees' },
-  { href: '/docs/token', label: '$TRENCH' },
+  { href: '/docs/token', label: '$MART' },
   { href: '/docs/treasury', label: 'Treasury' },
   { href: '/docs/security', label: 'Security' },
   { href: '/docs/faq', label: 'FAQ' },

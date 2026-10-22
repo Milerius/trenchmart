@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { DEFAULT_CONFIG_JSON } from '@trenchmart/shared/config';
 import { quote, splitFee } from '@trenchmart/shared/fee';
+import { displaySplitBps } from '@trenchmart/shared/rewards';
 import { Money, Tag } from '@/components/ui';
 import { TIER_LABEL, type PublicConfig } from '@/lib/config';
 
@@ -24,7 +25,8 @@ export const DEFAULT_FEES: FeeConfig = {
 };
 
 const SPLIT_LABEL: Record<string, string> = {
-  buyback: '$TRENCH buyback',
+  holders: '$MART holders',
+  buyback: '$MART buyback',
   ai_verification: 'Verification',
   ops: 'Operations',
   safety: 'Safety fund',
@@ -53,7 +55,7 @@ export function TierTable({
   const cfg = config ?? DEFAULT_FEES;
   return (
     <table className={`w-full border-collapse text-sm ${className}`}>
-      <caption className="sr-only">Buyer fee by $TRENCH tier</caption>
+      <caption className="sr-only">Buyer fee by $MART tier</caption>
       <thead>
         <tr className="text-left font-mono text-[11px] uppercase tracking-wide text-muted">
           <th scope="col" className="py-2 pr-3 font-medium">
@@ -193,7 +195,8 @@ export function FeeBreakdown({
         netFee: BigInt(quoted.fee) - BigInt(quoted.rebate),
       }
     : local;
-  const split = splitFee(q.netFee, cfg.feeSplitBps);
+  const shown = displaySplitBps(cfg.feeSplitBps);
+  const split = splitFee(q.netFee, shown);
   return (
     <div data-testid="fee-breakdown" className="text-sm">
       <dl className="m-0 space-y-2">
@@ -249,7 +252,7 @@ export function FeeBreakdown({
             {Object.entries(split).map(([key, lamports]) => (
               <Line
                 key={key}
-                label={`${SPLIT_LABEL[key] ?? key} · ${pct(cfg.feeSplitBps[key] ?? 0)}`}
+                label={`${SPLIT_LABEL[key] ?? key} · ${pct((shown as Record<string, number>)[key] ?? 0)}`}
               >
                 <Money lamports={lamports} centsPerSol={centsPerSol} />
               </Line>

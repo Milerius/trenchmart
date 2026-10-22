@@ -36,7 +36,7 @@ import { adminOnly, parseBody, signedIn, type Row, type SocialVars } from './soc
 /**
  * Paid featuring: "Featured · Sponsored" slots on home, category pages and the live activity
  * band, booked by UTC day and paid in SOL to the vault (memo tm:feat:<id>). Featuring never
- * changes a rank. Prices, the $TRENCH tier discount and every rule come from config rows
+ * changes a rank. Prices, the $MART tier discount and every rule come from config rows
  * (`feature_slots`, `feature_discount_bps`, `feature_rules`), editable by admins.
  */
 
