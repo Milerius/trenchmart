@@ -1,0 +1,71 @@
+# Mainnet API Worker (docs/ops/networks.md, docs/ops/mainnet-launch.md).
+# Separate Worker, database, bucket and queues from devnet. workers.dev only: no routes or
+# custom domains here; api.mainnet.trenchmart.fun is attached at launch (runbook step 8).
+# Fails closed until launch: SOLANA_CLUSTER=mainnet is refused (every request, cron and queue
+# message) unless MAINNET_LAUNCHED=1, and then it needs SOLANA_RPC_URL or HELIUS_RPC_URL.
+# Deploy: TM_DEPLOY_DB_ENV=~/.config/trenchmart/supabase-mainnet.env \
+#   API_HEALTH_URL=https://trenchmart-api-mainnet.trenchmart.workers.dev/api/v1/health \
+#   scripts/deploy-api.sh apps/api/wrangler.mainnet.toml
+name = "trenchmart-api-mainnet"
+main = "src/worker.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = false
+
+[placement]
+region = "aws:ap-south-1"
+
+[vars]
+SOLANA_CLUSTER = "mainnet"
+# Stays 0 until launch day (runbook step 7). 0 = the Worker refuses to serve.
+MAINNET_LAUNCHED = "0"
+APP_URL = "https://trenchmart.fun"
+API_URL = "https://api.mainnet.trenchmart.fun"
+SIWS_DOMAIN = "trenchmart.fun"
+LANDING_STATS = "auto"
+AI_AGENT_ID = "trenchmart-ai-v1"
+SANDBOX_BUDGET_MS = "15000"
+# Money moves only after a human turns these on (docs/ops/payouts.md, holder-rewards.md).
+PAYOUTS_AUTO = "0"
+REWARDS_AUTO = "0"
+# Filled at launch (runbook): VAULT_ADDRESS, MULTISIG_ADDRESS, MART_MINT, BUCKET_WALLET_*,
+# ESCROW_PROGRAM_ID, ESCROW_RESOLVER. Secrets (wrangler secret put -c wrangler.mainnet.toml):
+# SESSION_SECRET, INTERNAL_TOKEN, STATUS_PUSH_TOKEN, HELIUS_WEBHOOK_SECRET, AI_ATTEST_SECRET,
+# PROXY_SECRET (set), HELIUS_RPC_URL or SOLANA_RPC_URL, ESCROW_RESOLVER_SECRET (launch).
+
+# No cron until launch: enable "*/5 * * * *" in runbook step 7.
+[triggers]
+crons = []
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "trenchmart-files-mainnet"
+
+[[queues.producers]]
+binding = "SCAN_QUEUE"
+queue = "scan-static-mainnet"
+
+[[queues.producers]]
+binding = "REWARDS_QUEUE"
+queue = "rewards-send-mainnet"
+
+[[queues.consumers]]
+queue = "rewards-send-mainnet"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 40
+dead_letter_queue = "rewards-send-mainnet-dlq"
+
+# trenchmart-db-mainnet -> Supabase project zydwvewzlgjbvqufxoxi (free tier, ap-south-1).
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "0b1d60e34cc644eebfbd43371aba52e9"
+
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 120, period = 60 }
+
+[observability]
+enabled = true

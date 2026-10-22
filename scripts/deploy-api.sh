@@ -20,6 +20,8 @@ api_url="${API_HEALTH_URL:-https://api.trenchmart.fun/api/v1/health}"
 wrangler="${WRANGLER:-npx -y wrangler@4}"
 
 [ -f "$config" ] || { echo "deploy config not found: $config" >&2; exit 1; }
+# Absolute: wrangler runs from apps/api, so a relative path would resolve there.
+config="$(cd "$(dirname "$config")" && pwd)/$(basename "$config")"
 grep -q 'binding *= *"HYPERDRIVE"' "$config" || {
   echo "$config has no HYPERDRIVE binding; refusing to deploy" >&2
   exit 1
@@ -126,13 +128,32 @@ if [ -n "$hd_id" ]; then
 fi
 
 echo "== health"
+# A mainnet config before launch (MAINNET_LAUNCHED = "0") must answer MAINNET_REFUSED: the
+# Worker is deployed but fails closed. Anything else from it (even ok) fails the run.
+prelaunch=0
+if grep -Eq '^SOLANA_CLUSTER *= *"mainnet(-beta)?"' "$config" &&
+  ! grep -Eq '^MAINNET_LAUNCHED *= *"1"' "$config"; then
+  prelaunch=1
+fi
 healthy=0
 health_body=''
 for i in 1 2 3 4 5 6; do
   health_body="$(curl -sS --max-time 20 "$api_url" 2>/dev/null)" || health_body=''
   case "$health_body" in
     *SCHEMA_BEHIND*) ;;
-    *'"ok":true'*) printf '%s\n' "$health_body"; healthy=1; break ;;
+    *MAINNET_REFUSED*)
+      if [ "$prelaunch" = 1 ]; then
+        echo "mainnet Worker fails closed as expected before launch (MAINNET_REFUSED)"
+        healthy=1
+        break
+      fi
+      ;;
+    *'"ok":true'*)
+      if [ "$prelaunch" = 1 ]; then
+        echo "refusing: pre-launch mainnet Worker answered ok: $health_body" >&2
+        exit 1
+      fi
+      printf '%s\n' "$health_body"; healthy=1; break ;;
   esac
   sleep "${HEALTH_RETRY_SLEEP:-5}"
 done

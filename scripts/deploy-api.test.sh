@@ -50,11 +50,13 @@ run() {
   local name="$1" want="$2"
   shift 2
   log="$work/$name.log"
+  local cfg="$work/wrangler.toml" a
+  for a in "$@"; do case "$a" in TEST_CONFIG=*) cfg="${a#TEST_CONFIG=}" ;; esac; done
   : >"$log"
   env PATH="$work/bin:$PATH" WRANGLER="$work/bin/wrangler" FAKE_LOG="$log" HOME="$work/home" \
     TM_DEPLOY_DB_ENV="$work/prod.env" FAKE_HD_USER="postgres.$REF" HEALTH_RETRY_SLEEP=0 \
     FAKE_HEALTH='{"ok":true,"cluster":"devnet"}' API_HEALTH_URL=https://api.test/api/v1/health \
-    "$@" bash "$root/scripts/deploy-api.sh" "$work/wrangler.toml" >"$work/$name.out" 2>&1
+    "$@" bash "$root/scripts/deploy-api.sh" "$cfg" >"$work/$name.out" 2>&1
   local code=$?
   if { [ "$want" = 0 ] && [ "$code" = 0 ]; } || { [ "$want" != 0 ] && [ "$code" != 0 ]; }; then
     return 0
@@ -125,6 +127,20 @@ fi
 # 9. Health answers SCHEMA_BEHIND after deploy: the run fails and says so.
 if run schema-behind 1 FAKE_HEALTH='{"ok":false,"code":"SCHEMA_BEHIND","pending":["0099_x.sql"]}'; then
   grep -q SCHEMA_BEHIND "$work/schema-behind.out" && ok "SCHEMA_BEHIND health fails the deploy" || bad "no SCHEMA_BEHIND message"
+fi
+
+# 10-12. Pre-launch mainnet config: MAINNET_REFUSED is the expected health; ok is refused.
+{ cat "$work/wrangler.toml"; printf '[vars]\nSOLANA_CLUSTER = "mainnet"\nMAINNET_LAUNCHED = "0"\n'; } >"$work/mainnet.toml"
+refused='{"error":{"code":"MAINNET_REFUSED","message":"refusing mainnet"}}'
+if run mainnet-prelaunch 0 TEST_CONFIG="$work/mainnet.toml" FAKE_HEALTH="$refused"; then
+  has 'wrangler deploy' && grep -q 'fails closed as expected' "$work/mainnet-prelaunch.out" &&
+    ok "pre-launch mainnet Worker: MAINNET_REFUSED accepted" || bad "pre-launch mainnet not deployed"
+fi
+if run mainnet-prelaunch-open 1 TEST_CONFIG="$work/mainnet.toml"; then
+  ok "pre-launch mainnet Worker answering ok fails the deploy"
+fi
+if run devnet-refused 1 FAKE_HEALTH="$refused"; then
+  ok "MAINNET_REFUSED on a devnet config fails the deploy"
 fi
 
 echo "$pass passed, $fail failed"
