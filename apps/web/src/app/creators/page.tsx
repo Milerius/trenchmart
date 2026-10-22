@@ -266,7 +266,7 @@ function Leaderboard() {
               return (
                 <li
                   key={row.creator.wallet}
-                  className={`list-none ${first ? 'order-first md:order-none' : ''}`}
+                  className={`list-none ${first ? 'order-first md:order-none md:-translate-y-4' : ''}`}
                 >
                   <Link
                     href={profileHref(row.creator)}
@@ -277,14 +277,28 @@ function Leaderboard() {
                         : 'border-line bg-surface py-5'
                     }`}
                   >
-                    <span className="absolute inset-x-3 top-3 flex items-center justify-between font-mono text-[11px] text-muted">
-                      <span className={first ? 'text-accent' : ''}>#{row.position}</span>
+                    <span className="sr-only">#{row.position}</span>
+                    <span className="absolute inset-x-3 top-3 flex items-center justify-end font-mono text-[11px] text-muted">
                       <Movement row={row} />
                     </span>
-                    <CreatorAvatar
-                      who={row.creator}
-                      className={`${first ? 'h-24 w-24 text-2xl' : 'h-16 w-16 text-lg'} mt-3`}
-                    />
+                    {/* Prototype (tm-redesign Creators.tsx): crown above the winner's avatar,
+                        position badge on the avatar's bottom-right corner. */}
+                    <span className="relative mt-3" data-testid="podium-avatar">
+                      {first ? <CrownIcon /> : null}
+                      <CreatorAvatar
+                        who={row.creator}
+                        className={first ? 'h-24 w-24 text-2xl' : 'h-16 w-16 text-lg'}
+                      />
+                      <span
+                        aria-hidden="true"
+                        data-testid="podium-rank-badge"
+                        className={`absolute -right-1 -bottom-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-bg font-mono text-sm font-semibold ${
+                          first ? 'bg-accent text-onaccent' : 'bg-surface-2 text-ink'
+                        }`}
+                      >
+                        {row.position}
+                      </span>
+                    </span>
                     <CreatorName
                       who={row.creator}
                       className="max-w-full justify-center text-base"
@@ -556,5 +570,27 @@ export default function CreatorsPage() {
     <Suspense fallback={<Skeleton className={`${MARKET_WRAP} my-14 block h-40 w-full`} />}>
       <Leaderboard />
     </Suspense>
+  );
+}
+
+/** Lucide "crown" (ISC), inlined so the podium ships no icon library. */
+function CrownIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="podium-crown"
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="absolute -top-6 left-1/2 -translate-x-1/2 text-accent"
+    >
+      <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" />
+      <path d="M5 21h14" />
+    </svg>
   );
 }

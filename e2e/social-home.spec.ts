@@ -253,3 +253,61 @@ test('/creators fits a phone screen', async ({ page }) => {
   );
   expect(fits).toBe(true);
 });
+
+for (const vp of [
+  { name: 'desktop', width: 1440, height: 900 },
+  { name: 'mobile', width: 390, height: 844 },
+] as const) {
+  test(`/creators podium: crown on the #1 card only (${vp.name})`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await stub(page, {
+      activity: [],
+      boards: { earners: board('earners', [row(0), row(1), row(2), row(3)]) },
+      paid: '0',
+      last24h: '0',
+    });
+    await page.goto('/creators');
+    const cards = page.getByTestId('podium-card');
+    await expect(cards).toHaveCount(3);
+    // Exactly one crown on the page, inside the winner's card, above the avatar.
+    await expect(page.getByTestId('podium-crown')).toHaveCount(1);
+    const winner = cards.filter({ has: page.getByTestId('podium-crown') });
+    await expect(winner).toHaveCount(1);
+    await expect(winner).toContainText('rugradar');
+    const crown = winner.getByTestId('podium-crown');
+    await expect(crown).toBeVisible();
+    const c = (await crown.boundingBox())!;
+    const a = (await winner.getByTestId('podium-avatar').boundingBox())!;
+    expect(c.width).toBeCloseTo(22, 0);
+    expect(c.y + c.height).toBeLessThanOrEqual(a.y + 2);
+    expect(Math.abs(c.x + c.width / 2 - (a.x + a.width / 2))).toBeLessThan(2);
+    // Crown stays inside the card (the card clips overflow).
+    const w = (await winner.boundingBox())!;
+    expect(c.y).toBeGreaterThan(w.y);
+    // Rank badges 1/2/3 sit on every avatar; only #1 is lime.
+    const badges = page.getByTestId('podium-rank-badge');
+    await expect(badges).toHaveText(['2', '1', '3']); // DOM order 2 · 1 · 3; CSS reorders on phones
+    for (const name of ['Pulse Labs']) {
+      await expect(cards.filter({ hasText: name }).getByTestId('podium-crown')).toHaveCount(0);
+    }
+    // DOM order is 2 · 1 · 3. Desktop: winner in the middle, lifted (prototype md:-translate-y-4).
+    // Phone: winner stacked first.
+    const boxes = await Promise.all(
+      [0, 1, 2].map(async (i) => (await cards.nth(i).boundingBox())!),
+    );
+    if (vp.name === 'desktop') {
+      expect(boxes[1]!.y).toBeLessThan(boxes[0]!.y - 8);
+    } else {
+      expect(boxes[1]!.y).toBeLessThan(boxes[0]!.y);
+    }
+    // Visual check: the crown is drawn in the lime accent (a stroked SVG, not a blank box).
+    const stroke = await crown.evaluate((el) => getComputedStyle(el).color);
+    expect(stroke).toBe('rgb(198, 244, 50)');
+    await test.info().attach(`podium-${vp.name}.png`, {
+      body: await page.getByTestId('leaderboard-podium').screenshot({ animations: 'disabled' }),
+      contentType: 'image/png',
+    });
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(vp.width);
+  });
+}
