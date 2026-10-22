@@ -97,3 +97,83 @@ export async function expectNoOverlap(items: { label: string; locator: Locator }
       ).toBe(false);
     }
 }
+
+/**
+ * `expectLegible` fails when a visible control cannot be read in full:
+ * - its box is narrower than `minWidth` (a search box squashed to an icon pill, a button
+ *   shrunk around one letter);
+ * - it or any descendant clips its text (scrollWidth > clientWidth);
+ * - its text paints outside its own box, or onto any of the `others` boxes (the search "/"
+ *   hint spilling onto "Sell");
+ * - for text inputs, the input itself is narrower than `minInputWidth` (default 160 px).
+ */
+export async function expectLegible(
+  locator: Locator,
+  label: string,
+  opts: { minWidth?: number; minInputWidth?: number; others?: Locator[] } = {},
+) {
+  const others: { x: number; y: number; w: number; h: number }[] = [];
+  for (const other of opts.others ?? []) {
+    if (!(await other.isVisible())) continue;
+    const b = await other.boundingBox();
+    if (b) others.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+  }
+  const m = await locator.evaluate(
+    (el, { others, minInputWidth }) => {
+      const box = el.getBoundingClientRect();
+      const clipped: string[] = [];
+      const inputs: number[] = [];
+      for (const node of [el, ...Array.from(el.querySelectorAll('*'))] as HTMLElement[]) {
+        const style = getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden') continue;
+        if (node.matches('.sr-only') || node.closest('.sr-only')) continue;
+        if (node instanceof HTMLInputElement && node.type !== 'hidden') {
+          inputs.push(node.getBoundingClientRect().width);
+          continue;
+        }
+        if (
+          node.textContent?.trim() &&
+          node.scrollWidth > node.clientWidth + 1 &&
+          node.clientWidth > 0
+        )
+          clipped.push(
+            `${node.tagName}:${node.textContent.trim().slice(0, 20)} ${node.scrollWidth}>${node.clientWidth}`,
+          );
+      }
+      const spills: string[] = [];
+      const hits: string[] = [];
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const parent = node.parentElement;
+        if (!node.textContent?.trim() || !parent || parent.closest('.sr-only')) continue;
+        if (getComputedStyle(parent).visibility === 'hidden') continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const r of Array.from(range.getClientRects())) {
+          if (r.width < 0.5 || r.height < 0.5) continue;
+          if (r.left < box.left - 1 || r.right > box.right + 1)
+            spills.push(
+              `"${node.textContent.trim()}" ${r.left.toFixed(0)}-${r.right.toFixed(0)} outside ${box.left.toFixed(0)}-${box.right.toFixed(0)}`,
+            );
+          for (const o of others) {
+            const ox = Math.min(r.right, o.x + o.w) - Math.max(r.left, o.x);
+            const oy = Math.min(r.bottom, o.y + o.h) - Math.max(r.top, o.y);
+            if (ox > 0.5 && oy > 0.5)
+              hits.push(`"${node.textContent.trim()}" over ${JSON.stringify(o)}`);
+          }
+        }
+      }
+      const narrowInputs = inputs.filter((w) => w < minInputWidth);
+      return { width: box.width, clipped, spills, hits, narrowInputs };
+    },
+    { others, minInputWidth: opts.minInputWidth ?? 160 },
+  );
+  const why = `${label} ${JSON.stringify(m)}`;
+  expect(m.width, `${why}: narrower than ${opts.minWidth ?? 0}px`).toBeGreaterThanOrEqual(
+    opts.minWidth ?? 0,
+  );
+  expect(m.clipped, `${why}: text clipped`).toEqual([]);
+  expect(m.spills, `${why}: text paints outside its box`).toEqual([]);
+  expect(m.hits, `${why}: text overlaps a sibling`).toEqual([]);
+  expect(m.narrowInputs, `${why}: input narrower than ${opts.minInputWidth ?? 160}px`).toEqual([]);
+}

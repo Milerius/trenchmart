@@ -38,6 +38,8 @@ test('header search goes to /search?q= and sends the query', async ({ page }) =>
       : undefined,
   );
   await page.goto('/');
+  // 1280 px: the header search is an icon button that opens the search panel.
+  await page.getByTestId('header-search').click();
   await page.getByTestId('search').fill('trojan');
   await page.getByTestId('search').press('Enter');
   await page.waitForURL('**/search?q=trojan');

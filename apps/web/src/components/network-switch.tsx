@@ -81,12 +81,12 @@ function Menu() {
 /**
  * Devnet | Mainnet segmented pill, left of the wallet button (approved mockup,
  * /workspace/tm-netswitch-mock). The active cluster is the lime segment; mainnet stays greyed
- * until NEXT_PUBLIC_MAINNET_LAUNCHED=1. The full pill shows from xl; from sm to xl only the
+ * until NEXT_PUBLIC_MAINNET_LAUNCHED=1. The full pill shows from 1440 px; from sm to 1440 only the
  * active segment; below sm the header has no room (logo + wallet + menu fill 390 px), so the
  * same control is the first row of the mobile menu (`inMenu`).
  */
 export function NetworkSwitch({ inMenu = false }: { inMenu?: boolean }) {
-  const inactive = `${inMenu ? 'inline-flex' : 'hidden xl:inline-flex'} ${segment}`;
+  const inactive = `${inMenu ? 'inline-flex' : 'hidden min-[1440px]:inline-flex'} ${segment}`;
   const devnet = CLUSTER.id === 'devnet';
   return (
     <details

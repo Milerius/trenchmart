@@ -111,19 +111,28 @@ function Nav({ social }: { social?: Social }) {
   const pathname = usePathname();
   const config = usePublicConfig();
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchBox = useRef<HTMLDivElement>(null);
+  // Below 1440 px the search is an icon button; open, the same form drops below the header.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = () => {
+    setSearchOpen(true);
+    requestAnimationFrame(() => searchRef.current?.focus());
+  };
   // "/" jumps to search from anywhere that is not already a text field.
   useEffect(() => {
-    // Network pill (server-rendered <details>): outside click or Escape closes it.
+    // Network pill (server-rendered <details>) and the search panel: outside click or Escape.
     const onKey = (event: KeyboardEvent | MouseEvent) => {
       const target = event.target as HTMLElement;
+      const escape = (event as KeyboardEvent).key === 'Escape';
       for (const d of document.querySelectorAll('details[data-net][open]'))
-        if ((event as KeyboardEvent).key === 'Escape' || !d.contains(target))
-          d.removeAttribute('open');
+        if (escape || !d.contains(target)) d.removeAttribute('open');
+      if (escape || (!('key' in event) && !searchBox.current?.contains(target)))
+        setSearchOpen(false);
       if (!('key' in event) || event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey)
         return;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       event.preventDefault();
-      searchRef.current?.focus();
+      openSearch();
     };
     addEventListener('keydown', onKey);
     addEventListener('mousedown', onKey);
@@ -136,6 +145,7 @@ function Nav({ social }: { social?: Social }) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const q = String(data.get('q') ?? '').trim();
+    setSearchOpen(false);
     router.push(q ? `/search?q=${encodeURIComponent(q)}` : '/search');
   }
 
@@ -150,17 +160,19 @@ function Nav({ social }: { social?: Social }) {
   ];
   const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const [menuOpen, setMenuOpen] = useState(false);
-  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    setMenuOpen(false);
+    setSearchOpen(false);
+  }, [pathname]);
 
   const searchForm = (mobile: boolean) => (
     <form
       onSubmit={search}
       role="search"
-      className={
-        mobile
-          ? 'flex w-full'
-          : 'ml-auto hidden min-w-0 md:flex md:w-56 md:shrink lg:w-44 xl:w-56 2xl:w-64'
-      }
+      // .hdr-search (globals.css): hidden below 1440 until opened (then a panel under the
+      // header row); from 1440 an inline box with a ≥160 px input.
+      className={mobile ? 'flex w-full' : 'hdr-search'}
+      data-open={mobile || !searchOpen ? undefined : ''}
     >
       <label className="flex h-10 w-full items-center gap-2 rounded-full border border-line-control bg-inset px-3.5 focus-within:border-accent/60">
         <Search size={15} aria-hidden="true" className="shrink-0 text-muted" />
@@ -188,39 +200,50 @@ function Nav({ social }: { social?: Social }) {
   return (
     // Glass and sticky only from md up: a backdrop blur over scrolling content is the
     // costliest paint on low-end phone GPUs.
-    <header
-      data-testid="nav"
-      className="z-40 border-b border-line-soft bg-bg md:sticky md:top-0 md:border-white/[.06] md:bg-[rgba(16,18,16,0.6)] md:backdrop-blur-[18px] md:backdrop-saturate-[1.4]"
-    >
-      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
+    <header data-testid="nav" className="hdr">
+      {/* Priority plan (e2e/header-layout.spec.ts): nav from lg (compact until xl); search is
+          an icon button until 1440, then an input; GitHub/X and both network segments from
+          1440 (footer and menu before); the fee pill from 2xl. The row widens past 7xl from
+          1440 so those extras get real room. */}
+      <div className="hdr-row">
         <Logo />
-        <nav
-          aria-label="Primary"
-          className="ml-4 hidden shrink-0 items-center gap-1 text-sm lg:flex"
-        >
+        <nav aria-label="Primary" className="hdr-nav">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               aria-current={active(link.href) ? 'page' : undefined}
-              className={`motion-nav rounded-full px-3.5 py-2 whitespace-nowrap ${active(link.href) ? 'bg-white/[.08] text-ink' : 'text-ink-2 hover:bg-white/[.05] hover:text-ink'}`}
+              className="hdr-link motion-nav"
             >
               {link.label}
             </Link>
           ))}
         </nav>
-        {searchForm(false)}
+        <div ref={searchBox} className="ml-auto flex shrink-0 items-center">
+          <button
+            type="button"
+            data-testid="header-search"
+            aria-label="Search listings (press /)"
+            title="Search (/)"
+            aria-expanded={searchOpen}
+            onClick={() => (searchOpen ? setSearchOpen(false) : openSearch())}
+            className="hdr-search-btn motion-press"
+          >
+            <Search size={16} aria-hidden="true" />
+          </button>
+          {searchForm(false)}
+        </div>
         <Link
           href="/sell"
           aria-current={active('/sell') ? 'page' : undefined}
-          className={`motion-nav hidden rounded-full px-3.5 py-2 text-sm whitespace-nowrap sm:block ${active('/sell') ? 'bg-white/[.08] text-ink' : 'text-ink-2 hover:text-ink'}`}
+          className="hdr-sell motion-press"
         >
           Sell
         </Link>
-        <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
+        <div className="flex shrink-0 items-center gap-2 max-sm:ml-auto">
           {/* Icon links only when there is room for them next to the nav and search. */}
           {social ? (
-            <div data-testid="header-social" className="mr-1 hidden shrink-0 xl:block">
+            <div data-testid="header-social" className="mr-1 hidden shrink-0 min-[1440px]:block">
               {social.header}
             </div>
           ) : null}
@@ -228,12 +251,9 @@ function Nav({ social }: { social?: Social }) {
             <span
               data-testid="tier-pill"
               title={tierChip(wallet.session.tier, config)}
-              className="hidden h-10 shrink-0 items-center rounded-full border border-accent-line bg-accent-bg px-4 font-mono text-xs whitespace-nowrap text-accent xl:flex"
+              className="hdr-fee"
             >
-              {/* Short "5% fee" until 2xl; the tier name joins once the header has room. */}
-              <span className="hidden 2xl:inline">
-                {tierChip(wallet.session.tier, config).split(' · ')[0]} ·&nbsp;
-              </span>
+              {/* Fee only from 2xl; the tier name is in the title (and on checkout). */}
               {tierChip(wallet.session.tier, config).split(' · ').slice(1).join(' · ')}
             </span>
           ) : null}
@@ -269,7 +289,7 @@ function Nav({ social }: { social?: Social }) {
               key={link.href}
               href={link.href}
               aria-current={active(link.href) ? 'page' : undefined}
-              className={`block rounded-lg px-3 py-3 ${active(link.href) ? 'bg-white/[.06] text-ink' : 'text-ink-2 hover:bg-white/5 hover:text-ink'}`}
+              className="hdr-mlink"
             >
               {link.label}
             </Link>

@@ -99,9 +99,9 @@ for (const size of WIDTHS) {
       { label: 'wallet', locator: nav.getByTestId('connect') },
       { label: 'menu', locator: nav.getByTestId('menu-toggle') },
     ]);
-    // Both segments from xl; between sm and xl only the active one.
+    // Both segments from 1440; between sm and 1440 only the active one.
     const mainnetSegment = nav.getByTestId('network-pill-mainnet');
-    if (size.width >= 1280) await expect(mainnetSegment).toBeVisible();
+    if (size.width >= 1440) await expect(mainnetSegment).toBeVisible();
     else await expect(mainnetSegment).toBeHidden();
     await pill.click();
     const menu = pill.locator('xpath=..').getByTestId('network-menu');
