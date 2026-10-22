@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { expectLegible } from './legibility';
+import { expectNoHorizontalOverflow, expectNoOverlap } from './layout-helpers';
 
 // Home "Paid to creators" tile, live activity band and ticker, the top-creators strip, and the
 // /creators leaderboard. /api/v1 is stubbed (the CI e2e job runs without the API).
@@ -309,5 +311,63 @@ for (const vp of [
     });
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(width).toBeLessThanOrEqual(vp.width);
+  });
+}
+
+for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
+  test(`/creators layout: podium, table and ranking panel never overlap (${width}px)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await stub(page, {
+      activity: [],
+      boards: { earners: board('earners', [row(0), row(1), row(2), row(3)]) },
+      paid: '0',
+      last24h: '0',
+    });
+    await page.goto('/creators');
+    const cards = page.getByTestId('podium-card');
+    await expect(cards).toHaveCount(3);
+    // The table scrolls sideways inside its card on narrow screens; measure the card.
+    const table = page.getByTestId('leaderboard-table').locator('xpath=..');
+    const rules = page.getByTestId('ranking-rules');
+    await expect(table).toBeVisible();
+    await expectNoOverlap([
+      { label: 'podium #2', locator: cards.nth(0) },
+      { label: 'podium #1', locator: cards.nth(1) },
+      { label: 'podium #3', locator: cards.nth(2) },
+      { label: 'table', locator: table },
+      { label: 'ranking panel', locator: rules },
+    ]);
+    // Not just "not overlapping": a real gap between the podium and what follows.
+    const podiumBottom = Math.max(
+      ...(await Promise.all(
+        [0, 1, 2].map(async (i) => {
+          const b = (await cards.nth(i).boundingBox())!;
+          return b.y + b.height;
+        }),
+      )),
+    );
+    const below = Math.min((await table.boundingBox())!.y, (await rules.boundingBox())!.y);
+    expect(
+      below - podiumBottom,
+      `gap below the podium ${below - podiumBottom}px`,
+    ).toBeGreaterThanOrEqual(16);
+    // Every card's stats boxes sit inside the card.
+    for (let i = 0; i < 3; i++) {
+      const card = (await cards.nth(i).boundingBox())!;
+      const last = (await cards.nth(i).locator('> span').last().boundingBox())!;
+      expect(last.y + last.height, `podium card ${i} content clipped`).toBeLessThanOrEqual(
+        card.y + card.height,
+      );
+    }
+    await expectNoHorizontalOverflow(page.locator('body'), 'body');
+    await expectLegible(page.getByRole('heading', { level: 1, name: 'Creator leaderboard' }));
+    await expectLegible(cards.nth(1).getByText('paid out', { exact: false }), 'podium caption');
+    await expectLegible(table.locator('thead th').first(), 'table header');
+    await test.info().attach(`creators-${width}.png`, {
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
   });
 }
