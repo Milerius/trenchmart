@@ -62,6 +62,17 @@ The API has no public mainnet fallback. With `SOLANA_CLUSTER=mainnet` it starts 
 Before launch `/api/v1/health` answers 500 `MAINNET_REFUSED`; launched without a private RPC
 it answers 503 `MAINNET_RPC_REQUIRED` (`resolveRpc` in `packages/shared/src/cluster.ts`).
 
+## RPC provider
+
+Both API Workers use Helius as their Solana RPC. The URL (with its API key) is a Worker
+secret, never committed: devnet `trenchmart-api` reads `SOLANA_RPC_URL` =
+`https://devnet.helius-rpc.com/?api-key=…`, mainnet `trenchmart-api-mainnet` reads
+`HELIUS_RPC_URL` = `https://mainnet.helius-rpc.com/?api-key=…`. The key itself lives on the box in
+`~/.config/trenchmart/helius.env` (chmod 600). The devnet watchdog keeps its independent public
+probe (`RPC_URL` in `watchdog.wrangler.toml`); the mainnet watchdog takes a Helius `RPC_URL`
+secret when it is first deployed. To rotate, `wrangler secret put` the new URL; no code deploy
+is needed.
+
 ## Mainnet resources
 
 | Piece         | Devnet                                                      | Mainnet                                                                   |
