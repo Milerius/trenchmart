@@ -81,7 +81,7 @@ instruction. Bonds and verification fees still go to the vault below.
 
 ## Escrow vault (bonds and verification fees)
 
-- `VAULT_ADDRESS` = a Squads multisig vault PDA. The API **never** holds a key that can move vault funds.
+- `VAULT_ADDRESS` = a Squads multisig vault PDA. The API holds no multisig key. Its payout signer can only use one Squads spending limit (native SOL, capped per day, revocable by the multisig); see `docs/ops/payouts.md`.
 - The `ledger` table tracks what portion of the vault belongs to whom. Invariant (checked hourly, alert on mismatch): `on-chain vault balance ≥ sum(ledger where account='vault')`.
 
 ## Release & payout
@@ -90,6 +90,7 @@ instruction. Bonds and verification fees still go to the vault below.
   - status → released
   - payouts: `creator` = price → creator wallet; for each fee bucket → its configured wallet (`BUCKET_WALLET_*`).
   - ledger: `-total vault`, `+price creator:<id>`, `+bucket amounts`.
+- Automated payouts (`autoPayouts`, every cron tick) pay each line through the Squads spending limit, one idempotent transaction per line; see `docs/ops/payouts.md`. Only lines over the caps (or all lines when automation is off) take the batch path below.
 - `executePayouts` cron groups pending payouts into a batch (≤ 15 transfers per tx), writes a batch JSON to R2 `payout-batches/<id>.json`, marks `proposed`. Admin page shows the batch; a signer creates the Squads proposal (or, phase 2, the API proposes via Squads SDK using a proposer-only key). After execution admin posts the tx sig → `sent`.
 
 ## Disputes

@@ -72,6 +72,7 @@ import type { IsolatedSandboxResult } from './sandbox';
 import { startUpdatePeriod } from './versioning';
 import type { BlobStore } from './blob';
 import type { Env } from './env';
+import { autoPayoutConfig } from './payouts-auto';
 
 export class HttpError extends Error {
   constructor(
@@ -99,6 +100,8 @@ export type Deps = {
   optimizeImage?: import('./image-optimize').ImageOptimizer;
   /** Required when ESCROW_PROGRAM_ID is set. */
   escrowChain?: EscrowChain;
+  /** Chain access for automated payouts (payouts-auto.ts). Defaults to env.rpcUrl. */
+  payoutChain?: import('./payouts-auto').PayoutChain;
   /** Relays a signed transaction (agent broadcast). Defaults to sendRaw on env.rpcUrl. */
   sendTx?: (tx: Uint8Array) => Promise<string>;
   /** Fetch used for the optional model review. Defaults to the global fetch. */
@@ -990,9 +993,12 @@ export async function escrowHousekeeping(deps: Deps, limit = 10): Promise<string
 export async function proposePayouts(
   deps: Deps,
 ): Promise<{ batchId: string; count: number } | null> {
+  // With automated payouts on, only lines held over the caps still need a Squads batch.
+  const auto = Boolean(autoPayoutConfig(deps.env));
   const rows = await deps.sql<Row[]>`
     select * from payouts
     where status = 'pending' and recipient not like 'UNCONFIGURED:%'
+      and (${!auto} or held_reason is not null)
     order by created_at asc
     limit 15
   `;
@@ -1033,6 +1039,16 @@ export async function proposePayouts(
 }
 
 export async function markBatchSent(deps: Deps, batchId: string, txSig: string): Promise<number> {
+  // A batch with a line the payout signer already paid must never be executed: it would pay twice.
+  const [paid] = await deps.sql<{ n: number }[]>`
+    select count(*)::int as n from payouts where batch_id = ${batchId} and mode = 'auto'
+  `;
+  if ((paid?.n ?? 0) > 0)
+    throw new HttpError(
+      409,
+      'BATCH_SUPERSEDED',
+      `${paid!.n} line(s) of this batch were paid automatically; do not execute it in Squads`,
+    );
   const rows = await deps.sql<{ id: string }[]>`
     update payouts set status = 'sent', tx_sig = ${txSig} where batch_id = ${batchId} and status = 'proposed' returning id
   `;

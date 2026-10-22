@@ -8,6 +8,7 @@ import { parseSecretKey, publicKeyOf } from '@trenchmart/chain';
 import { pendingMigrations } from '@trenchmart/db';
 import type { Deps } from './logic';
 import { resolverOf } from './escrow';
+import { payoutHealth } from './payouts-auto';
 
 export type OpsLevel = 'warn' | 'critical';
 export type OpsAlert = { level: OpsLevel; code: string; message: string };
@@ -35,6 +36,10 @@ export const ALERT_CODES = [
   'DISPUTE_SPIKE',
   'DISPUTES_WAITING',
   'PAYOUTS_WAITING',
+  'PAYOUT_FAILED',
+  'PAYOUT_HELD',
+  'PAYOUT_LIMIT',
+  'PAYOUT_BALANCE_LOW',
   'CHECKOUT_PAUSED',
 ] as const;
 
@@ -423,8 +428,9 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
       add(
         'warn',
         'PAYOUTS_WAITING',
-        `${payouts!.n} vault payout line(s) waiting more than 48 h for the vault signature`,
+        `${payouts!.n} vault payout line(s) waiting more than 48 h (automated payouts paused or capped, or a Squads batch is unsigned)`,
       );
+    for (const alert of await payoutHealth(deps)) add(alert.level, alert.code, alert.message);
   } catch (err) {
     add('critical', 'DB_ERROR', `database check failed: ${(err as Error).message}`);
   }

@@ -178,6 +178,9 @@ export const protocol = {
   allowHosts: [...DEFAULT_CONFIG_JSON.require_allow_hosts],
   thresholds: { ...DEFAULT_CONFIG_JSON.tier_thresholds },
   payoutBatchLimit: PAYOUT_BATCH_LIMIT,
+  /** Automated payouts (docs/ops/payouts.md): Squads spending limit per day, backend cap per line. */
+  payoutDailyCapSol: 3,
+  payoutMaxLineSol: 0.5,
   downloadUrlSeconds: DOWNLOAD_URL_SECONDS,
   aiAgentId: AI_AGENT_ID,
   aiEngine: AI_ENGINE,

@@ -58,7 +58,7 @@ Gap list for taking TrenchMart from devnet to mainnet, last updated 2026-10-18 a
 
 - **Escrow program.** Signer, recipient, amount, time and state checks are verified, with invariants documented in `programs/trench_escrow/src/lib.rs`. There are 86 Rust tests: 72 Mollusk instruction tests against the built binary, plus 14 unit and property tests. The TypeScript client test runs against a local validator. All of it runs in the `anchor test` CI job. `security.txt` and the on-chain IDL are published.
 - **API escrow verification.** Owner and discriminator checks, a full-terms `escrowMismatch`, buyer-only checkout transactions with preflight, and a resolver key/pubkey consistency check. This PR also makes the memo match exact (L-05) and records the payouts the program actually made (L-06).
-- **Treasury.** Bonds and verification fees go to a Squads v4 vault (2-of-3). Payouts are proposed as batches for multisig approval (`proposePayouts`). The API holds no vault key.
+- **Treasury.** Bonds and verification fees go to a Squads v4 vault (2-of-3). Payouts are paid automatically through a Squads spending limit (per-day cap on chain, per-line cap in the backend, revocable by the multisig; `docs/ops/payouts.md`). The API holds no multisig key.
 - **Storage.** R2 binding `FILES` (`apps/api/wrangler.toml`), with signed download URLs and per-wallet watermarking.
 - **Supply chain.** gitleaks, `pnpm audit --prod --audit-level high` and `cargo audit` in CI. Pinned toolchain (`docs/TOOLCHAIN.md`).
 - **Transparency.** `/verify` reads the program hash, upgrade authority, multisig, buckets and recent escrows live from chain.
