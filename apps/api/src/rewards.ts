@@ -258,10 +258,21 @@ function ticksPerEpoch(cfg: RewardConfig): number {
   return Math.max(1, Math.floor(cfg.epochSeconds / REWARD_DEFAULTS.tickSeconds));
 }
 
+/**
+ * Ticks samples may be scheduled on: every tick but the last. A sample whose cron tick is
+ * missed (deploy, Worker error, RPC failure) is taken on the next tick, so the last tick is kept
+ * free as catch-up room. Without it a 900 s epoch (3 ticks, 3 samples) lost the epoch on any
+ * single missed tick (REWARD_SNAPSHOT_MISSED, devnet 2026-10-22 15:00). 3 h: 35 of 36 ticks.
+ */
+function sampleRange(cfg: RewardConfig): number {
+  const ticks = ticksPerEpoch(cfg);
+  return ticks > 1 ? ticks - 1 : 1;
+}
+
 export async function ensureEpoch(deps: Deps, cfg: RewardConfig, epochId: number): Promise<Row> {
   const { start, end } = epochBounds(epochId, cfg.epochSeconds);
   const seed = seedOf(deps, epochId);
-  const ticks = sampleTicks(seed, ticksPerEpoch(cfg), REWARD_DEFAULTS.samplesPerEpoch);
+  const ticks = sampleTicks(seed, sampleRange(cfg), REWARD_DEFAULTS.samplesPerEpoch);
   await deps.sql`
     insert into reward_epochs (epoch_id, starts_at, ends_at, seed, sample_ticks)
     values (${epochId}, ${start}, ${end}, ${seed}, ${ticks})
@@ -1067,7 +1078,13 @@ export async function currentEpoch(deps: Deps) {
     startsAt: start,
     endsAt: end,
     epochSeconds: cfg.epochSeconds,
-    samples: { done: e?.samples_done ?? 0, planned: REWARD_DEFAULTS.samplesPerEpoch },
+    samples: {
+      done: e?.samples_done ?? 0,
+      // min(6, ticks in the epoch): a 900 s test epoch has only 3 five-minute ticks.
+      planned:
+        (e?.sample_ticks as number[] | undefined)?.length ??
+        Math.min(REWARD_DEFAULTS.samplesPerEpoch, sampleRange(cfg)),
+    },
     revenueSoFar: String(rev?.revenue ?? 0),
     holderGrossSoFar: String(rev?.holder_gross ?? 0),
     carryIn: String(e?.carry_in ?? 0),

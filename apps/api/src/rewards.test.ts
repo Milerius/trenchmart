@@ -24,6 +24,7 @@ import { readEnv } from './env';
 import type { Deps } from './logic';
 import { opsCheck } from './ops';
 import {
+  currentEpoch,
   feeRouting,
   processBatchMessage,
   recentEpochs,
@@ -510,5 +511,46 @@ describe('$MART holder rewards', () => {
     const starts = feed.map((e) => new Date(e.startsAt as string | Date).getTime());
     expect(starts).toEqual([...starts].sort((a, b) => b - a));
     expect(starts.length).toBeGreaterThan(3);
+  });
+
+  it('reports the samples actually planned (2 in a 900 s epoch, 6 in 3 h)', async () => {
+    const short = await setup({ REWARDS_EPOCH_SECONDS: '900' });
+    expect((await currentEpoch(short.deps))?.samples.planned).toBe(2);
+    await rewardsTick(short.deps);
+    expect((await currentEpoch(short.deps))?.samples.planned).toBe(2);
+    const long = await setup();
+    expect((await currentEpoch(long.deps))?.samples.planned).toBe(6);
+  });
+
+  it('a missed cron tick is caught up on the last tick (never scheduled), 900 s and 3 h', async () => {
+    for (const len of [900, EPOCH]) {
+      await sql`truncate table reward_balances, reward_holders, reward_epochs cascade`;
+      const { deps, chain } = await setup({ REWARDS_EPOCH_SECONDS: String(len) });
+      chain.balances.set(randomKeypair().publicKey, tokens(2_000_000));
+      const id = epochIdAt(now.getTime(), len) + 1;
+      const start = id * len * 1000;
+      const ticks = len / 300;
+      // Worst case: every scheduled tick is the one the cron misses; the sample lands one tick later.
+      const [row] = await sql<{ sample_ticks: number[] }[]>`select 1`.then(async () => {
+        now = new Date(start + 1000);
+        await rewardsTick(deps);
+        return sql<
+          { sample_ticks: number[] }[]
+        >`select sample_ticks from reward_epochs where epoch_id = ${id}`;
+      });
+      const planned = row!.sample_ticks;
+      expect(Math.max(...planned)).toBeLessThan(ticks - 1); // last tick is free
+      expect(planned).toHaveLength(Math.min(6, ticks - 1));
+      const last = planned[planned.length - 1]!;
+      for (let t = 1; t < ticks; t++) {
+        if (t === last) continue; // the cron misses the last scheduled tick
+        now = new Date(start + t * 300_000 + 1000);
+        await rewardsTick(deps);
+      }
+      const [e] = await sql<
+        { samples_done: number }[]
+      >`select samples_done from reward_epochs where epoch_id = ${id}`;
+      expect(e!.samples_done).toBe(planned.length);
+    }
   });
 });
