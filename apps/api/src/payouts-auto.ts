@@ -343,10 +343,6 @@ export async function payoutHealth(deps: Deps): Promise<PayoutHealth> {
         code: 'LOW_BALANCE',
         message: `payout signer ${cfg.signer} holds ${Number(signer?.lamports ?? 0n) / 1e9} SOL; top it up so payout fees can be paid`,
       });
-    // In-flight sends have not left the vault yet: count them so overlapping runs never overdraw it.
-    const [inflight] = await deps.sql<{ sum: bigint }[]>`
-    select coalesce(sum(amount), 0)::bigint as sum from payouts where mode = 'auto' and status = 'sending'
-  `;
     const vault = await chain.account(cfg.vault);
     if ((vault?.lamports ?? 0n) < owed + 1_000_000n)
       alerts.push({
