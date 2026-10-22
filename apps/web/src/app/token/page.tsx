@@ -3,7 +3,8 @@
 import { solToLamports } from '@trenchmart/shared/money';
 import { displaySplitBps } from '@trenchmart/shared/rewards';
 import { useState } from 'react';
-import { DEFAULT_FEES, FeeBreakdown, TIER_ORDER, TierCards } from '@/components/fees';
+import { DEFAULT_FEES, TIER_ORDER, TierCards } from '@/components/fees';
+import { FeeBreakdown } from '@/components/fee-breakdown';
 import { GradientWords } from '@/components/gradient-words';
 import { MARKET_WRAP } from '@/components/page-hero';
 import { TIER_LABEL, usePublicConfig, useSolUsd } from '@/lib/config';

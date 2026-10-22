@@ -13,7 +13,8 @@ import {
   walletCountLabel,
   type WalletCount,
 } from '@trenchmart/shared/listing-kinds-display';
-import { DEFAULT_FEES, FeeBreakdown } from '@/components/fees';
+import { DEFAULT_FEES } from '@/components/fees';
+import { FeeBreakdown } from '@/components/fee-breakdown';
 import { Gallery, type GalleryImage } from '@/components/gallery';
 import {
   ListingMarkdown as Markdown,
