@@ -59,6 +59,15 @@ use anchor_lang::system_program;
 mod fee;
 mod state;
 
+// The Mollusk instruction tests live in tests/escrow.rs and use the crate by name. The crate is
+// cdylib-only (fat LTO, see Cargo.toml), which has no rlib for an integration test to link, so
+// the same file runs inside the lib's unit-test harness instead.
+#[cfg(all(test, not(target_os = "solana")))]
+mod escrow_tests {
+    use crate as trench_escrow;
+    include!("../tests/escrow.rs");
+}
+
 use fee::{quote, split_fee, FeeError};
 use state::Status;
 
@@ -452,6 +461,20 @@ fn move_lamports(from: &AccountInfo, to: &AccountInfo, amount: u64) -> Result<()
     Ok(())
 }
 
+/// True only for a loader-v3 `UpgradeableLoaderState::ProgramData` whose upgrade authority is
+/// `Some(authority)`. Layout (bincode): u32 tag `3`, u64 slot, then `Option<Pubkey>` as a 1-byte
+/// tag and, for `Some`, 32 bytes. Read by hand so the program does not link bincode/serde
+/// deserialization; anything else (wrong tag, `None`, short data) returns false.
+fn is_upgrade_authority(program_data: &AccountInfo, authority: &Pubkey) -> bool {
+    let Ok(data) = program_data.try_borrow_data() else {
+        return false;
+    };
+    data.len() >= 45
+        && data[..4] == 3u32.to_le_bytes()
+        && data[12] == 1
+        && data[13..45] == authority.as_ref()[..]
+}
+
 fn map_fee(err: FeeError) -> Error {
     match err {
         FeeError::Bps => error!(EscrowError::BadBps),
@@ -550,14 +573,18 @@ impl From<EscrowStatus> for Status {
 pub struct InitConfig<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
+    /// CHECK: the loader-v3 ProgramData PDA of this program: address pinned by `seeds`, owner
+    /// pinned to the loader, and its stored upgrade authority must be `authority`
+    /// (`is_upgrade_authority` reads the bincode layout by hand; any other shape fails closed).
     #[account(
         seeds = [crate::ID.as_ref()],
         bump,
         seeds::program = anchor_lang::solana_program::bpf_loader_upgradeable::ID,
-        constraint = program_data.upgrade_authority_address == Some(authority.key())
+        owner = anchor_lang::solana_program::bpf_loader_upgradeable::ID,
+        constraint = is_upgrade_authority(&program_data, &authority.key())
             @ EscrowError::ConfigAuthority
     )]
-    pub program_data: Account<'info, ProgramData>,
+    pub program_data: UncheckedAccount<'info>,
     #[account(
         init,
         payer = authority,

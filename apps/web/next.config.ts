@@ -1,11 +1,19 @@
 import type { NextConfig } from 'next';
 import { resolveApiUrl } from './src/lib/api-url';
+import { resolveCluster } from './src/lib/clusters';
 
 export default function config(phase: string): NextConfig {
   const apiUrl = resolveApiUrl(process.env, phase);
+  // Refuses NEXT_PUBLIC_CLUSTER=mainnet before NEXT_PUBLIC_MAINNET_LAUNCHED=1 (docs/ops/networks.md).
+  const { cluster, mainnetLaunched } = resolveCluster(process.env);
   return {
     // Server components read public listings at render time (SSR for crawlers and no-JS clients).
-    env: { TM_API_URL: apiUrl },
+    // Always defined so they inline and the other cluster's data drops out of the bundle.
+    env: {
+      TM_API_URL: apiUrl,
+      NEXT_PUBLIC_CLUSTER: cluster.id,
+      NEXT_PUBLIC_MAINNET_LAUNCHED: mainnetLaunched ? '1' : '0',
+    },
     // Playwright loads the dev server from 127.0.0.1; without this the client bundle is blocked and pages never hydrate.
     allowedDevOrigins: ['127.0.0.1'],
     // No CSP. A script-src policy that omits the extension origin blocks Phantom from

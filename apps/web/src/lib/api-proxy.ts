@@ -14,6 +14,7 @@ const HOP_BY_HOP = new Set([
   'content-length',
   'x-tm-client-ip',
   'x-tm-proxy',
+  'x-tm-site-host',
 ]);
 
 export async function proxy(request: Request, context: { params: Promise<{ path: string[] }> }) {
@@ -24,6 +25,9 @@ export async function proxy(request: Request, context: { params: Promise<{ path:
   request.headers.forEach((value, key) => {
     if (!HOP_BY_HOP.has(key.toLowerCase())) headers.set(key, value);
   });
+  // Which hostname the visitor is on (trenchmart.fun or devnet.trenchmart.fun): the API names
+  // it in the sign-in message, but only if it is on its SIWS allow-list.
+  headers.set('x-tm-site-host', source.host);
   const ip = request.headers.get('cf-connecting-ip');
   const secret = process.env.PROXY_SECRET;
   if (ip && secret) {
