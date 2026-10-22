@@ -50,6 +50,17 @@ export type Env = {
   escrowProgramVersion: 1 | 2;
   /** Low-value fee payer for escrow txs (M-02). Falls back to the resolver when unset. */
   escrowCrankSecret: string;
+  /**
+   * Automated payouts (docs/ops/payouts.md): a hot key that is only a member of one Squads
+   * spending limit. Empty secret or spending limit, or PAYOUTS_AUTO=0, keeps manual batches.
+   */
+  payout: {
+    enabled: boolean;
+    signerSecret: string;
+    spendingLimit: string;
+    maxLineLamports: bigint;
+    dailyCapLamports: bigint;
+  };
   /** Kill switch: when true, POST /orders returns 503 (mainnet readiness #18). */
   checkoutPaused: boolean;
   /** Shared secret the web proxy sends with the real client IP (M-03). */
@@ -151,6 +162,13 @@ export function assertProductionSecrets(source: Record<string, string | undefine
   if (weak.length) throw new InsecureConfigError(weak);
 }
 
+function lamportsEnv(value: string | undefined, fallback: bigint): bigint {
+  const raw = value?.trim();
+  if (!raw) return fallback;
+  if (!/^\d{1,19}$/.test(raw)) throw new Error('payout caps must be whole lamports');
+  return BigInt(raw);
+}
+
 export function readEnv(source: Record<string, string | undefined> = process.env): Env {
   assertProductionSecrets(source);
   const cluster = assertTestCluster(source.SOLANA_CLUSTER || 'devnet');
@@ -214,6 +232,13 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     escrowResolverSecret: blank(source.ESCROW_RESOLVER_SECRET),
     escrowProgramVersion: source.ESCROW_PROGRAM_VERSION === '2' ? 2 : 1,
     escrowCrankSecret: blank(source.ESCROW_CRANK_SECRET),
+    payout: {
+      enabled: !/^(0|false|no|off)$/i.test(source.PAYOUTS_AUTO ?? ''),
+      signerSecret: blank(source.PAYOUT_SIGNER_SECRET),
+      spendingLimit: blank(source.PAYOUT_SPENDING_LIMIT),
+      maxLineLamports: lamportsEnv(source.PAYOUT_MAX_LINE_LAMPORTS, 500_000_000n),
+      dailyCapLamports: lamportsEnv(source.PAYOUT_DAILY_CAP_LAMPORTS, 3_000_000_000n),
+    },
     checkoutPaused: /^(1|true|yes)$/i.test(source.CHECKOUT_PAUSED ?? ''),
     proxySecret: blank(source.PROXY_SECRET),
     xClientId: blank(source.X_CLIENT_ID),

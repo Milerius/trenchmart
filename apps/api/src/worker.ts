@@ -27,6 +27,7 @@ import { createImageOptimizer } from './image-optimize';
 import { assertDeployedEnv, readEnv, weakSecrets, isLocalAppUrl } from './env';
 import { closeAfterResponse } from './lifetime';
 import { withEdgeCache } from './edge-cache';
+import { autoPayouts } from './payouts-auto';
 import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
 import { deliverAlerts, opsCheck, recordOpsEvent, type OpsAlert } from './ops';
 import { statusTick } from './status';
@@ -181,6 +182,11 @@ export default {
         await step('expire', () => expireOrders(deps));
         await step('release', () => releaseOrders(deps));
         await step('featuring', () => featureMaintenance(deps));
+        await step('auto-payouts', async () => {
+          const result = await autoPayouts(deps);
+          if (result.submitted || result.confirmed || result.failed || result.retried)
+            console.log('payouts', JSON.stringify(result));
+        });
         await step('payouts', () => proposePayouts(deps));
         await step('escrow-housekeeping', () => escrowHousekeeping(deps));
         await step('wallet-intel', () => scanWalletIntel(deps));

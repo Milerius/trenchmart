@@ -10,7 +10,7 @@ export default function TreasuryDocsPage() {
       <DocHeader
         kicker="Treasury"
         title="Squads multisig vault"
-        lede="Bonds and verification fees sit in a Squads multisig vault. Order payments do not: each order is held by the escrow program. The API never holds a key that can move the vault."
+        lede="Bonds and verification fees sit in a Squads multisig vault. Order payments do not: each order is held by the escrow program. The API can move the vault only through a capped Squads spending limit for payouts."
       />
       <DocSection id="vault" title="Custody">
         <p>
@@ -29,11 +29,17 @@ export default function TreasuryDocsPage() {
         </p>
       </DocSection>
       <DocSection id="payouts" title="Payouts">
+        <p data-testid="payouts-auto">
+          Release writes payout rows. The backend pays them automatically through a Squads spending
+          limit: a payout key that is not a multisig member may move at most{' '}
+          {protocol.payoutDailyCapSol} SOL a day out of the vault, and the backend caps each line at{' '}
+          {protocol.payoutMaxLineSol} SOL. Each line is its own transaction, and its signature is
+          stored before broadcast, so a retry never pays twice.
+        </p>
         <p>
-          Release writes payout rows. A batch takes up to {protocol.payoutBatchLimit} pending rows,
-          writes the transfer list to object storage under payout-batches, and marks them proposed.
-          A Squads signer executes the proposal. Posting the signature marks the batch sent.
-          Recipients that are still unconfigured are left out of the batch.
+          Lines over the cap still go to a batch of up to {protocol.payoutBatchLimit} transfers for
+          a Squads signer. The multisig can remove the spending limit at any time, which stops
+          automated payouts. Recipients that are still unconfigured are left out.
         </p>
       </DocSection>
       <DocSection id="program" title="The on-chain program">

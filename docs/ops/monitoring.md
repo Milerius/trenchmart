@@ -214,7 +214,11 @@ Warn. A dispute has been open for more than 24 h. After 7 days the on-chain time
 
 ### PAYOUTS_WAITING
 
-Warn. Vault payout lines have been waiting more than 48 h for the vault signature. Sign the batch in Squads.
+Warn. Vault payout lines have been waiting more than 48 h. Payouts are automated through a Squads spending limit ([payouts.md](payouts.md)), so this means automation is paused (see `PAYOUT_LIMIT`), out of allowance, or the lines are held over the cap and their Squads batch is unsigned.
+
+### PAYOUT_FAILED, PAYOUT_LIMIT, PAYOUT_BALANCE_LOW, PAYOUT_HELD
+
+Automated payout alerts. See the table and runbook in [payouts.md](payouts.md).
 
 ### CHECKOUT_PAUSED
 

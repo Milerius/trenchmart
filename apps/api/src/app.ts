@@ -60,6 +60,7 @@ import {
   canonicalTerminal,
 } from '@trenchmart/shared';
 import { fromBase64, sendRaw } from '@trenchmart/chain';
+import { autoPayouts } from './payouts-auto';
 import { cachedSolUsd, fetchSolUsd, type PriceCache } from './price';
 import type { Env } from './env';
 import { BlobUnavailableError } from './blob';
@@ -1993,6 +1994,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (job === 'expire') return c.json({ expired: await expireOrders(deps) });
     if (job === 'release') return c.json({ released: await releaseOrders(deps) });
     if (job === 'payouts') return c.json({ batch: await proposePayouts(deps) });
+    if (job === 'auto-payouts') return c.json(await autoPayouts(deps));
     if (job === 'ledger') return c.json(jsonSafe({ vault: await ledgerVault(deps.sql) }));
     if (job === 'ranking')
       return c.json(jsonSafe({ ranks: await computeRanks(deps, { force: true }) }));
