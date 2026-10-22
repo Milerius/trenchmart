@@ -1,0 +1,19 @@
+# Mainnet external watchdog (src/watchdog.ts). Deploy only at launch (docs/ops/mainnet-launch.md
+# step 9): before that its targets are not live and every tick would log ALERT lines.
+# RPC_URL is a secret (private mainnet RPC): wrangler secret put RPC_URL -c watchdog.mainnet.wrangler.toml
+# STATUS_PUSH_TOKEN: the mainnet API Worker's value (~/.config/trenchmart/mainnet/api-secrets.env).
+name = "trenchmart-watchdog-mainnet"
+main = "src/watchdog.ts"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[vars]
+WEB_URL = "https://trenchmart.fun"
+API_URL = "https://api.mainnet.trenchmart.fun"
+CLUSTER = "mainnet"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true

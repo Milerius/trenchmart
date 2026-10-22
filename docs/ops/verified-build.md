@@ -73,3 +73,22 @@ solana-verify build --library-name trench_escrow \
 solana-verify get-executable-hash target/deploy/trench_escrow.so
 solana-verify get-executable-hash <(solana program dump Dbrq2s… -u <devnet-rpc> /dev/stdout)
 ```
+
+## Mainnet candidate
+
+Recorded 2026-10-22 (UTC+4) from the `solana-verify` run on `f1efb274` (the last commit that
+touches the program; `main` at `e5eebe0` builds the same source), image
+`solanafoundation/solana-verifiable-build:4.3.0`:
+
+|                                                       |                                                                                     |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Executable hash (`solana-verify get-executable-hash`) | `124e1180962fdb156ad016a91206ef2666edc54927794f0a7d9daede7d4a68a9`                  |
+| Matches devnet on-chain `Dbrq2s…`                     | yes                                                                                 |
+| `.so` size                                            | 183,928 bytes                                                                       |
+| `.so` sha256                                          | `31309a0fe9e12a1fa6cb926f3714bae2d8d31956bd1ac88cf6a122b82f4a9d40`                  |
+| Artifact                                              | `trench_escrow-verified-f1efb274f4416ef9b4aa9cbd797dd41dd7d456c6` (run 39753263810) |
+
+Recommended deploy: `--max-len 220000` (about 20% headroom, 36,072 bytes, so a later upgrade
+that grows the program does not need `solana program extend` first). ProgramData then locks
+1.11847884 SOL instead of 0.93523308 SOL (+0.18 SOL); the buffer is still sized by the `.so`.
+Re-check the hash if the program changes before launch.

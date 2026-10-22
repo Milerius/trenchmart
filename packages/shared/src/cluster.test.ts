@@ -28,6 +28,9 @@ describe('resolveRpc', () => {
     expect(() =>
       resolveRpc('mainnet', { explicit: 'https://api.mainnet-beta.solana.com' }),
     ).toThrow(/public mainnet-beta/);
+    expect(() =>
+      resolveRpc('mainnet', { explicit: 'https://API.mainnet-beta.solana.com./' }),
+    ).toThrow(/public mainnet-beta/);
     expect(() => resolveRpc('mainnet', { helius: 'http://mainnet.helius-rpc.com/' })).toThrow(
       /https/,
     );

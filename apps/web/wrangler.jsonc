@@ -7,4 +7,15 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS",
   },
+  // Mainnet web Worker (docs/ops/mainnet-launch.md). workers.dev only, no routes: the
+  // trenchmart.fun custom domain moves here at launch. Build with NEXT_PUBLIC_CLUSTER=mainnet
+  // NEXT_PUBLIC_MAINNET_LAUNCHED=1 (the build refuses mainnet otherwise), then
+  // `wrangler deploy --env mainnet`. Secret: PROXY_SECRET (mainnet API value).
+  "env": {
+    "mainnet": {
+      "name": "trenchmart-web-mainnet",
+      "workers_dev": true,
+      "preview_urls": false,
+    },
+  },
 }

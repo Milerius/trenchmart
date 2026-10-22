@@ -10,10 +10,10 @@ The pill and its menu are server-rendered HTML (`components/network-switch.tsx`,
 outside click or Escape. From `xl` both segments show; between `sm` and `xl` only the active
 one.
 
-| Cluster | Site                                                                                  | API (proxied same-origin at `/api/v1`) | Status        |
-| ------- | ------------------------------------------------------------------------------------- | -------------------------------------- | ------------- |
-| Devnet  | `https://devnet.trenchmart.fun` and, until mainnet launches, `https://trenchmart.fun` | `https://api.trenchmart.fun`           | live          |
-| Mainnet | `https://trenchmart.fun` (after launch)                                               | planned, not deployed                  | "Coming soon" |
+| Cluster | Site                                                                                              | API (proxied same-origin at `/api/v1`)                                                                                         | Status        |
+| ------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| Devnet  | `https://devnet.trenchmart.fun` and, until mainnet launches, `https://trenchmart.fun`             | `https://api.trenchmart.fun`                                                                                                   | live          |
+| Mainnet | `https://trenchmart.fun` (after launch); Worker `trenchmart-web-mainnet` configured, not deployed | `https://api.mainnet.trenchmart.fun` (after launch); now `https://trenchmart-api-mainnet.trenchmart.workers.dev`, fails closed | "Coming soon" |
 
 Until launch, `trenchmart.fun` and `devnet.trenchmart.fun` are the same Worker
 (`trenchmart-web`, two Cloudflare custom domains). No redirect between them: every existing
@@ -54,7 +54,29 @@ transaction, so no payment can be signed on the wrong network. Wallets that list
 Standard does not expose the selected network, so the existing devnet hint on a rejected
 transaction and the server's own checks still apply.
 
+## Mainnet RPC
+
+The API has no public mainnet fallback. With `SOLANA_CLUSTER=mainnet` it starts only when
+`MAINNET_LAUNCHED=1` and `SOLANA_RPC_URL` or `HELIUS_RPC_URL` is set (https, not
+`api.mainnet-beta.solana.com`, which cannot serve the holder-rewards `getProgramAccounts`).
+Before launch `/api/v1/health` answers 500 `MAINNET_REFUSED`; launched without a private RPC
+it answers 503 `MAINNET_RPC_REQUIRED` (`resolveRpc` in `packages/shared/src/cluster.ts`).
+
+## Mainnet resources
+
+| Piece         | Devnet                                                      | Mainnet                                                                   |
+| ------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| API Worker    | `trenchmart-api` (`wrangler.deploy.toml`)                   | `trenchmart-api-mainnet` (`apps/api/wrangler.mainnet.toml`)               |
+| Web Worker    | `trenchmart-web`                                            | `trenchmart-web-mainnet` (`apps/web/wrangler.jsonc` env `mainnet`)        |
+| Watchdog      | `trenchmart-watchdog`                                       | `trenchmart-watchdog-mainnet` (`watchdog.mainnet.wrangler.toml`)          |
+| Database      | Supabase `loxyhdllgazypqceftpj`, Hyperdrive `trenchmart-db` | Supabase `zydwvewzlgjbvqufxoxi`, Hyperdrive `trenchmart-db-mainnet`       |
+| Files         | R2 `trenchmart-files`                                       | R2 `trenchmart-files-mainnet`                                             |
+| Queues        | `rewards-send`, `rewards-send-dlq`, `scan-static`           | `rewards-send-mainnet`, `rewards-send-mainnet-dlq`, `scan-static-mainnet` |
+| Secrets (box) | `~/.config/trenchmart/api-secrets.env`                      | `~/.config/trenchmart/mainnet/api-secrets.env`                            |
+
 ## Launch checklist (mainnet)
+
+Full step-by-step: [mainnet-launch.md](mainnet-launch.md).
 
 1. Fill the `mainnet` entry in `cluster.ts` (program id, multisig, vault, mint, API base).
 2. Deploy a mainnet API Worker and a second web Worker built with `NEXT_PUBLIC_CLUSTER=mainnet

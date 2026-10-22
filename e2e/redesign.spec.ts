@@ -330,8 +330,9 @@ test.describe('phase 5: header, nav and footer', () => {
   test('footer lists the real devnet addresses and every site link', async ({ page }) => {
     await page.goto('/');
     const footer = page.getByRole('contentinfo');
+    const { explorerCluster } = E2E_ADDRESSES;
     const explorer = (address: string) =>
-      `https://explorer.solana.com/address/${address}?cluster=devnet`;
+      `https://explorer.solana.com/address/${address}${explorerCluster ? `?cluster=${explorerCluster}` : ''}`;
     await expect(footer.getByTestId('footer-program')).toHaveAttribute(
       'href',
       explorer(E2E_ADDRESSES.program),
