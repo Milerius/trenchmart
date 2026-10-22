@@ -97,9 +97,9 @@ export function NetworkSwitch({ inMenu = false }: { inMenu?: boolean }) {
       <summary
         data-testid={inMenu ? 'network-pill-menu' : 'network-pill'}
         data-cluster={CLUSTER.id}
-        aria-label={`Network: Solana ${CLUSTER.label}. Change network`}
         className="motion-press flex h-10 shrink-0 cursor-pointer list-none items-center rounded-full border border-line-strong p-[3px] font-mono text-xs leading-6 hover:border-line-control [&::-webkit-details-marker]:hidden"
       >
+        <span className="sr-only">Network:</span>
         <span className={devnet ? active : `${inactive} text-faint`}>
           {devnet ? <Dot /> : null}
           Devnet

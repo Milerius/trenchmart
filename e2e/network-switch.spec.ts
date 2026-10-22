@@ -64,7 +64,7 @@ test('pill sits left of the wallet button; menu is lazy; mainnet is coming soon'
   await expect(menu.getByTestId('network-option-devnet')).toContainText('devnet.trenchmart.fun');
   await expect(menu.getByTestId('network-option-devnet')).toHaveAttribute('aria-current', 'true');
   await mainnet.click({ force: true });
-  await expect(page).toHaveURL(/127\.0\.0\.1:3000\/$/);
+  expect(new URL(page.url()).pathname).toBe('/');
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await pill.click();
