@@ -33,7 +33,7 @@ export function LogoMark({ className }: { className?: string }) {
 
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2.5" aria-label="TrenchMart home">
+    <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="TrenchMart home">
       <LogoMark className="h-8 w-8" />
       <span className="text-lg font-bold tracking-[-0.02em]">trenchmart</span>
     </Link>
@@ -147,7 +147,11 @@ function Nav({ social }: { social?: Social }) {
     <form
       onSubmit={search}
       role="search"
-      className={mobile ? 'flex w-full' : 'ml-auto hidden min-w-0 md:flex md:w-56 xl:w-64'}
+      className={
+        mobile
+          ? 'flex w-full'
+          : 'ml-auto hidden min-w-0 md:flex md:w-56 md:shrink lg:w-44 xl:w-56 2xl:w-64'
+      }
     >
       <label className="flex h-10 w-full items-center gap-2 rounded-full border border-line-control bg-inset px-3.5 focus-within:border-accent/60">
         <Search size={15} aria-hidden="true" className="shrink-0 text-muted" />
@@ -181,7 +185,10 @@ function Nav({ social }: { social?: Social }) {
     >
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
         <Logo />
-        <nav aria-label="Primary" className="ml-4 hidden items-center gap-1 text-sm lg:flex">
+        <nav
+          aria-label="Primary"
+          className="ml-4 hidden shrink-0 items-center gap-1 text-sm lg:flex"
+        >
           {links.map((link) => (
             <Link
               key={link.href}
@@ -201,14 +208,24 @@ function Nav({ social }: { social?: Social }) {
         >
           Sell
         </Link>
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
-          {social ? <div className="mr-1 hidden lg:block">{social.header}</div> : null}
+        <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
+          {/* Icon links only when there is room for them next to the nav and search. */}
+          {social ? (
+            <div data-testid="header-social" className="mr-1 hidden shrink-0 xl:block">
+              {social.header}
+            </div>
+          ) : null}
           {wallet.session ? (
             <span
               data-testid="tier-pill"
-              className="hidden h-10 items-center rounded-full border border-accent-line bg-accent-bg px-4 font-mono text-xs text-accent xl:flex"
+              title={tierChip(wallet.session.tier, config)}
+              className="hidden h-10 shrink-0 items-center rounded-full border border-accent-line bg-accent-bg px-4 font-mono text-xs whitespace-nowrap text-accent xl:flex"
             >
-              {tierChip(wallet.session.tier, config)}
+              {/* Short "5% fee" until 2xl; the tier name joins once the header has room. */}
+              <span className="hidden 2xl:inline">
+                {tierChip(wallet.session.tier, config).split(' · ')[0]} ·&nbsp;
+              </span>
+              {tierChip(wallet.session.tier, config).split(' · ').slice(1).join(' · ')}
             </span>
           ) : null}
           <WalletMenu />
