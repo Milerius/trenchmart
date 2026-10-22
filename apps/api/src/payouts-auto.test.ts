@@ -44,6 +44,9 @@ type Chain = PayoutChain & {
   landed: Map<string, { err: unknown }>;
   transfers: { to: string; lamports: bigint }[];
   mode: 'ok' | 'drop' | 'throw-but-land' | 'program-error';
+  calls: string[];
+  account(address: string): Promise<{ data: Uint8Array; owner: string; lamports: bigint } | null>;
+  status(sig: string): Promise<{ confirmed: boolean; err: unknown } | null>;
 };
 
 function fakeChain(signer: string, spendingLimit: string): Chain {
@@ -57,6 +60,15 @@ function fakeChain(signer: string, spendingLimit: string): Chain {
     landed: new Map(),
     transfers: [],
     mode: 'ok',
+    calls: [],
+    async accounts(addresses) {
+      chain.calls.push('getMultipleAccounts');
+      return Promise.all(addresses.map((a) => chain.account(a)));
+    },
+    async statuses(sigs) {
+      chain.calls.push('getSignatureStatuses');
+      return Promise.all(sigs.map((sig) => chain.status(sig)));
+    },
     async account(address) {
       if (address === spendingLimit) {
         if (!chain.limitExists) return null;
@@ -85,6 +97,7 @@ function fakeChain(signer: string, spendingLimit: string): Chain {
       return null;
     },
     async send(tx) {
+      chain.calls.push('sendTransaction');
       const parsed = parseLegacyTx(tx);
       const sig = bs58.encode(parsed.signatures[0]!);
       if (chain.mode === 'drop') throw new Error('rpc timeout');
@@ -108,11 +121,14 @@ function fakeChain(signer: string, spendingLimit: string): Chain {
       const s = chain.landed.get(sig);
       return s ? { confirmed: true, err: s.err } : null;
     },
-    blockHeight: async () => chain.height,
-    blockhash: async () => ({
-      blockhash: bs58.encode(nacl.randomBytes(32)),
-      lastValidBlockHeight: chain.height + 150,
-    }),
+    blockHeight: async () => (chain.calls.push('getBlockHeight'), chain.height),
+    blockhash: async () => {
+      chain.calls.push('getLatestBlockhash');
+      return {
+        blockhash: bs58.encode(nacl.randomBytes(32)),
+        lastValidBlockHeight: chain.height + 150,
+      };
+    },
   };
   return chain;
 }
@@ -272,6 +288,39 @@ describe('automated payouts (Squads spending limit)', () => {
     await line(5_000n);
     await autoPayouts(deps);
     expect(chain.transfers).toHaveLength(3);
+  });
+
+  it('keeps each run to a fixed, batched RPC budget and carries the rest over', async () => {
+    const { deps, chain } = await setup();
+    for (let i = 0; i < 12; i += 1) await line(1_000_000n);
+    const first = await autoPayouts(deps);
+    expect(first.submitted).toBe(5);
+    expect(chain.calls.filter((c) => c === 'getMultipleAccounts')).toHaveLength(1);
+    expect(chain.calls.filter((c) => c === 'getLatestBlockhash')).toHaveLength(1);
+    expect(chain.calls.filter((c) => c === 'sendTransaction')).toHaveLength(5);
+    expect(chain.calls.length).toBeLessThanOrEqual(8);
+    chain.calls = [];
+    // Next run: 5 confirmations in ONE status call, then 5 more lines.
+    expect(await autoPayouts(deps)).toMatchObject({ confirmed: 5, submitted: 5 });
+    expect(chain.calls.filter((c) => c === 'getSignatureStatuses')).toHaveLength(1);
+    expect(chain.calls.length).toBeLessThanOrEqual(9);
+    await autoPayouts(deps);
+    await autoPayouts(deps);
+    expect(chain.transfers).toHaveLength(12);
+    expect((await rowsOf()).every((r) => r.status === 'sent')).toBe(true);
+    chain.calls = [];
+    await opsCheck(deps);
+    expect(chain.calls).toEqual(['getMultipleAccounts']);
+  });
+
+  it('reports a Worker subrequest-limit error as SUBREQUEST_LIMIT, not RPC_DOWN', async () => {
+    const { deps, chain } = await setup();
+    chain.accounts = async () => {
+      throw new Error('getMultipleAccounts: Too many subrequests by single Worker invocation.');
+    };
+    const codes = (await opsCheck(deps)).map((a) => a.code);
+    expect(codes).toContain('SUBREQUEST_LIMIT');
+    expect(codes).not.toContain('RPC_DOWN');
   });
 
   it('counts in-flight sends against the vault balance', async () => {

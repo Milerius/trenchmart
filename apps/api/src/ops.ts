@@ -8,7 +8,7 @@ import { parseSecretKey, publicKeyOf } from '@trenchmart/chain';
 import { pendingMigrations } from '@trenchmart/db';
 import type { Deps } from './logic';
 import { resolverOf } from './escrow';
-import { payoutHealth } from './payouts-auto';
+import { payoutHealth, rpcErrorCode } from './payouts-auto';
 
 export type OpsLevel = 'warn' | 'critical';
 export type OpsAlert = { level: OpsLevel; code: string; message: string };
@@ -19,6 +19,7 @@ export const ALERT_CODES = [
   'SCHEMA_BEHIND',
   'R2_ERROR',
   'RPC_DOWN',
+  'SUBREQUEST_LIMIT',
   'WEB_DOWN',
   'LOW_BALANCE',
   'RESOLVER_MISCONFIGURED',
@@ -198,7 +199,7 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
           `RPC getHealth: HTTP ${res.status} ${body.result ?? ''}`.trim(),
         );
     } catch (err) {
-      add('critical', 'RPC_DOWN', `RPC unreachable: ${(err as Error).message}`);
+      add('critical', rpcErrorCode(err), `RPC unreachable: ${(err as Error).message}`);
     }
   }
   if (deps.env.appUrl && !/localhost|127\.0\.0\.1/.test(deps.env.appUrl)) {
@@ -248,7 +249,7 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
             `${role} ${pubkey} holds ${Number(lamports) / 1e9} SOL; top it up so releases and refunds keep landing`,
           );
       } catch (err) {
-        add('critical', 'RPC_DOWN', `balance read failed: ${(err as Error).message}`);
+        add('critical', rpcErrorCode(err), `balance read failed: ${(err as Error).message}`);
       }
     }
     if (deps.env.expectedUpgradeAuthority) {
@@ -261,7 +262,7 @@ export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
             `escrow program upgrade authority is ${authority || 'none (immutable)'}, expected ${deps.env.expectedUpgradeAuthority}`,
           );
       } catch (err) {
-        add('warn', 'RPC_DOWN', `upgrade authority read failed: ${(err as Error).message}`);
+        add('warn', rpcErrorCode(err), `upgrade authority read failed: ${(err as Error).message}`);
       }
     }
   }

@@ -5,8 +5,8 @@
 // spending limit at any time, which stops every automated payout.
 import bs58 from 'bs58';
 import {
-  accountData,
   compileLegacyTx,
+  fromBase64,
   decodeSpendingLimit,
   effectiveRemaining,
   latestBlockhash,
@@ -30,39 +30,70 @@ export const PAYOUT_CEILINGS = {
   dailyCapLamports: 20_000_000_000n,
 };
 export const PAYOUT_MAX_ATTEMPTS = 5;
-export const PAYOUT_LINES_PER_RUN = 10;
+/** Each line is one sendTransaction subrequest; the rest carries over to the next tick. */
+export const PAYOUT_LINES_PER_RUN = 5;
 /** The signer pays ~5000 lamports per payout; warn well before it runs dry. */
 export const PAYOUT_SIGNER_MIN_LAMPORTS = 20_000_000n;
 
 export type SigStatus = { confirmed: boolean; err: unknown } | null;
+export type ChainAccount = { data: Uint8Array; owner: string; lamports: bigint } | null;
+/**
+ * Every read is batched: a Worker invocation has a hard subrequest budget shared by every
+ * cron step (Cloudflare "Too many subrequests"), so one run makes a fixed, small number of calls.
+ */
 export type PayoutChain = {
-  account(address: string): Promise<{ data: Uint8Array; owner: string; lamports: bigint } | null>;
+  /** One getMultipleAccounts call, results in input order. */
+  accounts(addresses: string[]): Promise<ChainAccount[]>;
   send(tx: Uint8Array): Promise<string>;
-  status(signature: string): Promise<SigStatus>;
+  /** One getSignatureStatuses call (max 256), results in input order. */
+  statuses(signatures: string[]): Promise<SigStatus[]>;
   blockHeight(): Promise<number>;
   blockhash(): Promise<{ blockhash: string; lastValidBlockHeight: number }>;
 };
 
 export function rpcPayoutChain(url: string): PayoutChain {
   return {
-    account: (address) => accountData(url, address),
+    async accounts(addresses) {
+      if (addresses.length === 0) return [];
+      const result = (await rpc(url, 'getMultipleAccounts', [
+        addresses,
+        { encoding: 'base64', commitment: 'confirmed' },
+      ])) as {
+        value: Array<{ data: [string, string]; owner: string; lamports: number } | null>;
+      };
+      return result.value.map((v) =>
+        v ? { data: fromBase64(v.data[0]), owner: v.owner, lamports: BigInt(v.lamports) } : null,
+      );
+    },
     send: (tx) => sendRaw(url, tx),
-    async status(signature) {
+    async statuses(signatures) {
+      if (signatures.length === 0) return [];
       const result = (await rpc(url, 'getSignatureStatuses', [
-        [signature],
+        signatures,
         { searchTransactionHistory: true },
       ])) as { value: Array<{ confirmationStatus?: string; err: unknown } | null> };
-      const s = result.value[0];
-      if (!s) return null;
-      return {
-        confirmed: s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized',
-        err: s.err ?? null,
-      };
+      return result.value.map((s) =>
+        s
+          ? {
+              confirmed:
+                s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized',
+              err: s.err ?? null,
+            }
+          : null,
+      );
     },
     blockHeight: async () =>
       Number(await rpc(url, 'getBlockHeight', [{ commitment: 'confirmed' }])),
     blockhash: () => latestBlockhash(url),
   };
+}
+
+/** Cloudflare's per-invocation subrequest cap is our own budget problem, not an RPC outage. */
+export function isSubrequestLimit(err: unknown): boolean {
+  return /too many subrequests/i.test(err instanceof Error ? err.message : String(err));
+}
+export function rpcErrorCode(err: unknown): 'SUBREQUEST_LIMIT' | 'RPC_DOWN' {
+  return isSubrequestLimit(err) ? 'SUBREQUEST_LIMIT' : 'RPC_DOWN';
 }
 
 export function payoutChainOf(deps: Deps): PayoutChain {
@@ -110,11 +141,7 @@ export type LimitCheck =
   { ok: true; limit: SpendingLimitAccount; lamports: bigint } | { ok: false; reason: string };
 
 /** Reads the spending limit and refuses anything but the exact scope the design allows. */
-export async function readSpendingLimit(
-  chain: PayoutChain,
-  cfg: AutoPayoutConfig,
-): Promise<LimitCheck> {
-  const info = await chain.account(cfg.spendingLimit);
+export function checkSpendingLimit(info: ChainAccount, cfg: AutoPayoutConfig): LimitCheck {
   if (!info) return { ok: false, reason: 'spending limit account does not exist yet' };
   if (info.owner !== SQUADS_PROGRAM_ID)
     return { ok: false, reason: 'spending limit is not owned by the Squads program' };
@@ -162,8 +189,9 @@ async function reconcile(deps: Deps, chain: PayoutChain, out: AutoPayoutResult):
   `;
   if (rows.length === 0) return;
   let height: number | null = null;
-  for (const row of rows) {
-    const status = await chain.status(row.tx_sig as string);
+  const statuses = await chain.statuses(rows.map((row) => row.tx_sig as string));
+  for (const [i, row] of rows.entries()) {
+    const status = statuses[i] ?? null;
     if (status && status.confirmed && !status.err) {
       const done = await deps.sql`
         update payouts set status = 'sent', last_error = null
@@ -208,7 +236,8 @@ export async function autoPayouts(deps: Deps): Promise<AutoPayoutResult> {
   const chain = payoutChainOf(deps);
   await reconcile(deps, chain, out);
 
-  const check = await readSpendingLimit(chain, cfg);
+  const [limitInfo, vault] = await chain.accounts([cfg.spendingLimit, cfg.vault]);
+  const check = checkSpendingLimit(limitInfo ?? null, cfg);
   if (!check.ok) return { ...out, skipped: check.reason };
   const nowSec = Math.floor(deps.now().getTime() / 1000);
   const [spent] = await deps.sql<{ sum: bigint }[]>`
@@ -220,7 +249,6 @@ export async function autoPayouts(deps: Deps): Promise<AutoPayoutResult> {
   const [inflight] = await deps.sql<{ sum: bigint }[]>`
     select coalesce(sum(amount), 0)::bigint as sum from payouts where mode = 'auto' and status = 'sending'
   `;
-  const vault = await chain.account(cfg.vault);
   // Keep the vault rent-exempt and never spend more than the program or our cap allows.
   let budget = [
     effectiveRemaining(check.limit, nowSec),
@@ -235,6 +263,8 @@ export async function autoPayouts(deps: Deps): Promise<AutoPayoutResult> {
     order by created_at asc
     limit ${PAYOUT_LINES_PER_RUN}
   `;
+  // One blockhash per run: every line still gets its own transaction (distinct memo and signature).
+  let latest: { blockhash: string; lastValidBlockHeight: number } | null = null;
   for (const row of rows) {
     const amount = row.amount as bigint;
     const hold =
@@ -252,7 +282,7 @@ export async function autoPayouts(deps: Deps): Promise<AutoPayoutResult> {
       continue;
     }
     if (amount > budget) break; // oldest first: wait for the next period instead of skipping
-    const latest = await chain.blockhash();
+    latest ??= await chain.blockhash();
     const tx = signTx(
       compileLegacyTx({
         feePayer: cfg.signer,
@@ -336,21 +366,24 @@ export async function payoutHealth(deps: Deps): Promise<PayoutHealth> {
   `;
   const owed = due?.sum ?? 0n;
   try {
-    const signer = await chain.account(cfg.signer);
+    const [signer, vault, limitInfo] = await chain.accounts([
+      cfg.signer,
+      cfg.vault,
+      cfg.spendingLimit,
+    ]);
     if ((signer?.lamports ?? 0n) < PAYOUT_SIGNER_MIN_LAMPORTS)
       alerts.push({
         level: 'critical',
         code: 'LOW_BALANCE',
         message: `payout signer ${cfg.signer} holds ${Number(signer?.lamports ?? 0n) / 1e9} SOL; top it up so payout fees can be paid`,
       });
-    const vault = await chain.account(cfg.vault);
     if ((vault?.lamports ?? 0n) < owed + 1_000_000n)
       alerts.push({
         level: 'critical',
         code: 'PAYOUT_BALANCE_LOW',
         message: `vault holds ${Number(vault?.lamports ?? 0n) / 1e9} SOL but ${Number(owed) / 1e9} SOL of payouts are due`,
       });
-    const check = await readSpendingLimit(chain, cfg);
+    const check = checkSpendingLimit(limitInfo ?? null, cfg);
     if (!check.ok)
       alerts.push({
         level: 'warn',
@@ -369,7 +402,7 @@ export async function payoutHealth(deps: Deps): Promise<PayoutHealth> {
   } catch (err) {
     alerts.push({
       level: 'critical',
-      code: 'RPC_DOWN',
+      code: rpcErrorCode(err),
       message: `payout check failed: ${(err as Error).message}`,
     });
   }

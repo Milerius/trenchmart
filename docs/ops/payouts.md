@@ -25,7 +25,7 @@ limit, add a new one with the new member).
 | On chain, Squads program              | 3 SOL per Day period, mint = native SOL, vault index 0, members = [payout signer], destinations = any | Spending limit `AouBPFgDADdskb1fxETGHBLaSzDUH25PSb3PWq3zzJUd` (create key `CaF3d39o…`) |
 | Backend, rolling 24 h                 | `PAYOUT_DAILY_CAP_LAMPORTS`, default 3 SOL, code ceiling 20 SOL                                       | `payouts-auto.ts`                                                                      |
 | Backend, per line (= per transaction) | `PAYOUT_MAX_LINE_LAMPORTS`, default 0.5 SOL, code ceiling 5 SOL                                       | `payouts-auto.ts`                                                                      |
-| Backend, per run                      | 10 lines per cron tick (every 5 min)                                                                  | `PAYOUT_LINES_PER_RUN`                                                                 |
+| Backend, per run                      | 5 lines per cron tick (every 5 min); the rest carries over                                            | `PAYOUT_LINES_PER_RUN`                                                                 |
 | Vault floor                           | 0.001 SOL is never spent (rent)                                                                       | `payouts-auto.ts`                                                                      |
 
 Squads v4 has no per-transaction field, so the per-transaction cap is the backend's per-line
@@ -55,6 +55,14 @@ One payout line = one transaction = one `spending_limit_use` instruction with me
 Old Squads batches (`payout-batches/*.json`) whose lines were paid automatically are void:
 `POST /admin/payouts/batches/:id/sent` answers `409 BATCH_SUPERSEDED` for them. Never execute
 an old batch JSON in Squads.
+
+## RPC budget per invocation
+
+A Worker invocation has a hard subrequest cap shared by every cron step. On 2026-10-22 at 10:05
+(UTC+4) single-account reads tripped it. A payout run now makes at most 1
+`getSignatureStatuses` (all in-flight lines), at most 1 `getBlockHeight`, 1
+`getMultipleAccounts` (limit + vault), 1 `getLatestBlockhash` and at most 5 `sendTransaction`
+calls. The watchdog check is one `getMultipleAccounts` (signer, vault, limit).
 
 ## Alerts (`/internal/ops`)
 
