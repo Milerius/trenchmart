@@ -11,6 +11,7 @@ alter table payouts add column if not exists valid_until_height bigint;
 alter table payouts add column if not exists sent_at timestamptz;
 -- Set when a line is over the automated caps; it then stays for a Squads batch.
 alter table payouts add column if not exists held_reason text;
-create index if not exists payouts_open on payouts (status, created_at)
-  where status in ('pending', 'proposed', 'sending', 'failed');
+-- No literal 'sending' here: a new enum value cannot be used in the transaction that adds it
+-- (the remote migrator runs a file as one transaction).
+create index if not exists payouts_open on payouts (status, created_at) where status <> 'sent';
 create index if not exists payouts_auto_sent on payouts (sent_at) where mode = 'auto';
