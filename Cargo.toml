@@ -7,6 +7,7 @@ overflow-checks = true
 lto = "fat"
 codegen-units = 1
 opt-level = "z"
+panic = "abort"
 
 # solana-verify picks the Docker base image from this (Anchor 1.2.1 / Agave 4.3.x toolchain).
 [workspace.metadata.cli]

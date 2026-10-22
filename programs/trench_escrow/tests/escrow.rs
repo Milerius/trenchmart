@@ -1,12 +1,12 @@
-//! Instruction-level tests for `trench_escrow`, run against the compiled SBF program in
-//! Mollusk (the Agave program runtime, minus the validator).
-//!
-//! The ELF comes from `anchor build` (`target/deploy/trench_escrow.so`). Without it the
-//! tests skip with a message, unless `TRENCH_ESCROW_REQUIRE_SBF=1`, which `anchor test`
-//! (Anchor.toml `[scripts] test`) sets so CI can never pass them vacuously.
-//!
-//! Every test checks the program's own error code, not just "it failed", so a check that
-//! starts failing for the wrong reason shows up.
+// Instruction-level tests for `trench_escrow`, run against the compiled SBF program in
+// Mollusk (the Agave program runtime, minus the validator).
+//
+// The ELF comes from `anchor build` (`target/deploy/trench_escrow.so`). Without it the
+// tests skip with a message, unless `TRENCH_ESCROW_REQUIRE_SBF=1`, which `anchor test`
+// (Anchor.toml `[scripts] test`) sets so CI can never pass them vacuously.
+//
+// Every test checks the program's own error code, not just "it failed", so a check that
+// starts failing for the wrong reason shows up.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -1705,6 +1705,41 @@ fn init_config_only_by_upgrade_authority() {
         result.program_result.is_err(),
         "config cannot be re-initialized"
     );
+}
+
+/// `program_data` is read by hand (no bincode): every malformed or foreign account fails closed.
+#[test]
+fn init_config_rejects_malformed_program_data() {
+    let mut h = harness!();
+    h.accounts.insert(h.config, Account::default());
+    let upgrader = Pubkey::new_unique();
+    h.accounts.insert(upgrader, wallet(WALLET));
+    let pd = program_data_pda();
+    let resolver = h.p.resolver;
+    let ix = init_config_ix(upgrader, pd, resolver, DISPUTE_TIMEOUT);
+    // Right bytes, wrong owner.
+    let mut acc = program_data_account(Some(upgrader));
+    acc.owner = Pubkey::new_unique();
+    h.accounts.insert(pd, acc);
+    h.fails(&ix, anchor_err(AnchorError::ConstraintOwner));
+    // Another loader-v3 state tag (2 = Program) with the authority bytes in place.
+    let mut acc = program_data_account(Some(upgrader));
+    acc.data[..4].copy_from_slice(&2u32.to_le_bytes());
+    h.accounts.insert(pd, acc);
+    h.fails(&ix, program_err(EscrowError::ConfigAuthority));
+    // Option tag other than 1 (Some).
+    let mut acc = program_data_account(Some(upgrader));
+    acc.data[12] = 2;
+    h.accounts.insert(pd, acc);
+    h.fails(&ix, program_err(EscrowError::ConfigAuthority));
+    // Truncated authority.
+    let mut acc = program_data_account(Some(upgrader));
+    acc.data.truncate(44);
+    h.accounts.insert(pd, acc);
+    h.fails(&ix, program_err(EscrowError::ConfigAuthority));
+    // Well-formed: accepted.
+    h.accounts.insert(pd, program_data_account(Some(upgrader)));
+    h.ok(&ix);
 }
 
 #[test]
