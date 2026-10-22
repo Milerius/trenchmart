@@ -44,6 +44,7 @@ async function headerItems(page: Page) {
       locator: social.nth(i),
     });
   items.push({ label: 'tier-pill', locator: nav.getByTestId('tier-pill') });
+  items.push({ label: 'network-pill', locator: nav.getByTestId('network-pill') });
   items.push({ label: 'wallet', locator: nav.getByTestId('connect') });
   items.push({ label: 'menu', locator: nav.getByTestId('menu-toggle') });
   return items;
@@ -56,7 +57,7 @@ for (const size of WIDTHS) {
     await page.setViewportSize(size);
     await signIn(page);
     const items = await headerItems(page);
-    const textual = ['nav:', 'sell', 'tier-pill', 'wallet'];
+    const textual = ['nav:', 'sell', 'tier-pill', 'network-pill', 'wallet'];
     for (const { label, locator } of items)
       if (textual.some((t) => label.startsWith(t)) && (await locator.isVisible()))
         await expectSingleLine(locator, label);

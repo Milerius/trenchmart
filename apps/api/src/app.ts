@@ -493,6 +493,20 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     return { expiresAt, refreshAfter: refreshAfter.toISOString() };
   }
 
+  /** Sign-in domain for the page's host: SIWS_DOMAIN, or one of SIWS_EXTRA_DOMAINS. */
+  function siwsSite(host: string | undefined): { domain: string; uri: string } {
+    const h = host?.trim().toLowerCase();
+    if (h && h !== deps.env.siwsDomain && deps.env.siwsExtraDomains.includes(h)) {
+      const scheme = deps.env.siwsUri.startsWith('http://') ? 'http' : 'https';
+      return { domain: h, uri: `${scheme}://${h}` };
+    }
+    return { domain: deps.env.siwsDomain, uri: deps.env.siwsUri };
+  }
+  const siwsSites = () => [
+    siwsSite(undefined),
+    ...deps.env.siwsExtraDomains.filter((d) => d !== deps.env.siwsDomain).map((d) => siwsSite(d)),
+  ];
+
   api.post('/auth/nonce', async (c) => {
     const body = await bodyOf(nonceBody, await c.req.json());
     const nonce = randomNonce();
@@ -501,12 +515,14 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     await deps.sql`
       insert into auth_nonces (nonce, wallet, expires_at) values (${nonce}, ${body.wallet}, ${expires})
     `;
+    // The web proxy names the page's host (x-tm-site-host); only allow-listed names are used.
+    const site = siwsSite(c.req.header('x-tm-site-host'));
     const message = buildSiwsMessage({
-      domain: deps.env.siwsDomain,
+      domain: site.domain,
       wallet: body.wallet,
       nonce,
       issuedAt: issued,
-      uri: deps.env.siwsUri,
+      uri: site.uri,
     });
     return c.json({ nonce, message });
   });
@@ -520,17 +536,20 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     let matched: Record<string, any> | null = null;
     for (const nonce of nonces) {
       const issued = new Date((nonce.expires_at as Date).getTime() - 10 * 60 * 1000);
-      const message = buildSiwsMessage({
-        domain: deps.env.siwsDomain,
-        wallet: body.wallet,
-        nonce: nonce.nonce as string,
-        issuedAt: issued,
-        uri: deps.env.siwsUri,
-      });
-      if (verifySiwsSignature(message, body.signature, body.wallet)) {
-        matched = nonce;
-        break;
+      for (const site of siwsSites()) {
+        const message = buildSiwsMessage({
+          domain: site.domain,
+          wallet: body.wallet,
+          nonce: nonce.nonce as string,
+          issuedAt: issued,
+          uri: site.uri,
+        });
+        if (verifySiwsSignature(message, body.signature, body.wallet)) {
+          matched = nonce;
+          break;
+        }
       }
+      if (matched) break;
     }
     if (!matched)
       throw new HttpError(401, 'BAD_SIGNATURE', 'signature does not match an open nonce');

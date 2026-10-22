@@ -5,6 +5,12 @@ export type Env = {
   apiUrl: string;
   siwsDomain: string;
   siwsUri: string;
+  /**
+   * Extra hostnames that serve this same deployment (SIWS_EXTRA_DOMAINS, comma separated, e.g.
+   * devnet.trenchmart.fun). A wallet only shows a sign-in whose domain matches the page, so a
+   * sign-in started on one of these names that host instead of SIWS_DOMAIN.
+   */
+  siwsExtraDomains: string[];
   sessionSecret: string;
   internalToken: string;
   /** Lets the external watchdog push its checks for the status page (status.ts). '' = off. */
@@ -210,6 +216,10 @@ export function readEnv(source: Record<string, string | undefined> = process.env
     apiUrl: blank(source.API_URL) || 'http://localhost:8787',
     siwsDomain: blank(source.SIWS_DOMAIN) || 'localhost:3000',
     siwsUri: blank(source.APP_URL) || 'http://localhost:3000',
+    siwsExtraDomains: (blank(source.SIWS_EXTRA_DOMAINS) ?? '')
+      .split(',')
+      .map((d) => d.trim().toLowerCase())
+      .filter((d) => /^[a-z0-9.-]+(:\d+)?$/.test(d)),
     sessionSecret: source.SESSION_SECRET || 'change-me-32-bytes-min',
     internalToken: source.INTERNAL_TOKEN || 'change-me',
     // Ignored unless it is a real secret (32+ chars), so a blank or default never opens the route.

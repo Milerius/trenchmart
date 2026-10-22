@@ -113,15 +113,24 @@ function Nav({ social }: { social?: Social }) {
   const searchRef = useRef<HTMLInputElement>(null);
   // "/" jumps to search from anywhere that is not already a text field.
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
+    // Network pill (server-rendered <details>): outside click or Escape closes it.
+    const onKey = (event: KeyboardEvent | MouseEvent) => {
+      const target = event.target as HTMLElement;
+      for (const d of document.querySelectorAll('details[data-net][open]'))
+        if ((event as KeyboardEvent).key === 'Escape' || !d.contains(target))
+          d.removeAttribute('open');
+      if (!('key' in event) || event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey)
+        return;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
       event.preventDefault();
       searchRef.current?.focus();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    addEventListener('keydown', onKey);
+    addEventListener('mousedown', onKey);
+    return () => {
+      removeEventListener('keydown', onKey);
+      removeEventListener('mousedown', onKey);
+    };
   }, []);
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -228,6 +237,7 @@ function Nav({ social }: { social?: Social }) {
               {tierChip(wallet.session.tier, config).split(' · ').slice(1).join(' · ')}
             </span>
           ) : null}
+          {social?.network}
           <WalletMenu />
           <button
             type="button"
@@ -249,6 +259,10 @@ function Nav({ social }: { social?: Social }) {
           aria-label="Mobile"
           className="flex flex-col gap-1 border-t border-line px-4 py-3 sm:px-6 lg:hidden"
         >
+          <div className="flex items-center justify-between gap-3 pb-2 sm:hidden">
+            <span className="text-xs text-muted">Network</span>
+            {social?.networkMenu}
+          </div>
           <div className="pb-2 md:hidden">{searchForm(true)}</div>
           {[...links, { href: '/sell', label: 'Sell' }].map((link) => (
             <Link
@@ -381,7 +395,16 @@ const FULL_BLEED_PREFIXES = ['/c/', '/u/'];
 const PRELOADED_READS = ['/api/v1/me', '/api/v1/config/public'];
 
 /** Server-rendered link groups (see social-links.tsx): HTML only, no client JS. */
-export type Social = { header: ReactNode; menu: ReactNode; footer: ReactNode };
+export type Social = {
+  header: ReactNode;
+  menu: ReactNode;
+  footer: ReactNode;
+  /** Network switch pill (network-switch.tsx): header and mobile-menu copies. */
+  network?: ReactNode;
+  networkMenu?: ReactNode;
+  /** Wallet-on-another-cluster banner (cluster-mismatch.tsx), shown via <html data-cluster-mismatch>. */
+  clusterBanner?: ReactNode;
+};
 
 export function Shell({ children, social }: { children: ReactNode; social?: Social }) {
   // Redesigned pages lay out their own full-width hero and column; the rest get the column.
@@ -398,6 +421,7 @@ export function Shell({ children, social }: { children: ReactNode; social?: Soci
         Skip to content
       </a>
       <NetworkBanner />
+      {social?.clusterBanner}
       <Ticker />
       <Nav social={social} />
       {/* overflow-x-clip lets a page paint full-width glows without a horizontal scrollbar. */}
