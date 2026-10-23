@@ -25,7 +25,8 @@ function Menu() {
       {ORDER.map((id) => {
         const c = CLUSTERS[id];
         const current = id === CLUSTER.id;
-        const enabled = id === 'devnet' || MAINNET_LAUNCHED;
+        // Mainnet is live on mainnet.trenchmart.fun: both networks are always selectable.
+        const enabled = true;
         const body = (
           <>
             <span className="flex items-center gap-2 font-semibold">
