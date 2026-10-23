@@ -10,10 +10,10 @@ The pill and its menu are server-rendered HTML (`components/network-switch.tsx`,
 outside click or Escape. From `xl` both segments show; between `sm` and `xl` only the active
 one.
 
-| Cluster | Site                                                                                              | API (proxied same-origin at `/api/v1`)                                                                                         | Status        |
-| ------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| Devnet  | `https://devnet.trenchmart.fun` and, until mainnet launches, `https://trenchmart.fun`             | `https://api.trenchmart.fun`                                                                                                   | live          |
-| Mainnet | `https://trenchmart.fun` (after launch); Worker `trenchmart-web-mainnet` configured, not deployed | `https://api.mainnet.trenchmart.fun` (after launch); now `https://trenchmart-api-mainnet.trenchmart.workers.dev`, fails closed | "Coming soon" |
+| Cluster | Site                                                                                              | API (proxied same-origin at `/api/v1`)                                                                          | Status        |
+| ------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------- |
+| Devnet  | `https://devnet.trenchmart.fun` and, until mainnet launches, `https://trenchmart.fun`             | `https://api.trenchmart.fun`                                                                                    | live          |
+| Mainnet | `https://trenchmart.fun` (after launch); Worker `trenchmart-web-mainnet` configured, not deployed | `https://api.mainnet.trenchmart.fun` (custom domain, live but fails closed with `MAINNET_REFUSED` until launch) | "Coming soon" |
 
 Until launch, `trenchmart.fun` and `devnet.trenchmart.fun` are the same Worker
 (`trenchmart-web`, two Cloudflare custom domains). No redirect between them: every existing

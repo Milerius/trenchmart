@@ -1,17 +1,19 @@
 # Mainnet API Worker (docs/ops/networks.md, docs/ops/mainnet-launch.md).
-# Separate Worker, database, bucket and queues from devnet. workers.dev only: no routes or
-# custom domains here; api.mainnet.trenchmart.fun is attached at launch (runbook step 8).
+# Separate Worker, database, bucket and queues from devnet. Custom domain only:
+# api.mainnet.trenchmart.fun, behind the zone WAF and rate-limit rules
+# (docs/ops/edge-protection.md); workers.dev and preview URLs are off (deploy-api.sh enforces).
 # Fails closed until launch: SOLANA_CLUSTER=mainnet is refused (every request, cron and queue
 # message) unless MAINNET_LAUNCHED=1, and then it needs SOLANA_RPC_URL or HELIUS_RPC_URL.
 # Deploy: TM_DEPLOY_DB_ENV=~/.config/trenchmart/supabase-mainnet.env \
-#   API_HEALTH_URL=https://trenchmart-api-mainnet.trenchmart.workers.dev/api/v1/health \
+#   API_HEALTH_URL=https://api.mainnet.trenchmart.fun/api/v1/health \
 #   scripts/deploy-api.sh apps/api/wrangler.mainnet.toml
 name = "trenchmart-api-mainnet"
 main = "src/worker.ts"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
-workers_dev = true
+workers_dev = false
 preview_urls = false
+routes = [{ pattern = "api.mainnet.trenchmart.fun", custom_domain = true }]
 
 [placement]
 region = "aws:ap-south-1"

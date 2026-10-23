@@ -151,12 +151,22 @@ if run devnet-workers-dev 0 TEST_CONFIG="$work/wd.toml"; then
     has "cfg: name = \"trenchmart-api\"" && has "deploy -c $work/.wrangler.deploy.edge.toml" && [ ! -e "$work/.wrangler.deploy.edge.toml" ] &&
     ok "devnet API deploys with workers.dev and preview URLs off" || bad "devnet workers.dev not forced off"
 fi
-# 14. Mainnet API (another Worker name) keeps workers.dev: it has no custom domain before launch.
-{ printf 'name = "trenchmart-api-mainnet"\nworkers_dev = true\n'; tail -n +2 "$work/mainnet.toml"; } >"$work/mn-wd.toml"
+# 14-15. Mainnet API: workers.dev forced off too, and its custom domain route is required.
+route='routes = [{ pattern = "api.mainnet.trenchmart.fun", custom_domain = true }]'
+{ printf 'name = "trenchmart-api-mainnet"\nworkers_dev = true\n%s\n' "$route"; tail -n +2 "$work/mainnet.toml"; } >"$work/mn-wd.toml"
 if run mainnet-workers-dev 0 TEST_CONFIG="$work/mn-wd.toml" FAKE_HEALTH="$refused"; then
-  has 'cfg: workers_dev = true' && ! has 'cfg: preview_urls = false' &&
-    ok "mainnet API keeps workers.dev" || bad "mainnet workers.dev changed"
+  has 'cfg: workers_dev = false' && has 'cfg: preview_urls = false' && ! has 'cfg: workers_dev = true' &&
+    has 'cfg: name = "trenchmart-api-mainnet"' &&
+    ok "mainnet API deploys with workers.dev and preview URLs off" || bad "mainnet workers.dev not forced off"
 fi
+{ printf 'name = "trenchmart-api-mainnet"\nworkers_dev = false\npreview_urls = false\n'; tail -n +2 "$work/mainnet.toml"; } >"$work/mn-noroute.toml"
+if run mainnet-no-route 1 TEST_CONFIG="$work/mn-noroute.toml" FAKE_HEALTH="$refused"; then
+  ! has 'wrangler deploy' && ok "mainnet API without its custom domain is refused" || bad "mainnet deployed without custom domain"
+fi
+# 16. The committed mainnet config keeps these settings.
+mn="$root/apps/api/wrangler.mainnet.toml"
+grep -q '^workers_dev = false' "$mn" && grep -q '^preview_urls = false' "$mn" && grep -qxF "$route" "$mn" &&
+  ok "wrangler.mainnet.toml: custom domain only" || { fail=$((fail + 1)); echo "FAIL wrangler.mainnet.toml edge settings"; }
 
 echo "$pass passed, $fail failed"
 [ "$fail" = 0 ]

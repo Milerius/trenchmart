@@ -7,9 +7,12 @@ stay the fine-grained ones; the edge rules are coarse backstops.
 
 ## Custom domain only
 
-The devnet API Worker `trenchmart-api` answers only on `https://api.trenchmart.fun`.
-`workers_dev` and `preview_urls` are off (`apps/api/wrangler.toml`), and
-`scripts/deploy-api.sh` forces both off for any config named `trenchmart-api`, so an older
+The API Workers answer only on their custom domains: devnet `trenchmart-api` on
+`https://api.trenchmart.fun`, mainnet `trenchmart-api-mainnet` on
+`https://api.mainnet.trenchmart.fun`.
+`workers_dev` and `preview_urls` are off (`apps/api/wrangler.toml`, `apps/api/wrangler.mainnet.toml`), and
+`scripts/deploy-api.sh` forces both off for configs named `trenchmart-api` or
+`trenchmart-api-mainnet` (and refuses a mainnet config without its custom domain route), so an older
 local `wrangler.deploy.toml` cannot turn the `*.workers.dev` URL back on. That URL would skip the
 zone rules below.
 
@@ -17,15 +20,14 @@ Every caller already uses the custom domain: the web Worker (`API_URL` baked int
 the watchdog (`API_URL` in `apps/api/watchdog.wrangler.toml`), the box alert relay
 (`/workspace/tm-alerts/check.sh`), the sandbox VPS, `deploy-api.sh` and the GitHub workflows.
 
-The mainnet API Worker `trenchmart-api-mainnet` keeps workers.dev (no custom domain before
-launch, preview URLs off) and still answers `MAINNET_REFUSED`.
+The mainnet API still answers `MAINNET_REFUSED` until launch; only its hostname moved.
 
 ## Zone rules
 
 | Phase                             | Rule                      | What it does                                                                                                                                                                                                                                                                    |
 | --------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| WAF custom rules                  | `tm_internal_bearer_only` | Blocks `api.trenchmart.fun/api/v1/internal/*` unless the request has an `Authorization: Bearer …` header and is `GET` or `POST`. The Worker still checks the token (`INTERNAL_TOKEN` or the watchdog's `STATUS_PUSH_TOKEN`); the rule only stops anonymous probing at the edge. |
-| Rate limiting (the one Free rule) | `tm_api_v1_flood`         | Per IP and colo: more than 200 requests in 10 s to `api.trenchmart.fun/api/v1/*` → blocked for 10 s. Above the Worker's 600 reads/min per IP, so normal agents never hit it.                                                                                                    |
+| WAF custom rules                  | `tm_internal_bearer_only` | Blocks `/api/v1/internal/*` on both API hosts unless the request has an `Authorization: Bearer …` header and is `GET` or `POST`. The Worker still checks the token (`INTERNAL_TOKEN` or the watchdog's `STATUS_PUSH_TOKEN`); the rule only stops anonymous probing at the edge. |
+| Rate limiting (the one Free rule) | `tm_api_v1_flood`         | Per IP and colo: more than 200 requests in 10 s to `/api/v1/*` on `api.trenchmart.fun` or `api.mainnet.trenchmart.fun` → blocked for 10 s. Above the Worker's 600 reads/min per IP, so normal agents never hit it.                                                              |
 
 Callers of `/internal/*` and their auth: box relay (Bearer `INTERNAL_TOKEN`), watchdog
 (Bearer `STATUS_PUSH_TOKEN`), sandbox VPS (Bearer `INTERNAL_TOKEN`), `deploy-api.sh` (Bearer
@@ -41,6 +43,8 @@ Revisit only with a plan that offers Super Bot Fight Mode with skip rules, or by
 to its own zone.
 
 ## Cost alerts (account notifications, email to the owner)
+
+Account-wide: they cover the devnet and mainnet Workers alike.
 
 | Policy                         | Type                                            | Threshold                                             |
 | ------------------------------ | ----------------------------------------------- | ----------------------------------------------------- |
