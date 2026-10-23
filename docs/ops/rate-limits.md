@@ -34,3 +34,5 @@ The browser relay forwards a signed transaction only when it is:
 Anything else answers 400 (`NOT_ISSUED`, `FOREIGN_PROGRAM`, `WRONG_SIGNER`,
 `BAD_SIGNATURE`, `BAD_TX`) before the RPC is called. Each wallet may call it 20 times a
 minute (429 `RATE_LIMIT`), counted before validation so refused attempts cost budget too.
+
+Read limits and per-route-group write limits (12xx namespaces): see [abuse-limits.md](abuse-limits.md).

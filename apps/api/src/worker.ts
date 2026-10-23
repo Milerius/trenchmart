@@ -12,7 +12,8 @@ import {
   tokenBalance,
   walletHistory,
 } from '@trenchmart/chain';
-import { createApp, type PriceCacheBox } from './app';
+import { createApp, safeEqual, type PriceCacheBox } from './app';
+import { readGate, type AbuseLimiters, type Limiter } from './abuse-limits';
 import { scanWalletIntel } from './social';
 import { computeRanks } from './ranking';
 import { featureMaintenance } from './featuring';
@@ -49,6 +50,12 @@ type Binding = Record<string, unknown> & {
   FILES?: R2BucketLike;
   // Workers Rate Limiting binding (M-03): edge counter, no database write per request.
   RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
+  // Abuse limits (abuse-limits.ts): reads per IP, write route groups per IP and per wallet.
+  READ_LIMITER?: Limiter;
+  AUTH_LIMITER?: Limiter;
+  TX_LIMITER?: Limiter;
+  VERIFY_LIMITER?: Limiter;
+  UPLOAD_LIMITER?: Limiter;
 };
 
 type Ctx = { waitUntil: (p: Promise<unknown>) => void };
@@ -160,6 +167,20 @@ export default {
       }
       return Response.json({ ok: true, cluster });
     }
+    const limiters: AbuseLimiters = {
+      read: env.READ_LIMITER,
+      auth: env.AUTH_LIMITER,
+      tx: env.TX_LIMITER,
+      verify: env.VERIFY_LIMITER,
+      upload: env.UPLOAD_LIMITER,
+    };
+    const limited = await readGate(
+      request,
+      limiters,
+      (env.PROXY_SECRET as string | undefined)?.trim() || undefined,
+      safeEqual,
+    );
+    if (limited) return limited;
     const dbUrl = databaseUrl(env);
     if (!dbUrl) throw new Error('HYPERDRIVE or DATABASE_URL is required');
     const run = async (): Promise<Response> => {
@@ -170,6 +191,7 @@ export default {
           sandboxQueue: env.SCAN_QUEUE,
           rateLimiter: env.RATE_LIMITER,
           limiters: limitersFrom(env as unknown as Record<string, unknown>),
+          abuseLimiters: limiters,
           rewardQueue: env.REWARDS_QUEUE,
         },
         priceCache,

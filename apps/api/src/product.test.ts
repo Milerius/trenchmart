@@ -1794,6 +1794,63 @@ describe('owner product decisions', () => {
     >`select amount::text as amount from token_balances where wallet = ${wallet}`;
     expect(rows).toEqual([{ amount: '42' }]);
   });
+  it('abuse limits: write route groups per IP /64 and per wallet, before the handler', async () => {
+    const hits = new Map<string, number>();
+    const seen: string[] = [];
+    const binding = (limit: number) => ({
+      async limit({ key }: { key: string }) {
+        seen.push(key);
+        const n = (hits.get(key) ?? 0) + 1;
+        hits.set(key, n);
+        return { success: n <= limit };
+      },
+    });
+    const app = await appFor(
+      {},
+      { abuseLimiters: { auth: binding(3), tx: binding(2), upload: binding(1) } },
+    );
+    const wallet = keypair();
+    // login() uses two auth writes (nonce + verify) from the default 'local' IP.
+    const cookie = await login(app, wallet);
+    const nonce = (ip: string) =>
+      app.request('/api/v1/auth/nonce', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+        body: JSON.stringify({ wallet: keypair().publicKey }),
+      });
+    expect((await nonce('2001:db8:5:6::1')).status).toBe(200);
+    expect((await nonce('2001:db8:5:6::2')).status).toBe(200);
+    expect((await nonce('2001:db8:5:6::3')).status).toBe(200);
+    // Fourth from the same /64 (new address): refused, with Retry-After.
+    const limited = await nonce('2001:db8:5:6:aaaa::9');
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('60');
+    expect(((await limited.json()) as { error: { code: string } }).error.code).toBe('RATE_LIMIT');
+    expect((await nonce('2001:db8:5:7::1')).status).toBe(200);
+    // tx group, signed in: the wallet bucket holds across IPs.
+    const quote = (ip: string) =>
+      app.request('/api/v1/orders/quote', {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json', 'cf-connecting-ip': ip },
+        body: JSON.stringify({ listingId: '00000000-0000-0000-0000-000000000000' }),
+      });
+    expect((await quote('192.0.2.1')).status).not.toBe(429);
+    expect((await quote('192.0.2.2')).status).not.toBe(429);
+    expect((await quote('192.0.2.3')).status).toBe(429);
+    expect(seen).toContain(`tx:w:${wallet.publicKey}`);
+    // Uploads are refused before auth or body parsing once the bucket is full.
+    const put = () =>
+      app.request('/api/v1/files', {
+        method: 'PUT',
+        headers: { 'cf-connecting-ip': '192.0.2.50' },
+      });
+    expect((await put()).status).not.toBe(429);
+    expect((await put()).status).toBe(429);
+    // Reads and ungrouped writes are not touched by the group limits.
+    const before = seen.length;
+    await app.request('/api/v1/categories', { headers: { 'cf-connecting-ip': '192.0.2.50' } });
+    expect(seen.length).toBe(before);
+  });
   it('M-04: X OAuth PKCE verifies the account; dev-linked handles stay unverified', async () => {
     // Without X OAuth configured: dev link works but is marked unverified and cannot be
     // used to reach a creator page by X handle.

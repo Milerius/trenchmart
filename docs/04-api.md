@@ -2,6 +2,8 @@
 
 Base: `/api/v1`. JSON. Errors: `{ "error": { "code": "STRING", "message": "..." } }`. Auth via `tm_session` cookie. Lamports serialized as **strings** in JSON.
 
+Rate limits: 600 reads/min per IP (IPv6 per /64) plus per-route-group write limits per IP and per wallet (auth 20, tx 60, verify 20, upload 60 per minute) on top of 120 writes/min per IP and each API key's budget. 429 `RATE_LIMIT` with `Retry-After`. See docs/ops/abuse-limits.md.
+
 Legend: 🔓 public · 👤 signed in · 🛠 creator · 🔍 verifier · 🛡 admin · 🤖 internal/webhook
 
 ## Auth
