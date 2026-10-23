@@ -9,6 +9,7 @@
 #   2. pnpm db:pending  hard gate against the same target: exits 1 if anything is missing
 #   3. wrangler deploy  with the deploy config (must keep the HYPERDRIVE binding)
 #   4. GET /health      503 SCHEMA_BEHIND (the Worker still sees a schema gap) fails the run
+#      (devnet API: workers.dev and preview URLs forced off, custom domain only)
 #   5. Hyperdrive limit kept <= 10 and, with INTERNAL_TOKEN set, reported to the ops check
 # The env file holds SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF (Management API) and,
 # optionally, a DATABASE_URL on that same project. Cloudflare: CLOUDFLARE_API_TOKEN/ACCOUNT_ID.
@@ -22,6 +23,7 @@ wrangler="${WRANGLER:-npx -y wrangler@4}"
 [ -f "$config" ] || { echo "deploy config not found: $config" >&2; exit 1; }
 # Absolute: wrangler runs from apps/api, so a relative path would resolve there.
 config="$(cd "$(dirname "$config")" && pwd)/$(basename "$config")"
+trap 'rm -f "$root/apps/api/.wrangler.deploy.placed.toml" "$root/apps/api/.wrangler.deploy.edge.toml"' EXIT
 grep -q 'binding *= *"HYPERDRIVE"' "$config" || {
   echo "$config has no HYPERDRIVE binding; refusing to deploy" >&2
   exit 1
@@ -33,9 +35,21 @@ grep -q 'binding *= *"HYPERDRIVE"' "$config" || {
 if ! grep -q '^\[placement\]' "$config"; then
   placed="$root/apps/api/.wrangler.deploy.placed.toml"
   { cat "$config"; printf '\n[placement]\nregion = "aws:ap-south-1"\n'; } >"$placed"
-  trap 'rm -f "$placed"' EXIT
   echo "note: $(basename "$config") has no [placement]; deploying with region aws:ap-south-1"
   config="$placed"
+fi
+
+# The devnet API Worker answers only on api.trenchmart.fun: its workers.dev and preview URLs
+# would skip the zone WAF and rate-limit rules (docs/ops/edge-protection.md). Older local
+# deploy configs say workers_dev = true, so force both off in a temporary copy. Other Workers
+# (the mainnet API, which lives on workers.dev until launch) are left alone.
+if grep -q '^name *= *"trenchmart-api"' "$config" &&
+  ! { grep -q '^workers_dev *= *false' "$config" && grep -q '^preview_urls *= *false' "$config"; }; then
+  edge="$root/apps/api/.wrangler.deploy.edge.toml"
+  sed -e '/^workers_dev *=/d' -e '/^preview_urls *=/d' \
+    -e '/^name *= *"trenchmart-api"/a workers_dev = false\npreview_urls = false' "$config" >"$edge"
+  echo "note: $(basename "$config") enables workers.dev or preview URLs; deploying with both off"
+  config="$edge"
 fi
 
 cd "$root"

@@ -2,6 +2,10 @@ name = "trenchmart-api"
 main = "src/worker.ts"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
+# Custom domain only (api.trenchmart.fun): workers.dev and preview URLs would bypass the zone
+# WAF and rate-limit rules. scripts/deploy-api.sh forces both off (docs/ops/edge-protection.md).
+workers_dev = false
+preview_urls = false
 
 
 # Run the Worker next to the database (Supabase, AWS ap-south-1 / Mumbai) instead of next to
