@@ -28,8 +28,9 @@ launch, preview URLs off) and still answers `MAINNET_REFUSED`.
 | Rate limiting (the one Free rule) | `tm_api_v1_flood`         | Per IP and colo: more than 200 requests in 10 s to `api.trenchmart.fun/api/v1/*` → blocked for 10 s. Above the Worker's 600 reads/min per IP, so normal agents never hit it.                                                                                                    |
 
 Callers of `/internal/*` and their auth: box relay (Bearer `INTERNAL_TOKEN`), watchdog
-(Bearer `STATUS_PUSH_TOKEN`), sandbox VPS, `hyperdrive-limit` workflow and `deploy-api.sh`
-(Bearer `INTERNAL_TOKEN`). A new internal caller must send a Bearer header.
+(Bearer `STATUS_PUSH_TOKEN`), sandbox VPS (Bearer `INTERNAL_TOKEN`), `deploy-api.sh` (Bearer
+`INTERNAL_TOKEN`) and the `hyperdrive-limit` workflow (Bearer `TM_INTERNAL_TOKEN`, the API's
+`INTERNAL_TOKEN`). A new internal caller must send a Bearer header.
 
 ## Bot Fight Mode: off on purpose
 

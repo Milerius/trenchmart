@@ -23,7 +23,9 @@ wrangler="${WRANGLER:-npx -y wrangler@4}"
 [ -f "$config" ] || { echo "deploy config not found: $config" >&2; exit 1; }
 # Absolute: wrangler runs from apps/api, so a relative path would resolve there.
 config="$(cd "$(dirname "$config")" && pwd)/$(basename "$config")"
-trap 'rm -f "$root/apps/api/.wrangler.deploy.placed.toml" "$root/apps/api/.wrangler.deploy.edge.toml"' EXIT
+# Temporary copies sit beside the config so its relative paths (main, assets) still resolve.
+edge="$(dirname "$config")/.wrangler.deploy.edge.toml"
+trap 'rm -f "$root/apps/api/.wrangler.deploy.placed.toml" "$edge"' EXIT
 grep -q 'binding *= *"HYPERDRIVE"' "$config" || {
   echo "$config has no HYPERDRIVE binding; refusing to deploy" >&2
   exit 1
@@ -45,7 +47,6 @@ fi
 # (the mainnet API, which lives on workers.dev until launch) are left alone.
 if grep -q '^name *= *"trenchmart-api"' "$config" &&
   ! { grep -q '^workers_dev *= *false' "$config" && grep -q '^preview_urls *= *false' "$config"; }; then
-  edge="$root/apps/api/.wrangler.deploy.edge.toml"
   sed -e '/^workers_dev *=/d' -e '/^preview_urls *=/d' \
     -e '/^name *= *"trenchmart-api"/a workers_dev = false\npreview_urls = false' "$config" >"$edge"
   echo "note: $(basename "$config") enables workers.dev or preview URLs; deploying with both off"

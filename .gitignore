@@ -26,5 +26,5 @@ apps/web/AGENTS.md
 # Local deploy configs (account-specific)
 apps/api/wrangler.deploy.toml
 apps/api/.wrangler.deploy.placed.toml
-apps/api/.wrangler.deploy.edge.toml
+**/.wrangler.deploy.edge.toml
 apps/web/wrangler.deploy.jsonc

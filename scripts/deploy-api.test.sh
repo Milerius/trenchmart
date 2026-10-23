@@ -148,7 +148,7 @@ fi
 { printf 'name = "trenchmart-api"\nworkers_dev = true\n'; tail -n +2 "$work/wrangler.toml"; } >"$work/wd.toml"
 if run devnet-workers-dev 0 TEST_CONFIG="$work/wd.toml"; then
   has 'cfg: workers_dev = false' && has 'cfg: preview_urls = false' && ! has 'cfg: workers_dev = true' &&
-    [ ! -e "$root/apps/api/.wrangler.deploy.edge.toml" ] &&
+    has "cfg: name = \"trenchmart-api\"" && has "deploy -c $work/.wrangler.deploy.edge.toml" && [ ! -e "$work/.wrangler.deploy.edge.toml" ] &&
     ok "devnet API deploys with workers.dev and preview URLs off" || bad "devnet workers.dev not forced off"
 fi
 # 14. Mainnet API (another Worker name) keeps workers.dev: it has no custom domain before launch.
