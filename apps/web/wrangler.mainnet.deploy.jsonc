@@ -1,0 +1,16 @@
+// Mainnet web Worker: trenchmart.fun (default), www and mainnet.trenchmart.fun. No secrets here
+// (PROXY_SECRET is a Worker secret). Build: docs/ops/mainnet-launch.md.
+{
+  "name": "trenchmart-web-mainnet",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "trenchmart.fun", "custom_domain": true },
+    { "pattern": "www.trenchmart.fun", "custom_domain": true },
+    { "pattern": "mainnet.trenchmart.fun", "custom_domain": true },
+  ],
+}

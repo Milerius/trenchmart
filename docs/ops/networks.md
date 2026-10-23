@@ -150,3 +150,13 @@ Verified against mainnet RPC on 2026-10-23: `solana program show` names vault 0 
 Squads vault transaction. OtterSec verify must pass `-- --features mainnet`. Note: the default
 (devnet) verified build at this commit no longer matches devnet on-chain `124e1180…` (the cfg
 lines moved source positions); that is expected until devnet is upgraded.
+
+## Live since 2026-10-23 (UTC+4)
+
+- `trenchmart.fun` and `www` → mainnet web Worker `trenchmart-web-mainnet` (also on `mainnet.trenchmart.fun`);
+  `devnet.trenchmart.fun` → devnet Worker `trenchmart-web`. The header switch links the two.
+- Mainnet API `api.mainnet.trenchmart.fun` (`MAINNET_LAUNCHED=1`, payouts/rewards auto off). Devnet API sign-in domain is
+  `devnet.trenchmart.fun`.
+- $MART mint: `VAYdSoVF9j7RXgPz6wwELsFNPqortx3iXEXVXHpMART`.
+- Web mainnet deploy config: `apps/web/wrangler.mainnet.deploy.jsonc` (`opennextjs-cloudflare build/deploy --config ...`,
+  `NEXT_PUBLIC_CLUSTER=mainnet NEXT_PUBLIC_MAINNET_LAUNCHED=1`, `API_URL=TM_API_URL=https://api.mainnet.trenchmart.fun`, Node >= 22).

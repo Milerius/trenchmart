@@ -25,8 +25,8 @@ MAINNET_LAUNCHED = "1"
 APP_URL = "https://trenchmart.fun"
 API_URL = "https://api.mainnet.trenchmart.fun"
 SIWS_DOMAIN = "trenchmart.fun"
-# Pre-DNS preview host of the mainnet web Worker.
-SIWS_EXTRA_DOMAINS = "mainnet.trenchmart.fun"
+# Second host of the mainnet web Worker (trenchmart.fun is the default).
+SIWS_EXTRA_DOMAINS = "mainnet.trenchmart.fun,www.trenchmart.fun"
 LANDING_STATS = "auto"
 AI_AGENT_ID = "trenchmart-ai-v1"
 SANDBOX_BUDGET_MS = "15000"
@@ -45,7 +45,6 @@ BUCKET_WALLET_BUYBACK = "BcsSeH6ZFsGWZU7BSApFDPcDbKTsLRrTJoVop6NYGxTY"
 BUCKET_WALLET_AI_VERIFICATION = "7B2DPketA1h9TiwCTbSHmmiWFBjGeQ3tusAG9ryBpTps"
 BUCKET_WALLET_OPS = "HQcbzwj5HXqk2JEJL6X6rTgrVnVb77Yi6oS5EvNCYUcs"
 BUCKET_WALLET_SAFETY = "9cX6L4NBvKSfL19k6mVGecn7JwH6qhxgC4nPR4U5YqHr"
-# MART_MINT is a Worker secret only (never in the repo): wrangler secret put MART_MINT -c wrangler.mainnet.toml
 # Secrets (wrangler secret put -c wrangler.mainnet.toml):
 # SESSION_SECRET, INTERNAL_TOKEN, STATUS_PUSH_TOKEN, HELIUS_WEBHOOK_SECRET, AI_ATTEST_SECRET,
 # PROXY_SECRET (set), HELIUS_RPC_URL or SOLANA_RPC_URL, ESCROW_RESOLVER_SECRET (launch).
