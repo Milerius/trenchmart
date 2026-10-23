@@ -192,12 +192,17 @@ const externalChecksBody = z.object({
         name: z.enum(['web', 'api', 'rpc']),
         ok: z.boolean(),
         ms: z.number().int().min(0).max(120_000),
+        // rpc only: which RPC answered (watchdog Helius-first with public fallback).
+        provider: z.enum(['helius', 'public']).optional(),
       }),
     )
     .min(1)
     .max(3)
     .refine((checks) => new Set(checks.map((c) => c.name)).size === checks.length, {
       message: 'one check per name',
+    })
+    .refine((checks) => checks.every((c) => c.provider === undefined || c.name === 'rpc'), {
+      message: 'provider is for the rpc check only',
     }),
 });
 

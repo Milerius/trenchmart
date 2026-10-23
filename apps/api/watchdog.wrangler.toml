@@ -7,7 +7,11 @@ workers_dev = true
 [vars]
 WEB_URL = "https://trenchmart.fun"
 API_URL = "https://api.trenchmart.fun"
-# Mainnet: delete this var and `wrangler secret put RPC_URL` with a dedicated (Helius) URL.
+# RPC check: Helius first, this public RPC as the automatic fallback when Helius fails or times
+# out (src/watchdog.ts checkRpc; docs/ops/networks.md). The Helius URL carries the API key, so it
+# is a Worker secret only, never here:
+#   wrangler secret put HELIUS_RPC_URL -c watchdog.wrangler.toml   (https://devnet.helius-rpc.com/?api-key=…)
+# Without the secret the watchdog checks this public RPC alone.
 RPC_URL = "https://solana-devnet.api.onfinality.io/public" # api.devnet.solana.com answers 403 to Workers
 CLUSTER = "devnet"
 

@@ -1,6 +1,11 @@
 # Mainnet external watchdog (src/watchdog.ts). Deploy only at launch (docs/ops/mainnet-launch.md
 # step 9): before that its targets are not live and every tick would log ALERT lines.
-# RPC_URL is a secret (private mainnet RPC): wrangler secret put RPC_URL -c watchdog.mainnet.wrangler.toml
+# RPC check: Helius first, the public RPC_URL below as the automatic fallback when Helius fails or
+# times out (src/watchdog.ts checkRpc; docs/ops/networks.md). The Helius URL carries the API key,
+# so it is a Worker secret only, never here:
+#   wrangler secret put HELIUS_RPC_URL -c watchdog.mainnet.wrangler.toml   (https://mainnet.helius-rpc.com/?api-key=…)
+# If an older RPC_URL secret exists, delete it first (wrangler secret delete RPC_URL -c …): a secret
+# shadows the public var below.
 # STATUS_PUSH_TOKEN: the mainnet API Worker's value (~/.config/trenchmart/mainnet/api-secrets.env).
 name = "trenchmart-watchdog-mainnet"
 main = "src/watchdog.ts"
@@ -10,6 +15,8 @@ workers_dev = true
 [vars]
 WEB_URL = "https://trenchmart.fun"
 API_URL = "https://api.mainnet.trenchmart.fun"
+# Public fallback (no key). api.mainnet-beta.solana.com may answer 403 to Workers like devnet's.
+RPC_URL = "https://solana-rpc.publicnode.com"
 CLUSTER = "mainnet"
 
 [triggers]

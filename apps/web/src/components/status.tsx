@@ -33,6 +33,8 @@ type Component = {
   p50Ms: number | null;
   p95Ms: number | null;
   uptime90: number | null;
+  /** rpc only: which RPC answered the newest watchdog check. */
+  provider?: 'helius' | 'public' | null;
   days: Day[];
 };
 type Incident = {
@@ -163,6 +165,15 @@ function ComponentRow({ c }: { c: Component }) {
           <div className="min-w-0">
             <h3 className="m-0 text-[15px] font-semibold">{c.name}</h3>
             <p className="m-0 text-[13px] text-muted">{WHAT[c.id] ?? ''}</p>
+            {c.provider ? (
+              <p
+                className="m-0 font-mono text-[12px] text-ink-2"
+                data-testid={`provider-${c.id}`}
+                data-provider={c.provider}
+              >
+                via {c.provider === 'helius' ? 'Helius' : 'Public fallback'}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex w-full items-center justify-between gap-4 pl-5 sm:w-auto sm:pl-0">

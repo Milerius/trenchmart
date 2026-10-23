@@ -68,10 +68,41 @@ Both API Workers use Helius as their Solana RPC. The URL (with its API key) is a
 secret, never committed: devnet `trenchmart-api` reads `SOLANA_RPC_URL` =
 `https://devnet.helius-rpc.com/?api-key=…`, mainnet `trenchmart-api-mainnet` reads
 `HELIUS_RPC_URL` = `https://mainnet.helius-rpc.com/?api-key=…`. The key itself lives on the box in
-`~/.config/trenchmart/helius.env` (chmod 600). The devnet watchdog keeps its independent public
-probe (`RPC_URL` in `watchdog.wrangler.toml`); the mainnet watchdog takes a Helius `RPC_URL`
-secret when it is first deployed. To rotate, `wrangler secret put` the new URL; no code deploy
-is needed.
+`~/.config/trenchmart/helius.env` (chmod 600). To rotate, `wrangler secret put` the new URL; no
+code deploy is needed.
+
+## Watchdog RPC check (Helius first, public fallback)
+
+Both watchdog Workers (`src/watchdog.ts`, `checkRpc`) call `getHealth` on Helius first and fall
+back to a public RPC automatically when Helius errors, answers unhealthy, or does not answer within
+4 s (`PRIMARY_RPC_TIMEOUT_MS`). The RPC check is healthy if either answers; it is down (and logs
+`ALERT`) only when both fail. The reported latency is the answering provider's, so a Helius timeout
+followed by a fast fallback does not read as a slow RPC.
+
+| Watchdog                      | Primary (Worker secret)                                        | Public fallback (`RPC_URL` var)                  |
+| ----------------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| `trenchmart-watchdog`         | `HELIUS_RPC_URL` = `https://devnet.helius-rpc.com/?api-key=…`  | `https://solana-devnet.api.onfinality.io/public` |
+| `trenchmart-watchdog-mainnet` | `HELIUS_RPC_URL` = `https://mainnet.helius-rpc.com/?api-key=…` | `https://solana-rpc.publicnode.com`              |
+
+Set the secret without echoing it (the key never goes in a toml, a commit, a log or a chat):
+
+```sh
+source ~/.config/trenchmart/helius.env   # never cat/echo it
+printf '%s' "https://devnet.helius-rpc.com/?api-key=$HELIUS_API_KEY" |
+  wrangler secret put HELIUS_RPC_URL -c apps/api/watchdog.wrangler.toml
+```
+
+(mainnet: same with `mainnet.helius-rpc.com` and `-c apps/api/watchdog.mainnet.wrangler.toml`, at
+launch; delete any older `RPC_URL` secret there first, since a secret shadows the public var).
+Without `HELIUS_RPC_URL` the watchdog checks the public RPC alone.
+
+The watchdog pushes which provider answered (`provider: "helius" | "public"`, rpc check only, never
+a URL) with its checks; the API stores it in `status_probes.provider` (migration 0043) and
+`GET /api/v1/status` serves it on the `rpc` component. The public `/status` page shows it under
+Solana RPC as "via Helius" or "via Public fallback". The watchdog's own `GET /` detail says the
+same (e.g. `ok (public fallback; Helius timeout)`), with no URL or key. Failure details only ever
+hold `timeout`, `unreachable` or the HTTP status, never the error message, which could echo the
+request URL.
 
 ## Mainnet resources
 

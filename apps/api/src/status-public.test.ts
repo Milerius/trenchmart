@@ -42,6 +42,7 @@ const ALLOWED = new Set([
   '.components[].p50Ms',
   '.components[].p95Ms',
   '.components[].uptime90',
+  '.components[].provider',
   '.components[].days',
   '.components[].days[].date',
   '.components[].days[].state',

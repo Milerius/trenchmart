@@ -28,6 +28,8 @@ export type PublicComponent = {
   p50Ms: number | null;
   p95Ms: number | null;
   uptime90: number | null;
+  /** rpc only: which RPC answered the newest probe ('helius' or 'public' fallback). */
+  provider: 'helius' | 'public' | null;
   days: PublicDay[];
 };
 export type PublicIncident = {
@@ -88,8 +90,16 @@ export async function publicStatus(deps: Deps): Promise<PublicStatus> {
   const known = new Set<string>(STATUS_COMPONENTS.map((c) => c.id));
   const firstDay = utcDay(now, -(STATUS_WINDOW_DAYS - 1));
   const [latest, latency, daily, incidents] = await Promise.all([
-    deps.sql<{ component: string; state: string; latency_ms: number | null; checked_at: Date }[]>`
-      select distinct on (component) component, state, latency_ms, checked_at
+    deps.sql<
+      {
+        component: string;
+        state: string;
+        latency_ms: number | null;
+        provider: string | null;
+        checked_at: Date;
+      }[]
+    >`
+      select distinct on (component) component, state, latency_ms, provider, checked_at
       from status_probes order by component, checked_at desc
     `,
     deps.sql<{ component: string; p50: number | null; p95: number | null }[]>`
@@ -165,6 +175,11 @@ export async function publicStatus(deps: Deps): Promise<PublicStatus> {
       p50Ms: int(lat?.p50),
       p95Ms: int(lat?.p95),
       uptime90: pct(up90, samples90),
+      // Allowlisted provider name only (never a URL), and only while the probe is fresh.
+      provider:
+        id === 'rpc' && fresh && (last?.provider === 'helius' || last?.provider === 'public')
+          ? last.provider
+          : null,
       days,
     };
   });

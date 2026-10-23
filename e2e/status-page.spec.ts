@@ -51,6 +51,8 @@ function body(kind: 'empty' | 'healthy' | 'degraded') {
         p50Ms: kind === 'empty' ? null : id === 'api' ? 96 : 120,
         p95Ms: kind === 'empty' ? null : id === 'api' ? 312 : 480,
         uptime90: kind === 'empty' ? null : degraded ? 99.31 : 100,
+        provider:
+          id !== 'rpc' || kind === 'empty' ? null : kind === 'healthy' ? 'helius' : 'public',
         days:
           kind === 'empty'
             ? days(0)
@@ -208,4 +210,28 @@ test('prototype header and the glowing all-clear card', async ({ page }) => {
   const overall = page.getByTestId('status-overall');
   await expect(overall).toContainText('All systems operational');
   expect(await overall.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('26px');
+});
+
+test('Solana RPC row names the provider that answered: Helius, or the public fallback', async ({
+  page,
+}) => {
+  await stub(page, 'healthy');
+  await page.goto('/status');
+  await expect(page.getByTestId('provider-rpc')).toHaveText('via Helius');
+  await expect(page.getByTestId('status-rpc')).toHaveAttribute('data-state', 'operational');
+  // Only the RPC row carries a provider.
+  await expect(page.locator('[data-testid^="provider-"]')).toHaveCount(1);
+
+  await page.unroute('**/api/v1/**');
+  await stub(page, 'degraded');
+  await page.reload();
+  await expect(page.getByTestId('provider-rpc')).toHaveText('via Public fallback');
+  // The fallback answering keeps the RPC healthy.
+  await expect(page.getByTestId('status-rpc')).toHaveAttribute('data-state', 'operational');
+  await expect(page.locator('main')).not.toContainText('api-key');
+
+  await page.unroute('**/api/v1/**');
+  await stub(page, 'empty');
+  await page.reload();
+  await expect(page.getByTestId('provider-rpc')).toHaveCount(0);
 });

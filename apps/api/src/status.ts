@@ -26,7 +26,14 @@ export const STATUS_COMPONENTS = [
 
 export type ComponentId = (typeof STATUS_COMPONENTS)[number]['id'];
 export type ProbeState = 'operational' | 'degraded' | 'down';
-export type Probe = { component: ComponentId; state: ProbeState; latencyMs: number | null };
+export type RpcProvider = 'helius' | 'public';
+export type Probe = {
+  component: ComponentId;
+  state: ProbeState;
+  latencyMs: number | null;
+  /** rpc only, from the watchdog: which RPC answered. */
+  provider?: RpcProvider | null;
+};
 
 /** Probe rows are kept this long; the daily roll-up keeps the 90-day history. */
 export const STATUS_RETENTION = { probesDays: 14, dailyDays: 100 };
@@ -180,7 +187,12 @@ function applyAlerts(probes: Probe[], codes: string[]): Probe[] {
   return probes;
 }
 
-export type ExternalCheck = { name: 'web' | 'api' | 'rpc'; ok: boolean; ms: number };
+export type ExternalCheck = {
+  name: 'web' | 'api' | 'rpc';
+  ok: boolean;
+  ms: number;
+  provider?: RpcProvider;
+};
 
 /**
  * Stores the watchdog's pushed web/API/RPC checks as probes. Open ops alerts (codes only) for
@@ -189,7 +201,12 @@ export type ExternalCheck = { name: 'web' | 'api' | 'rpc'; ok: boolean; ms: numb
 export async function recordExternal(deps: Deps, checks: ExternalCheck[]): Promise<Probe[]> {
   const probes: Probe[] = checks.map((c) => {
     const ms = Math.round(c.ms);
-    return { component: c.name, state: stateOf(c.name, c.ok, ms), latencyMs: ms };
+    return {
+      component: c.name,
+      state: stateOf(c.name, c.ok, ms),
+      latencyMs: ms,
+      provider: c.name === 'rpc' ? (c.provider ?? null) : null,
+    };
   });
   const open = await deps.sql<{ code: string }[]>`
     select code from ops_alerts where resolved_at is null
@@ -210,10 +227,11 @@ export async function recordStatus(deps: Deps, probes: Probe[]): Promise<void> {
     component: p.component,
     state: p.state,
     latency_ms: p.latencyMs,
+    provider: p.provider ?? null,
     checked_at: at,
   }));
   await deps.sql`
-    insert into status_probes ${deps.sql(rows, 'component', 'state', 'latency_ms', 'checked_at')}
+    insert into status_probes ${deps.sql(rows, 'component', 'state', 'latency_ms', 'provider', 'checked_at')}
   `;
   for (const p of probes) {
     if (p.state === 'operational') {
