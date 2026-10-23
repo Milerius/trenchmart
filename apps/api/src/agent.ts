@@ -22,6 +22,7 @@ import {
   verifySiwsSignature,
   type ApiScope,
 } from '@trenchmart/shared';
+import { keyRateTier } from './limits';
 import { audit, ensureSnapshot, HttpError, releaseOrders, sha256Hex, type Deps } from './logic';
 
 /**
@@ -46,6 +47,9 @@ export type ApiKeyContext = {
   userId: string;
   scopes: ApiScope[];
   rateLimitPerMin: number;
+  /** Requests today (UTC), this one included, and the key's daily quota. */
+  dailyCount: number;
+  dailyQuota: number;
 };
 
 type Row = Record<string, any>;
@@ -158,12 +162,22 @@ export async function authenticateApiKey(
   if (!/^tmk_[A-Za-z0-9_-]{43}$/.test(token))
     throw new HttpError(401, 'INVALID_API_KEY', 'API key is invalid, revoked or expired');
   const hash = await hashApiKey(token);
+  const now = deps.now();
+  const today = now.toISOString().slice(0, 10);
+  // One round trip: authenticate, count the request against the daily quota, touch last_used.
   const rows = await deps.sql<Row[]>`
+    with k as (
+      update api_keys set
+        daily_count = case when daily_day = ${today}::date then daily_count + 1 else 1 end,
+        daily_day = ${today}::date,
+        last_used_at = ${now}
+      where key_hash = ${hash} and revoked_at is null
+        and (expires_at is null or expires_at > ${now})
+      returning id, user_id, scopes, rate_limit_per_min, daily_count, daily_quota
+    )
     select k.id as key_id, k.scopes as key_scopes, k.rate_limit_per_min as key_rate,
-      k.last_used_at as key_last_used, u.*
-    from api_keys k join users u on u.id = k.user_id
-    where k.key_hash = ${hash} and k.revoked_at is null
-      and (k.expires_at is null or k.expires_at > ${deps.now()})
+      k.daily_count as key_daily_count, k.daily_quota as key_daily_quota, u.*
+    from k join users u on u.id = k.user_id
   `;
   const row = rows[0];
   if (!row) throw new HttpError(401, 'INVALID_API_KEY', 'API key is invalid, revoked or expired');
@@ -171,13 +185,10 @@ export async function authenticateApiKey(
     key_id: id,
     key_scopes: scopes,
     key_rate: rate,
-    key_last_used: lastUsed,
+    key_daily_count: dailyCount,
+    key_daily_quota: dailyQuota,
     ...user
   } = row as Row;
-  const now = deps.now();
-  if (!lastUsed || now.getTime() - (lastUsed as Date).getTime() > 60_000) {
-    await deps.sql`update api_keys set last_used_at = ${now} where id = ${id}`;
-  }
   return {
     user,
     key: {
@@ -185,6 +196,8 @@ export async function authenticateApiKey(
       userId: user.id as string,
       scopes: scopeArray(scopes),
       rateLimitPerMin: rate as number,
+      dailyCount: Number(dailyCount),
+      dailyQuota: Number(dailyQuota),
     },
   };
 }
@@ -234,24 +247,32 @@ export function scopeFor(method: string, path: string): ScopeRule {
 }
 
 /**
- * Per-key fixed-window limit on every request (reads included), counted in the same
- * rate_buckets table the write limiter falls back to. Returns the remaining budget.
+ * Per-key limit on every request (reads included). In production a Workers Rate Limiting
+ * binding keyed by key id (limits.ts keyRateTier: the largest tier not above the key's rate);
+ * without one, or below the smallest tier, an exact Postgres fixed window.
  */
 export async function consumeKeyRate(
   deps: Deps,
   key: ApiKeyContext,
-): Promise<{ ok: boolean; remaining: number; resetSec: number }> {
+): Promise<{ ok: boolean; limit: number; remaining: number | null; resetSec: number }> {
   const now = deps.now();
   const windowStart = new Date(Math.floor(now.getTime() / 60_000) * 60_000);
+  const resetSec = Math.ceil((windowStart.getTime() + 60_000 - now.getTime()) / 1000);
+  const tier = keyRateTier(key.rateLimitPerMin);
+  const binding = tier ? deps.limiters?.[tier.name] : undefined;
+  if (tier && binding) {
+    const { success } = await binding.limit({ key: `apikey:${key.id}` });
+    return { ok: success, limit: tier.limit, remaining: success ? null : 0, resetSec };
+  }
   const hits = await deps.sql<{ hits: number }[]>`
     insert into rate_buckets (key, window_start, hits) values (${'apikey:' + key.id}, ${windowStart}, 1)
     on conflict (key, window_start) do update set hits = rate_buckets.hits + 1
     returning hits
   `;
   const used = hits[0]?.hits ?? 1;
-  const resetSec = Math.ceil((windowStart.getTime() + 60_000 - now.getTime()) / 1000);
   return {
     ok: used <= key.rateLimitPerMin,
+    limit: key.rateLimitPerMin,
     remaining: Math.max(0, key.rateLimitPerMin - used),
     resetSec,
   };
@@ -282,6 +303,7 @@ function keyView(row: Row) {
     rateLimitPerMin: row.rate_limit_per_min,
     createdVia: row.created_via,
     createdAt: row.created_at,
+    dailyQuota: row.daily_quota,
     lastUsedAt: row.last_used_at,
     expiresAt: row.expires_at,
     revokedAt: row.revoked_at,

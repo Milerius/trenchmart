@@ -127,12 +127,18 @@ export default function AgentDocsPage() {
           <li>
             Per key: its <Code>rateLimitPerMin</Code> across all methods (default{' '}
             {AGENT_LIMITS.defaultKeyRate}, max {AGENT_LIMITS.maxKeyRate}). Responses carry{' '}
-            <Code>X-RateLimit-Limit</Code>, <Code>X-RateLimit-Remaining</Code>,{' '}
-            <Code>X-RateLimit-Reset</Code>; a 429 carries <Code>Retry-After</Code>.
+            <Code>X-RateLimit-Limit</Code>, <Code>X-RateLimit-Reset</Code> (and{' '}
+            <Code>X-RateLimit-Remaining</Code> when known); a 429 carries <Code>Retry-After</Code>.
           </li>
+          <li data-testid="limit-daily">
+            Per key per day: {AGENT_LIMITS.keyDailyQuota.toLocaleString('en-US')} requests (UTC),
+            shown in <Code>X-Quota-Limit</Code> and <Code>X-Quota-Remaining</Code>; past it,{' '}
+            <Code>429 DAILY_QUOTA</Code> until 00:00 UTC.
+          </li>
+          <li>Per wallet: {AGENT_LIMITS.walletKeyRate} requests per minute across all its keys.</li>
           <li>
-            Per IP: {AGENT_LIMITS.ipWritesPerMin} writes and {AGENT_LIMITS.ipReadsPerMin} reads per
-            minute (IPv6 per /64).
+            Per IP: {AGENT_LIMITS.ipKeyRate} API-key requests, {AGENT_LIMITS.ipWritesPerMin} writes
+            and {AGENT_LIMITS.ipReadsPerMin} reads per minute (IPv6 per /64).
           </li>
           <li>
             Per route group, per IP and per wallet, each minute: sign-in{' '}

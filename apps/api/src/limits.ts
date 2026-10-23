@@ -1,3 +1,4 @@
+import { IP_KEY_RATE, WALLET_KEY_RATE } from '@trenchmart/shared';
 import type { Deps } from './logic';
 
 /** A Workers Rate Limiting binding (wrangler [[ratelimits]]). */
@@ -13,6 +14,19 @@ export const LIMITS = {
   txSend: { binding: 'TX_SEND_LIMITER', limit: 20, periodSec: 60 },
   /** POST /auth/nonce per client IP (abuse limits, docs/04-api.md). */
   authNonce: { binding: 'AUTH_NONCE_LIMITER', limit: 20, periodSec: 60 },
+  /** Every API-key request per client IP (/64), checked before the key is hashed or looked up. */
+  apiKeyIp: { binding: 'API_KEY_IP_LIMITER', limit: IP_KEY_RATE, periodSec: 60 },
+  /** All of one wallet's API keys together. */
+  apiKeyWallet: { binding: 'API_KEY_WALLET_LIMITER', limit: WALLET_KEY_RATE, periodSec: 60 },
+  /**
+   * Per-key budgets (rate_limit_per_min). A binding has one fixed limit, so each key uses the
+   * largest tier not above its own rate; keys below the smallest tier count in Postgres.
+   */
+  keyRate10: { binding: 'KEY_RATE_10', limit: 10, periodSec: 60 },
+  keyRate30: { binding: 'KEY_RATE_30', limit: 30, periodSec: 60 },
+  keyRate60: { binding: 'KEY_RATE_60', limit: 60, periodSec: 60 },
+  keyRate120: { binding: 'KEY_RATE_120', limit: 120, periodSec: 60 },
+  keyRate300: { binding: 'KEY_RATE_300', limit: 300, periodSec: 60 },
 } as const satisfies Record<string, { binding: string; limit: number; periodSec: 10 | 60 }>;
 
 export type LimitName = keyof typeof LIMITS;
@@ -62,4 +76,20 @@ export async function hitLimit(deps: Deps, name: LimitName, key: string): Promis
     returning hits
   `;
   return (hits[0]?.hits ?? 1) <= spec.limit;
+}
+
+const KEY_TIERS = [300, 120, 60, 30, 10] as const;
+
+/** The binding tier for a key's per-minute rate: the largest tier not above it, or null. */
+export function keyRateTier(rate: number): { name: LimitName; limit: number } | null {
+  const tier = KEY_TIERS.find((t) => t <= rate);
+  return tier ? { name: `keyRate${tier}` as LimitName, limit: tier } : null;
+}
+
+/** Cron: drops Postgres fallback counters older than a day (no window is longer). */
+export async function pruneRateBuckets(deps: Pick<Deps, 'sql' | 'now'>): Promise<number> {
+  const cutoff = new Date(deps.now().getTime() - 24 * 60 * 60 * 1000);
+  const rows =
+    await deps.sql`delete from rate_buckets where window_start < ${cutoff} returning key`;
+  return rows.length;
 }

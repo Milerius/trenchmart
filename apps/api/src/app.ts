@@ -369,6 +369,10 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (isApiKeyHeader(authorization) && c.req.path.startsWith('/api/v1/')) {
       // Agent API key: the cookie is ignored, scopes are enforced deny-by-default, and every
       // request (reads included) counts against the key's own per-minute limit.
+      // The IP limit runs first, before the key is hashed or looked up, so a flood of bogus
+      // tmk_ keys costs one edge counter each and never reaches Postgres.
+      if (!(await hitLimit(deps, 'apiKeyIp', ipKey(clientIp(c, deps.env)))))
+        return c.json({ error: { code: 'RATE_LIMIT', message: 'too many requests' } }, 429);
       const rule = scopeFor(c.req.method, c.req.path.slice('/api/v1'.length));
       if (rule === 'denied')
         return c.json(
@@ -389,13 +393,38 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
           403,
         );
       const budget = await consumeKeyRate(deps, authed.key);
-      c.header('X-RateLimit-Limit', String(authed.key.rateLimitPerMin));
-      c.header('X-RateLimit-Remaining', String(budget.remaining));
+      c.header('X-RateLimit-Limit', String(budget.limit));
+      if (budget.remaining !== null) c.header('X-RateLimit-Remaining', String(budget.remaining));
       c.header('X-RateLimit-Reset', String(budget.resetSec));
       if (!budget.ok) {
         c.header('Retry-After', String(budget.resetSec));
         return c.json(
           { error: { code: 'RATE_LIMIT', message: 'API key rate limit exceeded' } },
+          429,
+        );
+      }
+      // All of one wallet's keys together share an aggregate budget.
+      if (!(await hitLimit(deps, 'apiKeyWallet', `user:${authed.key.userId}`))) {
+        c.header('Retry-After', String(budget.resetSec));
+        return c.json(
+          { error: { code: 'RATE_LIMIT', message: 'wallet API rate limit exceeded' } },
+          429,
+        );
+      }
+      const quotaLeft = Math.max(0, authed.key.dailyQuota - authed.key.dailyCount);
+      c.header('X-Quota-Limit', String(authed.key.dailyQuota));
+      c.header('X-Quota-Remaining', String(quotaLeft));
+      if (authed.key.dailyCount > authed.key.dailyQuota) {
+        const now = deps.now();
+        const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+        c.header('Retry-After', String(Math.ceil((midnight - now.getTime()) / 1000)));
+        return c.json(
+          {
+            error: {
+              code: 'DAILY_QUOTA',
+              message: 'API key daily quota exceeded (resets 00:00 UTC)',
+            },
+          },
           429,
         );
       }
