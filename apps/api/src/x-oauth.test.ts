@@ -250,6 +250,14 @@ describe('X OAuth callback (integration, through the web proxy)', () => {
     expect(audit).toHaveLength(1);
   });
 
+  // The last base64url char of a 32-byte MAC carries 4 bits: A-D all decode alike, so a flip
+  // to 'A' was a no-op whenever the MAC already ended in A-D (flaky). Change the top bits.
+  const tamperLast = (cookie: string) => {
+    const b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const v = b64.indexOf(cookie.at(-1)!);
+    return cookie.slice(0, -1) + (v >> 2 === 0 ? 'g' : 'A');
+  };
+
   it('refuses a callback whose state does not match the signed cookie, before calling X', async () => {
     const roman = keypair();
     const session = await login(roman);
@@ -266,9 +274,9 @@ describe('X OAuth callback (integration, through the web proxy)', () => {
       `${APP_URL}/studio/profile?x=invalid&reason=state_mismatch`,
     );
     // Tampered cookie (signature no longer matches).
-    expect(
-      location(await cb(`code=c&state=${flow.state}`, flow.cookie.replace(/.$/, 'A'))),
-    ).toContain('reason=state_mismatch');
+    expect(location(await cb(`code=c&state=${flow.state}`, tamperLast(flow.cookie)))).toContain(
+      'reason=state_mismatch',
+    );
     // Someone else's sign-in replayed into this session.
     const other = await login(keypair());
     expect(
