@@ -117,7 +117,7 @@ jobs:
         id: mainnet
         run: |
           set -euo pipefail
-          rm -f "target/deploy/${LIBRARY_NAME}.so"
+          sudo rm -f "target/deploy/${LIBRARY_NAME}.so"  # written by the Docker build as root
           solana-verify build --library-name "$LIBRARY_NAME" --base-image solanafoundation/solana-verifiable-build:4.3.0 -- --features mainnet
           MAINNET_HASH=$(solana-verify get-executable-hash "target/deploy/${LIBRARY_NAME}.so")
           echo "executable_hash=${MAINNET_HASH}" >> "$GITHUB_OUTPUT"
