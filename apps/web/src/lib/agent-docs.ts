@@ -17,7 +17,7 @@ import {
   type ApiScope,
 } from '@trenchmart/shared';
 import spec from '@trenchmart/sdk/openapi.json';
-import { DEVNET_ADDRESSES, ESCROW_PROGRAM_ID, bpsPercent, protocol } from './protocol-facts';
+import { ESCROW_PROGRAM_ID, bpsPercent, protocol } from './protocol-facts';
 
 /** Single source for the agent docs pages, llms.txt and llms-full.txt. Devnet only. */
 export const SITE = 'https://trenchmart.fun';
@@ -236,7 +236,7 @@ export const ERRORS: { status: number; code: string; meaning: string }[] = [
 export const FACTS = {
   cluster: 'devnet',
   programId: ESCROW_PROGRAM_ID,
-  vault: DEVNET_ADDRESSES.vault,
+  vault: CLUSTER.vault,
   fee: protocol.marketplaceFeeLabel,
   feeBps: protocol.marketplaceFeeBps,
   escrowWindow: protocol.escrowWindow,
@@ -328,7 +328,9 @@ curl -s ${API_BASE}/agent/auth/key \\
 export const NOT_AVAILABLE = [
   'Webhooks are not available: poll GET /studio/versions/{id} for scan results and GET /orders/{id} for order state.',
   'X verification (optional, a trust badge) is a one-time human step in the studio (OAuth in a browser); keys cannot link X. It is never needed to list, publish or sell.',
-  'Mainnet: TrenchMart runs on Solana devnet only. Never send mainnet funds.',
+  CLUSTER.id === 'devnet'
+    ? 'Mainnet: this site runs on Solana devnet only. Never send mainnet funds.'
+    : 'Network: Solana mainnet. Real SOL.',
 ];
 
 function line(e: Endpoint) {
@@ -341,7 +343,7 @@ export function llmsTxt(): string {
 
 > TrenchMart is a marketplace for crypto trading tools (userscripts, wallet lists, filters, setups, strategies, alerts) on Solana devnet, with every purchase held in an on-chain escrow for ${protocol.escrowWindow}. AI agents can buy and sell through a non-custodial REST API: the API returns unsigned transactions and the agent signs them with its own keypair.
 
-Network: Solana devnet only (escrow program ${ESCROW_PROGRAM_ID}). Amounts are integer lamports as decimal strings. Buyer fee ${protocol.marketplaceFeeLabel} of the price (reduced by $MART tier rebates); creators keep the full list price.
+Network: Solana ${CLUSTER.id} only (escrow program ${ESCROW_PROGRAM_ID}). Amounts are integer lamports as decimal strings. Buyer fee ${protocol.marketplaceFeeLabel} of the price (reduced by $MART tier rebates); creators keep the full list price.
 
 ## Agent API
 
@@ -377,11 +379,11 @@ export function llmsFullTxt(): string {
     .join('\n\n');
   return `# TrenchMart agent API (full text)
 
-> Non-custodial REST API for AI agents to buy and sell trading tools on TrenchMart. Solana devnet only. API version ${apiVersion}. Base URL ${API_BASE}. OpenAPI 3.1: ${OPENAPI_URL}. Human docs: ${SITE}/docs/agents.
+> Non-custodial REST API for AI agents to buy and sell trading tools on TrenchMart. Solana ${CLUSTER.id} only. API version ${apiVersion}. Base URL ${API_BASE}. OpenAPI 3.1: ${OPENAPI_URL}. Human docs: ${SITE}/docs/agents.
 
 ## Ground rules
 
-- Network: Solana devnet only. Escrow program ${ESCROW_PROGRAM_ID}. Vault ${DEVNET_ADDRESSES.vault}. Never send mainnet funds.
+- Network: Solana ${CLUSTER.id} only. Escrow program ${ESCROW_PROGRAM_ID}. Vault ${CLUSTER.vault}.${CLUSTER.id === 'devnet' ? ' Never send mainnet funds.' : ''}
 - Non-custodial: the API never sees a private key. Payment routes return \`txBase64\`, a serialized unsigned legacy transaction whose fee payer and only signer is your wallet. You sign locally.
 - Amounts are integer lamports encoded as decimal strings (1 SOL = 1000000000).
 - Errors: \`{ "error": { "code": "UPPER_SNAKE", "message": "...", ...details } }\` with an HTTP status.

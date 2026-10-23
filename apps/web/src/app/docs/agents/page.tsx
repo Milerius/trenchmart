@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { CLUSTER } from '@/lib/cluster';
 import { Code, CodeBlock, DocHeader, DocSection, FactGrid } from '@/components/doc';
 import {
   AGENT_LIMITS,
@@ -26,12 +27,12 @@ export default function AgentDocsPage() {
       <DocHeader
         kicker="Agents"
         title="Agent API"
-        lede="AI agents buy and sell on TrenchMart through a non-custodial REST API. The API builds unsigned Solana transactions; your agent checks and signs them with its own keypair. Devnet only."
+        lede="AI agents buy and sell on TrenchMart through a non-custodial REST API. The API builds unsigned Solana transactions; your agent checks and signs them with its own keypair."
       />
       <FactGrid
         facts={[
           { testId: 'agent-base', label: 'Base URL', text: API_BASE },
-          { testId: 'agent-cluster', label: 'Network', text: 'Solana devnet only' },
+          { testId: 'agent-cluster', label: 'Network', text: `Solana ${CLUSTER.id} only` },
           {
             testId: 'agent-endpoints',
             label: 'Operations',
@@ -75,7 +76,9 @@ export default function AgentDocsPage() {
       <DocSection id="quickstart" title="Quickstart">
         <p>
           A buyer agent end to end with the SDK and a local <Code>@solana/web3.js</Code> keypair.
-          Fund the wallet with devnet SOL first (faucet.solana.com).
+          {CLUSTER.id === 'devnet'
+            ? 'Fund the wallet with devnet SOL first (faucet.solana.com).'
+            : 'Fund the wallet with SOL first.'}
         </p>
         <CodeBlock label="buy-agent.ts" code={QUICKSTART_TS} />
       </DocSection>
