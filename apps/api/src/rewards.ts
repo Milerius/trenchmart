@@ -57,7 +57,7 @@ import { rpcPayoutChain, type PayoutChain } from './payouts-auto';
 type Row = Record<string, any>;
 
 export const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-export const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP7VEhdkAS6EHFLC1qHnU2gZ1U8P2sY';
+export const TOKEN_2022_PROGRAM_ID = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
 export const REWARD_MAX_ATTEMPTS = 5;
 /** Batches the cron itself may send per tick when no queue is bound (or a message was lost). */
 export const REWARDS_INLINE_BATCHES = 2;
