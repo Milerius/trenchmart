@@ -128,6 +128,26 @@ per line (`#` and `//` comments skipped). Upload the standard export as `.txt` o
 | POST   | `/review/versions/:id/attestation` | 🔍  | `{decision}` → message to sign: `trenchmart-attest:v1:<versionId>:<sha256>:<decision>:<iso>`                            |
 | POST   | `/review/versions/:id/decide`      | 🔍  | `{decision, notes, signature}` → verify sig; approve → live (old live → superseded, `listings.live_version_id` updated) |
 
+## Abuse limits
+
+Hard caps (none can be paid past). Constants live in `apps/api/src/studio-quotas.ts (body caps, nonces, Studio quotas); edge rate limits are in docs/ops/abuse-limits.md`.
+
+| Limit                                                                                                                                                            | Value                                                                                                                  | Error                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| Request body, every route except the upload routes below                                                                                                         | 1 MB (declared `content-length` refused before reading; chunked bodies counted while streaming)                        | 413 `BODY_TOO_LARGE`       |
+| Upload routes: `PUT /files` (signed, `max_file_bytes.setup`), `POST /studio/listings/{id}/images`, image variants, `POST /studio/profile/{avatar,banner}` (3 MB) | own caps                                                                                                               | 413 / 400 `FILE_TOO_LARGE` |
+| `POST /verify` body                                                                                                                                              | `contentBase64` ≤ 34,952,536 chars (25 MiB file)                                                                       | 413 `BODY_TOO_LARGE` / 400 |
+| `POST /studio/versions/{id}/reupload` body                                                                                                                       | 20 MB                                                                                                                  | 413 `BODY_TOO_LARGE`       |
+| `POST /auth/nonce` per client IP                                                                                                                                 | 20 / minute (`AUTH_NONCE_LIMITER` binding; Postgres fallback: `RATE_LIMIT_PER_MIN / 6`)                                | 429 `RATE_LIMIT`           |
+| Open sign-in nonces per wallet                                                                                                                                   | 5 (a new nonce drops the oldest open one, so sign-in never locks out); expired nonces are deleted by the 5-minute cron | —                          |
+| New Studio versions per creator per UTC day (all listings)                                                                                                       | 20 (5 free, then the upload supplement)                                                                                | 429 `DAILY_VERSION_CAP`    |
+| Scan runs (`/complete`, `/review`, `/reupload`) per creator per UTC day                                                                                          | 60                                                                                                                     | 429 `DAILY_SCAN_CAP`       |
+| Stored per creator (version files + listing images)                                                                                                              | 2 GB and 1,000 files                                                                                                   | 413 `STORAGE_QUOTA`        |
+
+`POST /verify` checks the declared length and the daily quota (free check or a paid credit)
+**before** it reads or decodes the body; without quota it answers 402 `SUPPLEMENT_REQUIRED`
+without parsing the upload.
+
 ## Admin
 
 | Method | Path                              | Notes                                                       |

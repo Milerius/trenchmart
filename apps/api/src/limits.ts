@@ -11,6 +11,8 @@ export type RateLimitBinding = { limit(input: { key: string }): Promise<{ succes
 export const LIMITS = {
   /** POST /tx/send per signed-in wallet (I-07). */
   txSend: { binding: 'TX_SEND_LIMITER', limit: 20, periodSec: 60 },
+  /** POST /auth/nonce per client IP (abuse limits, docs/04-api.md). */
+  authNonce: { binding: 'AUTH_NONCE_LIMITER', limit: 20, periodSec: 60 },
 } as const satisfies Record<string, { binding: string; limit: number; periodSec: 10 | 60 }>;
 
 export type LimitName = keyof typeof LIMITS;

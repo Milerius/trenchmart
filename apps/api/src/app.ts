@@ -122,7 +122,7 @@ import {
   scopeFor,
   type ApiKeyContext,
 } from './agent';
-import { hitLimit } from './limits';
+import { hitLimit, ipKey } from './limits';
 import { openApiSpec } from './openapi';
 import {
   activeBond,
@@ -174,6 +174,18 @@ import {
   uploadQuota,
   verifyQuota,
 } from './versioning';
+import { bodyLimit } from 'hono/body-limit';
+import {
+  assertDeclaredLength,
+  assertImageQuota,
+  assertVersionQuota,
+  bodyLimitFor,
+  bodyTooLarge,
+  NONCE_OPEN_MAX,
+  nonceFallbackLimit,
+  takeScanRun,
+  VERIFY_MAX_FILE_BYTES,
+} from './studio-quotas';
 
 /** Session lifetime; refreshed (no new signature) once it is a day old. */
 export const SESSION_TTL_S = 30 * 24 * 3600;
@@ -326,6 +338,28 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     }),
   );
+  const bodyLimiters = new Map<number, ReturnType<typeof bodyLimit>>();
+  // Request body cap (docs/04-api.md "Abuse limits"): 1 MB everywhere except the upload
+  // routes, which have their own caps. Declared lengths are refused before any read; a
+  // chunked body is counted while it streams.
+  app.use('*', async (c, next) => {
+    const method = c.req.method;
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next();
+    const max = bodyLimitFor(method, c.req.path);
+    if (max === null) return next();
+    assertDeclaredLength(c.req.header('content-length'), max);
+    let limiter = bodyLimiters.get(max);
+    if (!limiter) {
+      limiter = bodyLimit({
+        maxSize: max,
+        onError: () => {
+          throw bodyTooLarge(max);
+        },
+      });
+      bodyLimiters.set(max, limiter);
+    }
+    return limiter(c, next);
+  });
   app.use('*', async (c, next) => {
     const token = getCookie(c, 'tm_session');
     c.set('user', null);
@@ -534,14 +568,46 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     ...deps.env.siwsExtraDomains.filter((d) => d !== deps.env.siwsDomain).map((d) => siwsSite(d)),
   ];
 
+  // Without the binding (local, CI) the nonce budget scales with RATE_LIMIT_PER_MIN.
+  async function nonceFallback(ip: string): Promise<boolean> {
+    const now = deps.now();
+    const windowStart = new Date(Math.floor(now.getTime() / 60_000) * 60_000);
+    const hits = await deps.sql<{ hits: number }[]>`
+      insert into rate_buckets (key, window_start, hits) values (${'authNonce:' + ip}, ${windowStart}, 1)
+      on conflict (key, window_start) do update set hits = rate_buckets.hits + 1
+      returning hits
+    `;
+    return (hits[0]?.hits ?? 1) <= nonceFallbackLimit(deps.env.rateLimitPerMin);
+  }
+
   api.post('/auth/nonce', async (c) => {
+    // Own per-IP limit on top of the write limit: nonces are anonymous rows (abuse limits).
+    const nonceIp = ipKey(clientIp(c, deps.env));
+    const nonceOk = deps.limiters?.authNonce
+      ? await hitLimit(deps, 'authNonce', nonceIp)
+      : await nonceFallback(nonceIp);
+    if (!nonceOk) throw new HttpError(429, 'RATE_LIMIT', 'too many sign-in requests');
     const body = await bodyOf(nonceBody, await c.req.json());
     const nonce = randomNonce();
     const issued = deps.now();
     const expires = siwsExpiresAt(issued);
-    await deps.sql`
-      insert into auth_nonces (nonce, wallet, expires_at) values (${nonce}, ${body.wallet}, ${expires})
-    `;
+    // At most NONCE_OPEN_MAX open nonces per wallet: the oldest open ones are dropped, so
+    // anyone can still sign in with a fresh nonce (no lockout) but rows cannot pile up.
+    await deps.sql.begin(async (tx) => {
+      await tx`select pg_advisory_xact_lock(hashtextextended(${'nonce:' + body.wallet}, 0))`;
+      await tx`
+        insert into auth_nonces (nonce, wallet, expires_at) values (${nonce}, ${body.wallet}, ${expires})
+      `;
+      await tx`
+        delete from auth_nonces where wallet = ${body.wallet} and used_at is null
+          and nonce <> ${nonce}
+          and nonce not in (
+            select nonce from auth_nonces where wallet = ${body.wallet} and used_at is null
+              and expires_at > ${issued} and nonce <> ${nonce}
+            order by expires_at desc, nonce limit ${NONCE_OPEN_MAX - 1}
+          )
+      `;
+    });
     // The web proxy names the page's host (x-tm-site-host); only allow-listed names are used.
     const site = siwsSite(c.req.header('x-tm-site-host'));
     const message = buildSiwsMessage({
@@ -1226,14 +1292,36 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       throw new HttpError(401, 'SIGN_IN_REQUIRED', 'sign in with a wallet to verify a file');
     }
     requireUser(c);
+    const ipHashValue = clientIpHash(c, deps);
+    // Abuse limits: size and quota are checked before the body is read or decoded.
+    const quota = await verifyQuota(deps, user, ipHashValue);
+    if (!quota.freeLeft && quota.paidCredits === 0) {
+      throw new HttpDataError(
+        402,
+        'SUPPLEMENT_REQUIRED',
+        'your free verification for today is used; pay the supplement to verify another file',
+        {
+          supplement: {
+            kind: 'verify',
+            lamports: quota.supplementLamports.toString(),
+            reasons: ['verify_limit'],
+            resetsAt: quota.resetsAt.toISOString(),
+          },
+        },
+      );
+    }
     const body = await bodyOf(verifyJsonBody, await c.req.json());
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(body.contentBase64) || body.contentBase64.length % 4 === 1)
+      throw new HttpError(400, 'BAD_REQUEST', 'file is not base64');
+    const used = await consumeVerification(deps, user, ipHashValue, body.supplementId);
     let bytes: Uint8Array;
     try {
       bytes = Uint8Array.from(atob(body.contentBase64), (char) => char.charCodeAt(0));
     } catch {
       throw new HttpError(400, 'BAD_REQUEST', 'file is not base64');
     }
-    const used = await consumeVerification(deps, user, clientIpHash(c, deps), body.supplementId);
+    if (bytes.length > VERIFY_MAX_FILE_BYTES)
+      throw new HttpError(413, 'FILE_TOO_LARGE', 'file exceeds the 25 MB limit');
     return c.json({ ...(await matchFile(deps, body.fileName, bytes)), free: used.free });
   });
 
@@ -1389,6 +1477,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     }
     // Chunked uploads carry no content-length, so the limit is enforced while reading too.
     const bytes = await readCapped(c.req.raw.body, IMAGE_MAX_BYTES);
+    await assertImageQuota(deps.sql, user.id as string, deps.now(), bytes.length);
     return c.json(await uploadImage(deps, listing.id as string, user.id as string, bytes));
   });
 
@@ -1447,6 +1536,8 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       listing.category === 'setup' ? config.max_file_bytes.setup : config.max_file_bytes.default;
     if (body.fileSize > max)
       throw new HttpError(400, 'FILE_TOO_LARGE', 'file exceeds the category limit');
+    // Hard per-creator caps (abuse limits): versions per day and stored bytes/files.
+    await assertVersionQuota(deps.sql, user.id as string, deps.now(), body.fileSize);
     const tier = await tierForWallet(deps, user.wallet as string, config);
     const waived = tierAtLeast(tier.tier, config.verification_fee_free_from_tier);
     const fee = waived ? 0n : config.verification_fee_lamports;
@@ -1566,6 +1657,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     await assertSupplementPaid(deps, version);
     const bytes = await deps.blob.get(`uploads/${version.id}`);
     if (!bytes) throw new HttpError(400, 'FILE_MISSING', 'upload the file first');
+    await takeScanRun(deps, user.id as string, version.id as string);
     const hash = await sha256Hex(bytes);
     const clash = await deps.sql`
       select v.id from versions v join listings l on l.id = v.listing_id
@@ -1599,6 +1691,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (version.status === 'rejected') {
       throw new HttpError(403, 'NO_APPEAL', 'a rejected version has no appeal');
     }
+    await takeScanRun(deps, user.id as string, version.id as string);
     const stream =
       c.req.query('stream') === '1' || (c.req.header('accept') ?? '').includes('text/event-stream');
     if (stream) {
@@ -1617,6 +1710,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (version.status !== 'needs_creator') {
       throw new HttpError(400, 'NOT_PAUSED', 'upload a fix when the AI requests changes');
     }
+    await takeScanRun(deps, user.id as string, version.id as string);
     const body = await bodyOf(reuploadBody, await c.req.json());
     const bytes = Uint8Array.from(atob(body.contentBase64), (char) => char.charCodeAt(0));
     const hash = await sha256Hex(bytes);
@@ -2507,10 +2601,18 @@ async function serveFile(c: any, deps: Deps, method: 'GET' | 'PUT') {
     if (!bytes) return c.json({ error: { code: 'NOT_FOUND', message: 'file not found' } }, 404);
     return new Response(bytes, { headers: { 'content-type': 'application/octet-stream' } });
   }
-  const bytes = new Uint8Array(await c.req.arrayBuffer());
   const config = await loadConfig(deps);
-  if (bytes.length > config.max_file_bytes.setup) {
-    return c.json({ error: { code: 'FILE_TOO_LARGE', message: 'upload is too large' } }, 400);
+  const tooLarge = () =>
+    c.json({ error: { code: 'FILE_TOO_LARGE', message: 'upload is too large' } }, 400);
+  // Refuse an oversized declared length before reading; a chunked body is counted as it streams.
+  if (Number(c.req.header('content-length') ?? '0') > config.max_file_bytes.setup)
+    return tooLarge();
+  let bytes: Uint8Array;
+  try {
+    bytes = await readCapped(c.req.raw.body, config.max_file_bytes.setup);
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 413) return tooLarge();
+    throw err;
   }
   await deps.blob.put(key, bytes);
   return c.json({ ok: true, bytes: bytes.length });
