@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSql, migrate, type Sql } from '@trenchmart/db';
 import {
   compileLegacyTx,
@@ -25,7 +25,7 @@ import { filesystemBlob } from './blob';
 import { readEnv } from './env';
 import { sha256Hex, type Deps } from './logic';
 import type { EscrowChain } from './escrow';
-import { API_SCOPES, scopeArray, scopeFor } from './agent';
+import { API_SCOPES, recordBroadcast, scopeArray, scopeFor } from './agent';
 import { ROUTES, scopeOf } from './openapi';
 
 /** Integration: the agent API (keys, scopes, revocation, limits, validated broadcast). */
@@ -1065,5 +1065,29 @@ describe('scopeArray (text[] as returned through Hyperdrive)', () => {
     expect(scopeArray('{"read","admin"}')).toEqual(['read']);
     expect(scopeArray('{}')).toEqual([]);
     expect(scopeArray(null)).toEqual([]);
+  });
+});
+
+describe('recordBroadcast', () => {
+  it('never fails an accepted relay: one retry, then logs and returns false', async () => {
+    let calls = 0;
+    const failing = (async () => {
+      calls++;
+      throw new Error('db down');
+    }) as unknown as Deps['sql'];
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(await recordBroadcast({ sql: failing } as Deps, 'h', 'sig')).toBe(false);
+      expect(calls).toBe(2);
+      expect(errors).toHaveBeenCalledOnce();
+    } finally {
+      errors.mockRestore();
+    }
+    let n = 0;
+    const flaky = (async () => {
+      if (n++ === 0) throw new Error('blip');
+      return [];
+    }) as unknown as Deps['sql'];
+    expect(await recordBroadcast({ sql: flaky } as Deps, 'h', 'sig')).toBe(true);
   });
 });

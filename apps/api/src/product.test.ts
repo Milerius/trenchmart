@@ -1765,6 +1765,10 @@ describe('owner product decisions', () => {
       'x-tm-proxy': 'proxy-secret',
     });
     expect(keys.at(-1)).toBe('192.0.2.44:POST');
+    // IPv6: keyed by /64, so rotating addresses inside one /64 share a bucket.
+    await post({ 'cf-connecting-ip': '2001:db8:1:2::a' });
+    await post({ 'cf-connecting-ip': '2001:db8:1:2:ffff::b' });
+    expect(keys.slice(-2)).toEqual(['2001:db8:1:2::/64:POST', '2001:db8:1:2::/64:POST']);
     const limited = await post({ 'cf-connecting-ip': '198.51.100.9' });
     expect(limited.status).toBe(429);
     expect(plain.headers.get('x-content-type-options')).toBe('nosniff');

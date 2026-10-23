@@ -76,28 +76,42 @@ export async function runChecks(env: WatchdogEnv, f: typeof fetch = fetch): Prom
   ]);
 }
 
-/** One getHealth call. Returns null when healthy, else a problem text that never holds the URL. */
+/**
+ * One getHealth call. Returns null when healthy, else a problem text that never holds the URL.
+ * One deadline covers headers and body: a server that sends headers then stalls the body still
+ * times out, so the fallback runs.
+ */
 async function rpcHealth(f: typeof fetch, url: string, ms: number): Promise<string | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    const res = await timed(
-      f,
-      url,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
-      },
-      ms,
-    );
+    const res = await f(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
+      signal: ctrl.signal,
+    });
     // 429 means the RPC is up but rate-limiting us; treat as reachable.
     if (res.status === 429) return null;
-    const body = (await res.json().catch(() => ({}))) as { result?: unknown };
+    const read = res.json().catch((err: unknown) => {
+      if ((err as Error)?.name === 'AbortError') throw err;
+      return {};
+    });
+    const aborted = new Promise<never>((_, reject) =>
+      ctrl.signal.addEventListener('abort', () =>
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+      ),
+    );
+    if (ctrl.signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+    const body = (await Promise.race([read, aborted])) as { result?: unknown };
     return body.result === 'ok'
       ? null
       : `getHealth HTTP ${res.status} ${typeof body.result === 'string' ? body.result : ''}`.trim();
   } catch (err) {
     // Only the error name: a message could echo the request URL (the Helius key).
     return (err as Error).name === 'AbortError' ? 'timeout' : 'unreachable';
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -109,19 +123,20 @@ export async function checkRpc(env: WatchdogEnv, f: typeof fetch = fetch): Promi
   // ms is the latency of the provider that answered (a Helius timeout before a fast fallback
   // must not read as a slow RPC on the status page).
   let start = Date.now();
-  const done = (ok: boolean, detail: string, provider: RpcProvider): Check => ({
+  // provider is set only on success: a down RPC was answered by no provider.
+  const done = (ok: boolean, detail: string, provider?: RpcProvider): Check => ({
     name: 'rpc',
     ok,
     detail,
     ms: Date.now() - start,
-    provider,
+    ...(provider ? { provider } : {}),
   });
   let heliusProblem: string | null = null;
   if (env.HELIUS_RPC_URL) {
     heliusProblem = await rpcHealth(f, env.HELIUS_RPC_URL, PRIMARY_RPC_TIMEOUT_MS);
     if (heliusProblem === null) return done(true, 'ok (Helius)', 'helius');
   }
-  if (!env.RPC_URL) return done(false, `Helius ${heliusProblem ?? 'not configured'}`, 'helius');
+  if (!env.RPC_URL) return done(false, `Helius ${heliusProblem ?? 'not configured'}`);
   start = Date.now();
   const publicProblem = await rpcHealth(f, env.RPC_URL, 10_000);
   if (publicProblem === null) {
@@ -136,7 +151,6 @@ export async function checkRpc(env: WatchdogEnv, f: typeof fetch = fetch): Promi
     heliusProblem === null
       ? `RPC ${publicProblem}`
       : `Helius ${heliusProblem}; public ${publicProblem}`,
-    'public',
   );
 }
 

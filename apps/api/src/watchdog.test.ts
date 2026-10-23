@@ -248,6 +248,38 @@ describe('RPC check: Helius first, public fallback', () => {
       return f(i, init);
     }) as typeof fetch);
     expect(logged).toEqual(['[TrenchMart devnet] watchdog DOWN rpc']);
+    // A down RPC was answered by no provider: none is reported.
+    expect(c.provider).toBeUndefined();
+  });
+
+  it('reports no provider when Helius fails and no public RPC is configured', async () => {
+    const { f } = rpcWorld('500', 'ok');
+    const c = await checkRpc({ ...henv, RPC_URL: '' }, f);
+    expect(c.ok).toBe(false);
+    expect(c.provider).toBeUndefined();
+  });
+
+  it('times out a Helius body that stalls after headers, then falls back', async () => {
+    vi.useFakeTimers();
+    try {
+      const calls: string[] = [];
+      const f = (async (input: string | URL | Request) => {
+        const url = String(input);
+        calls.push(url === HELIUS ? 'helius' : 'public');
+        if (url === HELIUS)
+          // Headers arrive; the body never does (the stream is never closed).
+          return new Response(new ReadableStream({ start() {} }), { status: 200 });
+        return Response.json({ result: 'ok' });
+      }) as typeof fetch;
+      const pending = checkRpc(henv, f);
+      await vi.advanceTimersByTimeAsync(PRIMARY_RPC_TIMEOUT_MS + 1);
+      const c = await pending;
+      expect(c).toMatchObject({ ok: true, provider: 'public' });
+      expect(c.detail).toContain('Helius timeout');
+      expect(calls).toEqual(['helius', 'public']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('without HELIUS_RPC_URL checks the public RPC only (provider public)', async () => {
