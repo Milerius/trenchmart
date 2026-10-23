@@ -31,8 +31,20 @@ SANDBOX_BUDGET_MS = "15000"
 # Money moves only after a human turns these on (docs/ops/payouts.md, holder-rewards.md).
 PAYOUTS_AUTO = "0"
 REWARDS_AUTO = "0"
-# Filled at launch (runbook): VAULT_ADDRESS, MULTISIG_ADDRESS, MART_MINT, BUCKET_WALLET_*,
-# ESCROW_PROGRAM_ID, ESCROW_RESOLVER. Secrets (wrangler secret put -c wrangler.mainnet.toml):
+# Mainnet addresses (deployed 2026-10-23, docs/ops/mainnet-launch.md). Squads v4 2-of-3 multisig;
+# vault 0 = treasury + program upgrade authority, 1 = holder rewards, 2..5 = fee buckets.
+ESCROW_PROGRAM_ID = "Dm2jtJDfSji2TASEGKxsY1CwxeUCXqGznefkJpSASZLp"
+ESCROW_RESOLVER = "7aEPhhZipf2MEvDdjhzt4VdGWrDFEC8KT4pyWnGUsQ6q"
+EXPECTED_UPGRADE_AUTHORITY = "AoK6JdJQgtW9Wrt2z47gHnNMju2RrwNRhTZon13K3kf1"
+MULTISIG_ADDRESS = "FFsRpwj5aTteCsS9kWpUAyQ7a9KzSSbDZgwgq2JdqbsN"
+VAULT_ADDRESS = "AoK6JdJQgtW9Wrt2z47gHnNMju2RrwNRhTZon13K3kf1"
+REWARDS_VAULT_INDEX = "1"
+BUCKET_WALLET_BUYBACK = "BcsSeH6ZFsGWZU7BSApFDPcDbKTsLRrTJoVop6NYGxTY"
+BUCKET_WALLET_AI_VERIFICATION = "7B2DPketA1h9TiwCTbSHmmiWFBjGeQ3tusAG9ryBpTps"
+BUCKET_WALLET_OPS = "HQcbzwj5HXqk2JEJL6X6rTgrVnVb77Yi6oS5EvNCYUcs"
+BUCKET_WALLET_SAFETY = "9cX6L4NBvKSfL19k6mVGecn7JwH6qhxgC4nPR4U5YqHr"
+# MART_MINT is a Worker secret only (never in the repo): wrangler secret put MART_MINT -c wrangler.mainnet.toml
+# Secrets (wrangler secret put -c wrangler.mainnet.toml):
 # SESSION_SECRET, INTERNAL_TOKEN, STATUS_PUSH_TOKEN, HELIUS_WEBHOOK_SECRET, AI_ATTEST_SECRET,
 # PROXY_SECRET (set), HELIUS_RPC_URL or SOLANA_RPC_URL, ESCROW_RESOLVER_SECRET (launch).
 
