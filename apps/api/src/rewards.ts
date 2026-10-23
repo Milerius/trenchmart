@@ -312,6 +312,8 @@ export async function sampleIfDue(
   // Pre-launch: the mint account does not exist yet. Skip the sample quietly (no holders,
   // everyone stays at the base tier) instead of failing every cron tick.
   if (!mint) return false;
+  // A pre-launch address can hold lamports as a plain system account: not a mint yet, skip too.
+  if (mint.owner === '11111111111111111111111111111111' || mint.data.length === 0) return false;
   if (mint.owner !== TOKEN_PROGRAM_ID && mint.owner !== TOKEN_2022_PROGRAM_ID)
     throw new Error('$MART mint is not owned by a token program');
   const supply = readU64(mint.data, 36);
