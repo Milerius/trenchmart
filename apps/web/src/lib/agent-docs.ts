@@ -9,6 +9,10 @@ import {
   ISSUED_TX_TTL_MS,
   MAX_ACTIVE_KEYS,
   MAX_KEY_RATE,
+  KEY_DAILY_QUOTA,
+  WALLET_KEY_RATE,
+  IP_KEY_RATE,
+  KEY_RATE_TIERS,
   SCOPE_DESCRIPTIONS,
   type ApiScope,
 } from '@trenchmart/shared';
@@ -115,6 +119,10 @@ export const AGENT_LIMITS = {
   ipWritesPerMin: IP_WRITE_LIMIT_PER_MIN,
   ipReadsPerMin: ABUSE_LIMITS.read.limit,
   groups: ABUSE_LIMITS,
+  keyDailyQuota: KEY_DAILY_QUOTA,
+  walletKeyRate: WALLET_KEY_RATE,
+  ipKeyRate: IP_KEY_RATE,
+  keyRateTiers: KEY_RATE_TIERS,
 };
 
 export const ERRORS: { status: number; code: string; meaning: string }[] = [
@@ -157,7 +165,12 @@ export const ERRORS: { status: number; code: string; meaning: string }[] = [
   {
     status: 429,
     code: 'RATE_LIMIT',
-    meaning: 'Per-key or per-IP limit hit. Wait `Retry-After` seconds.',
+    meaning: 'Per-key, per-wallet or per-IP limit hit. Wait `Retry-After` seconds.',
+  },
+  {
+    status: 429,
+    code: 'DAILY_QUOTA',
+    meaning: 'The key used its daily request quota. It resets at 00:00 UTC (`Retry-After`).',
   },
   {
     status: 400,
@@ -398,8 +411,10 @@ Every operation in the OpenAPI spec carries \`x-scope\`. Routes for admins, sign
 
 ## Limits
 
-- Per key: \`rateLimitPerMin\` requests per minute across all methods (default ${DEFAULT_KEY_RATE}, max ${MAX_KEY_RATE}). Every response carries X-RateLimit-Limit, X-RateLimit-Remaining and X-RateLimit-Reset. 429 RATE_LIMIT includes Retry-After.
-- Per IP: ${IP_WRITE_LIMIT_PER_MIN} writes per minute (POST, PUT, PATCH, DELETE) and ${ABUSE_LIMITS.read.limit} reads (GET) per minute. IPv6 counts per /64.
+- Per key: \`rateLimitPerMin\` requests per minute across all methods (default ${DEFAULT_KEY_RATE}, max ${MAX_KEY_RATE}). The edge counter enforces the largest tier not above it (${KEY_RATE_TIERS.join(', ')} per minute; a 50/min key gets 30/min); keys under 10/min are counted exactly. Every response carries X-RateLimit-Limit and X-RateLimit-Reset (X-RateLimit-Remaining when known). 429 RATE_LIMIT includes Retry-After.
+- Per key per day: ${KEY_DAILY_QUOTA} requests (UTC day; X-Quota-Limit, X-Quota-Remaining). Past it, 429 DAILY_QUOTA until 00:00 UTC.
+- Per wallet: ${WALLET_KEY_RATE} requests per minute across all of its keys.
+- Per IP: ${IP_KEY_RATE} API-key requests per minute, ${IP_WRITE_LIMIT_PER_MIN} writes per minute (POST, PUT, PATCH, DELETE) and ${ABUSE_LIMITS.read.limit} reads (GET) per minute. IPv6 counts per /64.
 - Per route group, per IP and per signed-in wallet, each per minute: sign-in (/auth/*, /agent/auth/*) ${ABUSE_LIMITS.auth.limit}, transactions (/orders*, /tx/*, /agent/tx/*, /agent/orders/*, bonds, fees, featuring bookings, supplements) ${ABUSE_LIMITS.tx.limit}, /verify* ${ABUSE_LIMITS.verify.limit}, uploads (/files, listing images, content, versions, reupload, profile) ${ABUSE_LIMITS.upload.limit}. A full buy or sell flow uses well under these. 429 RATE_LIMIT carries Retry-After.
 - Keys per wallet: ${MAX_ACTIVE_KEYS} active.
 - Sellers: ${protocol.uploadsPerCreatorPerDay} new uploads per creator per day and ${protocol.updatesPerListingPerDay} update per listing per day (UTC). Past that, a version needs a paid supplement (${protocol.uploadSupplement} per extra upload; GET /studio/listings/{id}/upload-quota has the exact quote).

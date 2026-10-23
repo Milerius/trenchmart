@@ -30,6 +30,7 @@ export const MIGRATIONS = [
   '0042_holder_rewards.sql',
   '0043_status_rpc_provider.sql',
   '0044_abuse_quotas.sql',
+  '0045_api_key_quota.sql',
 ] as const;
 
 /**

@@ -35,7 +35,7 @@ import { processBatchMessage, rewardsTick } from './rewards';
 import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
 import { deliverAlerts, opsCheck, recordOpsEvent, type OpsAlert } from './ops';
 import { statusTick } from './status';
-import { limitersFrom } from './limits';
+import { limitersFrom, pruneRateBuckets } from './limits';
 
 type Binding = Record<string, unknown> & {
   DATABASE_URL?: string;
@@ -295,6 +295,8 @@ export default {
         );
         // Expired sign-in nonces (open or used) can never be verified again.
         await step('auth-nonces', () => pruneAuthNonces(deps));
+        // Rate-limit fallback counters (limits.ts) and old windows: a day is plenty.
+        await step('rate-buckets', () => pruneRateBuckets(deps));
         let alerts: OpsAlert[] = [];
         await step('ops', async () => {
           alerts = await opsCheck(deps);

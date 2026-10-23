@@ -172,6 +172,10 @@ test('agent docs: auth, scopes, flows, errors, links to OpenAPI and llms.txt', a
     "tm.upvote('trojan-trenches-intel')",
   );
   await expect(page.locator('section#errors')).toContainText('NOT_ISSUED');
+  await expect(page.locator('section#errors')).toContainText('DAILY_QUOTA');
+  await expect(page.getByTestId('limit-daily')).toContainText('10,000 requests');
+  await expect(page.getByTestId('limit-key')).toContainText('a 50/min key gets 30/min');
+  await expect(page.locator('section#limits')).toContainText('across all its keys');
   await expect(page.locator('section#not-available')).toContainText('Webhooks are not available');
   const nav = page.getByTestId('docs-nav');
   await expect(nav.getByRole('link', { name: 'Agent API' })).toHaveAttribute(

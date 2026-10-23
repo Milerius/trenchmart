@@ -73,7 +73,7 @@ enabled = true
 # I-07: /tx/send per signed-in wallet. Namespaces 12xx are mainnet, 11xx devnet (rate-limits.md).
 [[ratelimits]]
 name = "TX_SEND_LIMITER"
-namespace_id = "1201"
+namespace_id = "1301"
 simple = { limit = 20, period = 60 }
 
 # POST /auth/nonce per client IP (limits.ts authNonce, docs/ops/rate-limits.md).
@@ -81,3 +81,39 @@ simple = { limit = 20, period = 60 }
 name = "AUTH_NONCE_LIMITER"
 namespace_id = "1210"
 simple = { limit = 20, period = 60 }
+
+# Abuse fix 2: API keys (IP before lookup, per-wallet cap, per-key tiers) (limits.ts LIMITS; docs/ops/rate-limits.md).
+[[ratelimits]]
+name = "API_KEY_IP_LIMITER"
+namespace_id = "1302"
+simple = { limit = 600, period = 60 }
+
+[[ratelimits]]
+name = "API_KEY_WALLET_LIMITER"
+namespace_id = "1303"
+simple = { limit = 600, period = 60 }
+
+[[ratelimits]]
+name = "KEY_RATE_10"
+namespace_id = "1304"
+simple = { limit = 10, period = 60 }
+
+[[ratelimits]]
+name = "KEY_RATE_30"
+namespace_id = "1305"
+simple = { limit = 30, period = 60 }
+
+[[ratelimits]]
+name = "KEY_RATE_60"
+namespace_id = "1306"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "KEY_RATE_120"
+namespace_id = "1307"
+simple = { limit = 120, period = 60 }
+
+[[ratelimits]]
+name = "KEY_RATE_300"
+namespace_id = "1308"
+simple = { limit = 300, period = 60 }

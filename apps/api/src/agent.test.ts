@@ -26,6 +26,7 @@ import { readEnv } from './env';
 import { sha256Hex, type Deps } from './logic';
 import type { EscrowChain } from './escrow';
 import { API_SCOPES, recordBroadcast, scopeArray, scopeFor } from './agent';
+import { pruneRateBuckets } from './limits';
 import { ROUTES, scopeOf } from './openapi';
 
 /** Integration: the agent API (keys, scopes, revocation, limits, validated broadcast). */
@@ -626,6 +627,80 @@ describe('agent API', () => {
     // Next minute window: allowed again.
     h.clock.now = new Date(h.clock.now.getTime() + 61_000);
     expect((await call(h.app, 'GET', '/listings', { key: slow })).status).toBe(200);
+  });
+
+  it('abuse fix 2: IP limit before key lookup, binding per key, wallet cap, daily quota', async () => {
+    const h = await harness();
+    const wallet = keypair();
+    const key = await mintKey(h.app, wallet, ['read'], 50);
+    const keyRow = async () =>
+      (await sql`select id, daily_count from api_keys where prefix = ${key.slice(0, 12)}`)[0]!;
+    const fake = (allow: () => boolean) => {
+      const keys: string[] = [];
+      return {
+        keys,
+        limit: async ({ key: k }: { key: string }) => (keys.push(k), { success: allow() }),
+      };
+    };
+
+    // IP limit first: when it trips, the key is never hashed or looked up (count unchanged).
+    expect((await call(h.app, 'GET', '/listings', { key })).status).toBe(200);
+    const before = Number((await keyRow()).daily_count);
+    const ipLimit = fake(() => false);
+    h.deps.limiters = { apiKeyIp: ipLimit };
+    const blocked = await call(h.app, 'GET', '/listings', { key });
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('retry-after')).toBe('60');
+    const bogus = await call(h.app, 'GET', '/listings', { key: `tmk_${'A'.repeat(43)}` });
+    expect(bogus.status).toBe(429);
+    expect(Number((await keyRow()).daily_count)).toBe(before);
+    expect(ipLimit.keys[0]).toBe('apiKeyIp:local');
+
+    // Per-key binding keyed by key id: a 50/min key uses the 30/min tier (never looser).
+    const tier30 = fake(() => true);
+    h.deps.limiters = { keyRate30: tier30 };
+    const viaBinding = await call(h.app, 'GET', '/listings', { key });
+    expect(viaBinding.status).toBe(200);
+    expect(viaBinding.headers.get('x-ratelimit-limit')).toBe('30');
+    expect(tier30.keys).toEqual([`apikey:${(await keyRow()).id as string}`]);
+    tier30.limit = async () => ({ success: false });
+    expect((await call(h.app, 'GET', '/listings', { key })).body.error.code).toBe('RATE_LIMIT');
+
+    // Aggregate per-wallet cap across all of the wallet's keys.
+    const second = await mintKey(h.app, wallet, ['read'], 50);
+    let walletHits = 0;
+    h.deps.limiters = { apiKeyWallet: { limit: async () => ({ success: ++walletHits <= 2 }) } };
+    expect((await call(h.app, 'GET', '/listings', { key })).status).toBe(200);
+    expect((await call(h.app, 'GET', '/listings', { key: second })).status).toBe(200);
+    const capped = await call(h.app, 'GET', '/listings', { key: second });
+    expect(capped.status).toBe(429);
+    expect(capped.body.error.message).toContain('wallet');
+    h.deps.limiters = {};
+
+    // Daily quota per key (UTC day), with headers; resets the next day.
+    await sql`update api_keys set daily_quota = 2, daily_count = 0, daily_day = null where prefix = ${key.slice(0, 12)}`;
+    const first = await call(h.app, 'GET', '/listings', { key });
+    expect(first.headers.get('x-quota-limit')).toBe('2');
+    expect(first.headers.get('x-quota-remaining')).toBe('1');
+    expect((await call(h.app, 'GET', '/listings', { key })).status).toBe(200);
+    const over = await call(h.app, 'GET', '/listings', { key });
+    expect(over.status).toBe(429);
+    expect(over.body.error.code).toBe('DAILY_QUOTA');
+    expect(Number(over.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect((await call(h.app, 'GET', '/listings', { key: second })).status).toBe(200);
+    h.clock.now = new Date(h.clock.now.getTime() + 24 * 60 * 60 * 1000);
+    expect((await call(h.app, 'GET', '/listings', { key })).status).toBe(200);
+  });
+
+  it('cron prunes rate_buckets windows older than a day', async () => {
+    const h = await harness();
+    const old = new Date(h.clock.now.getTime() - 25 * 60 * 60 * 1000);
+    const fresh = new Date(h.clock.now.getTime() - 60_000);
+    const tag = randomUUID();
+    await sql`insert into rate_buckets (key, window_start, hits) values (${'old:' + tag}, ${old}, 1), (${'new:' + tag}, ${fresh}, 1)`;
+    expect(await pruneRateBuckets(h.deps)).toBeGreaterThanOrEqual(1);
+    const left = await sql`select key from rate_buckets where key like ${'%' + tag}`;
+    expect(left.map((r) => r.key)).toEqual(['new:' + tag]);
   });
 
   it('broadcast relays only the exact issued transaction, signed by the key wallet', async () => {
