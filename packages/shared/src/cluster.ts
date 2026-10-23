@@ -13,10 +13,35 @@ export function assertTestCluster(cluster: string): TestCluster {
   throw new Error(`Unknown Solana cluster "${cluster}". Use devnet, testnet, or localnet.`);
 }
 
+/**
+ * Mainnet RPC URLs accepted by `assertSafeRpc`. Only `resolveRpc` adds to it, and only for a
+ * deployment on cluster=mainnet (which itself needs MAINNET_LAUNCHED=1). Devnet builds never
+ * register a URL, so they keep refusing mainnet.
+ */
+const allowedMainnetRpc = new Set<string>();
+
+/** Host only: never put an RPC URL's query string (api-key) or path token in text. */
+export function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return 'rpc';
+  }
+}
+
+/** Strips query strings and api-key style secrets from any URLs inside free text. */
+export function redactSecrets(text: string): string {
+  return text
+    .replace(/(https?|wss?):\/\/[^\s"'<>)]+/gi, (m) => redactUrl(m))
+    .replace(/(api[-_]?key=)[^&\s"'<>)]+/gi, '$1[redacted]');
+}
+
 export function assertSafeRpc(url: string): void {
+  if (allowedMainnetRpc.has(url)) return;
   const u = url.toLowerCase();
   if (u.includes('mainnet')) {
-    throw new Error(`Refusing mainnet RPC URL: ${url}`);
+    throw new Error(`Refusing mainnet RPC URL: ${redactUrl(url)}`);
   }
 }
 
@@ -83,5 +108,6 @@ export function resolveRpc(
     throw new MainnetRpcRequiredError('the public mainnet-beta endpoint is not allowed');
   }
   if (/devnet|testnet/.test(host)) throw new MainnetRpcRequiredError('URL names another cluster');
+  allowedMainnetRpc.add(url);
   return url;
 }

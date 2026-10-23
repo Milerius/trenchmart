@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MainnetRpcRequiredError, parseCluster, resolveRpc } from './cluster';
+import {
+  MainnetRpcRequiredError,
+  assertSafeRpc,
+  parseCluster,
+  redactSecrets,
+  resolveRpc,
+} from './cluster';
 
 describe('parseCluster', () => {
   it('refuses mainnet unless the deployment is launched', () => {
@@ -50,5 +56,34 @@ describe('resolveRpc', () => {
     expect(resolveRpc('mainnet', { helius: 'https://mainnet.helius-rpc.com/?api-key=k' })).toBe(
       'https://mainnet.helius-rpc.com/?api-key=k',
     );
+  });
+});
+
+describe('mainnet RPC guard', () => {
+  const key = 'secret-key-123';
+  const helius = `https://mainnet.helius-rpc.com/?api-key=${key}`;
+
+  it('devnet refuses a mainnet URL and never echoes the api-key', () => {
+    const other = `https://mainnet.helius-rpc.com/?api-key=${key}-other`;
+    expect(() => assertSafeRpc(other)).toThrow(
+      /Refusing mainnet RPC URL: https:\/\/mainnet\.helius-rpc\.com$/,
+    );
+    try {
+      assertSafeRpc(other);
+    } catch (err) {
+      expect((err as Error).message).not.toContain(key);
+    }
+    expect(() => resolveRpc('devnet', { helius: other })).toThrow(/Refusing/);
+  });
+
+  it('a mainnet deployment accepts its Helius mainnet URL in the RPC layer', () => {
+    expect(resolveRpc('mainnet', { helius })).toBe(helius);
+    expect(() => assertSafeRpc(helius)).not.toThrow();
+  });
+
+  it('redacts URLs and api keys in free text', () => {
+    const out = redactSecrets(`fetch ${helius} failed; api-key=${key}`);
+    expect(out).not.toContain(key);
+    expect(out).toContain('https://mainnet.helius-rpc.com');
   });
 });
