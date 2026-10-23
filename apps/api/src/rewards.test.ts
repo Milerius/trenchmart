@@ -261,6 +261,16 @@ describe('$MART holder rewards', () => {
     await sql?.end();
   });
 
+  it('skips sampling without throwing while the $MART mint does not exist yet (pre-launch)', async () => {
+    const { deps, chain } = await setup();
+    const real = chain.accounts;
+    chain.accounts = async (addresses) =>
+      (await real(addresses)).map((a, i) => (addresses[i] === MINT ? null : a));
+    now = new Date(epochStart(7_000).getTime() + 1000);
+    const out = await rewardsTick(deps);
+    expect(out.sampled).toBe(false);
+  });
+
   it('routes 70% of each fee (holders 50% + buyback 20%) to the rewards vault', async () => {
     const { deps } = await setup();
     const lines = await revenue(deps, 1_000_000_000n, 'r1');

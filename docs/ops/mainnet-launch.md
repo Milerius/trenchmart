@@ -117,6 +117,6 @@ lines moved source positions); that is expected until devnet is upgraded.
   `devnet.trenchmart.fun` → devnet Worker `trenchmart-web`. The header switch links the two.
 - Mainnet API `api.mainnet.trenchmart.fun` (`MAINNET_LAUNCHED=1`, payouts/rewards auto off). Devnet API sign-in domain is
   `devnet.trenchmart.fun`.
-- $MART mint: `VAYdSoVF9j7RXgPz6wwELsFNPqortx3iXEXVXHpMART`.
+- $MART mint: `EZZFUgLKRCtuY9Cu4CyH8ncqfLC5rHfgdoHzzTGppump`.
 - Web mainnet deploy config: `apps/web/wrangler.mainnet.deploy.jsonc` (`opennextjs-cloudflare build/deploy --config ...`,
   `NEXT_PUBLIC_CLUSTER=mainnet NEXT_PUBLIC_MAINNET_LAUNCHED=1`, `API_URL=TM_API_URL=https://api.mainnet.trenchmart.fun`, Node >= 22).
