@@ -75,3 +75,9 @@ enabled = true
 name = "TX_SEND_LIMITER"
 namespace_id = "1201"
 simple = { limit = 20, period = 60 }
+
+# POST /auth/nonce per client IP (limits.ts authNonce, docs/ops/rate-limits.md).
+[[ratelimits]]
+name = "AUTH_NONCE_LIMITER"
+namespace_id = "1210"
+simple = { limit = 20, period = 60 }

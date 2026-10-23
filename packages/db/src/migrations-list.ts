@@ -29,6 +29,7 @@ export const MIGRATIONS = [
   '0041_auto_payouts.sql',
   '0042_holder_rewards.sql',
   '0043_status_rpc_provider.sql',
+  '0044_abuse_quotas.sql',
 ] as const;
 
 /**

@@ -134,7 +134,8 @@ export const devLinkBody = z.object({
 
 export const verifyJsonBody = z.object({
   fileName: z.string().min(1).max(180),
-  contentBase64: z.string().min(1),
+  /** Base64 of at most 25 MiB (the setup category file limit). */
+  contentBase64: z.string().min(1).max(34_952_536),
   /** A paid verification supplement, needed after the free verification of the day. */
   supplementId: z.string().uuid().optional(),
 });

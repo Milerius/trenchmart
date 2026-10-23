@@ -1,4 +1,5 @@
 import { createSql } from '@trenchmart/db';
+import { pruneAuthNonces } from './studio-quotas';
 import { configureSandboxWasm } from '@trenchmart/scanner';
 // workerd cannot fetch the QuickJS engine at runtime; wrangler bundles it as a compiled module.
 // The package's exports map hides the .wasm path, and wrangler's CompiledWasm rule needs it.
@@ -292,6 +293,8 @@ export default {
           'sessions',
           () => deps.sql`delete from sessions where expires_at < now() - interval '7 days'`,
         );
+        // Expired sign-in nonces (open or used) can never be verified again.
+        await step('auth-nonces', () => pruneAuthNonces(deps));
         let alerts: OpsAlert[] = [];
         await step('ops', async () => {
           alerts = await opsCheck(deps);
