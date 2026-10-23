@@ -309,7 +309,9 @@ export async function sampleIfDue(
   );
   if (tick < ticks[done]!) return false;
   const [mint] = await chain.accounts([cfg.mint]);
-  if (!mint) throw new Error(`$MART mint ${cfg.mint} not found`);
+  // Pre-launch: the mint account does not exist yet. Skip the sample quietly (no holders,
+  // everyone stays at the base tier) instead of failing every cron tick.
+  if (!mint) return false;
   if (mint.owner !== TOKEN_PROGRAM_ID && mint.owner !== TOKEN_2022_PROGRAM_ID)
     throw new Error('$MART mint is not owned by a token program');
   const supply = readU64(mint.data, 36);

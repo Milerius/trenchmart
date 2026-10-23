@@ -283,12 +283,28 @@ export async function fetchTransaction(url: string, signature: string): Promise<
 export { fromBase64 };
 
 /** Sum of `owner`'s token accounts for `mint`, in base units (classic SPL and Token-2022). */
+/** Matches the RPC error for a mint account that does not exist yet (e.g. pre-launch). */
+export function isMissingMintError(err: unknown): boolean {
+  return err instanceof RpcError && /could not find mint/i.test(err.message);
+}
+
+/**
+ * Sum of the owner's token accounts for `mint`, in base units. A mint that does not exist
+ * on-chain yet (pre-launch) reads as a zero balance (base tier) instead of throwing.
+ */
 export async function tokenBalance(url: string, owner: string, mint: string): Promise<bigint> {
-  const result = (await rpc(url, 'getTokenAccountsByOwner', [
-    owner,
-    { mint },
-    { encoding: 'jsonParsed', commitment: 'confirmed' },
-  ])) as {
+  let raw: unknown;
+  try {
+    raw = await rpc(url, 'getTokenAccountsByOwner', [
+      owner,
+      { mint },
+      { encoding: 'jsonParsed', commitment: 'confirmed' },
+    ]);
+  } catch (err) {
+    if (isMissingMintError(err)) return 0n;
+    throw err;
+  }
+  const result = raw as {
     value: { account: { data: { parsed?: { info?: { tokenAmount?: { amount?: string } } } } } }[];
   };
   let total = 0n;
