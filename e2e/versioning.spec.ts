@@ -688,3 +688,43 @@ test('studio: the free-upload count in the limit copy comes from config, not a c
   );
   await expect(page.getByTestId('supplement-notice')).not.toContainText('5 free uploads');
 });
+
+test('I-07: a relay refusal from /tx/send is shown and nothing is marked paid', async ({
+  page,
+}) => {
+  const { secret, address } = wallet();
+  const calls = await setup(page, address, secret, ({ method, path }) => {
+    if (path === `/studio/listings/${LISTING_ID}/upload-quota`)
+      return {
+        json: quota({
+          updatesToday: 1,
+          reasons: ['listing_update_limit'],
+          supplementRequired: true,
+        }),
+      };
+    if (method === 'POST' && path === `/studio/listings/${LISTING_ID}/versions`)
+      return {
+        json: {
+          versionId: 'v-142',
+          uploadUrl: '/api/v1/files?key=uploads/v-142&exp=1&sig=s',
+          feeTx: null,
+          supplement: { id: 'sup-1', lamports: '50000000', tx: { txBase64: unsignedTx(address) } },
+        },
+      };
+    if (path === '/tx/send')
+      return {
+        status: 429,
+        json: { error: { code: 'RATE_LIMIT', message: 'too many transactions' } },
+      };
+    return undefined;
+  });
+  await page.goto(`/studio/listings/${LISTING_ID}/versions/new`);
+  await page.getByLabel('Changelog').fill('Hotfix');
+  await page
+    .locator('#file')
+    .setInputFiles({ name: 'a.user.js', mimeType: 'text/javascript', buffer: Buffer.from('x') });
+  await page.getByTestId('submit-version').click();
+  await expect(page.getByText('too many transactions')).toBeVisible();
+  await expect(page).toHaveURL(`/studio/listings/${LISTING_ID}/versions/new`);
+  expect(calls.some((c) => c.path === '/supplements/sup-1/submitted')).toBe(false);
+});

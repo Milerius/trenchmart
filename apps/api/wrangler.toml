@@ -49,3 +49,9 @@ simple = { limit = 120, period = 60 }
 # Workers Logs: keeps console output (ALERT lines from opsCheck and the cron) searchable.
 [observability]
 enabled = true
+
+# I-07: /tx/send per signed-in wallet (limits.ts LIMITS.txSend; docs/ops/rate-limits.md).
+[[ratelimits]]
+name = "TX_SEND_LIMITER"
+namespace_id = "1011"
+simple = { limit = 20, period = 60 }

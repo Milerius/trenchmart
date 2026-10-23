@@ -69,3 +69,9 @@ simple = { limit = 120, period = 60 }
 
 [observability]
 enabled = true
+
+# I-07: /tx/send per signed-in wallet. Namespaces 102x are mainnet, 101x devnet (rate-limits.md).
+[[ratelimits]]
+name = "TX_SEND_LIMITER"
+namespace_id = "1021"
+simple = { limit = 20, period = 60 }
