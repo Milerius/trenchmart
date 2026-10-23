@@ -6,6 +6,7 @@
 import bs58 from 'bs58';
 import { parseSecretKey, publicKeyOf } from '@trenchmart/chain';
 import { pendingMigrations } from '@trenchmart/db';
+import { redactSecrets } from '@trenchmart/shared';
 import type { Deps } from './logic';
 import { resolverOf } from './escrow';
 import { payoutHealth, rpcErrorCode } from './payouts-auto';
@@ -134,7 +135,7 @@ export async function recordOpsEvent(
   detail: string,
 ): Promise<void> {
   try {
-    await deps.sql`insert into ops_events (kind, detail) values (${kind}, ${detail.slice(0, 500)})`;
+    await deps.sql`insert into ops_events (kind, detail) values (${kind}, ${redactSecrets(detail).slice(0, 500)})`;
   } catch {
     // The DB itself may be what failed; the ALERT log line still goes to Workers Logs.
   }
@@ -178,7 +179,7 @@ async function count(deps: Deps, kind: OpsEventKind, since: Date): Promise<numbe
 export async function opsCheck(deps: Deps): Promise<OpsAlert[]> {
   const alerts: OpsAlert[] = [];
   const add = (level: OpsLevel, code: string, message: string) =>
-    alerts.push({ level, code, message });
+    alerts.push({ level, code, message: redactSecrets(message) });
   const now = deps.now();
   const t = OPS_THRESHOLDS;
   const f = fetchOf(deps);

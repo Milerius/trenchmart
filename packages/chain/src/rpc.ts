@@ -1,4 +1,4 @@
-import { assertSafeRpc } from '@trenchmart/shared';
+import { assertSafeRpc, redactSecrets, redactUrl } from '@trenchmart/shared';
 import { fromBase64, toBase64 } from './tx';
 
 export type RpcTransfer = { source: string; destination: string; lamports: bigint };
@@ -35,12 +35,7 @@ export class RpcError extends Error {
 
 /** Hides keys in `?api-key=` style query strings and path tokens from error text. */
 export function redactRpcUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.protocol}//${parsed.host}`;
-  } catch {
-    return 'rpc';
-  }
+  return redactUrl(url);
 }
 
 export async function rpc(
@@ -67,7 +62,7 @@ export async function rpc(
       });
     } catch (err) {
       last = new RpcError(
-        `${method}: ${redactRpcUrl(url)} unreachable (${err instanceof Error ? err.message : 'network error'})`,
+        `${method}: ${redactRpcUrl(url)} unreachable (${err instanceof Error ? redactSecrets(err.message) : 'network error'})`,
         0,
         true,
       );
@@ -85,7 +80,7 @@ export async function rpc(
       response.status >= 500 ||
       (body?.error?.code !== undefined && RETRYABLE_RPC_CODES.has(body.error.code));
     if (body?.error || !response.ok || !body) {
-      const detail = body?.error?.message ?? `HTTP ${response.status}`;
+      const detail = redactSecrets(body?.error?.message ?? `HTTP ${response.status}`);
       last = new RpcError(
         `${method}: ${detail} (${redactRpcUrl(url)})`,
         response.status,
