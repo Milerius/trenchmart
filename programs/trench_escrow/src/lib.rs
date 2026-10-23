@@ -71,7 +71,13 @@ mod escrow_tests {
 use fee::{quote, split_fee, FeeError};
 use state::Status;
 
+// Devnet/localnet id by default; the mainnet binary is built with `--features mainnet`
+// (`solana-verify build --library-name trench_escrow -- --features mainnet`).
+// Keep the devnet line first: `anchor keys sync` (CI) rewrites the first declare_id!.
+#[cfg(not(feature = "mainnet"))]
 declare_id!("Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw");
+#[cfg(feature = "mainnet")]
+declare_id!("Dm2jtJDfSji2TASEGKxsY1CwxeUCXqGznefkJpSASZLp");
 
 // Lets wallets, explorers and security tools (Phantom, Blowfish, Solscan) identify the
 // program and its owner. https://github.com/neodyme-labs/solana-security-txt
