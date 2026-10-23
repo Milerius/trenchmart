@@ -169,25 +169,35 @@ describe('readGate', () => {
   });
 });
 
-describe('wrangler.toml', () => {
-  const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
-  const blocks = [
-    ...toml.matchAll(
-      /\[\[ratelimits\]\]\s*name = "(\w+)"\s*namespace_id = "(\d+)"\s*simple = \{ limit = (\d+), period = (\d+) \}/g,
-    ),
-  ];
-  it('declares every abuse binding with the documented limit and a 60 s period', () => {
-    for (const { binding, limit } of Object.values(ABUSE_LIMITS)) {
-      const block = blocks.find((b) => b[1] === binding);
-      expect(block, binding).toBeTruthy();
-      expect(Number(block![3])).toBe(limit);
-      expect(block![4]).toBe('60');
-    }
-  });
-  it('uses distinct namespace ids, none of them the mainnet 1002', () => {
-    const ids = blocks.map((b) => b[2]);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).not.toContain('1002');
+describe('wrangler configs', () => {
+  const ids = (file: string) => {
+    const toml = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    return [
+      ...toml.matchAll(
+        /\[\[ratelimits\]\]\s*name = "(\w+)"\s*namespace_id = "(\d+)"\s*simple = \{ limit = (\d+), period = (\d+) \}/g,
+      ),
+    ];
+  };
+  const devnet = ids('wrangler.toml');
+  const mainnet = ids('wrangler.mainnet.toml');
+  it.each([
+    ['devnet', devnet, /^12\d\d$/],
+    ['mainnet', mainnet, /^13\d\d$/],
+  ] as const)(
+    '%s declares every abuse binding with its limit, 60 s and its id range',
+    (_n, blocks, range) => {
+      for (const { binding, limit } of Object.values(ABUSE_LIMITS)) {
+        const block = blocks.find((b) => b[1] === binding);
+        expect(block, binding).toBeTruthy();
+        expect(Number(block![3])).toBe(limit);
+        expect(block![4]).toBe('60');
+        expect(block![2]).toMatch(range);
+      }
+    },
+  );
+  it('never shares a namespace id within or across the two Workers', () => {
+    const all = [...devnet, ...mainnet].map((b) => b[2]);
+    expect(new Set(all).size).toBe(all.length);
   });
   it('legit agent flows fit: a buy and a sell each use far less than one window', () => {
     // Buy: quote, order, broadcast, submitted, download, release.

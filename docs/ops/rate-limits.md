@@ -21,6 +21,11 @@ limits below (same last two digits). Never reuse an id across Workers.
 | `API_KEY_WALLET_LIMITER`       | 1103      | 1303      | 600 / 60 s                  | key owner (user id)  | all of a wallet's keys together                   |
 | `KEY_RATE_10` … `KEY_RATE_300` | 1104–1108 | 1304–1308 | 10, 30, 60, 120, 300 / 60 s | API key id           | per-key `rateLimitPerMin` tiers                   |
 | `AUTH_NONCE_LIMITER`           | 1110      | 1210      | 20 / 60 s                   | client IP (/64)      | `POST /auth/nonce` (abuse limits, docs/04-api.md) |
+| `READ_LIMITER`                 | 1201      | 1311      | 600 / 60 s                  | client IP (/64)      | every GET, cache hits included (abuse-limits.md)  |
+| `AUTH_LIMITER`                 | 1202      | 1312      | 20 / 60 s                   | IP (/64) + wallet    | auth writes (abuse-limits.md)                     |
+| `TX_LIMITER`                   | 1203      | 1313      | 60 / 60 s                   | IP (/64) + wallet    | tx writes (abuse-limits.md)                       |
+| `VERIFY_LIMITER`               | 1204      | 1314      | 20 / 60 s                   | IP (/64) + wallet    | /verify writes (abuse-limits.md)                  |
+| `UPLOAD_LIMITER`               | 1205      | 1315      | 60 / 60 s                   | IP (/64) + wallet    | upload writes (abuse-limits.md)                   |
 
 IPv6 clients are keyed by their /64 (`ipKey` in limits.ts), because one host rotates freely
 inside it. This applies to the global write limiter (`RATE_LIMITER` and the Postgres

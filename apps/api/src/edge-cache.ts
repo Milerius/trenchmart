@@ -57,21 +57,7 @@ export const EDGE_RULES: Rule[] = [
   // probes run every 5 min). Viewer-independent, so signed-in visitors share the copy.
   { pattern: /^\/api\/v1\/status$/, fresh: 60, stale: 300, shared: true },
   { pattern: /^\/api\/v1\/(featured|featuring\/config)$/, fresh: 60, stale: 300, shared: true },
-  // Viewer-independent public feeds that were uncached (every page view hit Postgres):
-  // holder-reward leaderboards and epochs, the payout feed and the OpenAPI document.
-  {
-    pattern: /^\/api\/v1\/rewards\/(current|top|epochs\/recent)$/,
-    fresh: 60,
-    stale: 600,
-    shared: true,
-  },
-  {
-    pattern: /^\/api\/v1\/rewards\/wallet\/[1-9A-HJ-NP-Za-km-z]{32,44}$/,
-    fresh: 30,
-    stale: 300,
-    shared: true,
-  },
-  { pattern: /^\/api\/v1\/payouts\/recent$/, fresh: 60, stale: 600, shared: true },
+  // The OpenAPI document changes only on deploy; agents fetch it often.
   { pattern: /^\/api\/v1\/openapi\.json$/, fresh: 300, stale: DAY, shared: true },
   { pattern: /^\/api\/v1\/creators\/leaderboard$/, fresh: 60, stale: 600, shared: true },
   { pattern: /^\/api\/v1\/creators\/[^/]+$/, fresh: 60, stale: 600 },

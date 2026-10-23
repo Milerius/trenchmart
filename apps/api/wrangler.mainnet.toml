@@ -117,3 +117,31 @@ simple = { limit = 120, period = 60 }
 name = "KEY_RATE_300"
 namespace_id = "1308"
 simple = { limit = 300, period = 60 }
+
+# API abuse limits (abuse-limits.ts, docs/ops/abuse-limits.md). Reads per IP (IPv6 /64), cache
+# hits included; write route groups per IP and per signed-in wallet. Keep in sync with
+# ABUSE_LIMITS (abuse-limits.test.ts checks). Mainnet ids 1311-1315 (devnet 1201-1205).
+[[ratelimits]]
+name = "READ_LIMITER"
+namespace_id = "1311"
+simple = { limit = 600, period = 60 }
+
+[[ratelimits]]
+name = "AUTH_LIMITER"
+namespace_id = "1312"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "TX_LIMITER"
+namespace_id = "1313"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "VERIFY_LIMITER"
+namespace_id = "1314"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "UPLOAD_LIMITER"
+namespace_id = "1315"
+simple = { limit = 60, period = 60 }
