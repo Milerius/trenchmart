@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
+import { CLUSTER } from '@/lib/cluster';
 import { solText, usdFor, usdText } from '@/lib/money';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -235,6 +236,7 @@ export function Row({
 }
 
 export function NetworkBanner() {
+  if (CLUSTER.id !== 'devnet') return null;
   return (
     <div
       role="note"

@@ -6,17 +6,13 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { preload } from 'react-dom';
 import { Menu, Search, X } from 'lucide-react';
 import { NetworkBanner } from '@/components/ui';
+import { CLUSTER } from '@/lib/cluster';
 import { type ActivityEvent, activityText, type SponsoredChip } from '@/components/activity';
 import { api } from '@/lib/api';
 import { tierChip, usePublicConfig } from '@/lib/config';
 import { useWallet, WalletProvider } from '@/lib/wallet';
 import { WalletMenu } from '@/components/wallet-menu';
-import {
-  DEVNET_ADDRESSES,
-  ESCROW_PROGRAM_ID,
-  explorerAddress,
-  shortKey,
-} from '@/lib/protocol-facts';
+import { ESCROW_PROGRAM_ID, explorerAddress, shortKey } from '@/lib/protocol-facts';
 
 /** Same geometry as brand/logo-mark.svg. */
 export function LogoMark({ className }: { className?: string }) {
@@ -41,7 +37,7 @@ export function Logo() {
 }
 
 const TICKER_FACTS = [
-  'Solana devnet · live',
+  `Solana ${CLUSTER.id} · live`,
   'Holders: up to 100% off the 5% fee',
   'Creators: 0% commission',
   'Every version scanned; scripts sandboxed; AI review: rules engine + LLM',
@@ -351,9 +347,9 @@ const FOOTER_COLUMNS: { title: string; links: [string, string][] }[] = [
 
 function Footer({ social }: { social?: Social }) {
   const addresses: [string, string, string | undefined][] = [
-    ['Escrow program (devnet)', ESCROW_PROGRAM_ID, 'footer-program'],
-    ['Squads multisig', DEVNET_ADDRESSES.multisig, undefined],
-    ['$MART mint', DEVNET_ADDRESSES.martMint, undefined],
+    [`Escrow program (${CLUSTER.id})`, ESCROW_PROGRAM_ID, 'footer-program'],
+    ['Squads multisig', CLUSTER.multisig, undefined],
+    ['$MART mint', CLUSTER.martMint, undefined],
   ];
   return (
     <footer className="mt-24 border-t border-line">
@@ -397,7 +393,8 @@ function Footer({ social }: { social?: Social }) {
         ))}
       </div>
       <p className="m-0 border-t border-line-soft px-6 py-5 text-center font-mono text-xs text-muted">
-        Devnet POC. Test SOL only. Not financial advice. Tools don&apos;t guarantee profits.
+        {CLUSTER.id === 'devnet' ? 'Devnet POC. Test SOL only. ' : ''}Not financial advice. Tools
+        don&apos;t guarantee profits.
       </p>
     </footer>
   );
