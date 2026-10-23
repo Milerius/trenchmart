@@ -99,6 +99,8 @@ export type Deps = {
   rateLimiter?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   /** Named abuse limits (limits.ts). Missing ones fall back to Postgres counters. */
   limiters?: import('./limits').Limiters;
+  /** Per-route-group write limits per IP and per wallet (abuse-limits.ts). */
+  abuseLimiters?: import('./abuse-limits').AbuseLimiters;
   /** Re-encodes PNG/JPEG uploads to a smaller WebP (image-optimize.ts). Optional. */
   optimizeImage?: import('./image-optimize').ImageOptimizer;
   /** Required when ESCROW_PROGRAM_ID is set. */

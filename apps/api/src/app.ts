@@ -1,3 +1,4 @@
+import { ABUSE_PERIOD_SEC, allowWrite, writeGroup } from './abuse-limits';
 import {
   currentEpoch,
   recentEpochs,
@@ -393,6 +394,18 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       // M-03: keyed on the edge-provided client IP, never on X-Forwarded-For.
       const ip = clientIp(c, deps.env);
       const key = `${ip}:${c.req.method}`;
+      // Route-group limits (auth, tx, verify, upload) per IP /64 and per signed-in wallet.
+      const group = writeGroup(c.req.method, path);
+      if (group) {
+        const wallet = (c.get('user')?.wallet as string | undefined) ?? null;
+        if (!(await allowWrite(deps.abuseLimiters, group, ip, wallet))) {
+          c.header('Retry-After', String(ABUSE_PERIOD_SEC));
+          return c.json(
+            { error: { code: 'RATE_LIMIT', message: `too many ${group} requests` } },
+            429,
+          );
+        }
+      }
       if (deps.rateLimiter) {
         const { success } = await deps.rateLimiter.limit({ key });
         if (!success)

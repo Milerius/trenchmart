@@ -130,7 +130,15 @@ export default function AgentDocsPage() {
             <Code>X-RateLimit-Limit</Code>, <Code>X-RateLimit-Remaining</Code>,{' '}
             <Code>X-RateLimit-Reset</Code>; a 429 carries <Code>Retry-After</Code>.
           </li>
-          <li>Per IP: {AGENT_LIMITS.ipWritesPerMin} writes per minute.</li>
+          <li>
+            Per IP: {AGENT_LIMITS.ipWritesPerMin} writes and {AGENT_LIMITS.ipReadsPerMin} reads per
+            minute (IPv6 per /64).
+          </li>
+          <li>
+            Per route group, per IP and per wallet, each minute: sign-in{' '}
+            {AGENT_LIMITS.groups.auth.limit}, transactions {AGENT_LIMITS.groups.tx.limit}, verify{' '}
+            {AGENT_LIMITS.groups.verify.limit}, uploads {AGENT_LIMITS.groups.upload.limit}.
+          </li>
           <li>Per wallet: {AGENT_LIMITS.maxActiveKeys} active keys.</li>
           <li>
             Sellers: {FACTS.uploadsPerCreatorPerDay} uploads per creator and{' '}

@@ -1,6 +1,7 @@
 import { CLUSTER } from '@/lib/cluster';
 import { ENDPOINTS } from '@/lib/cluster-endpoints';
 import {
+  ABUSE_LIMITS,
   API_SCOPES,
   CHALLENGE_TTL_MS,
   DEFAULT_CONFIG_JSON,
@@ -112,6 +113,8 @@ export const AGENT_LIMITS = {
   challengeMinutes: CHALLENGE_TTL_MS / 60_000,
   issuedTxMinutes: ISSUED_TX_TTL_MS / 60_000,
   ipWritesPerMin: IP_WRITE_LIMIT_PER_MIN,
+  ipReadsPerMin: ABUSE_LIMITS.read.limit,
+  groups: ABUSE_LIMITS,
 };
 
 export const ERRORS: { status: number; code: string; meaning: string }[] = [
@@ -396,7 +399,8 @@ Every operation in the OpenAPI spec carries \`x-scope\`. Routes for admins, sign
 ## Limits
 
 - Per key: \`rateLimitPerMin\` requests per minute across all methods (default ${DEFAULT_KEY_RATE}, max ${MAX_KEY_RATE}). Every response carries X-RateLimit-Limit, X-RateLimit-Remaining and X-RateLimit-Reset. 429 RATE_LIMIT includes Retry-After.
-- Per IP: ${IP_WRITE_LIMIT_PER_MIN} writes per minute (POST, PUT, PATCH, DELETE).
+- Per IP: ${IP_WRITE_LIMIT_PER_MIN} writes per minute (POST, PUT, PATCH, DELETE) and ${ABUSE_LIMITS.read.limit} reads (GET) per minute. IPv6 counts per /64.
+- Per route group, per IP and per signed-in wallet, each per minute: sign-in (/auth/*, /agent/auth/*) ${ABUSE_LIMITS.auth.limit}, transactions (/orders*, /tx/*, /agent/tx/*, /agent/orders/*, bonds, fees, featuring bookings, supplements) ${ABUSE_LIMITS.tx.limit}, /verify* ${ABUSE_LIMITS.verify.limit}, uploads (/files, listing images, content, versions, reupload, profile) ${ABUSE_LIMITS.upload.limit}. A full buy or sell flow uses well under these. 429 RATE_LIMIT carries Retry-After.
 - Keys per wallet: ${MAX_ACTIVE_KEYS} active.
 - Sellers: ${protocol.uploadsPerCreatorPerDay} new uploads per creator per day and ${protocol.updatesPerListingPerDay} update per listing per day (UTC). Past that, a version needs a paid supplement (${protocol.uploadSupplement} per extra upload; GET /studio/listings/{id}/upload-quota has the exact quote).
 

@@ -90,6 +90,27 @@ describe('edge cache', () => {
     expect(withOrigin.headers.get('cookie')).toBeNull();
   });
 
+  it('caches the hot public reward, payout and OpenAPI reads for everyone', () => {
+    const rule = (path: string, headers: Record<string, string> = {}) =>
+      ruleFor(new Request(`https://api.trenchmart.fun/api/v1${path}`, { headers }));
+    const signedIn = { cookie: 'tm_session=abc' };
+    for (const path of [
+      '/rewards/current',
+      '/rewards/top',
+      '/rewards/epochs/recent',
+      '/rewards/wallet/So11111111111111111111111111111111111111112',
+      '/payouts/recent',
+      '/openapi.json',
+    ]) {
+      expect(rule(path), path).not.toBeNull();
+      expect(rule(path, signedIn)?.shared, path).toBe(true);
+    }
+    expect(rule('/rewards/wallet/not-a-wallet')).toBeNull();
+    expect(rule('/openapi.json')?.stale).toBe(86_400);
+    // Viewer-dependent reads stay uncached when signed in.
+    expect(rule('/listings', signedIn)).toBeNull();
+    expect(rule('/featuring/calendar')).toBeNull();
+  });
   it('keeps aggregates stale-while-revalidate for a day, prices only ten minutes', () => {
     const rule = (path: string) => ruleFor(new Request(`https://api.trenchmart.fun/api/v1${path}`));
     expect(rule('/stats')?.stale).toBe(86_400);
