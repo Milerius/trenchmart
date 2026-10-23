@@ -5,6 +5,7 @@ import { SocialIcons, SocialPills } from '@/components/social-links';
 import { NetworkSwitch } from '@/components/network-switch';
 import { ClusterMismatchBanner } from '@/components/cluster-mismatch';
 import { DEVNET_ADDRESSES, ESCROW_CLUSTER, ESCROW_PROGRAM_ID } from '@/lib/protocol-facts';
+import { SITE_DESCRIPTION, SITE_TITLE } from '@/lib/site-meta';
 import './globals.css';
 
 const sans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
@@ -19,10 +20,17 @@ const serif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: 'TrenchMart · Reviewed trading tools, escrowed on Solana devnet',
-  description:
-    'Buy and sell trading scripts, filters and wallet lists that pass automated security review. On-chain escrow on every order, 0% creator commission. Devnet proof of concept.',
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   metadataBase: new URL('https://trenchmart.fun'),
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: '/',
+    siteName: 'TrenchMart',
+    type: 'website',
+  },
+  twitter: { card: 'summary_large_image', title: SITE_TITLE, description: SITE_DESCRIPTION },
   alternates: {
     types: { 'application/json': '/.well-known/trenchmart.json' },
   },
