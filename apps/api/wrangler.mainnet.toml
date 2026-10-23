@@ -25,6 +25,8 @@ MAINNET_LAUNCHED = "1"
 APP_URL = "https://trenchmart.fun"
 API_URL = "https://api.mainnet.trenchmart.fun"
 SIWS_DOMAIN = "trenchmart.fun"
+# Pre-DNS preview host of the mainnet web Worker.
+SIWS_EXTRA_DOMAINS = "mainnet.trenchmart.fun"
 LANDING_STATS = "auto"
 AI_AGENT_ID = "trenchmart-ai-v1"
 SANDBOX_BUDGET_MS = "15000"
