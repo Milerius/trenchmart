@@ -10,7 +10,7 @@ export const MAINNET: ClusterConfig = {
   escrowProgramId: 'Dm2jtJDfSji2TASEGKxsY1CwxeUCXqGznefkJpSASZLp',
   multisig: 'FFsRpwj5aTteCsS9kWpUAyQ7a9KzSSbDZgwgq2JdqbsN',
   vault: 'AoK6JdJQgtW9Wrt2z47gHnNMju2RrwNRhTZon13K3kf1',
-  martMint: process.env.NEXT_PUBLIC_MART_MINT ?? '',
+  martMint: process.env.NEXT_PUBLIC_MART_MINT || 'VAYdSoVF9j7RXgPz6wwELsFNPqortx3iXEXVXHpMART',
   rewardsVault: 'HgR2hVhSNv6YacZ8fwjbFt3WudZauYQABn3sNHaiEM7y',
   rewardsSpendingLimit: '',
   rewardsWallet: '',

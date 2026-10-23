@@ -30,7 +30,9 @@ jobs:
             [[ "$code" =~ ^2 ]] || problems+=("$name: HTTP $code")
           }
           probe api "$API/health"
-          probe web https://trenchmart.fun/
+          probe web https://devnet.trenchmart.fun/
+          probe mainnet-api https://api.mainnet.trenchmart.fun/api/v1/health
+          probe mainnet-web https://trenchmart.fun/
           if [[ -n "${TOKEN:-}" ]]; then
             # 503 here means a critical ops alert; it is already in the feed, so only note it.
             ops="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -H "Authorization: Bearer $TOKEN" "$API/internal/ops" 2>/dev/null)" || ops=unreachable

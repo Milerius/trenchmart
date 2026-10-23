@@ -31,7 +31,7 @@ describe('cluster config', () => {
   });
 
   it('switches hostname and keeps path and query', () => {
-    expect(switchUrl('devnet', '/l/x', '?a=1')).toBe('https://trenchmart.fun/l/x?a=1');
+    expect(switchUrl('devnet', '/l/x', '?a=1')).toBe('https://devnet.trenchmart.fun/l/x?a=1');
   });
 
   it('flags a wallet whose account lacks this cluster, trusts unknown or multi-chain', () => {

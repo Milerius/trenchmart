@@ -5,7 +5,7 @@ compatibility_date = "2026-09-01"
 workers_dev = true
 
 [vars]
-WEB_URL = "https://trenchmart.fun"
+WEB_URL = "https://devnet.trenchmart.fun"
 API_URL = "https://api.trenchmart.fun"
 # RPC check: Helius first, this public RPC as the automatic fallback when Helius fails or times
 # out (src/watchdog.ts checkRpc; docs/ops/networks.md). The Helius URL carries the API key, so it

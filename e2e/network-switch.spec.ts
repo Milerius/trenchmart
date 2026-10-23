@@ -4,7 +4,7 @@ import { installMockWallet, MockAuth } from './wallet-mock';
 
 /**
  * Devnet | Mainnet network switch (docs/ops/networks.md): segmented pill left of the wallet
- * button, lazy menu, mainnet links to mainnet.trenchmart.fun, and the amber wallet-cluster banner.
+ * button, lazy menu, mainnet links to trenchmart.fun, and the amber wallet-cluster banner.
  */
 
 const WALLET = 'AaoUxqv5mKkqNfuN2rRdx3xF4nJcTq2wJqzGqVjsRfiX';
@@ -58,8 +58,8 @@ test('pill sits left of the wallet button; menu is lazy; mainnet is coming soon'
   await expect(menu).toBeVisible();
   await expect(page.getByTestId('network-switch')).toHaveAttribute('open', '');
   const mainnet = menu.getByTestId('network-option-mainnet');
-  await expect(mainnet).toHaveAttribute('href', 'https://mainnet.trenchmart.fun/');
-  await expect(mainnet).toContainText('mainnet.trenchmart.fun · real SOL');
+  await expect(mainnet).toHaveAttribute('href', 'https://trenchmart.fun/');
+  await expect(mainnet).toContainText('trenchmart.fun · real SOL');
   await expect(mainnet.getByTestId('network-coming-soon')).toHaveCount(0);
   await expect(menu.getByTestId('network-option-devnet')).toContainText(
     'trenchmart.fun · test SOL only',
@@ -108,7 +108,7 @@ for (const size of WIDTHS) {
     await expect(menu).toBeVisible();
     await expect(menu.getByTestId('network-option-mainnet')).toHaveAttribute(
       'href',
-      'https://mainnet.trenchmart.fun/',
+      'https://trenchmart.fun/',
     );
     const box = (await menu.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);
