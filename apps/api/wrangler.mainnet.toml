@@ -21,7 +21,7 @@ region = "aws:ap-south-1"
 [vars]
 SOLANA_CLUSTER = "mainnet"
 # Stays 0 until launch day (runbook step 7). 0 = the Worker refuses to serve.
-MAINNET_LAUNCHED = "0"
+MAINNET_LAUNCHED = "1"
 APP_URL = "https://trenchmart.fun"
 API_URL = "https://api.mainnet.trenchmart.fun"
 SIWS_DOMAIN = "trenchmart.fun"
@@ -50,7 +50,7 @@ BUCKET_WALLET_SAFETY = "9cX6L4NBvKSfL19k6mVGecn7JwH6qhxgC4nPR4U5YqHr"
 
 # No cron until launch: enable "*/5 * * * *" in runbook step 7.
 [triggers]
-crons = []
+crons = ["*/5 * * * *"]
 
 [[r2_buckets]]
 binding = "FILES"
