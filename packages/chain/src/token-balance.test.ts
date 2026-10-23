@@ -37,3 +37,20 @@ describe('tokenBalance', () => {
     await expect(tokenBalance(URL_, OWNER, MINT)).rejects.toThrow(/WrongSize/);
   });
 });
+
+describe('rpc error detail', () => {
+  it('falls back to the HTTP status when a 5xx body has a non-string error message, and retries', async () => {
+    const f = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ error: { code: 1, message: { nested: true } } }), {
+          status: 503,
+        }),
+    );
+    vi.stubGlobal('fetch', f);
+    const { rpc } = await import('./rpc');
+    await expect(rpc(URL_, 'getSlot', [], { attempts: 2, sleep: async () => {} })).rejects.toThrow(
+      /HTTP 503/,
+    );
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+});

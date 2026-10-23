@@ -80,7 +80,9 @@ export async function rpc(
       response.status >= 500 ||
       (body?.error?.code !== undefined && RETRYABLE_RPC_CODES.has(body.error.code));
     if (body?.error || !response.ok || !body) {
-      const detail = redactSecrets(body?.error?.message ?? `HTTP ${response.status}`);
+      const detail = redactSecrets(
+        typeof body?.error?.message === 'string' ? body.error.message : `HTTP ${response.status}`,
+      );
       last = new RpcError(
         `${method}: ${detail} (${redactRpcUrl(url)})`,
         response.status,

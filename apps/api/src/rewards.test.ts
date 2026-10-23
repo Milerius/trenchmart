@@ -271,6 +271,24 @@ describe('$MART holder rewards', () => {
     expect(out.sampled).toBe(false);
   });
 
+  it('skips sampling while the $MART address is still a plain system account (pre-launch)', async () => {
+    const { deps, chain } = await setup();
+    const real = chain.accounts;
+    chain.accounts = async (addresses) =>
+      (await real(addresses)).map((a, i) =>
+        addresses[i] === MINT
+          ? {
+              owner: '11111111111111111111111111111111',
+              lamports: 229_478_280n,
+              data: new Uint8Array(),
+            }
+          : a,
+      );
+    now = new Date(epochStart(7_001).getTime() + 1000);
+    const out = await rewardsTick(deps);
+    expect(out.sampled).toBe(false);
+  });
+
   it('routes 70% of each fee (holders 50% + buyback 20%) to the rewards vault', async () => {
     const { deps } = await setup();
     const lines = await revenue(deps, 1_000_000_000n, 'r1');
