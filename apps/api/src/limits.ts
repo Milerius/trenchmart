@@ -1,4 +1,4 @@
-import { IP_KEY_RATE, WALLET_KEY_RATE } from '@trenchmart/shared';
+import { IP_KEY_RATE, KEY_RATE_TIERS, WALLET_KEY_RATE } from '@trenchmart/shared';
 import type { Deps } from './logic';
 
 /** A Workers Rate Limiting binding (wrangler [[ratelimits]]). */
@@ -78,7 +78,7 @@ export async function hitLimit(deps: Deps, name: LimitName, key: string): Promis
   return (hits[0]?.hits ?? 1) <= spec.limit;
 }
 
-const KEY_TIERS = [300, 120, 60, 30, 10] as const;
+const KEY_TIERS = [...KEY_RATE_TIERS].reverse();
 
 /** The binding tier for a key's per-minute rate: the largest tier not above it, or null. */
 export function keyRateTier(rate: number): { name: LimitName; limit: number } | null {

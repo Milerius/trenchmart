@@ -123,7 +123,7 @@ import {
   scopeFor,
   type ApiKeyContext,
 } from './agent';
-import { hitLimit, ipKey } from './limits';
+import { hitLimit, ipKey, LIMITS } from './limits';
 import { openApiSpec } from './openapi';
 import {
   activeBond,
@@ -371,8 +371,10 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       // request (reads included) counts against the key's own per-minute limit.
       // The IP limit runs first, before the key is hashed or looked up, so a flood of bogus
       // tmk_ keys costs one edge counter each and never reaches Postgres.
-      if (!(await hitLimit(deps, 'apiKeyIp', ipKey(clientIp(c, deps.env)))))
+      if (!(await hitLimit(deps, 'apiKeyIp', ipKey(clientIp(c, deps.env))))) {
+        c.header('Retry-After', String(LIMITS.apiKeyIp.periodSec));
         return c.json({ error: { code: 'RATE_LIMIT', message: 'too many requests' } }, 429);
+      }
       const rule = scopeFor(c.req.method, c.req.path.slice('/api/v1'.length));
       if (rule === 'denied')
         return c.json(

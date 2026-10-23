@@ -124,11 +124,13 @@ export default function AgentDocsPage() {
 
       <DocSection id="limits" title="Limits">
         <ul className="m-0 list-disc space-y-1 pl-5">
-          <li>
+          <li data-testid="limit-key">
             Per key: its <Code>rateLimitPerMin</Code> across all methods (default{' '}
-            {AGENT_LIMITS.defaultKeyRate}, max {AGENT_LIMITS.maxKeyRate}). Responses carry{' '}
-            <Code>X-RateLimit-Limit</Code>, <Code>X-RateLimit-Reset</Code> (and{' '}
-            <Code>X-RateLimit-Remaining</Code> when known); a 429 carries <Code>Retry-After</Code>.
+            {AGENT_LIMITS.defaultKeyRate}, max {AGENT_LIMITS.maxKeyRate}), enforced at the largest
+            of {AGENT_LIMITS.keyRateTiers.join(', ')} per minute not above it (a 50/min key gets
+            30/min). Responses carry <Code>X-RateLimit-Limit</Code>, <Code>X-RateLimit-Reset</Code>{' '}
+            (and <Code>X-RateLimit-Remaining</Code> when known); a 429 carries{' '}
+            <Code>Retry-After</Code>.
           </li>
           <li data-testid="limit-daily">
             Per key per day: {AGENT_LIMITS.keyDailyQuota.toLocaleString('en-US')} requests (UTC),

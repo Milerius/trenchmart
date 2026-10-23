@@ -650,6 +650,7 @@ describe('agent API', () => {
     h.deps.limiters = { apiKeyIp: ipLimit };
     const blocked = await call(h.app, 'GET', '/listings', { key });
     expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('retry-after')).toBe('60');
     const bogus = await call(h.app, 'GET', '/listings', { key: `tmk_${'A'.repeat(43)}` });
     expect(bogus.status).toBe(429);
     expect(Number((await keyRow()).daily_count)).toBe(before);

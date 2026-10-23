@@ -13,6 +13,8 @@ export const KEY_DAILY_QUOTA = 10_000;
 export const WALLET_KEY_RATE = 600;
 /** API-key requests per minute per client IP (IPv6: per /64), before the key is checked. */
 export const IP_KEY_RATE = 600;
+/** Per-key edge counters: a key is enforced at the largest tier not above its own rate. */
+export const KEY_RATE_TIERS = [10, 30, 60, 120, 300] as const;
 /** A key-minting challenge must be signed and redeemed within this window. */
 export const CHALLENGE_TTL_MS = 10 * 60_000;
 /** Unsigned transactions the API issues can be relayed by /agent/tx/broadcast this long. */
