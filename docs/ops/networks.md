@@ -130,3 +130,23 @@ NEXT_PUBLIC_MAINNET_LAUNCHED=1`.
    `devnet.trenchmart.fun` on the devnet one. Rebuild devnet with
    `NEXT_PUBLIC_MAINNET_LAUNCHED=1` so its pill links to mainnet.
 4. Set `SIWS_DOMAIN`/`APP_URL` per API Worker.
+
+## Mainnet deployment (2026-10-23, UTC+4)
+
+| Item                        | Value                                                                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Program id                  | `Dm2jtJDfSji2TASEGKxsY1CwxeUCXqGznefkJpSASZLp` (built with `--features mainnet`)                                                               |
+| ProgramData                 | `9i37dpREk1wvYcmKYnQKwC1swxtSinLJnz8KP4TJ1tNB`, max-len 183,928 bytes                                                                          |
+| Source commit               | `ccc26e1d0742544d45d4cbca9591a1fc3b3e729a` (#161), artifact `trench_escrow-mainnet-verified-ccc26e1…` (run 39944108479)                        |
+| Executable hash             | `dc41f8ae608c83664f8ccc7d90b38d4d80089a582885a63cbe9765993abc2839` (CI build = on-chain dump)                                                  |
+| Squads v4 multisig (2-of-3) | `FFsRpwj5aTteCsS9kWpUAyQ7a9KzSSbDZgwgq2JdqbsN`                                                                                                 |
+| Vault 0 (upgrade authority) | `AoK6JdJQgtW9Wrt2z47gHnNMju2RrwNRhTZon13K3kf1`                                                                                                 |
+| Members                     | `2f5Tzu3zKL5dVe2U9tMM3DNCFjpQS7A37AMV7abTeKDP`, `6peYN5x6f7wttNcpgVQpbNsnKJ8gjLwydw4LUQDpPMXm`, `9jicNiQVxFJXHG4gjMDcUkYPsdF8tVFy7WEPhwrnDywU` |
+| Deploy tx                   | `3vNbkWPhhZwAj8JoWKFpon6bUwFE6GMuCHX9zjox5u6kSKogepsJNLM1ptwL2nrvr96MJe57ktepsuzVF7z6qTBi`                                                     |
+| Multisig create tx          | `2Y6NgTdUi21Kr5motkv3bet479LocmMhUztscdxBPyv33SarZjnHm2geEUhwvuw18DsRxFxf2WTE11NbwWZ74ufC`                                                     |
+| Authority transfer tx       | `o8MAQNmJuL9x3LWGNqfZ7g6teebmKyh5NddqwSNut4nwpe3iKoeHb3hsGkYqZm6gqFctLHGZg9VDwWJ5wTythn5`                                                      |
+
+Verified against mainnet RPC on 2026-10-23: `solana program show` names vault 0 as authority, the on-chain dump hashes to `dc41f8ae…`, the multisig account reads threshold 2 with the three members, and the three transactions above are finalized. Steps 1–3 done. `init_config` (step 4) is pending: it needs the mainnet resolver pubkey and a
+Squads vault transaction. OtterSec verify must pass `-- --features mainnet`. Note: the default
+(devnet) verified build at this commit no longer matches devnet on-chain `124e1180…` (the cfg
+lines moved source positions); that is expected until devnet is upgraded.
