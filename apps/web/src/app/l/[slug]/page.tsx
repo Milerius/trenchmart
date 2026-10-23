@@ -26,8 +26,8 @@ const load = cache(async (slug: string) =>
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const { data } = await load(slug);
-  if (!data) return { title: 'Listing · TrenchMart (Solana devnet)' };
-  const title = `${data.title} · TrenchMart (Solana devnet)`;
+  if (!data) return { title: 'Listing · TrenchMart' };
+  const title = `${data.title} · TrenchMart`;
   return {
     title,
     description: data.summary,
