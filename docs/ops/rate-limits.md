@@ -76,3 +76,5 @@ Checked in this order, cheapest first:
 
 The 5-minute cron (`rate-buckets` step) deletes `rate_buckets` windows older than a day
 (`pruneRateBuckets`, index `rate_buckets_window_idx`).
+
+Edge (zone) rules in front of these limits, and why Bot Fight Mode is off: [edge-protection.md](edge-protection.md).

@@ -20,6 +20,7 @@ SH
 cat >"$work/bin/wrangler" <<'SH'
 #!/usr/bin/env bash
 echo "wrangler $*" >>"$FAKE_LOG"
+if [ "$1" = deploy ]; then sed 's/^/  cfg: /' "$3" >>"$FAKE_LOG"; fi
 case "$1 $2" in
   'hyperdrive get')
     [ "${FAKE_HD_FAIL:-0}" = 1 ] && exit 1
@@ -141,6 +142,20 @@ if run mainnet-prelaunch-open 1 TEST_CONFIG="$work/mainnet.toml"; then
 fi
 if run devnet-refused 1 FAKE_HEALTH="$refused"; then
   ok "MAINNET_REFUSED on a devnet config fails the deploy"
+fi
+
+# 13. Devnet API: workers.dev / preview URLs forced off even if the local config enables them.
+{ printf 'name = "trenchmart-api"\nworkers_dev = true\n'; tail -n +2 "$work/wrangler.toml"; } >"$work/wd.toml"
+if run devnet-workers-dev 0 TEST_CONFIG="$work/wd.toml"; then
+  has 'cfg: workers_dev = false' && has 'cfg: preview_urls = false' && ! has 'cfg: workers_dev = true' &&
+    has "cfg: name = \"trenchmart-api\"" && has "deploy -c $work/.wrangler.deploy.edge.toml" && [ ! -e "$work/.wrangler.deploy.edge.toml" ] &&
+    ok "devnet API deploys with workers.dev and preview URLs off" || bad "devnet workers.dev not forced off"
+fi
+# 14. Mainnet API (another Worker name) keeps workers.dev: it has no custom domain before launch.
+{ printf 'name = "trenchmart-api-mainnet"\nworkers_dev = true\n'; tail -n +2 "$work/mainnet.toml"; } >"$work/mn-wd.toml"
+if run mainnet-workers-dev 0 TEST_CONFIG="$work/mn-wd.toml" FAKE_HEALTH="$refused"; then
+  has 'cfg: workers_dev = true' && ! has 'cfg: preview_urls = false' &&
+    ok "mainnet API keeps workers.dev" || bad "mainnet workers.dev changed"
 fi
 
 echo "$pass passed, $fail failed"
