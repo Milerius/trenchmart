@@ -9,12 +9,12 @@ blocks in `apps/api/wrangler.toml` (devnet), `wrangler.mainnet.toml` and the loc
 ## Namespace ids
 
 Rate Limiting namespaces are account-wide: two Workers that share an id share counters.
-Devnet uses `1001` and `101x`, mainnet `1002` and `102x`. Never reuse an id across Workers.
+Devnet uses `1001` and `1101`–`1199`, mainnet `1002` and `1201`–`1299` (same last two digits per limit). Never reuse an id across Workers.
 
 | Binding           | Devnet | Mainnet | Budget     | Key                | Used by                |
 | ----------------- | ------ | ------- | ---------- | ------------------ | ---------------------- |
 | `RATE_LIMITER`    | 1001   | 1002    | 120 / 60 s | client IP + method | every write (M-03)     |
-| `TX_SEND_LIMITER` | 1011   | 1021    | 20 / 60 s  | signed-in wallet   | `POST /tx/send` (I-07) |
+| `TX_SEND_LIMITER` | 1101   | 1201    | 20 / 60 s  | signed-in wallet   | `POST /tx/send` (I-07) |
 
 IPv6 clients are keyed by their /64 (`ipKey` in limits.ts), because one host rotates freely
 inside it.
