@@ -146,7 +146,7 @@ NEXT_PUBLIC_MAINNET_LAUNCHED=1`.
 | Multisig create tx          | `2Y6NgTdUi21Kr5motkv3bet479LocmMhUztscdxBPyv33SarZjnHm2geEUhwvuw18DsRxFxf2WTE11NbwWZ74ufC`                                                     |
 | Authority transfer tx       | `o8MAQNmJuL9x3LWGNqfZ7g6teebmKyh5NddqwSNut4nwpe3iKoeHb3hsGkYqZm6gqFctLHGZg9VDwWJ5wTythn5`                                                      |
 
-Steps 1–3 done. `init_config` (step 4) is pending: it needs the mainnet resolver pubkey and a
+Verified against mainnet RPC on 2026-10-23: `solana program show` names vault 0 as authority, the on-chain dump hashes to `dc41f8ae…`, the multisig account reads threshold 2 with the three members, and all four transactions are finalized. Steps 1–3 done. `init_config` (step 4) is pending: it needs the mainnet resolver pubkey and a
 Squads vault transaction. OtterSec verify must pass `-- --features mainnet`. Note: the default
 (devnet) verified build at this commit no longer matches devnet on-chain `124e1180…` (the cfg
 lines moved source positions); that is expected until devnet is upgraded.

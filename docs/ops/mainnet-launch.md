@@ -15,7 +15,7 @@ here has touched mainnet.
 | Money switches                              | `PAYOUTS_AUTO = "0"`, `REWARDS_AUTO = "0"`, no cron                                                                                                                                                                                                |
 | Web Worker config                           | `apps/web/wrangler.jsonc` env `mainnet` (`trenchmart-web-mainnet`, workers.dev only). Not deployed: the web build refuses `NEXT_PUBLIC_CLUSTER=mainnet` until launch                                                                               |
 | Watchdog config                             | `apps/api/watchdog.mainnet.wrangler.toml` (`trenchmart-watchdog-mainnet`), not deployed                                                                                                                                                            |
-| Verified build                              | [verified-build.md](verified-build.md#mainnet-candidate): hash `124e1180…4a68a9`, 183,928 bytes                                                                                                                                                    |
+| Verified build                              | mainnet build (`--features mainnet`, artifact `trench_escrow-mainnet-verified-<sha>`): hash `dc41f8ae…bc2839`, 183,928 bytes. `124e1180…` is the devnet binary; never deploy it to mainnet                                                         |
 
 ## What the owner provides
 
@@ -34,7 +34,7 @@ private mainnet RPC.
 
 1. **Squads multisig.** Create a Squads v4 2-of-3 multisig on mainnet (app.squads.so or
    `@sqds/multisig`) with the three member keys. Record the multisig and vault PDA (index 0).
-2. **Deploy the verified binary.** Download the `trench_escrow-verified-<sha>` artifact of the
+2. **Deploy the verified binary.** Download the `trench_escrow-mainnet-verified-<sha>` artifact (built `-- --features mainnet`; NOT `trench_escrow-verified-<sha>`, which is the devnet id) of the
    commit you deploy, check `solana-verify get-executable-hash trench_escrow.so` equals the hash
    in verified-build.md, then:
    ```bash
@@ -49,7 +49,7 @@ private mainnet RPC.
 5. **Spending limits.** In Squads, add the payout and rewards spending limits (amount, period,
    destination-free, member = the hot payout/rewards signer) per [payouts.md](payouts.md) and
    [holder-rewards.md](holder-rewards.md). Record their PDAs.
-6. **Verify.** `solana-verify verify-from-repo` + `remote submit-job` (verified-build.md).
+6. **Verify.** `solana-verify verify-from-repo ... -- --features mainnet` + `remote submit-job` (verified-build.md); expected hash `dc41f8ae…bc2839`.
 7. **Fill the configs** (PR): `apps/web/src/lib/cluster-mainnet.ts` (program, multisig, vault,
    mint, rewards vault/limit/wallet); `wrangler.mainnet.toml` vars (VAULT_ADDRESS,
    MULTISIG_ADDRESS, MART_MINT, BUCKET_WALLET_*, ESCROW_PROGRAM_ID, ESCROW_RESOLVER),
@@ -106,7 +106,7 @@ private mainnet RPC.
 | Multisig create tx          | `2Y6NgTdUi21Kr5motkv3bet479LocmMhUztscdxBPyv33SarZjnHm2geEUhwvuw18DsRxFxf2WTE11NbwWZ74ufC`                                                     |
 | Authority transfer tx       | `o8MAQNmJuL9x3LWGNqfZ7g6teebmKyh5NddqwSNut4nwpe3iKoeHb3hsGkYqZm6gqFctLHGZg9VDwWJ5wTythn5`                                                      |
 
-Steps 1–3 done. `init_config` (step 4) is pending: it needs the mainnet resolver pubkey and a
+Verified against mainnet RPC on 2026-10-23: `solana program show` names vault 0 as authority, the on-chain dump hashes to `dc41f8ae…`, the multisig account reads threshold 2 with the three members, and all four transactions are finalized. Steps 1–3 done. `init_config` (step 4) is pending: it needs the mainnet resolver pubkey and a
 Squads vault transaction. OtterSec verify must pass `-- --features mainnet`. Note: the default
 (devnet) verified build at this commit no longer matches devnet on-chain `124e1180…` (the cfg
 lines moved source positions); that is expected until devnet is upgraded.
