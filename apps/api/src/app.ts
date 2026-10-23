@@ -118,6 +118,7 @@ import {
   consumeKeyRate,
   isApiKeyHeader,
   registerAgentRoutes,
+  recordBroadcast,
   validateRelay,
   scopeFor,
   type ApiKeyContext,
@@ -427,7 +428,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     if (write) {
       // M-03: keyed on the edge-provided client IP, never on X-Forwarded-For.
       const ip = clientIp(c, deps.env);
-      const key = `${ip}:${c.req.method}`;
+      const key = `${ipKey(ip)}:${c.req.method}`; // IPv6: one bucket per /64
       // Route-group limits (auth, tx, verify, upload) per IP /64 and per signed-in wallet.
       const group = writeGroup(c.req.method, path);
       if (group) {
@@ -504,7 +505,7 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
     } catch (err) {
       throw new HttpError(502, 'RPC', err instanceof Error ? err.message : 'broadcast failed');
     }
-    await deps.sql`update issued_txs set broadcast_sig = ${signature} where message_hash = ${checked.hash}`;
+    await recordBroadcast(deps, checked.hash, signature);
     return c.json({ signature });
   });
 

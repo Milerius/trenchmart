@@ -153,7 +153,7 @@ describe('monitoring and alerts', () => {
   beforeEach(async () => {
     sql ??= createSql(databaseUrl);
     await migrate(sql);
-    await sql`truncate table ops_events, ops_alerts, disputes, payouts, orders, versions, listings, users restart identity cascade`;
+    await sql`truncate table ops_events, ops_alerts, disputes, payouts, orders, versions, listings, users, rate_buckets restart identity cascade`;
     now = new Date('2026-06-01T00:00:00.000Z');
   });
   afterAll(async () => {

@@ -77,7 +77,10 @@ Both watchdog Workers (`src/watchdog.ts`, `checkRpc`) call `getHealth` on Helius
 back to a public RPC automatically when Helius errors, answers unhealthy, or does not answer within
 4 s (`PRIMARY_RPC_TIMEOUT_MS`). The RPC check is healthy if either answers; it is down (and logs
 `ALERT`) only when both fail. The reported latency is the answering provider's, so a Helius timeout
-followed by a fast fallback does not read as a slow RPC.
+followed by a fast fallback does not read as a slow RPC. The timeout covers the whole call
+(headers and body), so a provider that sends headers and stalls the body still falls back. A
+down RPC check carries no provider (none answered), so the status page never shows "via ..." next
+to a down RPC.
 
 | Watchdog                      | Primary (Worker secret)                                        | Public fallback (`RPC_URL` var)                  |
 | ----------------------------- | -------------------------------------------------------------- | ------------------------------------------------ |

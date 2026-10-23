@@ -567,7 +567,7 @@ export function registerAgentRoutes(api: Hono<Vars>, deps: Deps): void {
     } catch (err) {
       throw new HttpError(502, 'RPC', err instanceof Error ? err.message : 'broadcast failed');
     }
-    await deps.sql`update issued_txs set broadcast_sig = ${signature} where message_hash = ${checked.hash}`;
+    await recordBroadcast(deps, checked.hash, signature);
     return c.json({ signature, kind: checked.kind });
   });
 
@@ -604,4 +604,31 @@ export function registerAgentRoutes(api: Hono<Vars>, deps: Deps): void {
       );
     return c.json(jsonSafe({ released: true, releaseSig: fresh[0]?.release_sig ?? null }));
   });
+}
+
+/**
+ * Records the relayed signature on its issued_txs row. The RPC already accepted the transaction,
+ * so a recording failure must never turn into a failed relay (the client would retry a payment
+ * that went through): one retry, then log and move on. broadcast_sig is bookkeeping only; the
+ * chain (and the order sync) is the source of truth for whether the transaction landed.
+ */
+export async function recordBroadcast(
+  deps: Deps,
+  hash: string,
+  signature: string,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await deps.sql`update issued_txs set broadcast_sig = ${signature} where message_hash = ${hash}`;
+      return true;
+    } catch (err) {
+      if (attempt === 1)
+        console.error('broadcast_sig not recorded', {
+          hash,
+          signature,
+          error: err instanceof Error ? err.message : String(err),
+        });
+    }
+  }
+  return false;
 }

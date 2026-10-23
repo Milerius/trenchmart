@@ -18,7 +18,8 @@ Devnet uses `1001` and `1101`–`1199`, mainnet `1002` and `1201`–`1299` (same
 | `AUTH_NONCE_LIMITER` | 1110   | 1210    | 20 / 60 s  | client IP (/64)    | `POST /auth/nonce` (abuse limits, docs/04-api.md) |
 
 IPv6 clients are keyed by their /64 (`ipKey` in limits.ts), because one host rotates freely
-inside it.
+inside it. This applies to the global write limiter (`RATE_LIMITER` and the Postgres
+`rate_buckets` fallback): the key is `ipKey(clientIp) + ":" + method`.
 
 ## `POST /tx/send` (I-07)
 
@@ -31,6 +32,11 @@ The browser relay forwards a signed transaction only when it is:
   (`issued_txs`, the same check as `POST /agent/tx/broadcast`), **or** made only of
   TrenchMart escrow program instructions (plus compute budget), for wallets that rewrite
   the message before signing. The program enforces its own signer and state rules.
+
+Once the RPC accepts a transaction, the response is always its signature. Recording it in
+`issued_txs.broadcast_sig` is bookkeeping (`recordBroadcast` in agent.ts, shared with
+`POST /agent/tx/broadcast`): one retry, then a `broadcast_sig not recorded` log line, never a
+500, so a client is never told an accepted payment failed and tempted to pay again.
 
 Anything else answers 400 (`NOT_ISSUED`, `FOREIGN_PROGRAM`, `WRONG_SIGNER`,
 `BAD_SIGNATURE`, `BAD_TX`) before the RPC is called. Each wallet may call it 20 times a
