@@ -4,7 +4,7 @@ import { installMockWallet, MockAuth } from './wallet-mock';
 
 /**
  * Devnet | Mainnet network switch (docs/ops/networks.md): segmented pill left of the wallet
- * button, lazy menu, mainnet "Coming soon" until launch, and the amber wallet-cluster banner.
+ * button, lazy menu, mainnet links to mainnet.trenchmart.fun, and the amber wallet-cluster banner.
  */
 
 const WALLET = 'AaoUxqv5mKkqNfuN2rRdx3xF4nJcTq2wJqzGqVjsRfiX';
@@ -58,13 +58,13 @@ test('pill sits left of the wallet button; menu is lazy; mainnet is coming soon'
   await expect(menu).toBeVisible();
   await expect(page.getByTestId('network-switch')).toHaveAttribute('open', '');
   const mainnet = menu.getByTestId('network-option-mainnet');
-  await expect(mainnet).toHaveAttribute('aria-disabled', 'true');
-  await expect(mainnet).not.toHaveAttribute('href');
-  await expect(mainnet.getByTestId('network-coming-soon')).toHaveText('Coming soon');
-  await expect(menu.getByTestId('network-option-devnet')).toContainText('devnet.trenchmart.fun');
+  await expect(mainnet).toHaveAttribute('href', 'https://mainnet.trenchmart.fun/');
+  await expect(mainnet).toContainText('mainnet.trenchmart.fun · real SOL');
+  await expect(mainnet.getByTestId('network-coming-soon')).toHaveCount(0);
+  await expect(menu.getByTestId('network-option-devnet')).toContainText(
+    'trenchmart.fun · test SOL only',
+  );
   await expect(menu.getByTestId('network-option-devnet')).toHaveAttribute('aria-current', 'true');
-  await mainnet.click({ force: true });
-  expect(new URL(page.url()).pathname).toBe('/');
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await pill.click();
@@ -107,8 +107,8 @@ for (const size of WIDTHS) {
     const menu = pill.locator('xpath=..').getByTestId('network-menu');
     await expect(menu).toBeVisible();
     await expect(menu.getByTestId('network-option-mainnet')).toHaveAttribute(
-      'aria-disabled',
-      'true',
+      'href',
+      'https://mainnet.trenchmart.fun/',
     );
     const box = (await menu.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);
