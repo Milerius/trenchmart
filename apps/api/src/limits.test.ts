@@ -82,7 +82,7 @@ describe('wrangler [[ratelimits]] blocks', () => {
     const all = [...devnet, ...mainnet].map((b) => b.ns);
     expect(new Set(all).size).toBe(all.length);
     expect(mainnet.find((b) => b.name === 'RATE_LIMITER')?.ns).toBe('1002');
-    expect(devnet.every((b) => b.ns === '1001' || /^1[12]\d\d$/.test(b.ns))).toBe(true);
-    expect(mainnet.every((b) => b.ns === '1002' || /^13\d\d$/.test(b.ns))).toBe(true);
+    expect(devnet.some((b) => b.ns === '1002')).toBe(false);
+    expect(devnet.every((b) => /^1[0-2]\d\d$/.test(b.ns))).toBe(true);
   });
 });
