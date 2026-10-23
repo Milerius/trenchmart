@@ -8,7 +8,7 @@ here has touched mainnet.
 
 | Item                                        | Where                                                                                                                                                                                                                                              |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mainnet API Worker `trenchmart-api-mainnet` | `apps/api/wrangler.mainnet.toml`; `https://trenchmart-api-mainnet.trenchmart.workers.dev` (fails closed: `/api/v1/health` = 500 `MAINNET_REFUSED` while `MAINNET_LAUNCHED = "0"`)                                                                  |
+| Mainnet API Worker `trenchmart-api-mainnet` | `apps/api/wrangler.mainnet.toml`; `https://api.mainnet.trenchmart.fun` (custom domain only, workers.dev off; fails closed: `/api/v1/health` = 500 `MAINNET_REFUSED` while `MAINNET_LAUNCHED = "0"`)                                                |
 | Mainnet database                            | Supabase project `trenchmart-mainnet` (`zydwvewzlgjbvqufxoxi`, free tier, ap-south-1), migrations applied; Hyperdrive `trenchmart-db-mainnet` (`0b1d60e34cc644eebfbd43371aba52e9`, limit 10). Box env: `~/.config/trenchmart/supabase-mainnet.env` |
 | Bucket and queues                           | R2 `trenchmart-files-mainnet`; queues `rewards-send-mainnet`, `rewards-send-mainnet-dlq`, `scan-static-mainnet`                                                                                                                                    |
 | API secrets (fresh, not shared with devnet) | `~/.config/trenchmart/mainnet/api-secrets.env`: SESSION_SECRET, INTERNAL_TOKEN, STATUS_PUSH_TOKEN, HELIUS_WEBHOOK_SECRET, AI_ATTEST_SECRET, PROXY_SECRET. Set on the Worker                                                                        |
@@ -59,13 +59,14 @@ private mainnet RPC.
    wrangler secret put HELIUS_RPC_URL -c wrangler.mainnet.toml        # private RPC
    wrangler secret put ESCROW_RESOLVER_SECRET -c wrangler.mainnet.toml
    TM_DEPLOY_DB_ENV=~/.config/trenchmart/supabase-mainnet.env \
-     API_HEALTH_URL=https://trenchmart-api-mainnet.trenchmart.workers.dev/api/v1/health \
+     API_HEALTH_URL=https://api.mainnet.trenchmart.fun/api/v1/health \
      ../../scripts/deploy-api.sh wrangler.mainnet.toml
    ```
    Health must be `{"ok":true,"cluster":"mainnet"}`. Leave PAYOUTS_AUTO/REWARDS_AUTO at 0 until
    a manual payout and a rewards dry run succeed.
-8. **API hostname.** Attach custom domain `api.mainnet.trenchmart.fun` to
-   `trenchmart-api-mainnet` (the web config already points there).
+8. **API hostname.** Already done: `api.mainnet.trenchmart.fun` is the custom domain of
+   `trenchmart-api-mainnet` (route in `wrangler.mainnet.toml`, behind the zone WAF and rate
+   limit, [edge-protection.md](edge-protection.md)). Just check it answers.
 9. **Web.** Build and deploy the mainnet site:
    ```bash
    cd apps/web
