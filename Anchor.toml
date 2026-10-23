@@ -8,6 +8,9 @@ skip-lint = false
 [programs.devnet]
 trench_escrow = "Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw"
 
+[programs.mainnet]
+trench_escrow = "Dm2jtJDfSji2TASEGKxsY1CwxeUCXqGznefkJpSASZLp"
+
 [programs.localnet]
 trench_escrow = "Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw"
 

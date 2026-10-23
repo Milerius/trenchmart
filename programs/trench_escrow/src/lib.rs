@@ -71,6 +71,11 @@ mod escrow_tests {
 use fee::{quote, split_fee, FeeError};
 use state::Status;
 
+// Devnet/localnet id by default; the mainnet binary is built with `--features mainnet`
+// (`solana-verify build --library-name trench_escrow -- --features mainnet`).
+#[cfg(feature = "mainnet")]
+declare_id!("Dm2jtJDfSji2TASEGKxsY1CwxeUCXqGznefkJpSASZLp");
+#[cfg(not(feature = "mainnet"))]
 declare_id!("Dbrq2sACPk98FGzLihajJd4r2Q4jdKNn62GSURndv2kw");
 
 // Lets wallets, explorers and security tools (Phantom, Blowfish, Solscan) identify the

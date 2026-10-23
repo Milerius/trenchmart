@@ -111,3 +111,27 @@ jobs:
           path: target/deploy/trench_escrow.so
           if-no-files-found: error
           retention-days: 30
+
+      # Mainnet binary: same source, `mainnet` feature swaps declare_id to Dm2jtJ….
+      - name: Reproducible Docker build (mainnet)
+        id: mainnet
+        run: |
+          set -euo pipefail
+          rm -f "target/deploy/${LIBRARY_NAME}.so"
+          solana-verify build --library-name "$LIBRARY_NAME" --base-image solanafoundation/solana-verifiable-build:4.3.0 -- --features mainnet
+          MAINNET_HASH=$(solana-verify get-executable-hash "target/deploy/${LIBRARY_NAME}.so")
+          echo "executable_hash=${MAINNET_HASH}" >> "$GITHUB_OUTPUT"
+          echo "mainnet executable_hash=${MAINNET_HASH} size=$(stat -c %s target/deploy/${LIBRARY_NAME}.so)"
+          {
+            echo ""
+            echo "- mainnet (\`Dm2jtJDfSji2TASEGKxsY1CwxeUCXqGznefkJpSASZLp\`) executable hash: \`${MAINNET_HASH}\`"
+            echo "- mainnet .so bytes: $(stat -c %s target/deploy/${LIBRARY_NAME}.so)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload mainnet verified .so
+        uses: actions/upload-artifact@v4
+        with:
+          name: trench_escrow-mainnet-verified-${{ github.sha }}
+          path: target/deploy/trench_escrow.so
+          if-no-files-found: error
+          retention-days: 90
