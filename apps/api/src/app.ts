@@ -117,9 +117,11 @@ import {
   consumeKeyRate,
   isApiKeyHeader,
   registerAgentRoutes,
+  validateRelay,
   scopeFor,
   type ApiKeyContext,
 } from './agent';
+import { hitLimit } from './limits';
 import { openApiSpec } from './openapi';
 import {
   activeBond,
@@ -434,8 +436,12 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
   // Agent API: wallet-signed key minting, key management, validated broadcast, release.
   registerAgentRoutes(api, deps);
 
+  // I-07: a relay for the signed-in wallet's own TrenchMart transactions only (validateRelay),
+  // never a general RPC proxy. Per-wallet budget on top of the per-IP write limit.
   api.post('/tx/send', async (c) => {
-    requireUser(c);
+    const user = requireUser(c);
+    if (!(await hitLimit(deps, 'txSend', `wallet:${user.wallet as string}`)))
+      return c.json({ error: { code: 'RATE_LIMIT', message: 'too many transactions' } }, 429);
     const body = await bodyOf(txBroadcastBody, await c.req.json());
     let bytes: Uint8Array;
     try {
@@ -444,12 +450,15 @@ export function createApp(deps: Deps, priceCache: PriceCacheBox = { value: null 
       throw new HttpError(400, 'BAD_TX', 'transaction is not base64');
     }
     if (bytes.length < 64) throw new HttpError(400, 'BAD_TX', 'transaction is too short');
+    const checked = await validateRelay(deps, user.wallet as string, bytes);
+    let signature: string;
     try {
-      const signature = await sendRaw(deps.env.rpcUrl, bytes);
-      return c.json({ signature });
+      signature = await (deps.sendTx ?? ((tx: Uint8Array) => sendRaw(deps.env.rpcUrl, tx)))(bytes);
     } catch (err) {
       throw new HttpError(502, 'RPC', err instanceof Error ? err.message : 'broadcast failed');
     }
+    await deps.sql`update issued_txs set broadcast_sig = ${signature} where message_hash = ${checked.hash}`;
+    return c.json({ signature });
   });
 
   api.get('/files', async (c) => serveFile(c, deps, 'GET'));

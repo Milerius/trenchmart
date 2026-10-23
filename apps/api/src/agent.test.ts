@@ -776,6 +776,77 @@ describe('agent API', () => {
     expect(expired.body.error.code).toBe('TX_EXPIRED');
   });
 
+  it('I-07: /tx/send relays only issued or escrow-only transactions, with a per-wallet limit', async () => {
+    const h = await harness();
+    const listing = await seedListing();
+    const buyer = keypair();
+    const cookie = await login(h.app, buyer);
+    const order = await call(h.app, 'POST', '/orders', {
+      cookie,
+      body: { listingId: listing.listingId },
+    });
+    expect(order.status).toBe(200);
+    const signed = toBase64(signTx(fromBase64(order.body.txBase64), [buyer.secretKey]));
+    const send = (txBase64: string, c = cookie) =>
+      call(h.app, 'POST', '/tx/send', { cookie: c, body: { txBase64 } });
+
+    // Not signed in: refused before anything else.
+    expect((await call(h.app, 'POST', '/tx/send', { body: { txBase64: signed } })).status).toBe(
+      401,
+    );
+    // An arbitrary transaction (not issued, not escrow-only) is not relayed.
+    const memoOnly = compileLegacyTx({
+      feePayer: buyer.publicKey,
+      instructions: [memoIx('spam', buyer.publicKey)],
+      recentBlockhash: blockhash,
+    });
+    const memoRes = await send(toBase64(signTx(memoOnly, [buyer.secretKey])));
+    expect(memoRes.status).toBe(400);
+    expect(memoRes.body.error.code).toBe('NOT_ISSUED');
+    const foreign = compileLegacyTx({
+      feePayer: buyer.publicKey,
+      instructions: [{ programId: randomKeypair().publicKey, keys: [], data: new Uint8Array([1]) }],
+      recentBlockhash: blockhash,
+    });
+    expect((await send(toBase64(signTx(foreign, [buyer.secretKey])))).body.error.code).toBe(
+      'FOREIGN_PROGRAM',
+    );
+    // Another wallet's session cannot relay this wallet's transaction.
+    const other = await login(h.app, keypair());
+    expect((await send(signed, other)).body.error.code).toBe('WRONG_SIGNER');
+    // Unsigned: refused.
+    expect((await send(order.body.txBase64)).body.error.code).toBe('BAD_SIGNATURE');
+    expect(h.sent).toHaveLength(0);
+
+    // The issued transaction: relayed byte for byte and recorded.
+    const ok = await send(signed);
+    expect(ok.status).toBe(200);
+    expect(h.sent).toHaveLength(1);
+    expect(toBase64(h.sent[0]!)).toBe(signed);
+    const recorded =
+      await sql`select broadcast_sig from issued_txs where broadcast_sig = ${ok.body.signature}`;
+    expect(recorded).toHaveLength(1);
+
+    // An escrow-program-only transaction (wallet rewrote the message) is allowed.
+    const escrowOnly = compileLegacyTx({
+      feePayer: buyer.publicKey,
+      instructions: [{ programId, keys: [], data: new Uint8Array([9, 9]) }],
+      recentBlockhash: blockhash,
+    });
+    expect((await send(toBase64(signTx(escrowOnly, [buyer.secretKey])))).status).toBe(200);
+    expect(h.sent).toHaveLength(2);
+
+    // Per-wallet budget: 20 per minute (counted before validation), then 429.
+    let last = 0;
+    for (let i = 0; i < 20; i += 1)
+      last = (await send(toBase64(signTx(memoOnly, [buyer.secretKey])))).status;
+    expect(last).toBe(429);
+    // Another wallet is unaffected.
+    expect((await send(signed, other)).status).toBe(400);
+    h.clock.now = new Date(h.clock.now.getTime() + 61_000);
+    expect((await send(toBase64(signTx(memoOnly, [buyer.secretKey])))).status).toBe(400);
+  });
+
   it('runs the full agent buy flow: order, sign, broadcast, confirm, download, release, review', async () => {
     const h = await harness();
     const listing = await seedListing();

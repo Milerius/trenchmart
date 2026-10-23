@@ -392,6 +392,36 @@ export async function validateBroadcast(
   return { parsed, hash, kind: row.kind as string };
 }
 
+/**
+ * I-07: what the browser relay (POST /tx/send) accepts. The same checks as the agent
+ * broadcast (one signer = the session wallet, valid signature, marketplace programs only,
+ * byte-identical to an issued message). The one exception: a signed transaction whose every
+ * instruction goes to the TrenchMart escrow program (plus compute budget), for wallets that
+ * rewrite the message before signing; the program itself enforces who may do what.
+ */
+export async function validateRelay(
+  deps: Deps,
+  walletAddress: string,
+  bytes: Uint8Array,
+): Promise<{ hash: string; kind: string }> {
+  try {
+    const checked = await validateBroadcast(deps, walletAddress, bytes);
+    return { hash: checked.hash, kind: checked.kind };
+  } catch (err) {
+    if (!(err instanceof HttpError) || err.code !== 'NOT_ISSUED') throw err;
+    const escrow = deps.env.escrowProgramId;
+    if (!escrow) throw err;
+    const parsed = parseLegacyTx(bytes);
+    const escrowOnly =
+      parsed.instructions.some((ix) => ix.programId === escrow) &&
+      parsed.instructions.every(
+        (ix) => ix.programId === escrow || ix.programId === COMPUTE_BUDGET_PROGRAM,
+      );
+    if (!escrowOnly) throw err;
+    return { hash: await sha256Hex(parsed.message), kind: 'escrow' };
+  }
+}
+
 export function registerAgentRoutes(api: Hono<Vars>, deps: Deps): void {
   /** Step 1: a challenge that states every term of the key. */
   api.post('/agent/auth/challenge', async (c) => {

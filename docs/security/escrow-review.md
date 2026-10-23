@@ -35,7 +35,7 @@ The real risks are in the design around the program, not in its arithmetic:
 | I-04 | Info     | Program | `open_dispute` after the window returns `TooEarly`                                  | **Fixed** #37 (`WindowClosed`)                                                               |
 | I-05 | Info     | Program | Unaudited; verified-build CI added (hash may still differ until Squads redeploy)    | Audit declined; `solana-verify` workflow + `docs/ops/verified-build.md` (OtterSec = mainnet) |
 | I-06 | Info     | API     | Webhook secret not compared in constant time; webhook token balances are trusted    | **Fixed** #38 (constant-time compare, balances re-read on chain)                             |
-| I-07 | Info     | API     | `POST /tx/send` relays any signed transaction for any session                       | Open                                                                                         |
+| I-07 | Info     | API     | `POST /tx/send` relays any signed transaction for any session                       | Fixed: issued-or-escrow-only relay, 20/min per wallet (docs/ops/rate-limits.md)              |
 | I-08 | Info     | API     | The funding tx is bound to the order only by memo                                   | Accepted (the account is authoritative)                                                      |
 | I-09 | Info     | API     | `decodeEscrow` accepts data longer than the layout                                  | Accepted (owner + discriminator checked)                                                     |
 | I-10 | Info     | API     | Order memos carry a 32-bit short id                                                 | Accepted                                                                                     |
@@ -54,7 +54,7 @@ Live smoke test, order `54ad8cd9…`:
 | Resolver freeze, without the buyer's signature | `3cgda7vh…Grds`   |
 | Admin refund                                   | `5qiRbgdQ…94LWP`  |
 
-Owner decisions (2026-10-18): no third-party audit, no hardware-wallet multisig. The owner holds the mainnet upgrade authority and resolver keys himself. Remaining open items: I-05 (verified build) and I-07 (`/tx/send` relay; low impact because the wallet signs every transaction).
+Owner decisions (2026-10-18): no third-party audit, no hardware-wallet multisig. The owner holds the mainnet upgrade authority and resolver keys himself. Remaining open item: I-05 (verified build). I-07 (`/tx/send` relay) was fixed on 2026-10-23.
 
 ## What was verified as correct
 
@@ -179,7 +179,9 @@ This is a status record only. `refund` refuses (`FundsAlreadyReleased`), and `re
 
 ### I-07 `POST /tx/send` is an open relay for signed-in users
 
-It forwards any base64 transaction to the RPC and spends Helius credits. It is bounded only by the M-03 limiter.
+It forwarded any base64 transaction to the RPC and spent Helius credits, bounded only by the M-03 limiter.
+
+Fixed (2026-10-23): it now relays only the session wallet's own transactions that match `issued_txs` (the agent broadcast check) or touch only the escrow program, with a per-wallet limit of 20 a minute. See docs/ops/rate-limits.md.
 
 ### I-08 / I-09 / I-10
 

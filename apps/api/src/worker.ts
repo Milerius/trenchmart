@@ -33,6 +33,7 @@ import { processBatchMessage, rewardsTick } from './rewards';
 import { escrowHousekeeping, expireOrders, proposePayouts, releaseOrders } from './logic';
 import { deliverAlerts, opsCheck, recordOpsEvent, type OpsAlert } from './ops';
 import { statusTick } from './status';
+import { limitersFrom } from './limits';
 
 type Binding = Record<string, unknown> & {
   DATABASE_URL?: string;
@@ -168,6 +169,7 @@ export default {
           ...deps,
           sandboxQueue: env.SCAN_QUEUE,
           rateLimiter: env.RATE_LIMITER,
+          limiters: limitersFrom(env as unknown as Record<string, unknown>),
           rewardQueue: env.REWARDS_QUEUE,
         },
         priceCache,
