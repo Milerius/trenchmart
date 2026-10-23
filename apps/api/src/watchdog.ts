@@ -14,13 +14,28 @@
 export type WatchdogEnv = {
   WEB_URL: string;
   API_URL: string;
+  /** Public RPC: the fallback when HELIUS_RPC_URL is set, the only RPC otherwise. */
   RPC_URL: string;
+  /** Primary RPC (Worker secret, URL carries the API key). Never logged, pushed or returned. */
+  HELIUS_RPC_URL?: string;
   CLUSTER?: string;
   STATUS_PUSH_TOKEN?: string;
 };
 
 // ms: wall time of the check, read by the API cron for the public status page (status.ts).
-export type Check = { name: 'web' | 'api' | 'rpc'; ok: boolean; detail: string; ms: number };
+// provider (rpc only): which RPC answered, 'helius' (primary) or 'public' (fallback). When both
+// fail it names the last one tried.
+export type RpcProvider = 'helius' | 'public';
+export type Check = {
+  name: 'web' | 'api' | 'rpc';
+  ok: boolean;
+  detail: string;
+  ms: number;
+  provider?: RpcProvider;
+};
+
+/** Helius gets this long before the watchdog falls back to the public RPC. */
+export const PRIMARY_RPC_TIMEOUT_MS = 4_000;
 
 async function timed(f: typeof fetch, url: string, init: RequestInit = {}, ms = 10_000) {
   const ctrl = new AbortController();
@@ -57,20 +72,72 @@ export async function runChecks(env: WatchdogEnv, f: typeof fetch = fetch): Prom
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean };
       return res.ok && body.ok ? null : `${env.API_URL}/api/v1/health HTTP ${res.status}`;
     }),
-    probe('rpc', async () => {
-      const res = await timed(f, env.RPC_URL, {
+    checkRpc(env, f),
+  ]);
+}
+
+/** One getHealth call. Returns null when healthy, else a problem text that never holds the URL. */
+async function rpcHealth(f: typeof fetch, url: string, ms: number): Promise<string | null> {
+  try {
+    const res = await timed(
+      f,
+      url,
+      {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth' }),
-      });
-      // 429 means the RPC is up but rate-limiting us; treat as reachable.
-      if (res.status === 429) return null;
-      const body = (await res.json().catch(() => ({}))) as { result?: string };
-      return body.result === 'ok'
-        ? null
-        : `RPC getHealth HTTP ${res.status} ${body.result ?? ''}`.trim();
-    }),
-  ]);
+      },
+      ms,
+    );
+    // 429 means the RPC is up but rate-limiting us; treat as reachable.
+    if (res.status === 429) return null;
+    const body = (await res.json().catch(() => ({}))) as { result?: unknown };
+    return body.result === 'ok'
+      ? null
+      : `getHealth HTTP ${res.status} ${typeof body.result === 'string' ? body.result : ''}`.trim();
+  } catch (err) {
+    // Only the error name: a message could echo the request URL (the Helius key).
+    return (err as Error).name === 'AbortError' ? 'timeout' : 'unreachable';
+  }
+}
+
+/**
+ * RPC check: Helius first (when HELIUS_RPC_URL is set), the public RPC_URL when Helius fails or
+ * times out. Healthy if either answers; provider names the one that did.
+ */
+export async function checkRpc(env: WatchdogEnv, f: typeof fetch = fetch): Promise<Check> {
+  // ms is the latency of the provider that answered (a Helius timeout before a fast fallback
+  // must not read as a slow RPC on the status page).
+  let start = Date.now();
+  const done = (ok: boolean, detail: string, provider: RpcProvider): Check => ({
+    name: 'rpc',
+    ok,
+    detail,
+    ms: Date.now() - start,
+    provider,
+  });
+  let heliusProblem: string | null = null;
+  if (env.HELIUS_RPC_URL) {
+    heliusProblem = await rpcHealth(f, env.HELIUS_RPC_URL, PRIMARY_RPC_TIMEOUT_MS);
+    if (heliusProblem === null) return done(true, 'ok (Helius)', 'helius');
+  }
+  if (!env.RPC_URL) return done(false, `Helius ${heliusProblem ?? 'not configured'}`, 'helius');
+  start = Date.now();
+  const publicProblem = await rpcHealth(f, env.RPC_URL, 10_000);
+  if (publicProblem === null) {
+    return done(
+      true,
+      heliusProblem === null ? 'ok (public)' : `ok (public fallback; Helius ${heliusProblem})`,
+      'public',
+    );
+  }
+  return done(
+    false,
+    heliusProblem === null
+      ? `RPC ${publicProblem}`
+      : `Helius ${heliusProblem}; public ${publicProblem}`,
+    'public',
+  );
 }
 
 /** Sends the checks to the API for the status page. Never throws: alerting must still run. */
@@ -88,7 +155,12 @@ export async function pushStatus(
         authorization: `Bearer ${env.STATUS_PUSH_TOKEN}`,
       },
       body: JSON.stringify({
-        checks: checks.map((c) => ({ name: c.name, ok: c.ok, ms: Math.max(0, Math.round(c.ms)) })),
+        checks: checks.map((c) => ({
+          name: c.name,
+          ok: c.ok,
+          ms: Math.max(0, Math.round(c.ms)),
+          ...(c.provider ? { provider: c.provider } : {}),
+        })),
       }),
     });
     if (!res.ok) console.error('STATUS_PUSH', res.status);

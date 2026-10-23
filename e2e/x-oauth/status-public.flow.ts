@@ -16,6 +16,7 @@ const COMPONENT_KEYS = [
   'name',
   'p50Ms',
   'p95Ms',
+  'provider',
   'state',
   'uptime90',
 ];
@@ -54,6 +55,9 @@ test('the public status summary is complete, anonymous and sanitized', async ({ 
     );
     for (const c of body.components) {
       expect(Object.keys(c).sort()).toEqual(COMPONENT_KEYS);
+      // RPC provider: a name only (never a URL); local ticks probe directly, so none here.
+      expect([null, 'helius', 'public']).toContain(c.provider);
+      if (c.id !== 'rpc') expect(c.provider).toBeNull();
       const days = c.days as { date: string; state: string }[];
       expect(days).toHaveLength(90);
       expect(['operational', 'degraded', 'down', 'none']).toContain(days[89]!.state);

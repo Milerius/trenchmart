@@ -106,6 +106,44 @@ describe('status page probes', () => {
     await sql`delete from ops_alerts where code = 'HTTP_5XX_SPIKE'`;
   });
 
+  it('stores which RPC answered (Helius or public fallback) and serves it on GET /status', async () => {
+    const { deps } = await statusSetup(sql, clock, { STATUS_PUSH_TOKEN: STATUS_PUSH });
+    const app = createApp(deps);
+    const push = (checks: unknown) =>
+      app.request('/api/v1/internal/status/external', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${STATUS_PUSH}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ checks }),
+      });
+    // provider only on rpc, only the two known names.
+    expect((await push([{ name: 'web', ok: true, ms: 1, provider: 'helius' }])).status).toBe(400);
+    expect(
+      (await push([{ name: 'rpc', ok: true, ms: 1, provider: 'https://x/?api-key=k' }])).status,
+    ).toBe(400);
+    const rpcRow = async () => {
+      const body = (await (await app.request('/api/v1/status')).json()) as {
+        components: { id: string; state: string; provider: string | null }[];
+      };
+      return {
+        rpc: body.components.find((c) => c.id === 'rpc')!,
+        others: body.components.filter((c) => c.id !== 'rpc').map((c) => c.provider),
+      };
+    };
+    expect((await push([{ name: 'rpc', ok: true, ms: 80, provider: 'helius' }])).status).toBe(200);
+    let row = await rpcRow();
+    expect(row.rpc).toMatchObject({ state: 'operational', provider: 'helius' });
+    expect(row.others.every((p) => p === null)).toBe(true);
+    clock.now = new Date(clock.now.getTime() + 5 * 60_000);
+    expect((await push([{ name: 'rpc', ok: true, ms: 300, provider: 'public' }])).status).toBe(200);
+    row = await rpcRow();
+    // Public fallback answering keeps the RPC healthy.
+    expect(row.rpc).toMatchObject({ state: 'operational', provider: 'public' });
+    const [stored] = await sql<{ provider: string | null }[]>`
+      select provider from status_probes where component = 'rpc' order by id desc limit 1
+    `;
+    expect(stored!.provider).toBe('public');
+  });
+
   it('a short or default push token never opens the push route', async () => {
     for (const token of ['short', 'change-me-change-me-change-me-change-me']) {
       const { deps } = await statusSetup(sql, clock, { STATUS_PUSH_TOKEN: token });
